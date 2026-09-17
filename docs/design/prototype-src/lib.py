@@ -142,7 +142,7 @@ def shell(role, active, content, crumbs=None, title=None, sub=None, actions='', 
   <nav class="sidenav{' collapsed' if collapsed else ''}" aria-label="Main">
     <div class="navlabel">{ {'operator':'Operator','officer':'Licensing officer','admin':'Administration'}[role] }</div>
     {nav}
-    <div class="navfoot"><a href="Main.dc.html">Privacy</a> · <a href="Main.dc.html">Terms</a> · <a href="Main.dc.html">Accessibility</a><br>© 2026 PermitFlow (fictional prototype)</div>
+    <div class="navfoot"><a href="Main.dc.html">Privacy</a> · <a href="Main.dc.html">Terms</a> · <a href="Main.dc.html">Accessibility</a><br>© 2026 PermitFlow</div>
   </nav>
   <main class="main">
     {crumb_html}{head}

@@ -231,8 +231,15 @@ def _validate_field(f: FieldDef, value: Any) -> str | None:  # noqa: PLR0911 - o
     return None
 
 
-def validate_section(key: str, data: dict[str, Any]) -> dict[str, str]:
-    """Return {field_key: message} for every failing field; empty dict means valid."""
+REQUIRED_MESSAGES = frozenset({"This field is required.", "You must confirm this declaration."})
+
+
+def validate_section(key: str, data: dict[str, Any], *, allow_missing: bool = False) -> dict[str, str]:
+    """Return {field_key: message} for every failing field; empty dict means valid.
+
+    With `allow_missing=True` (saving a draft), absent or empty required fields are not errors:
+    only format and type problems are reported, so an operator can save and return later.
+    """
     section = get_section(key)
     if section is None:
         raise KeyError(key)
@@ -242,7 +249,7 @@ def validate_section(key: str, data: dict[str, Any]) -> dict[str, str]:
         errors[extra] = "Unknown field."
     for f in section.fields:
         msg = _validate_field(f, data.get(f.key))
-        if msg:
+        if msg and not (allow_missing and msg in REQUIRED_MESSAGES):
             errors[f.key] = msg
     return errors
 

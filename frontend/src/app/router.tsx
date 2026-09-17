@@ -1,51 +1,61 @@
-import { Navigate, createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter } from "react-router-dom";
 
-import { AppShell } from './AppShell'
-import { homeFor, useAuth } from '@/features/auth/AuthContext'
-import { LoginPage } from '@/features/auth/LoginPage'
-import { RequireRole } from '@/features/auth/RequireRole'
-import { AdminOverviewPage } from '@/features/admin/OverviewPage'
-import { OfficerQueuePage } from '@/features/officer/QueuePage'
-import { ApplicationPage } from '@/features/operator/ApplicationPage'
-import { OperatorDashboardPage } from '@/features/operator/DashboardPage'
-import { NotFoundPanel } from '@/features/shared/states'
-
-function Root() {
-  const { user, ready } = useAuth()
-  if (!ready) return null
-  return <Navigate to={user ? homeFor(user.role) : '/login'} replace />
-}
+import { AppShell } from "./AppShell";
+import { LoginPage } from "@/features/auth/LoginPage";
+import { LandingPage } from "@/features/landing/LandingPage";
+import { RequireRole } from "@/features/auth/RequireRole";
+import { AdminOverviewPage } from "@/features/admin/OverviewPage";
+import { OfficerQueuePage } from "@/features/officer/QueuePage";
+import { ApplicationPage } from "@/features/operator/ApplicationPage";
+import { FormPage } from "@/features/operator/FormPage";
+import { OperatorDashboardPage } from "@/features/operator/DashboardPage";
+import { NotFoundPanel } from "@/features/shared/states";
 
 export const router = createBrowserRouter([
-  { path: '/', element: <Root /> },
-  { path: '/login', element: <LoginPage /> },
+  { path: "/", element: <LandingPage /> },
+  { path: "/login", element: <LoginPage /> },
   {
-    element: <RequireRole roles={['operator']} />,
+    element: <RequireRole roles={["operator"]} />,
     children: [
       {
         element: <AppShell />,
         children: [
-          { path: '/app/dashboard', element: <OperatorDashboardPage /> },
-          { path: '/app/applications', element: <OperatorDashboardPage /> },
-          { path: '/app/applications/:id', element: <ApplicationPage /> },
+          { path: "/app/dashboard", element: <OperatorDashboardPage /> },
+          { path: "/app/applications", element: <OperatorDashboardPage /> },
+          { path: "/app/applications/:id", element: <ApplicationPage /> },
+          { path: "/app/applications/:id/form", element: <FormPage /> },
+          {
+            path: "/app/applications/:id/form/:sectionKey",
+            element: <FormPage />,
+          },
         ],
       },
     ],
   },
   {
-    element: <RequireRole roles={['officer']} />,
-    children: [{ element: <AppShell />, children: [{ path: '/officer/queue', element: <OfficerQueuePage /> }] }],
+    element: <RequireRole roles={["officer"]} />,
+    children: [
+      {
+        element: <AppShell />,
+        children: [{ path: "/officer/queue", element: <OfficerQueuePage /> }],
+      },
+    ],
   },
   {
-    element: <RequireRole roles={['admin']} />,
-    children: [{ element: <AppShell />, children: [{ path: '/admin/overview', element: <AdminOverviewPage /> }] }],
+    element: <RequireRole roles={["admin"]} />,
+    children: [
+      {
+        element: <AppShell />,
+        children: [{ path: "/admin/overview", element: <AdminOverviewPage /> }],
+      },
+    ],
   },
   {
-    path: '*',
+    path: "*",
     element: (
       <div className="mx-auto max-w-lg px-4 py-10">
         <NotFoundPanel backTo="/" backLabel="Back to PermitFlow" />
       </div>
     ),
   },
-])
+]);

@@ -20,7 +20,7 @@ uv run uvicorn app.main:app --reload   # http://localhost:8000/api/v1/health, do
 
 cd ../frontend
 npm install
-npm run dev                            # http://localhost:5173
+npm run dev                            # http://localhost:3000
 ```
 
 ## Demo accounts
@@ -32,7 +32,7 @@ npm run dev                            # http://localhost:5173
 | Operator | operator@permitflow.example.sg |
 | Licensing officer | officer@permitflow.example.sg |
 
-Sign in at http://localhost:5173/login. Each role lands in its own workspace; a URL for another role shows "Not available for your role" and the API answers 403.
+Sign in at http://localhost:3000/login. Each role lands in its own workspace; a URL for another role shows "Not available for your role" and the API answers 403.
 
 ## Security (so far)
 

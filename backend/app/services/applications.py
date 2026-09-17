@@ -2,9 +2,13 @@
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import Forbidden, NotFound, ValidationFailed
+from app.domain.editability import editable_targets
+from app.domain.form_schema import get_section, validate_section
 from app.models import Application, User
 from app.models.enums import ApplicationStatus, LicenceType
 from app.repositories.applications import ApplicationRepository
@@ -43,3 +47,29 @@ class ApplicationService:
 
     def get_for(self, user: User, application_id: uuid.UUID) -> Application:
         return self.applications.get_for(user, application_id)
+
+    def update_section(
+        self, operator: User, application_id: uuid.UUID, key: str, data: dict[str, Any]
+    ) -> Application:
+        """Save one section of the working copy (FR-002, FR-003).
+
+        The row is locked for the transaction; editability follows the state machine (403 outside the
+        editable set); format/type errors are 422 with per-field messages; in `draft`, missing required
+        fields are tolerated so a partial section can be saved and completed later.
+        """
+        if get_section(key) is None:
+            raise NotFound("Section not found.")
+        app = self.applications.get_for(operator, application_id, for_update=True)
+        sections, _ = editable_targets(app.status, set(), set())  # open feedback wired in US-018
+        if key not in sections:
+            raise Forbidden("This section is not open for changes.")
+        errors = validate_section(key, data, allow_missing=app.status == ApplicationStatus.DRAFT)
+        if errors:
+            raise ValidationFailed("Some fields need attention.", details={"fields": errors})
+        draft = dict(app.draft_data)
+        draft[key] = data
+        app.draft_data = draft
+        app.version += 1
+        self.db.commit()
+        self.db.refresh(app)
+        return app
