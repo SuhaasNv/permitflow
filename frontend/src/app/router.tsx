@@ -12,6 +12,7 @@ import { FormPage } from '@/features/operator/FormPage'
 import { ReviewPage } from '@/features/operator/ReviewPage'
 import { SubmittedPage } from '@/features/operator/SubmittedPage'
 import { OperatorDashboardPage } from '@/features/operator/DashboardPage'
+import { ApplicationsPage } from '@/features/operator/ApplicationsPage'
 import { NotFoundPanel } from '@/features/shared/states'
 
 export const router = createBrowserRouter([
@@ -24,7 +25,7 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { path: '/app/dashboard', element: <OperatorDashboardPage /> },
-          { path: '/app/applications', element: <OperatorDashboardPage /> },
+          { path: '/app/applications', element: <ApplicationsPage /> },
           { path: '/app/applications/:id', element: <ApplicationPage /> },
           { path: '/app/applications/:id/documents', element: <DocumentsPage /> },
           { path: '/app/applications/:id/review', element: <ReviewPage /> },

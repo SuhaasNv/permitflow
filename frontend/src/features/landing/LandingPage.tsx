@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 
 import { homeFor, useAuth } from '@/features/auth/AuthContext'
 import { buttonClasses } from '@/features/shared/Button'
@@ -102,7 +102,15 @@ function useScrolled(threshold = 12): boolean {
 export function LandingPage() {
   const { user, ready } = useAuth()
   const scrolled = useScrolled()
-  if (ready && user) return <Navigate to={homeFor(user.role)} replace />
+  const { hash } = useLocation()
+  useEffect(() => {
+    // Deep links such as /#how arrive before the sections render; scroll once they exist.
+    if (!hash) return
+    const el = document.getElementById(hash.slice(1))
+    el?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+  }, [hash])
+  // Signed-in users land in their workspace, unless they asked for a section of this page (for example /#how).
+  if (ready && user && !hash) return <Navigate to={homeFor(user.role)} replace />
   return (
     <div className="flex min-h-screen flex-col bg-surface text-text">
       <header
@@ -125,8 +133,8 @@ export function LandingPage() {
             <a href="#journey" className="hidden text-sm font-medium text-text-2 no-underline hover:text-text md:inline">
               Track your application
             </a>
-            <Link to="/login" className={buttonClasses('primary', 'sm', 'h-9 px-4')}>
-              Sign in
+            <Link to={user ? homeFor(user.role) : '/login'} className={buttonClasses('primary', 'sm', 'h-9 px-4')}>
+              {user ? 'Back to my workspace' : 'Sign in'}
             </Link>
           </nav>
         </div>
@@ -149,8 +157,8 @@ export function LandingPage() {
               office needs changes, you update only what was flagged. Nothing you entered is lost.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
-              <Link to="/login" className={buttonClasses('primary', 'lg')}>
-                Sign in to apply
+              <Link to={user ? homeFor(user.role) : '/login'} className={buttonClasses('primary', 'lg')}>
+                {user ? 'Back to my workspace' : 'Sign in to apply'}
               </Link>
               <a href="#how" className={buttonClasses('secondary', 'lg')}>
                 How it works
