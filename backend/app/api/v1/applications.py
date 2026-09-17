@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, File, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Body, File, Form, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import CurrentUser, DbSession, OperatorUser
@@ -12,6 +12,7 @@ from app.models import Application
 from app.services.applications import ApplicationService
 from app.services.documents import DocumentService
 from app.services.operator_view import document_view, operator_view, summary
+from app.services.verification import VerificationService, run_verification
 
 router = APIRouter(prefix="/applications")
 
@@ -66,10 +67,13 @@ def upload_document(
     db: DbSession,
     document_type: Annotated[DocumentType, Form()],
     file: Annotated[UploadFile, File()],
+    background: BackgroundTasks,
 ) -> UploadOut:
     result = DocumentService(db).upload(
         user, application_id, document_type, file.filename or "", file.content_type, file.file
     )
+    if result.run is not None and not result.unchanged:
+        background.add_task(run_verification, result.run.id)
     service = ApplicationService(db)
     return UploadOut(
         application=_view(service, result.application),
@@ -100,3 +104,23 @@ def download_document(
             "Content-Length": str(doc.size_bytes),
         },
     )
+
+
+@router.post(
+    "/{application_id}/documents/{document_id}/verify",
+    response_model=UploadOut,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def rerun_verification(
+    application_id: uuid.UUID,
+    document_id: uuid.UUID,
+    user: CurrentUser,
+    db: DbSession,
+    background: BackgroundTasks,
+) -> UploadOut:
+    run = VerificationService(db).rerun(user, application_id, document_id)
+    background.add_task(run_verification, run.id)
+    service = ApplicationService(db)
+    app = service.get_for(user, application_id)
+    doc = next(d for d, _ in service.documents_with_runs(app) if d.id == document_id)
+    return UploadOut(application=_view(service, app), document=document_view(doc, run), unchanged=False)
