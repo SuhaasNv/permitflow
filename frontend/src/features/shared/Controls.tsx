@@ -1,8 +1,8 @@
-import type { ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import { forwardRef, useId } from 'react'
 
 import { cn } from '@/lib/cn'
-import { inputClasses } from './Field'
+import { FieldLabel, FieldMessage, inputClasses } from './Field'
 
 interface Wrap {
   label: string
@@ -15,24 +15,11 @@ interface Wrap {
 function Labelled({ id, label, help, error, required, className, children }: Wrap & { id: string; children: ReactNode }) {
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <label htmlFor={id} className="text-[13px] font-semibold leading-[18px]">
+      <FieldLabel htmlFor={id} required={required}>
         {label}
-        {required ? (
-          <span className="ml-0.5 text-error" aria-hidden="true">
-            *
-          </span>
-        ) : null}
-      </label>
+      </FieldLabel>
       {children}
-      {error ? (
-        <div id={`${id}-error`} role="alert" className="text-[13px] font-medium text-error">
-          {error}
-        </div>
-      ) : help ? (
-        <div id={`${id}-help`} className="text-[13px] text-text-3">
-          {help}
-        </div>
-      ) : null}
+      <FieldMessage id={id} error={error} help={help} />
     </div>
   )
 }
@@ -57,7 +44,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
         aria-describedby={error ? `${selectId}-error` : help ? `${selectId}-help` : undefined}
         className={cn(
           inputClasses(Boolean(error)),
-          'appearance-none bg-[url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2716%27 height=%2716%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23465060%27 stroke-width=%272%27><path d=%27m6 9 6 6 6-6%27/></svg>")] bg-[length:16px] bg-[right_10px_center] bg-no-repeat pr-9',
+          'appearance-none bg-[url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2716%27 height=%2716%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23465060%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27><path d=%27m6 9 6 6 6-6%27/></svg>")] bg-[length:16px] bg-[right_10px_center] bg-no-repeat pr-9',
         )}
         {...rest}
       >
@@ -87,18 +74,19 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>
         id={areaId}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${areaId}-error` : help ? `${areaId}-help` : undefined}
-        className={cn(inputClasses(Boolean(error)), 'h-auto min-h-24 resize-y py-2.5')}
+        className={cn(inputClasses(Boolean(error)), 'h-auto min-h-24 resize-y py-2.5 leading-[22px]')}
         {...rest}
       />
     </Labelled>
   )
 })
 
-export interface CheckboxFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
+export interface CheckboxFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label: string
   error?: string
 }
 
+/** Custom-drawn checkbox: 18 px box, animated check, same focus ring as inputs. */
 export const CheckboxField = forwardRef<HTMLInputElement, CheckboxFieldProps>(function CheckboxField(
   { label, error, id, className, ...rest },
   ref,
@@ -107,20 +95,50 @@ export const CheckboxField = forwardRef<HTMLInputElement, CheckboxFieldProps>(fu
   const boxId = id ?? autoId
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <label htmlFor={boxId} className="flex items-start gap-2.5 text-sm">
-        <input
-          ref={ref}
-          id={boxId}
-          type="checkbox"
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? `${boxId}-error` : undefined}
-          className="mt-0.5 h-[18px] w-[18px] shrink-0 accent-primary"
-          {...rest}
-        />
-        <span>{label}</span>
+      <label
+        htmlFor={boxId}
+        className={cn(
+          'group flex cursor-pointer items-start gap-3 rounded-md border px-3.5 py-3 text-sm leading-[21px]',
+          'transition-[border-color,background-color] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
+          'has-[:checked]:border-line-strong has-[:checked]:bg-surface-2 has-[:disabled]:cursor-not-allowed',
+          error ? 'border-error-line bg-error-soft/40' : 'border-line hover:border-line-strong',
+        )}
+      >
+        <span className="relative mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+          <input
+            ref={ref}
+            id={boxId}
+            type="checkbox"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${boxId}-error` : undefined}
+            className={cn(
+              'peer h-[18px] w-[18px] cursor-pointer appearance-none rounded-[4px] border bg-surface',
+              'transition-[background-color,border-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
+              'checked:border-text checked:bg-text focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(23,92,211,0.2)]',
+              'disabled:cursor-not-allowed disabled:bg-surface-2',
+              error ? 'border-error' : 'border-line-strong group-hover:border-text-3',
+            )}
+            {...rest}
+          />
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="pointer-events-none absolute opacity-0 transition-opacity duration-[var(--dur-fast)] peer-checked:opacity-100"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </span>
+        <span className="text-text">{label}</span>
       </label>
       {error ? (
-        <div id={`${boxId}-error`} role="alert" className="text-[13px] font-medium text-error">
+        <div id={`${boxId}-error`} role="alert" className="pf-enter-fast text-[13px] font-medium text-error">
           {error}
         </div>
       ) : null}

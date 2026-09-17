@@ -9,6 +9,8 @@ import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
 import { CheckboxField, SelectField, TextAreaField } from '@/features/shared/Controls'
 import { Field } from '@/features/shared/Field'
+import { SaveIndicator } from '@/features/shared/SaveIndicator'
+import { useToast } from '@/features/shared/Toast'
 import type { SectionValues } from '@/lib/zodFromSchema'
 import { defaultsFor, sectionSchema, toPayload } from '@/lib/zodFromSchema'
 
@@ -17,7 +19,9 @@ export interface SectionFormProps {
   data: Record<string, unknown>
   editable: boolean
   saving: boolean
+  savedAt?: number | null
   isLast: boolean
+  stepLabel?: string
   onSave: (payload: Record<string, unknown>, andContinue: boolean) => Promise<void>
   onDirtyChange: (dirty: boolean) => void
 }
@@ -26,7 +30,17 @@ function fieldError(errors: Record<string, { message?: string } | undefined>, ke
   return errors[key]?.message
 }
 
-export function SectionForm({ section, data, editable, saving, isLast, onSave, onDirtyChange }: SectionFormProps) {
+export function SectionForm({
+  section,
+  data,
+  editable,
+  saving,
+  savedAt = null,
+  isLast,
+  stepLabel,
+  onSave,
+  onDirtyChange,
+}: SectionFormProps) {
   const draftSchema = sectionSchema(section, 'draft')
   const completeSchema = sectionSchema(section, 'complete')
   // The schema is built at runtime from the server definition, so its static type is a generic record.
@@ -36,6 +50,7 @@ export function SectionForm({ section, data, editable, saving, isLast, onSave, o
     defaultValues: defaultsFor(section, data),
     mode: 'onBlur',
   })
+  const toast = useToast()
   const [summary, setSummary] = useState<string[]>([])
   const [serverError, setServerError] = useState<string | null>(null)
   const summaryRef = useRef<HTMLDivElement>(null)
@@ -73,6 +88,7 @@ export function SectionForm({ section, data, editable, saving, isLast, onSave, o
       try {
         await onSave(toPayload(values), andContinue)
         form.reset(values)
+        if (!andContinue) toast.push({ title: 'Section saved', body: `${section.title} is saved as part of your draft.`, tone: 'success' })
       } catch (error) {
         if (error instanceof AppError && error.status === 422 && error.details && typeof error.details.fields === 'object') {
           const fields = error.details.fields as Record<string, string>
@@ -147,31 +163,33 @@ export function SectionForm({ section, data, editable, saving, isLast, onSave, o
   }
 
   return (
-    <form
-      noValidate
-      onSubmit={submit(true)}
-      className="rounded-lg border border-line bg-surface shadow-[var(--shadow-1)]"
-      aria-labelledby={`section-${section.key}`}
-    >
-      <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4">
-        <h2 id={`section-${section.key}`} className="text-base font-semibold">
-          {section.title}
-        </h2>
-        <span className="text-xs text-text-3">{section.description}</span>
+    <form noValidate onSubmit={submit(true)} className="pf-surface" aria-labelledby={`section-${section.key}`}>
+      <div className="flex flex-wrap items-start gap-x-4 gap-y-1 border-b border-line px-5 py-5 sm:px-7">
+        <div className="min-w-0 flex-1">
+          {stepLabel ? <div className="pf-eyebrow mb-1.5">{stepLabel}</div> : null}
+          <h2 id={`section-${section.key}`} className="text-[22px] font-semibold leading-7 tracking-[-0.01em]">
+            {section.title}
+          </h2>
+          {section.description ? <p className="mt-1 text-[14px] leading-5 text-text-2">{section.description}</p> : null}
+        </div>
         {!editable ? (
-          <span className="ml-auto rounded border border-neutral-line bg-neutral-soft px-2 text-xs font-medium text-text-3">Read-only</span>
+          <span className="mt-1 inline-flex h-6 items-center gap-1.5 rounded-full border border-neutral-line bg-neutral-soft px-2 text-xs font-medium text-text-2">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            Read-only
+          </span>
         ) : null}
       </div>
-      <div className="flex flex-col gap-4 p-5">
+      <div className="flex flex-col gap-5 px-5 py-6 sm:px-7">
         {summary.length > 0 ? (
-          <div ref={summaryRef} tabIndex={-1}>
-            <Alert tone="error">
-              <div>
-                <b>
-                  {summary.length} {summary.length === 1 ? 'field needs' : 'fields need'} attention before this section is complete.
-                </b>
-                <div className="mt-0.5 text-[13px]">{summary.join(' · ')}</div>
-              </div>
+          <div ref={summaryRef} tabIndex={-1} className="outline-none">
+            <Alert
+              tone="error"
+              title={`${summary.length} ${summary.length === 1 ? 'field needs' : 'fields need'} attention before this section is complete.`}
+            >
+              {summary.join(' · ')}
             </Alert>
           </div>
         ) : null}
@@ -180,11 +198,11 @@ export function SectionForm({ section, data, editable, saving, isLast, onSave, o
             <span>{serverError}</span>
           </Alert>
         ) : null}
-        <div className="grid gap-4 sm:grid-cols-2 sm:gap-x-5">{section.fields.map(render)}</div>
+        <div className="grid gap-5 sm:grid-cols-2 sm:gap-x-6">{section.fields.map(render)}</div>
       </div>
       {editable ? (
-        <div className="flex flex-wrap items-center justify-end gap-2 rounded-b-lg border-t border-line bg-surface-2 px-5 py-3">
-          <span className="mr-auto text-xs text-text-3">{dirty ? 'Unsaved changes' : 'All changes saved'}</span>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3.5 sm:px-7">
+          <SaveIndicator dirty={dirty} saving={saving} savedAt={savedAt} className="mr-auto" />
           <Button type="button" variant="secondary" onClick={submit(false)} disabled={saving}>
             Save section
           </Button>

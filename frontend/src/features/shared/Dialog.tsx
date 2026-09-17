@@ -15,7 +15,7 @@ export interface DialogProps {
   onCancel: () => void
 }
 
-/** Confirmation dialog: title as a question, consequence in plain language, one primary action. */
+/** Confirmation dialog: title as a question, consequence in plain language, one primary action. Enters with a 220 ms rise. */
 export function Dialog({ open, title, children, confirmLabel, cancelLabel = 'Cancel', danger, busy, onConfirm, onCancel }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
@@ -31,20 +31,20 @@ export function Dialog({ open, title, children, confirmLabel, cancelLabel = 'Can
         e.preventDefault()
         onCancel()
       }}
-      className="m-auto w-[min(520px,calc(100vw-32px))] rounded-lg border border-line bg-surface p-0 text-text shadow-[0_20px_48px_rgba(16,24,40,0.28)] backdrop:bg-[rgba(16,24,40,0.45)]"
+      className="pf-dialog m-auto w-[min(520px,calc(100vw-32px))] rounded-lg border border-line bg-surface p-0 text-text shadow-[var(--shadow-3)] backdrop:bg-[rgba(16,24,40,0.5)]"
       aria-labelledby="dialog-title"
     >
-      <div className="px-6 pb-2 pt-5">
-        <h2 id="dialog-title" className="text-xl font-semibold leading-7">
+      <div className="px-6 pb-2 pt-6">
+        <h2 id="dialog-title" className="text-[20px] font-semibold leading-7 tracking-[-0.01em]">
           {title}
         </h2>
       </div>
-      <div className="flex flex-col gap-3 px-6 pb-5 text-sm leading-[21px] text-text-2">{children}</div>
-      <div className="flex justify-end gap-2 border-t border-line bg-surface-2 px-6 py-3">
+      <div className="flex flex-col gap-3 px-6 pb-6 text-sm leading-[21px] text-text-2">{children}</div>
+      <div className="flex justify-end gap-2 border-t border-line bg-surface-2 px-6 py-3.5">
         <Button variant="ghost" onClick={onCancel} disabled={busy}>
           {cancelLabel}
         </Button>
-        <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy}>
+        <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy} autoFocus>
           {confirmLabel}
         </Button>
       </div>

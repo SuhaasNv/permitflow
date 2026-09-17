@@ -7,12 +7,29 @@ function Mark({ ok, warn }: { ok: boolean; warn?: boolean }) {
   return (
     <span
       className={cn(
-        'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px]',
-        ok ? 'bg-success text-white' : warn ? 'bg-error text-white' : 'border-[1.5px] border-line-strong bg-surface',
+        'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px] transition-colors duration-[var(--dur-base)]',
+        ok ? 'bg-success text-white' : warn ? 'bg-warning text-white' : 'border-[1.5px] border-line-strong bg-surface',
       )}
       aria-hidden="true"
     >
-      {ok ? '✓' : warn ? '!' : ''}
+      {ok ? (
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      ) : warn ? (
+        '!'
+      ) : (
+        ''
+      )}
     </span>
   )
 }
@@ -22,16 +39,18 @@ export function CompletionCard({ view }: { view: ApplicationView }) {
   const c = view.completeness
   const base = `/app/applications/${view.id}`
   return (
-    <section className="rounded-lg border border-line bg-surface shadow-[var(--shadow-1)]" aria-labelledby="completion-title">
-      <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-        <h2 id="completion-title" className="text-base font-semibold">
-          Completion
-        </h2>
-        <span className={cn('text-sm font-semibold tabular-nums', c.is_complete ? 'text-success' : 'text-text-2')}>{c.percent}%</span>
-      </div>
-      <div className="px-5 pt-4">
+    <section className="pf-surface" aria-labelledby="completion-title">
+      <div className="px-5 pt-5">
+        <div className="flex items-baseline justify-between">
+          <h2 id="completion-title" className="text-[15px] font-semibold">
+            Completion
+          </h2>
+          <span className={cn('font-mono text-[22px] font-medium tabular-nums leading-7', c.is_complete ? 'text-success' : 'text-text')}>
+            {c.percent}%
+          </span>
+        </div>
         <div
-          className="h-2 overflow-hidden rounded-sm bg-neutral-soft"
+          className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-3"
           role="progressbar"
           aria-valuenow={c.percent}
           aria-valuemin={0}
@@ -39,20 +58,23 @@ export function CompletionCard({ view }: { view: ApplicationView }) {
           aria-label="Application completion"
         >
           <div
-            className={cn('h-full rounded-sm transition-[width] duration-500', c.is_complete ? 'bg-success' : 'bg-primary')}
+            className={cn(
+              'h-full rounded-full transition-[width] duration-[600ms] ease-[var(--ease-out)]',
+              c.is_complete ? 'bg-success' : 'bg-text',
+            )}
             style={{ width: `${c.percent}%` }}
           />
         </div>
-        <p className="mt-2 text-xs text-text-3">
-          {c.sections_complete} of {c.sections_total} sections complete · {c.documents_present} of {c.documents_total} documents uploaded
+        <p className="mt-2.5 text-xs leading-[18px] text-text-3">
+          {c.sections_complete} of {c.sections_total} sections · {c.documents_present} of {c.documents_total} documents
         </p>
       </div>
-      <ul className="px-5 pb-2 pt-3">
+      <ul className="mt-4 divide-y divide-line border-t border-line px-5 pb-2">
         {view.sections.map((s) => (
-          <li key={s.key} className="flex items-center gap-2.5 border-b border-line py-2.5 text-sm">
+          <li key={s.key} className="flex items-center gap-2.5 py-2.5 text-sm">
             <Mark ok={s.complete} warn={s.started && !s.complete} />
-            <span>{s.title}</span>
-            <span className="ml-auto text-xs text-text-3">{s.complete ? 'Complete' : s.started ? 'Needs attention' : 'Not started'}</span>
+            <span className="min-w-0 flex-1 truncate">{s.title}</span>
+            <span className="text-xs text-text-3">{s.complete ? 'Complete' : s.started ? 'Needs attention' : 'Not started'}</span>
             {s.editable && !s.complete ? (
               <Link to={`${base}/form/${s.key}`} className="text-xs font-semibold">
                 {s.started ? 'Fix' : 'Start'}
@@ -61,10 +83,10 @@ export function CompletionCard({ view }: { view: ApplicationView }) {
           </li>
         ))}
         {view.document_slots.map((d) => (
-          <li key={d.type} className="flex items-center gap-2.5 border-b border-line py-2.5 text-sm last:border-b-0">
+          <li key={d.type} className="flex items-center gap-2.5 py-2.5 text-sm">
             <Mark ok={d.present} />
-            <span>{d.label}</span>
-            <span className="ml-auto text-xs text-text-3">{d.present ? 'Uploaded' : 'Missing'}</span>
+            <span className="min-w-0 flex-1 truncate">{d.label}</span>
+            <span className="text-xs text-text-3">{d.present ? 'Uploaded' : 'Missing'}</span>
             {d.editable && !d.present ? (
               <Link to={`${base}/documents`} className="text-xs font-semibold">
                 Upload
