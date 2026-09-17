@@ -35,3 +35,6 @@ uploads/
 *.docx
 *.pptx
 *.xlsx
+
+# Large design exports stay out of git (link to the canvas instead)
+docs/extra-images/*.pdf
