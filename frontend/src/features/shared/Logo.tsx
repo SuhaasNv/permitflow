@@ -1,12 +1,20 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 import { cn } from '@/lib/cn'
 
 /** Brand mark (docs/design/brand) + wordmark. The wordmark is never coloured red. */
 export function Logo({ inverted = false, className }: { inverted?: boolean; className?: string }) {
+  const { pathname } = useLocation()
   return (
     <Link
       to="/"
+      onClick={(e) => {
+        // Already on the landing page: scroll back to the top instead of a no-op navigation.
+        if (pathname !== '/') return
+        e.preventDefault()
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
+      }}
       className={cn(
         'flex items-center gap-2.5 no-underline',
         inverted ? 'text-white hover:text-white' : 'text-text hover:text-text',

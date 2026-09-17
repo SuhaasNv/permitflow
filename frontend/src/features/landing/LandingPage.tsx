@@ -1,18 +1,74 @@
+import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 
 import { homeFor, useAuth } from '@/features/auth/AuthContext'
 import { buttonClasses } from '@/features/shared/Button'
 import { Logo } from '@/features/shared/Logo'
+import { Reveal } from '@/features/shared/Reveal'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import type { Tone } from '@/features/shared/StatusBadge'
 import { cn } from '@/lib/cn'
 
-const NEED: [string, string][] = [
-  ['Business profile (ACRA)', 'Issued within the last 6 months'],
-  ['Floor plan of the premises', 'Showing the food preparation area'],
-  ['Signed tenancy agreement', 'Covering the full licence period'],
-  ['Food hygiene certificate', 'For the business or a named food handler'],
+const glyph = (children: ReactNode) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.6"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    {children}
+  </svg>
+)
+
+/** Document-type glyphs: semantic, one per required document, never decorative. */
+const NEED: { title: string; sub: string; icon: ReactNode }[] = [
+  {
+    title: 'Business profile (ACRA)',
+    sub: 'Issued within the last 6 months',
+    icon: glyph(
+      <>
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z" />
+        <path d="M14 2v6h6M8 13h8M8 17h5" />
+      </>,
+    ),
+  },
+  {
+    title: 'Floor plan of the premises',
+    sub: 'Showing the food preparation area',
+    icon: glyph(
+      <>
+        <rect x="3" y="3" width="18" height="18" rx="1.5" />
+        <path d="M3 12h9M12 3v9M12 12v9M12 12h9M16 21v-4" />
+      </>,
+    ),
+  },
+  {
+    title: 'Signed tenancy agreement',
+    sub: 'Covering the full licence period',
+    icon: glyph(
+      <>
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z" />
+        <path d="M14 2v6h6" />
+        <path d="M8 17c1-2 2-2 3 0s2 2 3 0 2-2 3 0" />
+      </>,
+    ),
+  },
+  {
+    title: 'Food hygiene certificate',
+    sub: 'For the business or a named food handler',
+    icon: glyph(
+      <>
+        <circle cx="12" cy="9" r="5.5" />
+        <path d="m9.5 13.5-1.5 7 4-2.2 4 2.2-1.5-7M9.8 9l1.6 1.6L14.3 7.6" />
+      </>,
+    ),
+  },
 ]
 
 const STEPS: [string, string][] = [
@@ -76,7 +132,7 @@ export function LandingPage() {
         </div>
       </header>
 
-      {/* Hero: full width, two columns, editorial display type. */}
+      {/* Hero: full width, two columns, editorial display type; the document panel sits on a tinted backdrop. */}
       <section className="relative overflow-hidden border-b border-line">
         <div
           className="pointer-events-none absolute inset-y-0 right-0 hidden w-[42%] border-l border-line bg-surface-2 lg:block"
@@ -115,61 +171,68 @@ export function LandingPage() {
               </div>
             </dl>
           </div>
-          <div id="need" className="pf-enter lg:pt-3" style={{ animationDelay: '160ms' }}>
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-text-3">What you need</h2>
-              <span className="text-xs text-text-3">4 documents</span>
+          <div id="need" className="pf-enter lg:self-center" style={{ animationDelay: '160ms' }}>
+            <div className="pf-surface overflow-hidden shadow-[var(--shadow-2)]">
+              <div className="flex items-center justify-between border-b border-line bg-surface-2 px-5 py-3.5">
+                <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-text-2">What you need</h2>
+                <span className="font-mono text-xs text-text-3">4 documents</span>
+              </div>
+              <ol className="pf-stagger divide-y divide-line">
+                {NEED.map((item, i) => (
+                  <li key={item.title} className="flex items-center gap-4 px-5 py-4">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-surface-3 text-text-2">
+                      {item.icon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-mono text-[11px] text-text-3">0{i + 1}</span>
+                        <span className="text-[15px] font-semibold leading-[22px]">{item.title}</span>
+                      </div>
+                      <div className="text-[13px] leading-[18px] text-text-2">{item.sub}</div>
+                    </div>
+                    <span className="rounded border border-line bg-surface px-1.5 font-mono text-[11px] leading-[18px] text-text-3">
+                      PDF
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <p className="border-t border-line bg-surface-2 px-5 py-3 text-[12px] leading-[18px] text-text-3">
+                PDF, PNG, JPG or TXT, up to 10 MB each. PDF is recommended: it is the only format the automatic check can read.
+              </p>
             </div>
-            <ol className="mt-4 divide-y divide-line border-y border-line">
-              {NEED.map(([title, sub], i) => (
-                <li key={title} className="flex items-start gap-4 py-4">
-                  <span className="mt-0.5 font-mono text-[13px] text-text-3">0{i + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[15px] font-semibold leading-[22px]">{title}</div>
-                    <div className="text-[13px] leading-[18px] text-text-2">{sub}</div>
-                  </div>
-                  <span className="mt-0.5 rounded border border-line bg-surface px-1.5 font-mono text-[11px] leading-[18px] text-text-3">
-                    PDF
-                  </span>
-                </li>
-              ))}
-            </ol>
-            <p className="mt-4 text-[13px] leading-[19px] text-text-3">
-              PDF, PNG, JPG or TXT, up to 10 MB each. PDF is recommended: it is the only format the automatic check can read.
-            </p>
           </div>
         </div>
       </section>
 
-      {/* How it works: four steps on a single rule. */}
+      {/* How it works: four steps on a single rule, revealed in sequence. */}
       <section id="how" className="border-b border-line bg-bg">
         <div className="mx-auto max-w-[1440px] px-5 py-16 sm:px-10 lg:py-20">
           <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-16">
-            <div>
+            <Reveal>
               <div className="pf-eyebrow mb-3">How it works</div>
               <h2 className="font-display text-[34px] leading-[1.1] sm:text-[40px]">Four steps, one record.</h2>
               <p className="mt-4 text-[15px] leading-[23px] text-text-2">
                 Every revision you submit, every comment from the licensing office and every status change stays with the application.
               </p>
-            </div>
+            </Reveal>
             <ol className="grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
               {STEPS.map(([title, desc], i) => (
-                <li key={title} className="relative border-t border-line-strong pt-5">
+                <Reveal key={title} as="li" delay={i * 90} className="relative border-t border-line-strong pt-5">
                   <span className="absolute -top-px left-0 h-px w-10 bg-primary" aria-hidden="true" />
                   <div className="mb-3 font-mono text-[13px] text-text-3">0{i + 1}</div>
                   <div className="mb-2 text-[17px] font-semibold leading-6">{title}</div>
                   <p className="text-sm leading-[21px] text-text-2">{desc}</p>
-                </li>
+                </Reveal>
               ))}
             </ol>
           </div>
         </div>
       </section>
 
-      {/* Journey: the status vocabulary as a horizontal line. */}
+      {/* Journey: the status vocabulary on a rule that draws itself as you scroll to it. */}
       <section id="journey" className="border-b border-line">
         <div className="mx-auto max-w-[1440px] px-5 py-16 sm:px-10 lg:py-20">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <Reveal className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="pf-eyebrow mb-3">Track your application</div>
               <h2 className="font-display text-[34px] leading-[1.1] sm:text-[40px]">Always know where it stands.</h2>
@@ -177,48 +240,55 @@ export function LandingPage() {
             <p className="max-w-[46ch] text-[15px] leading-[23px] text-text-2">
               Each status tells you whether anything is needed from you. Amber means the licensing office is waiting for you.
             </p>
-          </div>
-          <ol className="mt-10 grid gap-6 sm:grid-cols-3 lg:grid-cols-6">
-            {JOURNEY.map((s, i) => (
-              <li key={s.label} className="relative pt-5">
-                <span className="absolute left-0 top-0 h-px w-full bg-line" aria-hidden="true" />
-                <span
-                  className={cn(
-                    'absolute -top-[3px] left-0 h-[7px] w-[7px] rounded-full',
-                    i === JOURNEY.length - 1 ? 'bg-success' : 'bg-line-strong',
-                  )}
-                  aria-hidden="true"
-                />
-                <StatusBadge label={s.label} tone={s.tone} />
-                <p className="mt-2.5 text-[13px] leading-[18px] text-text-2">{s.note}</p>
-              </li>
-            ))}
-          </ol>
+          </Reveal>
+          <Reveal as="div" threshold={0.35} className="relative mt-10">
+            <span className="absolute left-0 top-0 hidden h-px w-full bg-line lg:block" aria-hidden="true" />
+            <span className="pf-journey-line absolute left-0 top-0 hidden h-px w-full bg-ink lg:block" aria-hidden="true" />
+            <ol className="grid gap-6 sm:grid-cols-3 lg:grid-cols-6">
+              {JOURNEY.map((s, i) => (
+                <li key={s.label} className="relative pt-5" style={{ transitionDelay: `${200 + i * 180}ms` }}>
+                  <span className="absolute left-0 top-0 h-px w-full bg-line lg:hidden" aria-hidden="true" />
+                  <span
+                    className={cn(
+                      'pf-journey-dot absolute -top-[4px] left-0 h-[9px] w-[9px] rounded-full ring-4 ring-surface',
+                      i === JOURNEY.length - 1 ? 'bg-success' : s.tone === 'warning' ? 'bg-warning' : 'bg-ink',
+                    )}
+                    style={{ transitionDelay: `${260 + i * 200}ms` }}
+                    aria-hidden="true"
+                  />
+                  <div className="pf-reveal is-in" style={{ transitionDelay: `${300 + i * 200}ms` }}>
+                    <StatusBadge label={s.label} tone={s.tone} />
+                    <p className="mt-2.5 text-[13px] leading-[18px] text-text-2">{s.note}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </Reveal>
         </div>
       </section>
 
       {/* Advisory AI: what the checks do and do not do. */}
       <section className="bg-ink text-white">
         <div className="mx-auto grid max-w-[1440px] gap-10 px-5 py-16 sm:px-10 lg:grid-cols-2 lg:gap-20 lg:py-20">
-          <div>
+          <Reveal>
             <div className="pf-eyebrow mb-3 text-[#aeb6c2]">Automatic document checks</div>
             <h2 className="font-display text-[34px] leading-[1.1] sm:text-[40px]">Checks help you. Officers decide.</h2>
-          </div>
+          </Reveal>
           <dl className="grid gap-8 text-[15px] leading-[23px] sm:grid-cols-2">
-            <div className="border-t border-white/20 pt-4">
+            <Reveal delay={100} className="border-t border-white/20 pt-4">
               <dt className="mb-2 font-semibold">What the check does</dt>
               <dd className="text-[#c5cbd3]">
                 Reads each PDF you upload, picks out the business name, UEN, address and dates, and compares them with your form. It tells
                 you plainly when something differs.
               </dd>
-            </div>
-            <div className="border-t border-white/20 pt-4">
+            </Reveal>
+            <Reveal delay={200} className="border-t border-white/20 pt-4">
               <dt className="mb-2 font-semibold">What it never does</dt>
               <dd className="text-[#c5cbd3]">
                 Approve, reject or change your application. Every decision is made by a licensing officer, who sees the same findings and
                 the evidence behind them.
               </dd>
-            </div>
+            </Reveal>
           </dl>
         </div>
       </section>

@@ -51,7 +51,7 @@ Three families, each with one job: Public Sans carries every control, label and 
 
 ## Motion
 
-Tokens in `frontend/src/styles/index.css`: `--ease-out` cubic-bezier(0.2, 0, 0, 1), `--dur-fast` 150 ms (hover, focus, press), `--dur-base` 220 ms (dialogs, rail collapse, badge tone change), `--dur-slow` 320 ms (page and panel entrance). Utilities: `.pf-enter` (6 px rise + fade, keyed on the route in `AppShell`), `.pf-stagger` (children enter 40 ms apart), `.pf-check` (check mark draws itself), skeleton shimmer 1.4 s, toast in 320 / out 220 ms, verification progress steps advance every 700 ms while the server run is pending. Buttons settle 1 px on press. `prefers-reduced-motion` collapses every animation and transition to 1 ms.
+Tokens in `frontend/src/styles/index.css`: `--ease-out` cubic-bezier(0.2, 0, 0, 1), `--dur-fast` 150 ms (hover, focus, press), `--dur-base` 220 ms (dialogs, rail collapse, badge tone change), `--dur-slow` 320 ms (page and panel entrance). Utilities: `.pf-enter` (6 px rise + fade, keyed on the route in `AppShell`), `.pf-stagger` (children enter 40 ms apart), `.pf-check` (check mark draws itself), skeleton shimmer 1.4 s, toast in 320 / out 220 ms, verification progress steps advance every 700 ms while the server run is pending. Buttons: a tone sweeps in behind the label on hover (primary from the left, secondary from below, ghost from the centre) and the button settles 1 px on press. Landing: `Reveal` fades sections up 16 px over 640 ms as they enter the viewport; the status journey rule draws left to right over 1.4 s and its dots pop in sequence; the logo scrolls back to the top when already on the landing page. `prefers-reduced-motion` collapses every animation and transition to 1 ms.
 
 ## Status badge vocabulary (as rendered)
 
