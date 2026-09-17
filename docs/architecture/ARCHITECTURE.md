@@ -6,7 +6,7 @@ A modular monolith (ADR-001): one FastAPI backend, one React frontend, one Postg
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│ Browser (React 18 + TypeScript, Vite, Tailwind)                    │
+│ Browser (React 19 + TypeScript strict, Vite, Tailwind v4)          │
 │  pages/ ─▶ features/ (hooks: TanStack Query) ─▶ api/ (typed client)│
 │  Auth context (JWT in memory + sessionStorage)                     │
 └──────────────┬─────────────────────────────────────────────────────┘
@@ -202,5 +202,5 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 
 ## Deployment
 
-- Local: `docker compose up db` + `uvicorn` + `vite`; or full compose with all three.
-- Railway: `backend` service from `backend/Dockerfile` with a volume at `/data/uploads`; Postgres plugin; `frontend` static service built from `frontend/` with `VITE_API_URL`. See `docs/operations/OPERATIONS.md`.
+- Local: `docker compose up db` (PostgreSQL only; the API and the frontend run natively with `uvicorn` and `vite`) or `docker compose --profile full up` to also run the API container. A local database is kept because the test suite truncates tables between tests and because a reviewer must be able to run the system from a clean clone without any hosted credentials (NFR-001).
+- Railway, two environments: `development` deploys from the `dev` branch and `production` from `main` (see `docs/operations/BRANCHING.md`). Each has its own PostgreSQL and its own variables. Per environment: `backend` service from `backend/Dockerfile` with a volume at `/data/uploads`, `frontend` static service built from `frontend/` with `VITE_API_URL`. See `docs/operations/OPERATIONS.md`.

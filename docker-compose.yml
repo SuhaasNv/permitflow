@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: permitflow-db
+    environment:
+      POSTGRES_USER: permitflow
+      POSTGRES_PASSWORD: permitflow
+      POSTGRES_DB: permitflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U permitflow -d permitflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: permitflow-backend
+    profiles: ["full"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://permitflow:permitflow@db:5432/permitflow
+      UPLOAD_DIR: /data/uploads
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:
