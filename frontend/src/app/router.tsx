@@ -9,6 +9,8 @@ import { OfficerQueuePage } from '@/features/officer/QueuePage'
 import { ApplicationPage } from '@/features/operator/ApplicationPage'
 import { DocumentsPage } from '@/features/operator/DocumentsPage'
 import { FormPage } from '@/features/operator/FormPage'
+import { ReviewPage } from '@/features/operator/ReviewPage'
+import { SubmittedPage } from '@/features/operator/SubmittedPage'
 import { OperatorDashboardPage } from '@/features/operator/DashboardPage'
 import { NotFoundPanel } from '@/features/shared/states'
 
@@ -25,6 +27,8 @@ export const router = createBrowserRouter([
           { path: '/app/applications', element: <OperatorDashboardPage /> },
           { path: '/app/applications/:id', element: <ApplicationPage /> },
           { path: '/app/applications/:id/documents', element: <DocumentsPage /> },
+          { path: '/app/applications/:id/review', element: <ReviewPage /> },
+          { path: '/app/applications/:id/submitted', element: <SubmittedPage /> },
           { path: '/app/applications/:id/form', element: <FormPage /> },
           {
             path: '/app/applications/:id/form/:sectionKey',

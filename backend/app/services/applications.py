@@ -14,6 +14,7 @@ from app.models.enums import ApplicationStatus, LicenceType
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
+from app.repositories.revisions import RevisionRepository
 
 
 class ApplicationService:
@@ -22,6 +23,7 @@ class ApplicationService:
         self.applications = ApplicationRepository(db)
         self.audit = AuditRepository(db)
         self.documents = DocumentRepository(db)
+        self.revisions = RevisionRepository(db)
 
     def create(self, operator: User) -> Application:
         """One transaction: application row + `application.created` audit event (AUD-005)."""
@@ -80,3 +82,6 @@ class ApplicationService:
         docs = self.documents.current_for(app.id)
         runs = self.documents.latest_runs([d.id for d in docs])
         return [(d, runs.get(d.id)) for d in docs]
+
+    def revision_count(self, app: Application) -> int:
+        return self.revisions.count_for(app.id)
