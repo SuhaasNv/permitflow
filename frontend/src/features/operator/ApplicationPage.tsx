@@ -5,6 +5,7 @@ import { PageHeader } from '@/features/shared/PageHeader'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import { ErrorPanel, NotFoundPanel, Skeleton } from '@/features/shared/states'
 import { formatDate } from '@/lib/format'
+import { CompletionCard } from './CompletionCard'
 import { useApplication } from './queries'
 
 export function ApplicationPage() {
@@ -55,26 +56,38 @@ export function ApplicationPage() {
         <span className="text-sm text-text-2">{view.status_explanation}</span>
         <span className="ml-auto text-xs tabular-nums text-text-3">Created {formatDate(view.created_at)}</span>
       </div>
-      <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-        {view.sections.map((s) => (
-          <li key={s.key} className="rounded-lg border border-line bg-surface p-4">
+      <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {view.sections.map((s) => (
+            <li key={s.key} className="rounded-lg border border-line bg-surface p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-semibold">{s.title}</div>
+                {s.editable ? (
+                  <Link to={`/app/applications/${id}/form/${s.key}`} className="text-[13px] font-semibold">
+                    {s.started ? 'Edit' : 'Start'}
+                  </Link>
+                ) : null}
+              </div>
+              <div className="text-[13px] text-text-3">{s.description}</div>
+              <div className="mt-2 text-xs text-text-2">{s.complete ? 'Complete' : s.started ? 'Needs attention' : 'Not started'}</div>
+            </li>
+          ))}
+          <li className="rounded-lg border border-line bg-surface p-4 sm:col-span-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="font-semibold">{s.title}</div>
-              {s.editable ? (
-                <Link to={`/app/applications/${id}/form/${s.key}`} className="text-[13px] font-semibold">
-                  {s.started ? 'Edit' : 'Start'}
+              <div className="font-semibold">Documents</div>
+              {view.can_edit ? (
+                <Link to={`/app/applications/${id}/documents`} className="text-[13px] font-semibold">
+                  Manage
                 </Link>
               ) : null}
             </div>
-            <div className="text-[13px] text-text-3">{s.description}</div>
-            <div className="mt-2 text-xs text-text-2">{s.complete ? 'Complete' : s.started ? 'Needs attention' : 'Not started'}</div>
+            <div className="mt-2 text-xs text-text-2">
+              {view.completeness.documents_present} of {view.completeness.documents_total} required documents uploaded
+            </div>
           </li>
-        ))}
-      </ul>
-      <p className="mt-4 text-[13px] text-text-3">
-        {view.completeness.sections_complete} of {view.completeness.sections_total} sections complete ·{' '}
-        {view.completeness.documents_present} of {view.completeness.documents_total} documents uploaded ({view.completeness.percent}%)
-      </p>
+        </ul>
+        <CompletionCard view={view} />
+      </div>
     </>
   )
 }
