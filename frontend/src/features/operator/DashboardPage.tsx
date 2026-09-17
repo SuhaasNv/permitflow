@@ -241,12 +241,9 @@ function WhatYouNeed() {
           </li>
         ))}
       </ol>
-      <div className="flex items-center justify-between border-t border-line px-5 py-3 text-xs leading-[18px] text-text-3">
-        <span>PDF recommended · up to 10 MB each</span>
-        <Link to="/#how" className="font-semibold text-text-2 no-underline hover:text-text">
-          How it works
-        </Link>
-      </div>
+      <p className="border-t border-line px-5 py-3 text-xs leading-[18px] text-text-3">
+        PDF is recommended: it is the only format the automatic check can read. Up to 10 MB each.
+      </p>
     </section>
   )
 }
