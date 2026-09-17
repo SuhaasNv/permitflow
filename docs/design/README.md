@@ -1,8 +1,10 @@
 # PermitFlow: Design documentation
 
-Status: written (UI/UX design phase, 17–18 Sep 2026, after solutioning and before implementation). These documents explain how the engineering design in `docs/architecture/` and `docs/requirements/` becomes a usable interface. They do not restate requirements; they reference requirement and use-case IDs.
+Status: written (UI/UX design phase, 17 to 18 Sep 2026, after solutioning and before implementation) and updated at the Sprint 1 close with an as-built record. These documents explain how the engineering design in `docs/architecture/` and `docs/requirements/` becomes a usable interface. They do not restate requirements; they reference requirement and use-case IDs.
 
 **Prototype (clickable, browser):** https://claude.ai/artifact/LzFbAsy985c3EvA14yXbyj: 19 artboards on one canvas (design system, operator journey, operator resubmission, officer journey, admin concept, two phone screens). Links between artboards follow the real workflow: sign in as a persona → create → form → documents → review → submit → officer queue → review → request resubmission → operator responds → officer reviews Revision 2 → compare → audit. Every screen uses fictional Singapore data (Kopi & Kaya Toast House Pte. Ltd., PF-2026-000214, Jalan Besar).
+
+**As built (Sprint 1 close, 18 Sep 2026):** https://claude.ai/artifact/MzKLsdXJ5USLi6Xidob941: every shipped screen captured from the running product at 1440 and 390, reverse-engineered into colour, type, components, motion and the deliberate departures from prototype v3 (typography, single surfaces, dashboard split, application header, stepper, motion, red usage, landing width). The PNG captures are in `screens/as-built/`. Officer screens will be captured when Sprint 2 ships them.
 
 | Document | Purpose |
 |----------|---------|
