@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import type { DocumentSlotView } from '@/api/applications'
 import { AppError } from '@/api/client'
-import { deleteDocument, downloadDocument, uploadDocument, validateFile } from '@/api/documents'
+import { deleteDocument, downloadDocument, rerunVerification, uploadDocument, validateFile } from '@/api/documents'
 import type { UploadResult } from '@/api/documents'
 import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
@@ -75,6 +75,20 @@ export function DocumentSlot({ applicationId, slot, canDelete, onUploaded, onDel
         phase: 'error',
         message: error instanceof Error ? error.message : 'Upload failed. Try again.',
       })
+    }
+  }
+
+  const RERUNNABLE = new Set(['verified', 'issues_found', 'needs_review', 'unreadable', 'failed', 'unavailable'])
+  const rerun = async () => {
+    if (!doc) return
+    setBusy(true)
+    try {
+      onUploaded(await rerunVerification(applicationId, doc.id))
+      setState({ phase: 'idle' })
+    } catch (error) {
+      setState({ phase: 'error', message: error instanceof AppError ? error.message : 'Could not re-run the check.' })
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -167,6 +181,11 @@ export function DocumentSlot({ applicationId, slot, canDelete, onUploaded, onDel
           <Button variant="ghost" size="sm" onClick={() => void downloadDocument(applicationId, doc.id, doc.original_filename)}>
             Download
           </Button>
+          {doc.verification && RERUNNABLE.has(doc.verification.status) ? (
+            <Button variant="ghost" size="sm" loading={busy} onClick={() => void rerun()}>
+              Re-run check
+            </Button>
+          ) : null}
           {slot.editable ? (
             <label className="inline-flex h-8 cursor-pointer items-center rounded-md border border-line-strong bg-surface px-3 text-[13px] font-semibold text-text shadow-[var(--shadow-1)] hover:bg-surface-2">
               Replace file

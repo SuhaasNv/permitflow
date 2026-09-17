@@ -124,3 +124,7 @@ export async function downloadDocument(applicationId: string, documentId: string
   a.click()
   URL.revokeObjectURL(url)
 }
+
+export function rerunVerification(applicationId: string, documentId: string): Promise<UploadResult> {
+  return request<UploadResult>(`/applications/${applicationId}/documents/${documentId}/verify`, { method: 'POST' })
+}

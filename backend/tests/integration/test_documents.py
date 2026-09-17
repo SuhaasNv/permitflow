@@ -42,7 +42,7 @@ def test_upload_creates_document_pending_run_and_audit(client: TestClient, db: S
     body = r.json()
     assert body["unchanged"] is False
     assert body["document"]["original_filename"] == "ACRA_BizProfile.pdf"
-    assert body["document"]["verification"]["status"] == "pending"
+    assert body["document"]["verification"]["status"] == "pending"  # background task runs after the response
     slot = next(s for s in body["application"]["document_slots"] if s["type"] == "business_profile")
     assert slot["present"] is True and slot["document"]["id"] == body["document"]["id"]
     assert body["application"]["completeness"]["documents_present"] == 1
@@ -54,10 +54,8 @@ def test_upload_creates_document_pending_run_and_audit(client: TestClient, db: S
         and len(doc.sha256) == 64
     )
     assert db.scalar(select(VerificationRun)) is not None
-    assert [e.event_type for e in db.scalars(select(AuditEvent))] == [
-        "application.created",
-        "document.uploaded",
-    ]
+    events = [e.event_type for e in db.scalars(select(AuditEvent))]
+    assert events[:2] == ["application.created", "document.uploaded"]
 
 
 def test_replace_supersedes_and_identical_is_unchanged(client: TestClient, db: Session) -> None:

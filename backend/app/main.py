@@ -27,6 +27,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     settings.validate_for_startup()
     configure_logging()
+    if settings.app_env != "test":
+        from app.services.verification import mark_stale_runs_failed
+
+        try:
+            n = mark_stale_runs_failed()
+            if n:
+                logger.warning("stale_runs_marked_failed", extra={"extra_fields": {"count": n}})
+        except Exception:  # noqa: BLE001 - startup must not depend on this housekeeping
+            logger.exception("stale_run_cleanup_failed")
     yield
 
 
