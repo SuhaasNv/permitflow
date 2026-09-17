@@ -1,6 +1,6 @@
 # PermitFlow — AI Document Verification Design
 
-Status: design (solutioning phase). Governing decisions: ADR-004 (asynchronous, in-process), ADR-006 (advisory, structured, validated, replaceable). Vocabulary and issue codes: `docs/architecture/DOMAIN_MODEL.md` (VerificationRun).
+Status: implemented in Sprint 1 with the mock provider (`backend/app/services/verification.py`, `backend/app/infra/ai/`, `backend/app/domain/verification_rules.py`); the OpenAI provider is exercised in Sprint 2. Governing decisions: ADR-004 (asynchronous, in-process), ADR-006 (advisory, structured, validated, replaceable). Vocabulary and issue codes: `docs/architecture/DOMAIN_MODEL.md` (VerificationRun).
 
 ## Purpose
 

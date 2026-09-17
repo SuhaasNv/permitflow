@@ -6,7 +6,7 @@ A modular monolith (ADR-001): one FastAPI backend, one React frontend, one Postg
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│ Browser (React 18 + TypeScript, Vite, Tailwind)                    │
+│ Browser (React 19 + TypeScript strict, Vite, Tailwind v4)          │
 │  pages/ ─▶ features/ (hooks: TanStack Query) ─▶ api/ (typed client)│
 │  Auth context (JWT in memory + sessionStorage)                     │
 └──────────────┬─────────────────────────────────────────────────────┘
@@ -49,7 +49,7 @@ api  ──▶  services  ──▶  domain
 
 Rules:
 - `api` never touches `repositories` or `models` directly; it calls services and maps exceptions to HTTP.
-- `domain` is pure Python: no SQLAlchemy, no FastAPI, no I/O. It contains the state machine, labels, form schema, diff and resolution rules — the code a reviewer should read first.
+- `domain` is pure Python: no SQLAlchemy, no FastAPI, no I/O. It contains the enumerations (`domain/enums.py`, re-exported by `models/enums.py` for the persistence layer), the state machine (`domain/workflow.py`: transition table, guards, `available_actions` for the UI), labels (`domain/labels.py`: the assessment table verbatim plus the badge tone), form schema, diff and resolution rules — the code a reviewer should read first.
 - `services` orchestrate: load via repositories, apply domain rules, mutate, write audit events, create notifications, commit. One service method = one transaction.
 - `infra.ai` exposes `VerificationProvider`; `services.verification` is the only caller. No other module imports `infra.ai`.
 - A unit test enforces the two most important rules (routers do not import repositories; domain does not import SQLAlchemy/FastAPI).
@@ -136,7 +136,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /applications/{id}/documents | operator (own) | upload / replace by type |
 | DELETE | /applications/{id}/documents/{doc_id} | operator (own) | remove a document while in `draft` only |
 | GET | /applications/{id}/documents/{doc_id}/download | owner, officer or admin | file; the document must belong to `{id}` |
-| POST | /applications/{id}/documents/{doc_id}/verify | owner or officer | re-run verification (only when the latest run is terminal) |
+| POST | /applications/{id}/documents/{doc_id}/verify | owner or officer | re-run verification (only when the latest run is terminal); 202 |
 | GET | /applications/{id}/revisions | owner, officer or admin | list revisions |
 | GET | /applications/{id}/revisions/{n} | owner, officer or admin | snapshot |
 | GET | /applications/{id}/compare?from=n&to=m | owner, officer or admin | field and document diff |
@@ -202,5 +202,5 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 
 ## Deployment
 
-- Local: `docker compose up db` + `uvicorn` + `vite`; or full compose with all three.
-- Railway: `backend` service from `backend/Dockerfile` with a volume at `/data/uploads`; Postgres plugin; `frontend` static service built from `frontend/` with `VITE_API_URL`. See `docs/operations/OPERATIONS.md`.
+- Local: `docker compose up db` (PostgreSQL only; the API and the frontend run natively with `uvicorn` and `vite`) or `docker compose --profile full up` to also run the API container. A local database is kept because the test suite truncates tables between tests and because a reviewer must be able to run the system from a clean clone without any hosted credentials (NFR-001).
+- Railway, two environments: `development` deploys from the `dev` branch and `production` from `main` (see `docs/operations/BRANCHING.md`). Each has its own PostgreSQL and its own variables. Per environment: `backend` service from `backend/Dockerfile` with a volume at `/data/uploads`, `frontend` static service built from `frontend/` with `VITE_API_URL`. See `docs/operations/OPERATIONS.md`.

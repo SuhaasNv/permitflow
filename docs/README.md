@@ -35,7 +35,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `design/FRONTEND_ARCHITECTURE.md` | written | Folder layout, routing, query keys, forms, uploads, responsive breakpoints, motion, a11y |
 | `design/UI_REQUIREMENTS_TRACEABILITY.md` | written | Use case / requirement / story → screen |
 | `design/brand/` | written | Logo mark (SVG), monochrome mark, horizontal lockup, usage notes |
-| `design/screens/` | written | Rendered PNG of every artboard (for review without the canvas) |
+| `design/screens/` | written | Rendered PNG of every prototype artboard; `screens/as-built/` holds captures of the shipped screens at the Sprint 1 close |
 
 ## Security
 | Document | Status | Purpose |
@@ -63,12 +63,13 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 |----------|--------|---------|
 | `testing/TEST_STRATEGY.md` | to be written (Day 3) | Layers, what each layer protects, how to run |
 | `uat/UAT_PLAN.md` | to be written (Day 3) | Acceptance scenarios and results on the deployed URL |
-| `operations/OPERATIONS.md` | to be written (Day 3) | Setup, env vars, health, deploy, failure modes, rollback |
+| `operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
+| `operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |
 | `reviews/PRODUCTION_READINESS_REVIEW.md` | to be written (Day 3) | Honest gap list with severity |
 | `reviews/ASSESSMENT_TRACEABILITY.md` | to be written (Day 3) | Brief requirement → implementation → test → evidence |
 | `reviews/FINAL_REVIEW.md` | to be written (Day 3) | What we built, tradeoffs, what AI got wrong |
-| `../CHANGELOG.md` | to be written (from Sprint 1 close) | Milestones and sprint closes |
-| `../README.md` | to be written (Day 3, skeleton from Day 1) | Setup and overview |
+| `../CHANGELOG.md` | written (Sprint 1 closed 18 Sep 2026) | Milestones, sprint closes with Shipped / Slipped / Retro |
+| `../README.md` | written (skeleton, grows per story) | Setup and overview |
 
 ## Review history
 - 18 Sep 2026 — UI/UX design phase: two independent design-critique passes on the prototype (pass 1 scored 6.6/10 with 11 rendering bugs and 15 fixes; all applied; pass 2 results recorded in `design/UI_DESIGN.md`). Scope changes from the phase: public landing page (M1, FR-031), admin user management (S7, FR-030, US-073, T19), upload validation and hash-based duplicate detection made explicit (M3, SEC-005).

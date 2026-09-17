@@ -22,12 +22,17 @@ Rendered on the "Design system" artboard of the prototype. Values become Tailwin
 
 Contrast: all `text*`, `success`, `warning`, `error`, `info`, `primary` ≥ 4.5:1 on white and on their soft backgrounds.
 
-## Type scale (Public Sans; IBM Plex Mono for identifiers)
+## Type scale (Public Sans for UI; Instrument Serif for display; IBM Plex Mono for identifiers)
+
+Three families, each with one job: Public Sans carries every control, label and body line; Instrument Serif (regular only, tight leading) is reserved for display moments that address the person rather than the task (landing hero, sign-in, dashboard greeting, "Application submitted"); IBM Plex Mono marks identifiers and ordinal numbers (`01`, references, counts).
 
 | Style | Size / line | Weight | Use |
 |-------|-------------|--------|-----|
-| Display | 40 / 48 | 600 | landing hero only |
-| Page title | 26 / 32 | 600 | one per screen |
+| Display serif | 44 to 72 / 1.02 | 400, Instrument Serif | landing hero; 34 to 40 for landing section titles |
+| Greeting serif | 36 to 42 / 1.05 | 400, Instrument Serif | dashboard greeting, sign-in title, submitted title |
+| Page title | 28 / 36, tracking -0.015em | 600 | one per screen |
+| Form section title | 22 / 28 | 600 | section form header |
+| Section heading | 17 / 24 | 600 | review summaries, side panels |
 | Section title | 20 / 28 | 600 | dialogs, design-system sections |
 | Subsection | 16 / 24 | 600 | card headers, form sections |
 | Body | 15 / 22 | 400 | default |
@@ -41,8 +46,12 @@ Contrast: all `text*`, `success`, `warning`, `error`, `info`, `primary` ≥ 4.5:
 
 - Spacing scale: 4, 8, 12, 16, 20, 24, 32, 40. Page padding 24×32; card padding 20; card header 14×20; table cell 14×16.
 - Radius: 4 (tags), 6 (controls, small cards), 10 (containers), 12 (badges pill).
-- Elevation: `shadow-1` 0 1 2 rgba(16,24,40,.06) for cards; `shadow-2` 0 4 12 .10 for popovers/toast; dialogs 0 20 48 .28.
-- Layout: top bar 56; side nav 232; section rail 240; officer feedback rail 400; max content width follows viewport (1280 design width).
+- Elevation: `shadow-1` (1 px hairline) only on secondary buttons; panels are one bordered white surface (`.pf-surface`) with no shadow; `shadow-2` for toasts; `shadow-3` for dialogs. Never a card inside a card: hierarchy comes from rules (`divide-y`), whitespace and type.
+- Layout: masthead 28; top bar 56 (sticky, blurred); side nav 232, collapsed 64 (width animates 220 ms); bottom tab bar 64 on phones; content column max 1360 with 16 / 32 / 40 px gutters; officer feedback rail 400.
+
+## Motion
+
+Tokens in `frontend/src/styles/index.css`: `--ease-out` cubic-bezier(0.2, 0, 0, 1), `--dur-fast` 150 ms (hover, focus, press), `--dur-base` 220 ms (dialogs, rail collapse, badge tone change), `--dur-slow` 320 ms (page and panel entrance). Utilities: `.pf-enter` (6 px rise + fade, keyed on the route in `AppShell`), `.pf-stagger` (children enter 40 ms apart), `.pf-check` (check mark draws itself), skeleton shimmer 1.4 s, toast in 320 / out 220 ms, verification progress steps advance every 700 ms while the server run is pending. Buttons: a tone sweeps in behind the label on hover (primary from the left, secondary from below, ghost from the centre) and the button settles 1 px on press. Landing: `Reveal` fades sections up 16 px over 640 ms as they enter the viewport; the status journey rule draws left to right over 1.4 s and its dots pop in sequence; the logo scrolls back to the top when already on the landing page. `prefers-reduced-motion` collapses every animation and transition to 1 ms.
 
 ## Status badge vocabulary (as rendered)
 

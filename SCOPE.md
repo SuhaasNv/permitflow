@@ -52,7 +52,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 
 | # | Feature |
 |---|---------|
-| C1 | Operator dashboard summary cards (counts by status) |
+| C1 | Operator dashboard summary (counts by status) · **done in Sprint 1** as a one-line summary and grouped work cards, not KPI tiles |
 | C2 | Officer assignment (assign application to an officer) |
 | C3 | Image OCR for document verification (currently images are marked "not extractable") |
 | C4 | Download all documents as a bundle |
@@ -94,6 +94,10 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 ## Design phase (17–18 Sep 2026)
 
 A UI/UX design phase was run between solutioning and implementation: design direction, design system, clickable prototype (23 artboards) and design documentation in `docs/design/`. It changed no MUST item; it added the public landing page to M1, expanded S7 with user management, and fixed the upload validation wording in M3.
+
+## Sprint 1 check (18 Sep 2026)
+
+Re-read at the Sprint 1 close: M1 to M7 and M16, M17 are built for the operator side; M18 (tests) and M19 (CI skeleton) are partial by plan; nothing was added to or removed from MUST; S2 (re-run check) and S3 (delete while draft) landed with M3/M4; C1 landed as part of the dashboard redesign. No scope change.
 
 ## What "done" means for this MVP
 
