@@ -18,7 +18,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  */
 export const buttonClasses = (variant: Variant = 'primary', size: Size = 'md', extra = ''): string =>
   cn(
-    'inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-semibold no-underline',
+    'pf-btn inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-semibold no-underline',
     'transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
     'active:translate-y-px active:duration-75',
     'disabled:pointer-events-none disabled:border-line disabled:bg-neutral-soft disabled:text-text-3 disabled:shadow-none',
@@ -26,10 +26,10 @@ export const buttonClasses = (variant: Variant = 'primary', size: Size = 'md', e
     size === 'sm' && 'h-8 px-3 text-[13px]',
     size === 'lg' && 'h-12 px-6 text-[15px]',
     variant === 'primary' &&
-      'border-transparent bg-primary text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)] hover:bg-primary-hover hover:text-white',
+      'pf-btn-primary border-transparent bg-primary text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)] hover:text-white',
     variant === 'secondary' &&
-      'border-line-strong bg-surface text-text shadow-[var(--shadow-1)] hover:border-text-3 hover:bg-surface-2 hover:text-text',
-    variant === 'ghost' && 'border-transparent bg-transparent text-text-2 hover:bg-neutral-soft hover:text-text',
+      'pf-btn-secondary border-line-strong bg-surface text-text shadow-[var(--shadow-1)] hover:border-text-3 hover:text-text',
+    variant === 'ghost' && 'pf-btn-ghost border-transparent bg-transparent text-text-2 hover:text-text',
     variant === 'danger' && 'border-line-strong bg-surface text-text-2 hover:border-error-line hover:bg-error-soft hover:text-error',
     extra,
   )
