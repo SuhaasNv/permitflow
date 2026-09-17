@@ -1,6 +1,7 @@
 """Application settings, read once from the environment (NFR-005)."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
@@ -8,7 +9,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # Repository-root .env first, then a backend-local .env if present (later files win).
+    model_config = SettingsConfigDict(
+        env_file=(str(Path(__file__).resolve().parents[3] / ".env"), ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     app_env: Literal["development", "test", "production"] = "development"
     database_url: str = "postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow"

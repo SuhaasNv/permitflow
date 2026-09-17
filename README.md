@@ -15,12 +15,28 @@ docker compose up -d db          # PostgreSQL 16 on localhost:5432 (+ permitflow
 cd backend
 uv sync
 uv run alembic upgrade head
+uv run python scripts/seed.py           # demo accounts, see below
 uv run uvicorn app.main:app --reload   # http://localhost:8000/api/v1/health, docs at /api/docs
 
 cd ../frontend
 npm install
 npm run dev                            # http://localhost:5173
 ```
+
+## Demo accounts
+
+`scripts/seed.py` creates two accounts (idempotent). Password for both: the value of `SEED_PASSWORD`, default `PermitFlow!2026`.
+
+| Role | Email |
+|------|-------|
+| Operator | operator@permitflow.example.sg |
+| Licensing officer | officer@permitflow.example.sg |
+
+Sign in at http://localhost:5173/login. Each role lands in its own workspace; a URL for another role shows "Not available for your role" and the API answers 403.
+
+## Security (so far)
+
+Argon2 password hashes; JWT access tokens (8 h) with the role claim, re-checked against the user row on every request; failed-login rate limit 10 per minute per IP (429); generic 401 for wrong email or password; security headers and CORS allowlist; the app refuses to start without `JWT_SECRET` outside the test environment.
 
 ## Tests and checks
 
