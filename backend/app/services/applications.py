@@ -9,10 +9,11 @@ from sqlalchemy.orm import Session
 from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.domain.editability import editable_targets
 from app.domain.form_schema import get_section, validate_section
-from app.models import Application, User
+from app.models import Application, Document, User, VerificationRun
 from app.models.enums import ApplicationStatus, LicenceType
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
+from app.repositories.documents import DocumentRepository
 
 
 class ApplicationService:
@@ -20,6 +21,7 @@ class ApplicationService:
         self.db = db
         self.applications = ApplicationRepository(db)
         self.audit = AuditRepository(db)
+        self.documents = DocumentRepository(db)
 
     def create(self, operator: User) -> Application:
         """One transaction: application row + `application.created` audit event (AUD-005)."""
@@ -73,3 +75,8 @@ class ApplicationService:
         self.db.commit()
         self.db.refresh(app)
         return app
+
+    def documents_with_runs(self, app: Application) -> list[tuple[Document, VerificationRun | None]]:
+        docs = self.documents.current_for(app.id)
+        runs = self.documents.latest_runs([d.id for d in docs])
+        return [(d, runs.get(d.id)) for d in docs]

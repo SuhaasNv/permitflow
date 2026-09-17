@@ -5,13 +5,15 @@ from app.api.v1.applications_schemas import (
     ApplicationSummaryOut,
     CompletenessView,
     DocumentSlotView,
+    DocumentView,
     SectionView,
+    VerificationView,
 )
 from app.domain import completeness as completeness_rules
 from app.domain.enums import ApplicationStatus, DocumentType
 from app.domain.form_schema import SECTIONS
 from app.domain.labels import operator_label, tone_for
-from app.models import Application
+from app.models import Application, Document, VerificationRun
 
 LICENCE_TITLE = "Food Establishment Licence"
 
@@ -73,15 +75,43 @@ def summary(
     )
 
 
+def document_view(
+    doc: Document, run: VerificationRun | None, replaces: Document | None = None
+) -> DocumentView:
+    verification = None
+    if run is not None:
+        # Operators see the outcome and a plain explanation; confidence is officer-only (design decision).
+        verification = VerificationView(
+            status=run.status.value,
+            summary=run.summary,
+            issues=[{k: v for k, v in i.items() if k != "evidence"} for i in run.issues],
+            missing_information=list(run.missing_information),
+            error_reason=run.error_reason,
+            finished_at=run.finished_at,
+        )
+    return DocumentView(
+        id=doc.id,
+        document_type=doc.document_type.value,
+        original_filename=doc.original_filename,
+        content_type=doc.content_type,
+        size_bytes=doc.size_bytes,
+        uploaded_at=doc.uploaded_at,
+        replaces_filename=replaces.original_filename if replaces else None,
+        verification=verification,
+    )
+
+
 def operator_view(
     app: Application,
     *,
-    present_types: set[DocumentType] | None = None,
+    documents: list[tuple[Document, VerificationRun | None]] | None = None,
     editable_sections: set[str] | None = None,
     editable_document_types: set[DocumentType] | None = None,
     revision_count: int = 0,
 ) -> ApplicationOperatorView:
-    comp = completeness_rules.compute(app.draft_data, _present_types(app, present_types))
+    documents = documents or []
+    docs_by_type = {d.document_type: (d, r) for d, r in documents}
+    comp = completeness_rules.compute(app.draft_data, set(docs_by_type))
     editable_sections = editable_sections or set()
     editable_document_types = editable_document_types or set()
     sections = [
@@ -97,12 +127,18 @@ def operator_view(
         )
         for s, state in zip(SECTIONS, comp.sections, strict=True)
     ]
-    slots = [
-        DocumentSlotView(
-            type=d.type.value, label=d.label, present=d.present, editable=d.type in editable_document_types
+    slots = []
+    for d in comp.documents:
+        pair = docs_by_type.get(d.type)
+        slots.append(
+            DocumentSlotView(
+                type=d.type.value,
+                label=d.label,
+                present=d.present,
+                editable=d.type in editable_document_types,
+                document=document_view(pair[0], pair[1]) if pair else None,
+            )
         )
-        for d in comp.documents
-    ]
     return ApplicationOperatorView(
         id=app.id,
         reference_no=app.reference_no,
