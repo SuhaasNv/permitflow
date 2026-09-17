@@ -233,7 +233,7 @@ def landing():
     </div>
     <p class="muted" style="margin-top:20px;max-width:640px">Every application keeps a complete record: each revision you submitted, every comment from the licensing office, and when each status changed.</p>
   </div></section>
-  <footer class="land-foot" style="border-top:1px solid var(--line);margin-top:auto"><div class="wrap row" style="gap:24px;width:100%"><span>© 2026 PermitFlow (fictional prototype)</span><a href="Landing.dc.html">Privacy</a><a href="Landing.dc.html">Terms of use</a><a href="Landing.dc.html">Accessibility</a><a href="Landing.dc.html">Contact</a><a href="OfficerQueue.dc.html" style="margin-left:auto">Staff sign-in</a></div></footer>
+  <footer class="land-foot" style="border-top:1px solid var(--line);margin-top:auto"><div class="wrap row" style="gap:24px;width:100%"><span>© 2026 PermitFlow</span><a href="Landing.dc.html">Privacy</a><a href="Landing.dc.html">Terms of use</a><a href="Landing.dc.html">Accessibility</a><a href="Landing.dc.html">Contact</a><a href="OfficerQueue.dc.html" style="margin-left:auto">Staff sign-in</a></div></footer>
 </div>"""
     return page(body, 1280, 1720, 'Landing page')
 

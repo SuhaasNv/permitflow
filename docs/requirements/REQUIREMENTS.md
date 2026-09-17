@@ -10,7 +10,7 @@ Scope status per requirement is tracked in `SCOPE.md` and, at the end, in `docs/
 |----|-------------|----------------|
 | FR-001 | An operator can create a new licence application (single licence type: Food Establishment Licence). | UC1 Initial Submission; licence type is an engineering assumption |
 | FR-002 | The application form is divided into named sections; each section has typed fields with validation (required, format, length). | UC1 "Complete form data entry" |
-| FR-003 | An operator can save a draft and return to it later. | Implied by UC1 progress indicator; engineering assumption |
+| FR-003 | An operator can save a draft and return to it later. A section can be saved while required fields are still empty (only format and type errors block a draft save); completeness and submission require every required field. | Implied by UC1 progress indicator; engineering assumption |
 | FR-004 | An operator can upload documents by drag-and-drop (and by file picker), each tagged with a document type from a required-documents list. | UC1 "Document uploads with drag-and-drop" |
 | FR-005 | Each uploaded document shows an AI verification status (pending, running, verified, issues found, needs review, unreadable, failed, unavailable — defined in `docs/architecture/DOMAIN_MODEL.md`) that updates without a page reload. | UC1 "Real-time AI verification status visible per uploaded document" |
 | FR-006 | The form shows an overall completion progress indicator (sections complete, required documents uploaded). | UC1 "Progress indicator" |

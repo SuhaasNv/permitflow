@@ -1,57 +1,113 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from "react-router-dom";
 
-import { AppError } from '@/api/client'
-import { PageHeader } from '@/features/shared/PageHeader'
-import { StatusBadge } from '@/features/shared/StatusBadge'
-import { ErrorPanel, NotFoundPanel, Skeleton } from '@/features/shared/states'
-import { formatDate } from '@/lib/format'
-import { useApplication } from './queries'
+import { AppError } from "@/api/client";
+import { PageHeader } from "@/features/shared/PageHeader";
+import { StatusBadge } from "@/features/shared/StatusBadge";
+import { ErrorPanel, NotFoundPanel, Skeleton } from "@/features/shared/states";
+import { formatDate } from "@/lib/format";
+import { useApplication } from "./queries";
 
 export function ApplicationPage() {
-  const { id = '' } = useParams()
-  const app = useApplication(id)
+  const { id = "" } = useParams();
+  const app = useApplication(id);
 
   if (app.isPending) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading application">
+      <div
+        className="flex flex-col gap-3"
+        aria-busy="true"
+        aria-label="Loading application"
+      >
         <Skeleton className="h-8 w-1/2" />
         <Skeleton className="h-4 w-1/3" />
         <Skeleton className="mt-4 h-24 w-full" />
       </div>
-    )
+    );
   }
   if (app.isError) {
     if (app.error instanceof AppError && app.error.status === 404) {
-      return <NotFoundPanel backTo="/app/dashboard" backLabel="Back to my applications" />
+      return (
+        <NotFoundPanel
+          backTo="/app/dashboard"
+          backLabel="Back to my applications"
+        />
+      );
     }
-    return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
+    return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />;
   }
-  const view = app.data
+  const view = app.data;
   return (
     <>
-      <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-2 text-[13px] text-text-3">
+      <nav
+        aria-label="Breadcrumb"
+        className="mb-3 flex items-center gap-2 text-[13px] text-text-3"
+      >
         <Link to="/app/dashboard" className="text-text-2">
           My applications
         </Link>
         <span aria-hidden="true">›</span>
         <span className="text-text">{view.reference_no}</span>
       </nav>
-      <PageHeader title={`${view.reference_no} · ${view.licence_title}`} subtitle={view.status_explanation} />
+      <PageHeader
+        title={`${view.reference_no} · ${view.licence_title}`}
+        subtitle={view.status_explanation}
+        actions={
+          view.can_edit ? (
+            <Link
+              to={`/app/applications/${id}/form`}
+              className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-semibold text-white no-underline hover:bg-primary-hover hover:text-white"
+            >
+              Continue application
+            </Link>
+          ) : undefined
+        }
+      />
       <div className="flex flex-wrap items-center gap-4 rounded-lg border border-line bg-surface px-5 py-3.5 shadow-[var(--shadow-1)]">
-        <StatusBadge label={view.status_label} tone={view.status_tone} size="lg" />
+        <StatusBadge
+          label={view.status_label}
+          tone={view.status_tone}
+          size="lg"
+        />
         <span className="text-sm text-text-2">{view.status_explanation}</span>
-        <span className="ml-auto text-xs tabular-nums text-text-3">Created {formatDate(view.created_at)}</span>
+        <span className="ml-auto text-xs tabular-nums text-text-3">
+          Created {formatDate(view.created_at)}
+        </span>
       </div>
       <ul className="mt-5 grid gap-3 sm:grid-cols-2">
         {view.sections.map((s) => (
-          <li key={s.key} className="rounded-lg border border-line bg-surface p-4">
-            <div className="font-semibold">{s.title}</div>
+          <li
+            key={s.key}
+            className="rounded-lg border border-line bg-surface p-4"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-semibold">{s.title}</div>
+              {s.editable ? (
+                <Link
+                  to={`/app/applications/${id}/form/${s.key}`}
+                  className="text-[13px] font-semibold"
+                >
+                  {s.started ? "Edit" : "Start"}
+                </Link>
+              ) : null}
+            </div>
             <div className="text-[13px] text-text-3">{s.description}</div>
-            <div className="mt-2 text-xs text-text-2">{s.complete ? 'Complete' : s.started ? 'Needs attention' : 'Not started'}</div>
+            <div className="mt-2 text-xs text-text-2">
+              {s.complete
+                ? "Complete"
+                : s.started
+                  ? "Needs attention"
+                  : "Not started"}
+            </div>
           </li>
         ))}
       </ul>
-      <p className="mt-4 text-[13px] text-text-3">The form editor arrives with the next story (US-011).</p>
+      <p className="mt-4 text-[13px] text-text-3">
+        {view.completeness.sections_complete} of{" "}
+        {view.completeness.sections_total} sections complete ·{" "}
+        {view.completeness.documents_present} of{" "}
+        {view.completeness.documents_total} documents uploaded (
+        {view.completeness.percent}%)
+      </p>
     </>
-  )
+  );
 }

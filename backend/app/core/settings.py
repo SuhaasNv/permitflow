@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     jwt_expires_minutes: int = 480
 
-    cors_origins: str = "http://localhost:5173"
+    cors_origins: str = "http://localhost:3000"
 
     upload_dir: str = "./data/uploads"
     upload_max_bytes: int = 10 * 1024 * 1024

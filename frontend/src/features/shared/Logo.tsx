@@ -1,9 +1,13 @@
-import { Link } from 'react-router-dom'
+import { Link } from "react-router-dom";
 
 /** Brand mark (docs/design/brand) + wordmark. Never coloured red in the wordmark. */
 export function Logo() {
   return (
-    <Link to="/" className="flex items-center gap-2.5 text-text no-underline hover:text-text" aria-label="PermitFlow home">
+    <Link
+      to="/"
+      className="flex items-center gap-2.5 text-text no-underline hover:text-text"
+      aria-label="PermitFlow home"
+    >
       <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
         <rect width="32" height="32" rx="7" fill="#A8192A" />
         <path
@@ -16,7 +20,9 @@ export function Logo() {
         />
       </svg>
       <span className="text-base font-bold tracking-tight">PermitFlow</span>
-      <span className="hidden border-l border-line pl-2.5 text-xs text-text-3 sm:inline">Licensing Services</span>
+      <span className="hidden border-l border-line pl-2.5 text-xs text-text-3 sm:inline">
+        Licensing Services
+      </span>
     </Link>
-  )
+  );
 }
