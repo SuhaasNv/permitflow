@@ -42,12 +42,22 @@ export function ApplicationPage() {
         subtitle={view.status_explanation}
         actions={
           view.can_edit ? (
-            <Link
-              to={`/app/applications/${id}/form`}
-              className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-semibold text-white no-underline hover:bg-primary-hover hover:text-white"
-            >
-              Continue application
-            </Link>
+            <>
+              {view.can_submit ? (
+                <Link
+                  to={`/app/applications/${id}/review`}
+                  className="inline-flex h-10 items-center rounded-md border border-line-strong bg-surface px-4 text-sm font-semibold text-text no-underline shadow-[var(--shadow-1)] hover:bg-surface-2"
+                >
+                  Review and submit
+                </Link>
+              ) : null}
+              <Link
+                to={`/app/applications/${id}/form`}
+                className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-semibold text-white no-underline hover:bg-primary-hover hover:text-white"
+              >
+                Continue application
+              </Link>
+            </>
           ) : undefined
         }
       />

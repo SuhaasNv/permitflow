@@ -12,6 +12,7 @@ from app.models import Application
 from app.services.applications import ApplicationService
 from app.services.documents import DocumentService
 from app.services.operator_view import document_view, operator_view, summary
+from app.services.submission import SubmissionService
 from app.services.verification import VerificationService, run_verification
 
 router = APIRouter(prefix="/applications")
@@ -24,6 +25,7 @@ def _view(service: ApplicationService, app: Application) -> ApplicationOperatorV
         documents=service.documents_with_runs(app),
         editable_sections=sections,
         editable_document_types=doc_types,
+        revision_count=service.revision_count(app),
     )
 
 
@@ -31,7 +33,11 @@ def _view(service: ApplicationService, app: Application) -> ApplicationOperatorV
 def list_applications(user: OperatorUser, db: DbSession) -> list[ApplicationSummaryOut]:
     service = ApplicationService(db)
     return [
-        summary(a, present_types={d.document_type for d, _ in service.documents_with_runs(a)})
+        summary(
+            a,
+            present_types={d.document_type for d, _ in service.documents_with_runs(a)},
+            revision_count=service.revision_count(a),
+        )
         for a in service.list_for(user)
     ]
 
@@ -46,6 +52,14 @@ def create_application(user: OperatorUser, db: DbSession) -> ApplicationOperator
 def get_application(application_id: uuid.UUID, user: OperatorUser, db: DbSession) -> ApplicationOperatorView:
     service = ApplicationService(db)
     return _view(service, service.get_for(user, application_id))
+
+
+@router.post("/{application_id}/submit", response_model=ApplicationOperatorView)
+def submit_application(
+    application_id: uuid.UUID, user: OperatorUser, db: DbSession
+) -> ApplicationOperatorView:
+    app = SubmissionService(db).submit(user, application_id)
+    return _view(ApplicationService(db), app)
 
 
 @router.patch("/{application_id}/sections/{key}", response_model=ApplicationOperatorView)

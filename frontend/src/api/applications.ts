@@ -73,3 +73,7 @@ export function createApplication(): Promise<ApplicationView> {
 export function getApplication(id: string): Promise<ApplicationView> {
   return request<ApplicationView>(`/applications/${id}`)
 }
+
+export function submitApplication(id: string): Promise<ApplicationView> {
+  return request<ApplicationView>(`/applications/${id}/submit`, { method: 'POST' })
+}

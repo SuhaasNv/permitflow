@@ -66,7 +66,7 @@ export function DocumentsPage() {
             Back to form
           </Link>
           <Link
-            to={`/app/applications/${id}`}
+            to={`/app/applications/${id}/review`}
             className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-semibold text-white no-underline hover:bg-primary-hover hover:text-white"
           >
             Review and submit
