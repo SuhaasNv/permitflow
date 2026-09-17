@@ -4,6 +4,8 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 
 ## Sprint 1 (in progress, 18 Sep 2026)
 
+- US-010 Create application: `POST /applications` creates a draft with a sequential reference (`PF-<year>-<n>`, migration `0002`) and an `application.created` audit event in the same transaction; `GET /applications` (own only) and `GET /applications/{id}` (other operators' applications look like 404); `GET /form-schema`; operator view serializer with role label, tone, plain-language explanation, sections, document slots, editability and completeness; pure-domain form schema with server-side validation and completeness rules; dashboard with list, empty/loading/error states and "New application".
+
 - US-030 Role-specific status labels and the state machine: `domain/labels.py` (assessment table verbatim, tested row by row; badge tone), `domain/workflow.py` (every transition from STATE_MACHINE.md with actors and guards, reject from every non-terminal post-submission state, `available_actions` with disabled reasons), 528 parametrised tests covering every (state, target, actor) combination; `StatusBadge` component that renders the served label and never maps codes.
 
 - US-001 Login per persona: `POST /auth/login` (argon2, JWT with role claim, generic 401, 429 after 10 failed attempts per IP), `GET /auth/me`, role guards (`require_role`) that re-check the user row per request, seed script for operator and officer; frontend login page (Zod validation, error states), session in memory + sessionStorage with server re-validation, `RequireRole` guard, role home routing, app shell with masthead, collapsible side rail and mobile drawer, "Not available for your role" and not-found panels.
