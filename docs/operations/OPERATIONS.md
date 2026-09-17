@@ -1,0 +1,44 @@
+# PermitFlow: operations guide
+
+Status: growing with each story. Everything here describes what exists in the code today.
+
+## Local setup
+
+See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend). `docker compose up -d db` starts PostgreSQL 16 and creates two databases on first start: `permitflow` (development) and `permitflow_test` (pytest). `docker compose --profile full up` also builds and runs the backend container with a volume at `/data/uploads`.
+
+## Environment variables
+
+| Variable | Default | Used by | Notes |
+|----------|---------|---------|-------|
+| `APP_ENV` | `development` | backend | `development`, `test` or `production`. `test` selects `TEST_DATABASE_URL`, disables the login rate limiter and relaxes the JWT secret check. |
+| `DATABASE_URL` | local Postgres | backend | Postgres only (`postgresql+psycopg://`). |
+| `TEST_DATABASE_URL` | local `permitflow_test` | pytest, CI | Truncated between tests. |
+| `JWT_SECRET` | empty | backend | Required (≥ 16 chars) outside `APP_ENV=test`; the app refuses to start otherwise. |
+| `JWT_EXPIRES_MINUTES` | `480` | backend | 8 hours. |
+| `CORS_ORIGINS` | `http://localhost:5173` | backend | Comma separated allowlist. |
+| `UPLOAD_DIR` | `./data/uploads` | backend | Local disk storage; Railway volume at `/data/uploads`. |
+| `UPLOAD_MAX_BYTES` | `10485760` | backend | 10 MB. |
+| `LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | backend | Failed attempts per IP per minute. |
+| `AI_PROVIDER` | `mock` | backend | `mock` or `openai`. |
+| `OPENAI_API_KEY` | empty | backend | Required when `AI_PROVIDER=openai`. |
+| `OPENAI_MODEL` | `gpt-4o-mini` | backend | |
+| `AI_TIMEOUT_SECONDS` | `30` | backend | Per call. |
+| `AI_CONFIDENCE_THRESHOLD` | `0.6` | backend | Below this, `verified` becomes `needs_review`. |
+| `AI_MAX_TEXT_CHARS` | `20000` | backend | Extraction cap sent to the provider. |
+| `VITE_API_URL` | `http://localhost:8000/api/v1` | frontend | Build-time. |
+
+## Health
+
+`GET /api/v1/health` → `200 {"status":"ok","database":"ok"}` or `503 {"status":"degraded","database":"unreachable"}`. Provider configuration is never exposed here.
+
+## Logs
+
+JSON lines on stdout: one `request` line per request with `request_id`, method, path, status, duration and user id. The request id is echoed in the `X-Request-ID` response header and shown to users on 500 responses. No payloads or document text are logged.
+
+## Migrations
+
+`cd backend && uv run alembic upgrade head`. New migration: `uv run alembic revision --autogenerate -m "<what>"`, then review the file. The container image runs `alembic upgrade head` on start.
+
+## Deployment (planned, US-007)
+
+Two Railway environments: `development` (deploys from `dev`) and `production` (deploys from `main`), each with its own PostgreSQL and its own variables. Backend from `backend/Dockerfile` with a volume at `/data/uploads`; frontend as a static site built with `VITE_API_URL` pointing at that environment's API.

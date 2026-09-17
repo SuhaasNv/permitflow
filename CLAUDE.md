@@ -60,7 +60,7 @@ Board: "PermitFlow — Xtremax Assessment". Stories data source `collection://0a
 7. Any scope change → `SCOPE.md` (MUST/SHOULD/COULD/DEFERRED) the moment it is decided.
 8. AI prompt or provider change → `docs/ai/` and later `AI_USAGE.md`.
 9. `CHANGELOG.md` entry for meaningful milestones (not every commit).
-10. Commit with a conventional message (`feat:`, `fix:`, `test:`, `docs:`, `chore:`): short subject (≤ 50 chars), conclusive, body only when the "why" is not obvious. Never mention Claude, AI tools or add attribution trailers. Never `git push` without telling the user first and getting a yes in that turn.
+10. Work on a `feat/us-<id>-<slug>` branch from `dev` and merge it into `dev` with `--no-ff` (`docs/operations/BRANCHING.md`); `main` only receives releases. Commit with a conventional message (`feat:`, `fix:`, `test:`, `docs:`, `chore:`): short subject (≤ 50 chars), conclusive, body only when the "why" is not obvious. Never mention Claude, AI tools or add attribution trailers. Never `git push` without telling the user first and getting a yes in that turn.
 
 Then prompt the user with a one-line status: what is Done, what is next, and anything they must decide.
 
