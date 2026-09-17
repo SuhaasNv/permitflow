@@ -20,9 +20,8 @@ export function OfficerQueuePage() {
         subtitle="Submitted applications, newest activity first. Amber rows are waiting on the operator; blue rows are waiting on you."
       />
       <EmptyPanel
-        done
-        title="You are all caught up"
-        description="No applications currently require review. New submissions and resubmissions appear here as soon as they arrive."
+        title="The queue list is not available yet"
+        description="Submitted applications will be listed here from Sprint 2 (US-020). Nothing on this screen is hidden or filtered."
         footnote={`Last checked ${formatRelative(checkedAt)}`}
       />
     </>
