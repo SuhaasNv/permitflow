@@ -1,0 +1,36 @@
+sequenceDiagram
+    autonumber
+    title UC2-B Officer reviews a resubmission, compares and resolves
+    actor Ofc as Officer
+    participant UI as React SPA
+    participant API as FastAPI (api → services)
+    participant DF as domain.diff
+    participant WF as domain.workflow
+    participant DB as PostgreSQL
+
+    Ofc->>UI: open notification "Pre-Site Resubmitted"
+    UI->>API: GET /officer/applications/{id}
+    API->>DB: load revisions N-1 and N, feedback, documents
+    API->>DF: diff(rev N-1, rev N)
+    DF-->>API: changed sections + document changes
+    API-->>UI: officer view with "Changed" markers, feedback states (open / addressed)
+
+    Ofc->>UI: Compare with previous
+    UI->>API: GET /applications/{id}/compare?from=N-1&to=N
+    API->>DF: diff(from, to)
+    API-->>UI: field-level old/new, documents added/removed/replaced
+
+    Ofc->>UI: mark feedback item Resolved
+    UI->>API: POST /officer/applications/{id}/feedback/{fid}/resolve
+    API->>DB: feedback = resolved (resolved_by, resolved_at), audit feedback.resolved
+    API-->>UI: 200
+
+    alt another round needed
+        Ofc->>UI: add new feedback, Request resubmission (see UC2-A)
+    else no open feedback
+        Ofc->>UI: Schedule site visit
+        UI->>API: POST /officer/applications/{id}/transition {target: site_visit_scheduled}
+        API->>WF: transition(under_review → site_visit_scheduled, officer, ctx{open_feedback = 0})
+        API->>DB: status, audit, notification ("Pending Site Visit")
+        API-->>UI: 200
+    end

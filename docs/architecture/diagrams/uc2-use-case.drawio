@@ -1,0 +1,120 @@
+<mxfile host="app.diagrams.net" modified="2026-09-17T12:00:00.000Z" agent="PermitFlow" version="24.0.0" type="device">
+  <diagram id="uc2" name="UC2 – Officer Review &amp; Feedback">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="UC2 – Officer Application Review &amp; Feedback" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontStyle=1;fontSize=22;fontColor=#1F2937;" vertex="1" parent="1">
+          <mxGeometry x="200" y="20" width="800" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Actors -->
+        <mxCell id="officer" value="Licensing&lt;br&gt;Officer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#1F2937;strokeWidth=2;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="360" width="50" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="operator" value="Operator&lt;br&gt;(notified)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#6B7280;strokeWidth=2;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="300" width="50" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="ai" value="AI Provider&lt;br&gt;(results only)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#B45309;strokeWidth=2;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="150" width="50" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- Boundary -->
+        <mxCell id="sys" value="PermitFlow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F8FC;strokeColor=#1F2937;strokeWidth=2;verticalAlign=top;fontStyle=1;fontSize=15;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="220" y="90" width="760" height="700" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g1" value="Application review" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=12;fontStyle=2;fontColor=#4B5563;" vertex="1" parent="1">
+          <mxGeometry x="240" y="120" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="u_login" value="Log in" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="250" y="145" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="u_queue" value="Browse review queue&lt;br&gt;(internal status)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="500" y="145" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="u_review" value="Review full submission&lt;br&gt;(Start review)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;strokeWidth=2;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="250" y="215" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="u_airesults" value="See AI verification&lt;br&gt;results per document" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#B45309;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="500" y="215" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g2" value="Feedback workflow" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=12;fontStyle=2;fontColor=#4B5563;" vertex="1" parent="1">
+          <mxGeometry x="240" y="290" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="u_feedback" value="Add contextual feedback&lt;br&gt;(section / document)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="250" y="315" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="u_template" value="Use comment&lt;br&gt;template" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="500" y="315" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="u_status" value="Change application status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;strokeWidth=2;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="250" y="385" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="u_notify" value="Notify operator" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="760" y="385" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="u_outcome" value="Site visit · route to approval&lt;br&gt;· approve / reject" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="500" y="385" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g3" value="Resubmission management" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=12;fontStyle=2;fontColor=#4B5563;" vertex="1" parent="1">
+          <mxGeometry x="240" y="460" width="240" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="u_notified" value="Get notified on&lt;br&gt;Pre-Site Resubmitted" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="250" y="485" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="u_highlight" value="See changed sections&lt;br&gt;highlighted" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="500" y="485" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="u_compare" value="Compare revisions" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;strokeWidth=2;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="250" y="555" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="u_resolve" value="Track and resolve&lt;br&gt;flagged issues" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="500" y="555" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g4" value="Quality assurance" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=12;fontStyle=2;fontColor=#4B5563;" vertex="1" parent="1">
+          <mxGeometry x="240" y="630" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="u_audit" value="View audit trail" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="250" y="655" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="u_label" value="See status in&lt;br&gt;officer wording" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1F2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="500" y="655" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Associations -->
+        <mxCell id="a1" style="endArrow=none;html=1;strokeColor=#1F2937;" edge="1" parent="1" source="officer" target="u_login"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a2" style="endArrow=none;html=1;strokeColor=#1F2937;" edge="1" parent="1" source="officer" target="u_review"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a3" style="endArrow=none;html=1;strokeColor=#1F2937;" edge="1" parent="1" source="officer" target="u_feedback"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a4" style="endArrow=none;html=1;strokeColor=#1F2937;" edge="1" parent="1" source="officer" target="u_status"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a5" style="endArrow=none;html=1;strokeColor=#1F2937;" edge="1" parent="1" source="officer" target="u_notified"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a6" style="endArrow=none;html=1;strokeColor=#1F2937;" edge="1" parent="1" source="officer" target="u_compare"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a7" style="endArrow=none;html=1;strokeColor=#1F2937;" edge="1" parent="1" source="officer" target="u_audit"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a8" style="endArrow=none;html=1;strokeColor=#1F2937;" edge="1" parent="1" source="officer" target="u_queue"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a9" style="endArrow=none;html=1;strokeColor=#1F2937;" edge="1" parent="1" source="officer" target="u_outcome"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a10" style="endArrow=none;html=1;strokeColor=#1F2937;" edge="1" parent="1" source="officer" target="u_resolve"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a11" style="endArrow=none;html=1;strokeColor=#1F2937;" edge="1" parent="1" source="officer" target="u_label"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="s1" style="endArrow=none;html=1;strokeColor=#B45309;" edge="1" parent="1" source="u_airesults" target="ai"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="s2" style="endArrow=none;html=1;strokeColor=#6B7280;" edge="1" parent="1" source="u_notify" target="operator"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- include / extend -->
+        <mxCell id="i1" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#1F2937;fontSize=10;" edge="1" parent="1" source="u_review" target="u_airesults"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="i2" value="&amp;lt;&amp;lt;extend&amp;gt;&amp;gt;" style="endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#1F2937;fontSize=10;" edge="1" parent="1" source="u_template" target="u_feedback"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="i3" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#1F2937;fontSize=10;" edge="1" parent="1" source="u_status" target="u_notify">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="590" y="370" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="i4" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#1F2937;fontSize=10;" edge="1" parent="1" source="u_outcome" target="u_status"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="i5" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#1F2937;fontSize=10;" edge="1" parent="1" source="u_compare" target="u_highlight"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="i6" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#1F2937;fontSize=10;" edge="1" parent="1" source="u_compare" target="u_resolve"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="legend" value="Amber = AI results (advisory). Bold = key journeys (UC2-A Review &amp; request changes, UC2-B Compare, UC2-C Outcome in docs/requirements/USE_CASES.md). Status change always follows the state machine (docs/architecture/STATE_MACHINE.md)." style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;fontStyle=2;fontColor=#4B5563;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="240" y="735" width="720" height="45" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
