@@ -1,0 +1,63 @@
+# PermitFlow: Component inventory
+
+Components are extracted only where the prototype uses them in two or more places. Names are the intended React component names under `frontend/src/features/shared/` (layout under `frontend/src/app/`).
+
+## Layout
+
+| Component | Variants / props | Used on |
+|-----------|------------------|---------|
+| `AppShell` | role (operator / officer / admin) → side nav items; top bar with bell count and user chip | every authenticated screen |
+| `SideNav` / `BottomNav` | active item, counts; bottom tab bar on phone | all / phone |
+| `Breadcrumbs` | items (label, href) | nested screens |
+| `PageHeader` | title, subtitle, actions slot | all |
+| `StatusBar` | badge (role-aware), explanation, right meta, actions slot; `hasSteps` joins a `Stepper` band | application screens |
+| `Stepper` | steps, current | S-11, S-12, S-13 |
+| `SectionRail` | sections with completion mark (ok / todo / error / flagged / locked), completion bar, autosave note | S-11, S-15 |
+| `Tabs` | items with optional count | S-15, S-16, S-21, S-23, S-25 |
+| `StatStrip` | cells: number, uppercase label, context line, optional link, `hot` (primary colour) | S-10, S-20, S-40 |
+
+## Primitives
+
+| Component | Variants | Notes |
+|-----------|----------|-------|
+| `Button` | primary, secondary, ghost, danger, link; sm; disabled with `title` reason; `asChild` for links | one primary per screen |
+| `IconButton` | with badge count | bell |
+| `Input`, `Select`, `Textarea`, `Checkbox` | invalid, read-only, focus ring | RHF + Zod |
+| `Field` | label (required mark), control, help, error (`role="alert"`) | all forms |
+| `FormSection` | title, kicker tag, state (complete / editing / flagged / locked), header actions, footer actions | S-11, S-13, S-15, S-21, S-23 |
+| `KeyValueList` | 2-col definition list; muted variant for unchanged | read-only sections |
+| `Facts` | horizontal key facts row | S-21 |
+| `StatusBadge` | status code + role → label + colour; sizes | everywhere status shows |
+| `Badge` | neutral/info/warning/success/error/primary; dot | counts, upload state |
+| `Tag` | default, changed, editable, readonly | facts, markers |
+| `Alert` | info, warning, error, success, neutral; icon + bold lead | guidance and blocking messages |
+| `Toast` | success (dark), with undo/secondary line | after mutations |
+| `Dialog` | title as question, body, optional note field, footer (Cancel + primary/danger) | transitions, unsaved changes, remove |
+| `Table` | header uppercase, `rowlink` hover, `num` cells nowrap, right-aligned action column; `TableSkeleton`, `TableEmpty` | S-10, S-20, S-25, S-40 |
+| `Timeline` | dot kinds (primary/success/warning/info/neutral), title, description, time | S-10, S-14, S-16, S-25, S-40 |
+| `EmptyState`, `ErrorState`, `Skeleton` | icon, title, description, action | every data view (UX-002) |
+
+## Domain components
+
+| Component | Responsibility | Used on |
+|-----------|----------------|---------|
+| `DocumentSlot` | one required document type: empty (drop zone) or `DocumentCard` | S-12, S-15 |
+| `DropZone` | idle / dragging / uploading (progress) / error (type, size, duplicate) | S-12, S-15 |
+| `DocumentCard` | file name, type, size, uploaded time, upload badge (operator only), `VerificationBlock`, footer actions (download, replace, remove, re-run), "replaces …" line, markers (Changed/Replaced, feedback flag) | S-12, S-13, S-15, S-21, S-23 |
+| `VerificationBlock` | 8 states (see DESIGN_SYSTEM), confidence hint, `IssueList` (severity chip, message, evidence), "what to do", officer band (model, latency, advisory) | document cards |
+| `FeedbackPanel` / `FeedbackItem` | numbered, target tag, state badge, message, meta, context line; operator variant with "Go to" anchor; officer variant with Edit/Withdraw or Mark resolved/View change; rounds grouped | S-15, S-16, S-21, S-23, phone |
+| `InlineFeedbackNote` | officer comment repeated inside the flagged section/document | S-15 |
+| `FeedbackComposer` | target select (pre-filled from "Comment on …"), template select + chips, message; disabled with reason outside `under_review` | S-21, S-23 |
+| `TransitionActions` | renders every transition allowed for the role from the state machine table; disallowed ones disabled with tooltip; Reject always last, danger | S-21, S-23 |
+| `RevisionList` / `RevisionRow` | number, submitted at/by, changed summary, View / Compare | S-16, S-25 |
+| `RevisionDiff` | per section: field, old, new; Changed/Added/Replaced marks; unchanged rows recede; hide-unchanged toggle; documents table | S-24 |
+| `ChangedFieldValue` | new value highlighted + old value struck through | S-23 |
+| `CompletionCard` | percentage bar, sections/documents counts, or "items addressed n of m" | S-11, S-12, S-15 |
+| `RequiredDocumentsChecklist` | per-type status line | S-12, S-13 |
+| `NotificationsPanel` / `NotificationRow` | unread tint, title, body, time | S-17 |
+| `AuditTable` | when, event, actor, type (mono) | S-25, S-40 |
+| `PersonaPicker` | prototype/demo only: seeded accounts | S-00 |
+
+## Motion tokens
+
+`--t-fast 150ms` (hover, focus), `--t-base 350ms ease-out` (panel/page fade, dialog), highlight pulse 1.6 s once, indeterminate bar 1.6 s loop, spinner 0.9 s, shimmer 1.4 s. All collapse under `prefers-reduced-motion`.

@@ -31,6 +31,7 @@ If a session ends mid-story, leave a "Handover" line in `CHANGELOG.md` (what is 
 | Story DoD | `docs/planning/DEFINITION_OF_DONE.md` |
 | Domain model, state machine, architecture, ADRs | `docs/architecture/` |
 | Threat model | `docs/security/THREAT_MODEL.md` |
+| UI design: screens, design system, states, components, frontend architecture | `docs/design/` (prototype: link in `docs/design/README.md`) |
 
 If code and docs disagree, fix one of them in the same change. Never leave a doc describing something the code does not do.
 
@@ -76,6 +77,14 @@ Run the ritual in `docs/planning/SPRINTS.md`: tests green → Notion statuses fi
 - Uploads: allowlist (pdf, png, jpg, jpeg, txt), 10 MB, magic-byte check, server-generated keys, served only through an authorized endpoint.
 - Error body everywhere: `{ "error": { "code", "message", "details"? } }`.
 - No secrets in the repo; `.env.example` documents every variable.
+
+## 6a. UI rules from the design phase (apply to every frontend story)
+
+- Build screens from `docs/design/SCREEN_INVENTORY.md`; tokens and type scale from `docs/design/DESIGN_SYSTEM.md`; states from `docs/design/UI_STATES.md`. When a screen or component changes, update those files and the prototype in the same story.
+- No em dashes anywhere in UI copy or docs written from now on (use a colon, comma or middle dot). No emoji, gradients, KPI card grids or decorative icons. Red is for the brand mark, one primary action per screen and "needs you" signals only.
+- Every status uses a label plus a dot or icon, never colour alone; operator screens receive operator labels only.
+- Navigation: collapsible side rail (hamburger), bottom tab bar on phones; layouts verified at 390, 1024 and 1280.
+- Uploads: PDF recommended; allowlist + magic bytes + 10 MB; `sha256` duplicate detection surfaced as "no change".
 
 ## 7. Communication
 

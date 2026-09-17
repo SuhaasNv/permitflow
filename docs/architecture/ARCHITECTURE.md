@@ -66,7 +66,7 @@ Rules:
 | feedback | feedback | `create(officer, id, target, message, template_key)`, `resolve`, `withdraw`, `list`, `templates()` |
 | notifications | notifications | `notify(user_ids, kind, application, ...)`, `list(user)`, `mark_read` |
 | audit | audit_events | `record(application_id, actor, event_type, payload)`, `list(application_id)`, `feed(limit)` |
-| admin | — (reads other modules' tables through their repositories) | `overview()`, `ai_health()`, `audit_feed()`, `users()` |
+| admin | — (reads other modules' tables through their repositories; writes users through the auth module's service) | `overview()`, `ai_health()`, `audit_feed()`, `users()`, `create_user()`, `update_user(role, is_active)` |
 
 Cross-module writes go through services, never across repositories.
 
@@ -150,7 +150,9 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /admin/overview | admin | counts by status, idle applications, today's submissions |
 | GET | /admin/ai-health | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
 | GET | /admin/audit-feed | admin | latest 50 audit events across applications |
-| GET | /admin/users | admin | read-only user directory |
+| GET | /admin/users | admin | user directory |
+| POST | /admin/users | admin | create user `{full_name, email, role}`; audit `user.created` |
+| PATCH | /admin/users/{id} | admin | change `role` and/or `is_active`; audit `user.role_changed` / `user.deactivated` / `user.reactivated`; 409 when it would remove the last active admin |
 | GET | /admin/applications/{id} | admin | officer view, read-only (mutations 403) |
 | GET | /notifications | any | own notifications |
 | POST | /notifications/{id}/read | any | mark read; scoped to the caller's own notifications |
@@ -168,7 +170,8 @@ frontend/src
     auth/         login page, useAuth
     operator/     dashboard, application form (sections, uploads, progress), application detail, resubmission
     officer/      queue, review page (sections, documents, AI results, feedback panel, transition actions), compare view, audit
-    admin/        operations dashboard (status counts, idle, AI health, audit feed, users)
+    admin/        operations dashboard (status counts, idle, AI health, audit feed), users (add, change role, deactivate)
+    landing/      public landing page
     shared/       StatusBadge, FeedbackList, DocumentCard, RevisionCompare, EmptyState, ErrorState, Skeleton
   lib/            zod-from-schema builder, formatting, constants
   styles/         tailwind base, design tokens

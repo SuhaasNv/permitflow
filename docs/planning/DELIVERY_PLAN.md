@@ -1,6 +1,6 @@
 # PermitFlow — 3-Day Delivery Plan
 
-Dates: Day 1 = 17 September 2026, Day 2 = 18 September 2026, Day 3 = 19 September 2026. The plan adapts to progress; the final hours of Day 3 are protected for testing, deployment, documentation and review, not features.
+Dates: design phase = 17 September 2026 (US-009, `docs/design/`); Day 1 = 18 September 2026, Day 2 = 19 September 2026, Day 3 = 20 September 2026. The plan adapts to progress; the final hours of Day 3 are protected for testing, deployment, documentation and review, not features.
 
 ## Day 1 — Foundation and operator submission
 

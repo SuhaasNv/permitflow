@@ -8,7 +8,7 @@ Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC
 |---------|-----------|--------------|-------------------------|
 | Operator | `operator` | Business seeking a licence; creates, submits and resubmits applications; sees only own applications and operator-facing status labels | Operator dashboard (my applications) |
 | Licensing Officer | `officer` | Reviews applications, gives contextual feedback, moves status, compares revisions, reads audit trails | Review queue |
-| Admin | `admin` | Oversees the platform: throughput by status, stuck applications, AI verification health, cross-application audit feed, user directory; read-only on applications; not in the assessment brief, added by product decision (see `SCOPE.md`) | Operations dashboard |
+| Admin | `admin` | Oversees the platform: throughput by status, stuck applications, AI verification health, cross-application audit feed; manages users (create, change role, deactivate); read-only on applications; not in the assessment brief, added by product decision (see `SCOPE.md`) | Operations dashboard |
 
 ---
 
@@ -189,7 +189,7 @@ Not in the assessment brief; added as a product decision (SHOULD HAVE in `SCOPE.
 2. Sees counts of applications by internal status, applications with no activity for more than 7 days, and today's submissions/resubmissions.
 3. Sees AI verification health: runs in the last 24 h, failure/unavailable rate, average latency, provider in use.
 4. Sees the cross-application audit feed (latest 50 events) and can open any application read-only (officer view, no actions).
-5. Sees the user directory (name, email, role, created) read-only.
+5. Manages users: sees the directory (name, email, role, active, created, last active), creates a user with a role, changes a role, deactivates or reactivates a user. Each change is audited; the last active admin cannot be demoted or deactivated.
 
 **Alternative / error flows**
 - 1a. Operator or officer opens `/admin/*` → 403.

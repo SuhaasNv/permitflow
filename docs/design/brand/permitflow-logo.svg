@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="232" height="48" viewBox="0 0 232 48" role="img" aria-label="PermitFlow">
+  <rect x="8" y="8" width="32" height="32" rx="7" fill="#A8192A"/>
+  <path d="M17 18h14M17 24h9M17 30h4M24.5 30l2.5 2.5L32 26" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="50" y="31" font-family="Public Sans, Inter, system-ui, sans-serif" font-size="22" font-weight="700" letter-spacing="-0.3" fill="#1B2430">PermitFlow</text>
+</svg>

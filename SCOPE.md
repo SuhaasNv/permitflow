@@ -15,9 +15,9 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 
 | # | Feature | Assessment ref |
 |---|---------|----------------|
-| M1 | Email/password login, roles operator and officer with seeded accounts and role-specific home screens; the `admin` role value exists but its account and screens are S7 | roles (implied) |
+| M1 | Public landing page, email/password login, roles operator and officer with seeded accounts and role-specific home screens; the `admin` role value exists but its account and screens are S7 | roles (implied) |
 | M2 | Operator: create application, sectioned form with validation, save draft | UC1 form entry |
-| M3 | Operator: drag-and-drop document upload with document type, allowlisted types/sizes | UC1 uploads |
+| M3 | Operator: drag-and-drop document upload with document type; validation by extension + MIME allowlist (PDF, PNG, JPG, JPEG, TXT), magic bytes and 10 MB cap; `sha256` per file so an identical re-upload is detected as no change; PDF recommended (only machine-readable format) | UC1 uploads |
 | M4 | Per-document AI verification with live status (pending → running → result), structured issues, graceful "unavailable" | UC1 real-time AI status; UC2 AI results visible |
 | M5 | Progress indicator (sections + required documents) | UC1 |
 | M6 | Submit → Revision 1 → `application_received` | UC1 |
@@ -46,7 +46,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | S4 | Compare any two revisions (not only current vs previous) | Same diff function; only the selector changes |
 | S5 | AI evaluation dataset + runner script | Six fixtures, manual run documented |
 | S6 | Structured request logging with request id | Middleware only, no log shipping |
-| S7 | Admin persona: seeded admin account, `/admin/*` router and an operations dashboard (counts by status, idle applications, AI verification health, cross-application audit feed, read-only user directory and read-only application view). **Beyond the brief** — added because a regulator operating the platform needs oversight; the assessment names only Operator and Officer. The `admin` role value exists in the enum from Day 1 (cheap); everything else in this row is built only after the MUST list is Done, so cutting it removes a router and a page, not a concept. | One `/admin/*` router and one dashboard page; no user management actions |
+| S7 | Admin persona: seeded admin account, `/admin/*` router, an operations dashboard (counts by status, idle applications, AI verification health, cross-application audit feed, read-only application view) and **user management** (create user, change role, deactivate/reactivate; every change audited; the last active admin cannot be demoted or deactivated). **Beyond the brief** — added because a regulator operating the platform needs oversight and account control; the assessment names only Operator and Officer. The `admin` role value exists in the enum from Day 1 (cheap); everything else in this row is built only after the MUST list is Done, so cutting it removes a router and two pages, not a concept. | Overview page first; user management second (US-073); no password reset or self-registration |
 
 ## COULD HAVE (only if the core is stable)
 
@@ -85,11 +85,15 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 8. **Notification channel:** in-app notification centre; email is mocked.
 9. **AI verification scope:** the model checks whether the document plausibly is the declared type, whether key fields (e.g. business name, address) match the form, and whether obvious required information is missing. It does not attempt legal validity checks.
 10. **Authorization:** operators own applications individually (no organisation model).
-11. **Admin persona:** the brief names Operator and Officer only. We add a read-only Admin role for oversight and monitoring (S7). It never changes application state, so it does not affect the assessment's workflow or visibility rules.
+11. **Admin persona:** the brief names Operator and Officer only. We add an Admin role for oversight, monitoring and user management (S7). It never changes application state, so it does not affect the assessment's workflow or visibility rules; user changes are audited.
 12. **Feedback freeze:** officers can add or withdraw feedback only while the application is Under Review. Requesting resubmission releases that round's feedback to the operator and freezes it; this is what makes "edit only the flagged sections" safe (no item can disappear under an operator mid-edit).
 13. **"Only flagged sections" is enforced, not just suggested:** the API rejects changes to non-flagged sections during resubmission (403). We read the brief's "operator updates only the flagged sections" as a rule that protects the officer's review scope; the trade-off is that an operator who spots their own mistake elsewhere must wait for the officer to flag it. Documented as a product decision open to reversal.
 14. **Document slots:** exactly one current document per required type; no free-form "other" slot in the MVP (feedback targets a type, and multi-file slots would need per-file targets).
 15. **Third-party AI processing:** extracted document text (capped) and the relevant form section are sent to OpenAI for verification. This is a data-transfer decision a regulator would have to approve; the MVP documents it and the production gap (region, retention, redaction) in the threat model rather than pretending it is solved.
+
+## Design phase (17–18 Sep 2026)
+
+A UI/UX design phase was run between solutioning and implementation: design direction, design system, clickable prototype (23 artboards) and design documentation in `docs/design/`. It changed no MUST item; it added the public landing page to M1, expanded S7 with user management, and fixed the upload validation wording in M3.
 
 ## What "done" means for this MVP
 

@@ -53,6 +53,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: MVP · Day 3 (continuous) · Dependencies: all
 - Definition of Done: every document reflects the implemented system; no fake content.
 
+### US-009 — As the team, I want a reviewed UI design system and clickable prototype before implementation, so that every screen is built from an agreed, requirement-traced design.
+- Acceptance criteria: design direction, tokens and type scale; screen inventory with IDs, personas, requirements and states; operator and officer flows; component inventory; UI state inventory including the upload → verification lifecycle; frontend architecture; requirement traceability; a clickable prototype covering login, operator submission, resubmission, officer review, feedback, compare, audit, admin, phone and tablet; two independent design-critique passes with findings applied; brand mark and logo.
+- Priority: MVP · Design phase (17–18 Sep) · Dependencies: US-000 docs · Requirements: UX-001…UX-008 · `docs/design/`
+- Definition of Done: `docs/design/README.md` links the prototype; every screen in the inventory exists on the canvas; no contradiction with STATE_MACHINE or DOMAIN_MODEL.
+
 ---
 
 ## UC1 — Operator Submission & Resubmission
@@ -197,10 +202,10 @@ Not in the assessment brief; added as a product decision (SCOPE.md, S7). Read-on
 - Priority: Nice-to-have · Day 3 · Dependencies: US-070 · Requirements: FR-030, AUD-006 · Use case UC4-A
 - Definition of Done: DoD checklist + admin mutation returns 403 test.
 
-### US-073 — As an admin, I want a read-only user directory, so that I can see who has access and in which role.
-- Acceptance criteria: list of users with name, email, role and created date; no create/edit/delete actions in the MVP.
-- Priority: Nice-to-have · Day 3 · Dependencies: US-070 · Requirements: FR-030 · Use case UC4-A
-- Definition of Done: DoD checklist + role test.
+### US-073 — As an admin, I want to manage users (create, change role, deactivate), so that I control who has access and in which role.
+- Acceptance criteria: `GET /admin/users` lists users with name, email, role, active flag, created and last-active; `POST /admin/users` creates a user with a role (email unique, 409 on duplicate); `PATCH /admin/users/{id}` changes role and/or deactivates/reactivates; a change that would leave no active admin returns 409; an admin cannot change their own role; every change writes an audit event (`user.created`, `user.role_changed`, `user.deactivated`, `user.reactivated`); deactivated users get 401 on their next request; UI: users table with role filter, Add user drawer, Change role and Deactivate with confirmation; operators and officers receive 403.
+- Priority: Nice-to-have · Day 3 · Dependencies: US-070, US-001 · Requirements: FR-030, SEC-003 · Threat model T19 · Use case UC4-A
+- Definition of Done: DoD checklist + role test + last-admin protection test + audit event test.
 
 ## UC3 — On-Site Assessment & Post-Site Clarification (DEFERRED)
 

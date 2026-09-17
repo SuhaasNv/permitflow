@@ -109,9 +109,9 @@ Scope: the MVP as designed (this document is written before implementation and w
 - **Gap:** A regulator would require a data-processing agreement, a provider with zero data retention (or a regional/private deployment), redaction of personal identifiers before sending, and a retention policy for `extracted_text` (SEC-012 proposes deletion 90 days after a terminal state). None of these are implemented in the MVP.
 
 ### T19 Admin role misuse — Medium
-- **Risk:** The admin sees all applications and all users.
-- **Mitigation:** Admin is read-only by construction (no admin route calls a mutating service; mutating endpoints reject the admin role with 403); admin reads are audited only at the request-log level (no per-view audit events in the MVP).
-- **Gap:** Production would audit admin views of individual applications and add MFA for admin accounts.
+- **Risk:** The admin sees all applications and all users, and can create users, change roles and deactivate accounts (privilege escalation: an admin makes an operator an officer; lock-out: the only admin is deactivated).
+- **Mitigation:** Admin is read-only on applications by construction (no admin route calls an application-mutating service; those endpoints reject the admin role with 403). User management is the only admin write path: every create / role change / deactivate / reactivate is an audit event with actor and time; the service refuses any change that would leave zero active admins; an admin cannot change their own role; role changes take effect on the user's next request (JWT role claim is re-checked against the row on every request); admin reads are audited only at the request-log level.
+- **Gap:** Production would require MFA for admin accounts, a second admin's approval for role changes to `admin`, and per-view audit of admin access to individual applications.
 
 ## Production gaps summary
 Antivirus scanning, httpOnly cookie sessions, edge rate limiting and WAF, tamper-evident audit storage, encryption and retention policies, per-user quotas, SSO/MFA. All listed with recommendations in `docs/reviews/PRODUCTION_READINESS_REVIEW.md`.

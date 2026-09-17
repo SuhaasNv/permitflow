@@ -22,6 +22,21 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `architecture/diagrams/uc1-use-case`, `uc2-use-case`, `e4-admin-use-case` (`.drawio` / `.png`) | written | UML use case diagrams per epic |
 | `architecture/diagrams/sequences/*.mmd` / `.png` | written | Sequence diagrams UC1-A, UC1-B, UC2-A, UC2-B (Mermaid) |
 
+## Design (UI/UX phase, 17–18 Sep 2026)
+| Document | Status | Purpose |
+|----------|--------|---------|
+| `design/README.md` | written | Index + link to the clickable prototype (23 artboards) |
+| `design/UI_DESIGN.md` | written | Direction, personality, what is avoided, motion, accessibility, assumptions |
+| `design/DESIGN_SYSTEM.md` | written | Tokens, type scale, status / verification / feedback vocabularies as rendered |
+| `design/UI_FLOW.md` | written | Information architecture; operator and officer flows mapped to states and endpoints |
+| `design/SCREEN_INVENTORY.md` | written | Every screen with ID, persona, requirements, actions, states, responsive notes, priority |
+| `design/COMPONENT_INVENTORY.md` | written | Reusable components and where they are used |
+| `design/UI_STATES.md` | written | Loading / empty / error / permission states; upload → verification and feedback lifecycles |
+| `design/FRONTEND_ARCHITECTURE.md` | written | Folder layout, routing, query keys, forms, uploads, responsive breakpoints, motion, a11y |
+| `design/UI_REQUIREMENTS_TRACEABILITY.md` | written | Use case / requirement / story → screen |
+| `design/brand/` | written | Logo mark (SVG), monochrome mark, horizontal lockup, usage notes |
+| `design/screens/` | written | Rendered PNG of every artboard (for review without the canvas) |
+
 ## Security
 | Document | Status | Purpose |
 |----------|--------|---------|
@@ -56,4 +71,5 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `../README.md` | to be written (Day 3, skeleton from Day 1) | Setup and overview |
 
 ## Review history
+- 18 Sep 2026 — UI/UX design phase: two independent design-critique passes on the prototype (pass 1 scored 6.6/10 with 11 rendering bugs and 15 fixes; all applied; pass 2 results recorded in `design/UI_DESIGN.md`). Scope changes from the phase: public landing page (M1, FR-031), admin user management (S7, FR-030, US-073, T19), upload validation and hash-based duplicate detection made explicit (M3, SEC-005).
 - 17 Sep 2026 — Solutioning documents reviewed by a stringent solution-architect pass (six blocking findings: feedback withdraw deadlock, document target semantics, undefined verification vocabulary, background-task session lifetime, assessment brief in git history, incomplete concurrency design). All six were fixed in the documents before implementation; the significant findings (priority conflicts, SQLite fallback, admin cuttability, notification kinds, stuck-application exits, structured-output constraints, error shape, sub-resource IDOR, third-party data transfer, rate limiter definition, diff by hash, cut order) were also applied.

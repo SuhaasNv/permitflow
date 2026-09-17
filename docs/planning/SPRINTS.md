@@ -35,7 +35,11 @@ Sprint level — a sprint is Done when:
 6. Commit: "docs: close sprint N"
 ```
 
-## Sprint 1 — 17 September 2026 — "An operator can submit"
+## Design phase — 17 September 2026 (before Sprint 1)
+
+US-009: design direction, design system, clickable prototype (23 artboards), design docs in `docs/design/`, two critique passes. No code. Sprint dates below shifted by one day as a result.
+
+## Sprint 1 — 18 September 2026 — "An operator can submit"
 
 **Goal:** an operator logs in, creates an application, fills the form, uploads documents that are verified by the mock provider, and submits; the state machine, role labels and authorization exist and are unit-tested; CI skeleton runs.
 
@@ -56,7 +60,7 @@ Sprint level — a sprint is Done when:
 
 **Cut order if behind:** progress indicator UI polish → CI skeleton (keep local checks) → nothing else; the rest is the foundation.
 
-## Sprint 2 — 18 September 2026 — "The loop closes, twice"
+## Sprint 2 — 19 September 2026 — "The loop closes, twice"
 
 **Goal:** the officer reviews, gives contextual feedback and requests resubmission; the operator sees feedback on top, edits only flagged targets and resubmits; the officer sees highlights, compares revisions, tracks resolution and advances to an outcome; the audit trail and notifications work; OpenAI provider is wired. Two full rounds work end to end.
 
@@ -86,7 +90,7 @@ Sprint level — a sprint is Done when:
 
 **Cut order if behind:** follow `DELIVERY_PLAN.md` §Cut order — any-two-revision compare → static Zod schemas → queue filter / re-run / draft delete → notification bell → templates UI (endpoint stays). MUST stories (US-024 templates, US-031 outcome transitions) are never cut; their UI becomes plainer. The OpenAI provider may slip to Sprint 3 morning (mock stays default) without cutting anything.
 
-## Sprint 3 — 19 September 2026 — "Ship it honestly"
+## Sprint 3 — 20 September 2026 — "Ship it honestly"
 
 **Goal:** deployed, tested, documented, reviewed. Admin epic only if the core is stable by midday.
 
