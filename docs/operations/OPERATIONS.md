@@ -27,6 +27,10 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `AI_MAX_TEXT_CHARS` | `20000` | backend | Extraction cap sent to the provider. |
 | `VITE_API_URL` | `http://localhost:8000/api/v1` | frontend | Build-time. |
 
+## Seeding
+
+`cd backend && uv run python scripts/seed.py` creates the demo operator and officer if they do not exist. `SEED_PASSWORD` sets their password (default `PermitFlow!2026`); set it to something else in any shared environment.
+
 ## Health
 
 `GET /api/v1/health` → `200 {"status":"ok","database":"ok"}` or `503 {"status":"degraded","database":"unreachable"}`. Provider configuration is never exposed here.
