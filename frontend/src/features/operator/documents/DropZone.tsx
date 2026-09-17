@@ -11,7 +11,7 @@ interface DropZoneProps {
   onFile: (file: File) => void
 }
 
-/** Drag-and-drop area with a keyboard-reachable file picker (FR-004). */
+/** Drag-and-drop area with a keyboard-reachable file picker (FR-004). The whole zone is the click target. */
 export function DropZone({ label, hint = 'PDF, PNG, JPG or TXT · up to 10 MB', disabled, compact, onFile }: DropZoneProps) {
   const [over, setOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -34,9 +34,10 @@ export function DropZone({ label, hint = 'PDF, PNG, JPG or TXT · up to 10 MB', 
       onDragLeave={() => setOver(false)}
       onDrop={onDrop}
       className={cn(
-        'rounded-lg border-[1.5px] border-dashed text-center transition-colors',
-        compact ? 'px-4 py-4' : 'px-6 py-7',
-        over ? 'border-primary bg-primary-soft' : 'border-line-strong bg-surface hover:border-text-3',
+        'relative rounded-lg border-[1.5px] border-dashed text-center',
+        'transition-[border-color,background-color,transform] duration-[var(--dur-base)] ease-[var(--ease-out)]',
+        compact ? 'px-4 py-4' : 'px-6 py-8',
+        over ? 'scale-[1.005] border-text bg-surface-3' : 'border-line-strong bg-surface-2/60 hover:border-text-3 hover:bg-surface-2',
         disabled && 'opacity-60',
       )}
     >
@@ -45,7 +46,7 @@ export function DropZone({ label, hint = 'PDF, PNG, JPG or TXT · up to 10 MB', 
         id={inputId}
         type="file"
         accept=".pdf,.png,.jpg,.jpeg,.txt,application/pdf,image/png,image/jpeg,text/plain"
-        className="sr-only"
+        className="peer sr-only"
         disabled={disabled}
         onChange={(e) => {
           const file = e.target.files?.[0]
@@ -53,15 +54,27 @@ export function DropZone({ label, hint = 'PDF, PNG, JPG or TXT · up to 10 MB', 
           e.target.value = ''
         }}
       />
+      <label
+        htmlFor={inputId}
+        className="absolute inset-0 cursor-pointer rounded-lg peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus"
+      >
+        <span className="sr-only">{label}</span>
+      </label>
       {!compact ? (
-        <div className="mx-auto mb-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-neutral-soft text-text-2">
+        <div
+          className={cn(
+            'mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-surface text-text-2 shadow-[var(--shadow-1)]',
+            'transition-transform duration-[var(--dur-base)] ease-[var(--ease-out)]',
+            over && '-translate-y-0.5',
+          )}
+        >
           <svg
-            width="20"
-            height="20"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="1.8"
             strokeLinecap="round"
             strokeLinejoin="round"
             aria-hidden="true"
@@ -71,15 +84,13 @@ export function DropZone({ label, hint = 'PDF, PNG, JPG or TXT · up to 10 MB', 
           </svg>
         </div>
       ) : null}
-      <div className={cn('font-semibold', over && 'text-primary')}>
+      <div className="text-[15px] font-semibold">
         {over ? 'Drop to upload' : label}{' '}
         {!over ? (
-          <label htmlFor={inputId} className="cursor-pointer text-primary underline-offset-2 hover:underline">
-            browse
-          </label>
+          <span className="font-semibold text-primary underline decoration-primary-line underline-offset-[3px]">browse files</span>
         ) : null}
       </div>
-      <div className="mt-0.5 text-[13px] text-text-2">{hint}</div>
+      <div className="mt-1 text-[13px] text-text-3">{hint}</div>
     </div>
   )
 }

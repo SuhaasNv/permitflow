@@ -6,7 +6,10 @@ UX-002 requires explicit loading, empty, error and success states for every data
 
 | State | Rendering | Notes |
 |-------|-----------|-------|
-| Loading (page) | skeleton in the shape of the final layout (title bar, 3–5 rows) | never a blank page or a spinner-only page |
+| Loading (page) | `PageSkeleton` (eyebrow, title, subtitle) plus shimmering blocks in the shape of the final layout | never a blank page or a spinner-only page |
+| Saving (section) | footer `SaveIndicator`: "Unsaved changes" (amber dot) → "Saving…" (spinner) → "Saved just now" (drawn check), then relative time | live region |
+| Checking (document) | badge "Checking" with pulsing dot; verification block lists the four check steps advancing while the server run is pending | result copy always from the server |
+| Success (toast) | bottom-right toast, 4.5 s | section saved, document uploaded |
 | Loading (mutation) | button shows spinner + "Saving…", inputs stay editable-but-disabled | input never cleared |
 | Empty | `EmptyState` with icon, one-line title, one-line explanation, one action | copy is specific ("No applications yet: start a new application") |
 | Error (query) | `ErrorState` with request id and Retry | REL-005 |

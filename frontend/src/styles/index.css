@@ -4,15 +4,18 @@
 @theme {
   --font-sans: 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
 
-  --color-bg: #f3f4f6;
+  --color-bg: #f4f5f7;
   --color-surface: #ffffff;
-  --color-surface-2: #f9fafb;
-  --color-line: #d9dee5;
+  --color-surface-2: #f8f9fb;
+  --color-surface-3: #eef0f3;
+  --color-line: #dde1e7;
   --color-line-strong: #aeb6c2;
   --color-text: #1b2430;
   --color-text-2: #465060;
   --color-text-3: #66717f;
+  --color-ink: #1b2430;
 
   --color-primary: #a8192a;
   --color-primary-hover: #8a1422;
@@ -39,8 +42,15 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 10px;
-  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06);
-  --shadow-2: 0 4px 12px rgba(16, 24, 40, 0.1);
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.05), 0 0 0 1px rgba(16, 24, 40, 0.03);
+  --shadow-2: 0 6px 16px -4px rgba(16, 24, 40, 0.12), 0 2px 4px rgba(16, 24, 40, 0.05);
+  --shadow-3: 0 24px 48px -12px rgba(16, 24, 40, 0.28);
+
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-slow: 320ms;
 }
 
 @layer base {
@@ -51,6 +61,13 @@
     font-size: 15px;
     line-height: 22px;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'tnum' 0;
+  }
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.01em;
   }
   body {
     margin: 0;
@@ -63,9 +80,26 @@
   }
   a {
     color: var(--color-primary);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: color var(--dur-fast) var(--ease-out);
   }
   a:hover {
     color: var(--color-primary-hover);
+  }
+  ::selection {
+    background: #fbdfe2;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  input[type='date']::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
   }
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -74,10 +108,146 @@
       animation-duration: 0.001s !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.001s !important;
+      scroll-behavior: auto !important;
     }
   }
 }
 
+@layer components {
+  /* Page and panel entrance: 6 px rise + fade. Keyed on the route in AppShell. */
+  .pf-enter {
+    animation: pf-enter var(--dur-slow) var(--ease-out) both;
+  }
+  .pf-enter-fast {
+    animation: pf-enter var(--dur-base) var(--ease-out) both;
+  }
+  /* Staggered children: apply on a list, each item picks up a small delay. */
+  .pf-stagger > * {
+    animation: pf-enter var(--dur-slow) var(--ease-out) both;
+  }
+  .pf-stagger > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  .pf-stagger > *:nth-child(2) {
+    animation-delay: 40ms;
+  }
+  .pf-stagger > *:nth-child(3) {
+    animation-delay: 80ms;
+  }
+  .pf-stagger > *:nth-child(4) {
+    animation-delay: 120ms;
+  }
+  .pf-stagger > *:nth-child(5) {
+    animation-delay: 160ms;
+  }
+  .pf-stagger > *:nth-child(n + 6) {
+    animation-delay: 200ms;
+  }
+  /* Editorial surface: one bordered white panel, no shadow stacking. */
+  .pf-surface {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-lg);
+  }
+  .pf-eyebrow {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-3);
+  }
+  .pf-skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-surface-3);
+    border-radius: 6px;
+  }
+  .pf-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+    animation: pf-shimmer 1.4s var(--ease-in-out) infinite;
+  }
+  .pf-check {
+    stroke-dasharray: 24;
+    stroke-dashoffset: 24;
+    animation: pf-draw var(--dur-slow) var(--ease-out) forwards;
+  }
+  dialog.pf-dialog[open] {
+    animation: pf-dialog-in var(--dur-base) var(--ease-out);
+  }
+  dialog.pf-dialog[open]::backdrop {
+    animation: pf-fade-in var(--dur-base) var(--ease-out);
+  }
+  .pf-toast-in {
+    animation: pf-toast-in var(--dur-slow) var(--ease-out) both;
+  }
+  .pf-toast-out {
+    animation: pf-toast-out var(--dur-base) var(--ease-in-out) both;
+  }
+}
+
+@keyframes pf-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pf-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pf-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes pf-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pf-toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes pf-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes pf-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
 @keyframes slide {
   0% {
     transform: translateX(-100%);

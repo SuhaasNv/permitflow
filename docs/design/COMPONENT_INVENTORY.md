@@ -11,7 +11,8 @@ Components are extracted only where the prototype uses them in two or more place
 | `Breadcrumbs` | items (label, href) | nested screens |
 | `PageHeader` | title, subtitle, actions slot | all |
 | `StatusBar` | badge (role-aware), explanation, right meta, actions slot; `hasSteps` joins a `Stepper` band | application screens |
-| `Stepper` | steps, current | S-11, S-12, S-13 |
+| `Stepper` | steps (label, state done / current / attention / todo, href); equal-width grid, connectors fill on completion | S-11, S-12, S-13 |
+| `ApplicationHeader` | breadcrumb, reference + licence eyebrow, business name title, status badge + explanation, meta line, actions | S-10 detail, S-11, S-12, S-13 |
 | `SectionRail` | sections with completion mark (ok / todo / error / flagged / locked), completion bar, autosave note | S-11, S-15 |
 | `Tabs` | items with optional count | S-15, S-16, S-21, S-23, S-25 |
 | `StatStrip` | cells: number, uppercase label, context line, optional link, `hot` (primary colour) | S-10, S-20, S-40 |
@@ -27,7 +28,11 @@ Components are extracted only where the prototype uses them in two or more place
 | `FormSection` | title, kicker tag, state (complete / editing / flagged / locked), header actions, footer actions | S-11, S-13, S-15, S-21, S-23 |
 | `KeyValueList` | 2-col definition list; muted variant for unchanged | read-only sections |
 | `Facts` | horizontal key facts row | S-21 |
-| `StatusBadge` | status code + role → label + colour; sizes | everywhere status shows |
+| `StatusBadge` | served label + tone; sizes; `live` pulses the dot while something is in progress | everywhere status shows |
+| `SaveIndicator` | dirty / saving / saved (relative time, refreshed every 5 s) | section form footer |
+| `Toast` (`ToastProvider`, `useToast`) | title, body, tone; bottom-right stack, four max, auto-dismiss 4.5 s (errors stay) | section saved, document uploaded / removed / unchanged |
+| `Alert` | tone icon, optional title, optional action slot | inline messages |
+| `PageSkeleton`, `Skeleton` | shimmer placeholders in the shape of the final layout | every loading state |
 | `Badge` | neutral/info/warning/success/error/primary; dot | counts, upload state |
 | `Tag` | default, changed, editable, readonly | facts, markers |
 | `Alert` | info, warning, error, success, neutral; icon + bold lead | guidance and blocking messages |

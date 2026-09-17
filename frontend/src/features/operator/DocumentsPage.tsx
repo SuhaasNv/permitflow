@@ -3,10 +3,10 @@ import { Link, useParams } from 'react-router-dom'
 
 import type { ApplicationView } from '@/api/applications'
 import { AppError } from '@/api/client'
-import { Alert } from '@/features/shared/Alert'
-import { StatusBadge } from '@/features/shared/StatusBadge'
-import { ErrorPanel, NotFoundPanel, Skeleton } from '@/features/shared/states'
+import { buttonClasses } from '@/features/shared/Button'
+import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
 import { cn } from '@/lib/cn'
+import { ApplicationHeader } from './ApplicationHeader'
 import { DocumentSlot } from './documents/DocumentSlot'
 import { applicationKeys, useApplication } from './queries'
 
@@ -22,11 +22,15 @@ export function DocumentsPage() {
 
   if (app.isPending) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading documents">
-        <Skeleton className="h-8 w-1/2" />
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
-      </div>
+      <PageSkeleton label="Loading documents">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="flex flex-col gap-4">
+            <Skeleton className="h-40" />
+            <Skeleton className="h-40" />
+          </div>
+          <Skeleton className="h-56" />
+        </div>
+      </PageSkeleton>
     )
   }
   if (app.isError) {
@@ -37,101 +41,92 @@ export function DocumentsPage() {
   const view = app.data
   const c = view.completeness
   const canDelete = view.status_label === 'Draft'
+  const base = `/app/applications/${id}`
 
   return (
     <>
-      <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-2 text-[13px] text-text-3">
-        <Link to="/app/dashboard" className="text-text-2">
-          My applications
-        </Link>
-        <span aria-hidden="true">›</span>
-        <Link to={`/app/applications/${id}`} className="text-text-2">
-          {view.reference_no}
-        </Link>
-        <span aria-hidden="true">›</span>
-        <span className="text-text">Documents</span>
-      </nav>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-[26px] font-semibold leading-8 tracking-tight">Documents</h1>
-          <p className="mt-1 text-text-2">
-            {view.reference_no} · {view.licence_title}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Link
-            to={`/app/applications/${id}/form`}
-            className="inline-flex h-10 items-center rounded-md border border-line-strong bg-surface px-4 text-sm font-semibold text-text no-underline shadow-[var(--shadow-1)] hover:bg-surface-2"
-          >
-            Back to form
-          </Link>
-          <Link
-            to={`/app/applications/${id}/review`}
-            className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-semibold text-white no-underline hover:bg-primary-hover hover:text-white"
-          >
-            Review and submit
-          </Link>
-        </div>
-      </div>
-
-      <div className="mb-5 flex flex-wrap items-center gap-4 rounded-lg border border-line bg-surface px-5 py-3.5 shadow-[var(--shadow-1)]">
-        <StatusBadge label={view.status_label} tone={view.status_tone} size="lg" />
-        <span className="text-sm text-text-2">
-          {c.documents_total} documents required · {c.documents_present} uploaded
-        </span>
-      </div>
-
-      <Alert tone="info" className="mb-5">
-        <div>
-          <b>Uploads are checked automatically.</b> The checker reads each document and compares it with your form to warn you about likely
-          problems. It does not approve or reject anything: a licensing officer reviews every application.
-        </div>
-      </Alert>
+      <ApplicationHeader
+        view={view}
+        crumb="Documents"
+        aside={
+          <span>
+            · {c.documents_present} of {c.documents_total} documents uploaded
+          </span>
+        }
+        actions={
+          <>
+            <Link to={`${base}/form`} className={buttonClasses('secondary')}>
+              Back to form
+            </Link>
+            <Link to={`${base}/review`} className={buttonClasses('primary')}>
+              Review and submit
+            </Link>
+          </>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex flex-col gap-4">
-          {view.document_slots.map((slot) => (
+        <div className="pf-stagger flex flex-col gap-4">
+          {view.document_slots.map((slot, i) => (
             <DocumentSlot
               key={slot.type}
               applicationId={id}
               slot={slot}
+              index={i}
               canDelete={canDelete}
               onUploaded={(r) => setView(r.application)}
               onDeleted={setView}
             />
           ))}
         </div>
-        <aside className="flex flex-col gap-4">
-          <div className="rounded-lg border border-line bg-surface shadow-[var(--shadow-1)]">
-            <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-              <h2 className="text-base font-semibold">Required documents</h2>
-              <span className="text-xs tabular-nums text-text-3">
-                {c.documents_present} / {c.documents_total}
+        <aside className="flex flex-col gap-6 lg:sticky lg:top-[88px] lg:self-start">
+          <section className="pf-surface">
+            <div className="flex items-baseline justify-between px-5 pt-4">
+              <h2 className="text-[15px] font-semibold">Required documents</h2>
+              <span className="font-mono text-sm tabular-nums text-text-2">
+                {c.documents_present}/{c.documents_total}
               </span>
             </div>
-            <ul className="px-5">
+            <ul className="mt-2 divide-y divide-line px-5 pb-2">
               {view.document_slots.map((slot) => (
-                <li key={slot.type} className="flex items-center gap-2.5 border-b border-line py-2.5 text-sm last:border-b-0">
+                <li key={slot.type} className="flex items-center gap-2.5 py-2.5 text-sm">
                   <span
                     className={cn(
-                      'flex h-5 w-5 items-center justify-center rounded-full text-[11px]',
+                      'flex h-[18px] w-[18px] items-center justify-center rounded-full transition-colors duration-[var(--dur-base)]',
                       slot.present ? 'bg-success text-white' : 'border-[1.5px] border-line-strong',
                     )}
                     aria-hidden="true"
                   >
-                    {slot.present ? '✓' : ''}
+                    {slot.present ? (
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    ) : null}
                   </span>
-                  <span>{slot.label}</span>
-                  <span className="ml-auto text-xs text-text-3">{slot.present ? 'Uploaded' : 'Missing'}</span>
+                  <span className="min-w-0 flex-1 truncate">{slot.label}</span>
+                  <span className="text-xs text-text-3">{slot.present ? 'Uploaded' : 'Missing'}</span>
                 </li>
               ))}
             </ul>
-          </div>
-          <div className="rounded-lg border border-line bg-surface px-5 py-4 shadow-[var(--shadow-1)]">
-            <h2 className="mb-1.5 text-base font-semibold">Accepted files</h2>
-            <p className="text-[13px] text-text-2">
-              PDF, PNG, JPG or TXT, up to 10 MB each. PDF is recommended: it is the only format the automatic check can read. Re-uploading
-              an identical file is detected and does not count as a change.
+          </section>
+          <div className="px-1 text-[13px] leading-[19px] text-text-2">
+            <div className="mb-1.5 font-semibold text-text">About the automatic check</div>
+            <p>
+              Each upload is read and compared with your form so you can fix likely problems early. It never approves or rejects anything: a
+              licensing officer reviews every application and sees the same findings.
+            </p>
+            <p className="mt-3 text-text-3">
+              PDF, PNG, JPG or TXT, up to 10 MB each. PDF is recommended: it is the only format the check can read. Re-uploading an
+              identical file is detected and does not count as a change.
             </p>
           </div>
         </aside>

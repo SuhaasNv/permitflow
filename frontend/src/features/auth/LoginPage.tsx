@@ -13,10 +13,16 @@ import { Logo } from '@/features/shared/Logo'
 import { homeFor, useAuth } from './AuthContext'
 
 const schema = z.object({
-  email: z.string().trim().min(1, 'Enter your email address.').email('Enter a valid email address.'),
+  email: z.string().trim().min(1, 'Enter your email address.').email('Enter a valid email address, like name@company.sg.'),
   password: z.string().min(1, 'Enter your password.'),
 })
 type FormValues = z.infer<typeof schema>
+
+const POINTS: [string, string][] = [
+  ['Guided application', 'Four short sections with validation as you go. Drafts are saved on the server.'],
+  ['Checked uploads', 'Documents are read and compared with your form before you submit.'],
+  ['Feedback in context', 'Officer comments are tied to the section or document they concern. Only flagged parts reopen.'],
+]
 
 export function LoginPage() {
   const { user, ready, signIn } = useAuth()
@@ -51,15 +57,15 @@ export function LoginPage() {
   })
 
   return (
-    <div className="flex min-h-screen bg-bg">
-      <section className="flex w-full flex-col border-r border-line bg-surface px-6 py-10 sm:px-12 lg:w-[520px] lg:px-16 lg:py-14">
+    <div className="grid min-h-screen bg-surface lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <section className="flex flex-col px-6 py-8 sm:px-12 lg:px-20 lg:py-10">
         <div>
           <Logo />
         </div>
-        <div className="my-auto py-10">
-          <h1 className="text-[26px] font-semibold leading-8 tracking-tight">Sign in</h1>
-          <p className="mb-7 text-text-2">Use your registered email address and password.</p>
-          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-[18px]">
+        <div className="pf-enter my-auto w-full max-w-[400px] py-12">
+          <h1 className="font-display text-[40px] leading-[1.05] tracking-[-0.01em]">Sign in</h1>
+          <p className="mb-8 mt-3 text-[15px] leading-[22px] text-text-2">Use the email address and password you registered with.</p>
+          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
             {serverError ? (
               <Alert tone="error">
                 <span>{serverError}</span>
@@ -86,22 +92,40 @@ export function LoginPage() {
               Sign in
             </Button>
           </form>
+          <p className="mt-6 text-[13px] leading-[19px] text-text-3">
+            Sign-in is paused for a minute after 10 failed attempts. Licensing officers and administrators use the same sign-in.
+          </p>
         </div>
-        <div className="flex flex-col gap-1.5 text-xs leading-[18px] text-text-3">
-          <span>Sign-in is paused for a minute after 10 failed attempts.</span>
-          <span>
-            Licensing officers and administrators use the same sign-in. <Link to="/">About PermitFlow</Link>
-          </span>
+        <div className="text-[13px] text-text-3">
+          <Link to="/" className="text-text-2 no-underline hover:text-text">
+            About PermitFlow
+          </Link>
         </div>
       </section>
-      <section className="hidden flex-1 flex-col justify-center gap-6 px-20 py-16 lg:flex">
-        <div className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Food Establishment Licence</div>
-        <h2 className="max-w-[520px] text-[32px] font-semibold leading-10 tracking-tight">
-          Apply, respond to officer feedback and track your licence in one place.
-        </h2>
-        <p className="max-w-[480px] text-base leading-[26px] text-text-2">
-          Uploads are checked automatically so you can fix problems before you submit. Every decision is made by a licensing officer.
-        </p>
+      <section className="relative hidden flex-col justify-between overflow-hidden bg-ink px-16 py-14 text-white lg:flex xl:px-24">
+        <div
+          className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full border border-white/[0.06]"
+          aria-hidden="true"
+        />
+        <div
+          className="pointer-events-none absolute -bottom-52 -left-24 h-[520px] w-[520px] rounded-full border border-white/[0.06]"
+          aria-hidden="true"
+        />
+        <div className="pf-eyebrow text-[#aeb6c2]">Food Establishment Licence</div>
+        <div className="pf-stagger my-auto max-w-[520px]">
+          <h2 className="font-display text-[48px] leading-[1.05] xl:text-[56px]">
+            Everything about your licence, <em className="text-[#c5cbd3]">in one record.</em>
+          </h2>
+          <dl className="mt-12 divide-y divide-white/15 border-t border-white/15">
+            {POINTS.map(([title, text]) => (
+              <div key={title} className="grid gap-1 py-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-6">
+                <dt className="text-[15px] font-semibold">{title}</dt>
+                <dd className="text-[14px] leading-[21px] text-[#c5cbd3]">{text}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <p className="text-[13px] text-[#8d96a3]">Automatic checks are advisory. Every decision is made by a licensing officer.</p>
       </section>
     </div>
   )

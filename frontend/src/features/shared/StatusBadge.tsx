@@ -16,22 +16,27 @@ export interface StatusBadgeProps {
   label: string
   tone: Tone
   size?: 'md' | 'lg'
+  /** Pulses the dot: something is in progress (checking, saving). */
+  live?: boolean
   className?: string
 }
 
 /** Dot + label pill. Colour is never the only signal (UX-008). */
-export function StatusBadge({ label, tone, size = 'md', className }: StatusBadgeProps) {
+export function StatusBadge({ label, tone, size = 'md', live, className }: StatusBadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border font-semibold',
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border font-semibold transition-colors duration-[var(--dur-base)]',
         size === 'md' ? 'h-6 px-2 text-xs' : 'h-7 px-2.5 text-[13px]',
         tones[tone],
         className,
       )}
       data-tone={tone}
     >
-      <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-current" aria-hidden="true" />
+      <span className="relative flex h-[7px] w-[7px] shrink-0" aria-hidden="true">
+        {live ? <span className="absolute inset-0 animate-ping rounded-full bg-current opacity-60" /> : null}
+        <span className="relative h-[7px] w-[7px] rounded-full bg-current" />
+      </span>
       {label}
     </span>
   )
