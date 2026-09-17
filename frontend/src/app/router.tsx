@@ -6,6 +6,7 @@ import { LoginPage } from '@/features/auth/LoginPage'
 import { RequireRole } from '@/features/auth/RequireRole'
 import { AdminOverviewPage } from '@/features/admin/OverviewPage'
 import { OfficerQueuePage } from '@/features/officer/QueuePage'
+import { ApplicationPage } from '@/features/operator/ApplicationPage'
 import { OperatorDashboardPage } from '@/features/operator/DashboardPage'
 import { NotFoundPanel } from '@/features/shared/states'
 
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/app/dashboard', element: <OperatorDashboardPage /> },
           { path: '/app/applications', element: <OperatorDashboardPage /> },
+          { path: '/app/applications/:id', element: <ApplicationPage /> },
         ],
       },
     ],

@@ -1,0 +1,62 @@
+import logging
+import uuid
+
+from sqlalchemy import func, select, text
+from sqlalchemy.orm import Session
+
+from app.core.errors import NotFound
+from app.models import Application, User
+from app.models.enums import ApplicationStatus, Role
+
+logger = logging.getLogger("permitflow")
+
+
+class ApplicationRepository:
+    def __init__(self, db: Session) -> None:
+        self.db = db
+
+    def get_for(self, user: User, application_id: uuid.UUID, *, for_update: bool = False) -> Application:
+        """Ownership-aware lookup (SEC-002). Operators see only their own rows; others look like 404.
+
+        Officers and admins may read any application. Drafts are never visible to officers/admins
+        because they are not yet submitted (draft is a pre-submission state).
+        """
+        stmt = select(Application).where(Application.id == application_id)
+        if for_update:
+            stmt = stmt.with_for_update()
+        app = self.db.scalar(stmt)
+        if app is None:
+            raise NotFound("Application not found.")
+        if user.role == Role.OPERATOR and app.operator_id != user.id:
+            logger.warning(
+                "ownership_denied",
+                extra={"extra_fields": {"user_id": str(user.id), "application_id": str(application_id)}},
+            )
+            raise NotFound("Application not found.")
+        if user.role != Role.OPERATOR and app.status == ApplicationStatus.DRAFT:
+            raise NotFound("Application not found.")
+        return app
+
+    def list_for_operator(self, operator_id: uuid.UUID) -> list[Application]:
+        stmt = (
+            select(Application)
+            .where(Application.operator_id == operator_id)
+            .order_by(Application.updated_at.desc())
+        )
+        return list(self.db.scalars(stmt))
+
+    def count_for_operator(self, operator_id: uuid.UUID) -> int:
+        return int(
+            self.db.scalar(
+                select(func.count()).select_from(Application).where(Application.operator_id == operator_id)
+            )
+            or 0
+        )
+
+    def next_reference_no(self, year: int) -> str:
+        n = int(self.db.scalar(text("SELECT nextval('application_reference_seq')")) or 0)
+        return f"PF-{year}-{n:06d}"
+
+    def add(self, app: Application) -> Application:
+        self.db.add(app)
+        return app
