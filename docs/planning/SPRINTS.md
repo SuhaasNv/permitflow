@@ -39,7 +39,9 @@ Sprint level — a sprint is Done when:
 
 US-009: design direction, design system, clickable prototype (23 artboards), design docs in `docs/design/`, two critique passes. No code. Sprint dates below shifted by one day as a result.
 
-## Sprint 1 — 18 September 2026 — "An operator can submit"
+## Sprint 1 — 18 September 2026 — "An operator can submit" — CLOSED
+
+Closed 18 Sep 2026: goal met; US-002 OpenAI half moved to Sprint 2; retro in `CHANGELOG.md`.
 
 **Goal:** an operator logs in, creates an application, fills the form, uploads documents that are verified by the mock provider, and submits; the state machine, role labels and authorization exist and are unit-tested; CI skeleton runs.
 

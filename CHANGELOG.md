@@ -2,7 +2,44 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/planning/USER_STORIES.md`.
 
-## Sprint 1 (in progress, 18 Sep 2026)
+## Sprint 1 — 18 Sep 2026 — "An operator can submit"
+
+Sprint goal met: an operator signs in, creates an application, completes four validated sections, uploads four documents that are checked by the mock provider with live status, sees a server-computed progress indicator and submits; the submission becomes an immutable Revision 1 with audit events and officer notifications. Demonstrated end to end in Chrome at 1440, 820 and 390.
+
+Numbers at close: backend 578 tests (ruff, mypy strict, pytest on Postgres), frontend 18 tests (oxlint, tsc, vitest, vite build), all green locally. CI has not run remotely: nothing has been pushed yet. 25 commits on `dev`, every one conventional.
+
+### Shipped
+
+| Story | Outcome |
+|-------|---------|
+| US-000 Project skeleton | Done |
+| US-001 Login per persona | Done |
+| US-030 Role-specific status labels + state machine | Done (528 parametrised transition tests) |
+| US-010 Create application | Done |
+| US-011 Sectioned form with validation | Done |
+| US-012 Drag-and-drop document upload | Done (allowlist, magic bytes, 10 MB, sha256 no-change) |
+| US-002 AI verification pipeline | Mock half Done; see Slipped |
+| US-013 Live verification status | Done (pulled forward from Day 2) |
+| US-014 Progress indicator | Done |
+| US-015 Submit application | Done |
+| US-006 CI pipeline | Skeleton Done; Playwright and Docker build remain Day 3 as planned |
+| US-009 UI/UX design phase | Done (17 Sep, before the sprint) |
+
+Also in this sprint, not tied to a story: the public landing page (FR-031), the branching strategy, two Railway environments documented, the frontend redesign (typography, motion, single-surface panels, shell, landing, sign-in, dashboard, application header, stepper, save indicator, toasts, progressive document check, review page) and the dashboard / My applications split.
+
+### Slipped
+
+- US-002 OpenAI provider: the `OpenAIProvider` class exists and is selected by `AI_PROVIDER`, but it has not been run against a live key. Moved to Sprint 2 as planned from the start; the mock stays the default. Notion `Sprint Day` set to Day 2 with a note.
+- Nothing else slipped. US-006 was always split across Day 1 and Day 3.
+
+### Retro
+
+- What slowed us: the first UI pass was built to the prototype and judged "too basic". The redesign cost about a third of the day. Lesson: run the design-critique pass and a browser check on the first real screen, not after five screens.
+- What went well: the domain layer (state machine, labels, form schema, completeness, verification rules) is pure and fully tested, so every UI rewrite touched no business logic and no backend test. The pipeline-in-background-task with polling met "real-time status" without a broker.
+- What to change tomorrow: keep the officer screens honest from the first commit (no "all caught up" when the list is not built); verify every screen in Claude in Chrome at three widths before calling a story Done; write the Playwright journey early on Day 3 so the Sprint 2 loop is protected.
+- Risk into Sprint 2: 19 stories on the plan. The cut order in `SPRINTS.md` applies; the OpenAI provider may slip to Sprint 3 morning without cutting anything.
+
+### Milestones during the sprint
 
 - Dashboard and My applications are now different screens: the dashboard groups work cards by who is waiting on whom (Needs your response, Drafts to finish, With the licensing office, Decided) with a documents checklist rail; My applications is the full table with client-side status filter tabs.
 

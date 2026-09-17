@@ -2,7 +2,7 @@
 
 A regulatory licensing platform: business operators apply for a Food Establishment Licence, licensing officers review, give contextual feedback and request targeted resubmissions, and every uploaded document is checked by an advisory AI verifier. Built as a 3-day engineering assessment.
 
-Status: Sprint 1 in progress. What exists today is listed in `CHANGELOG.md`; scope is in `SCOPE.md`; documentation index in `docs/README.md`.
+Status: Sprint 1 closed (18 Sep 2026): an operator can apply, upload checked documents and submit. Sprint 2 (officer review and resubmission) starts next. What exists today is listed in `CHANGELOG.md`; scope is in `SCOPE.md`; documentation index in `docs/README.md`.
 
 ## Run locally
 

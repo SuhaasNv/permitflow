@@ -68,7 +68,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `reviews/PRODUCTION_READINESS_REVIEW.md` | to be written (Day 3) | Honest gap list with severity |
 | `reviews/ASSESSMENT_TRACEABILITY.md` | to be written (Day 3) | Brief requirement → implementation → test → evidence |
 | `reviews/FINAL_REVIEW.md` | to be written (Day 3) | What we built, tradeoffs, what AI got wrong |
-| `../CHANGELOG.md` | written (grows per story) | Milestones and sprint closes |
+| `../CHANGELOG.md` | written (Sprint 1 closed 18 Sep 2026) | Milestones, sprint closes with Shipped / Slipped / Retro |
 | `../README.md` | written (skeleton, grows per story) | Setup and overview |
 
 ## Review history

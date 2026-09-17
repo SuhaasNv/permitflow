@@ -20,7 +20,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 
 ### US-002 — As the system, I want an AI verification pipeline behind a provider interface, so that documents are checked consistently and the provider can be replaced.
 - Acceptance criteria: text extraction for PDF and TXT; empty text becomes `unreadable` with no model call; `VerificationProvider` protocol with `OpenAIProvider` (structured outputs) and `MockProvider`; provider chosen by `AI_PROVIDER`; output validated by a strict Pydantic model; confidence threshold rule; 30 s timeout with one retry; failures recorded as data, never raised; stale `running` runs marked `failed` on startup; runs in a background task after upload.
-- Priority: MVP · Day 1 (mock), Day 2 (OpenAI) · Dependencies: US-012 · Requirements: AI-001…AI-007, AI-009, REL-003, REL-004 · ADR-004, ADR-006
+- Priority: MVP · Day 1 (mock, done), Day 2 (OpenAI; slipped from Sprint 1 as planned) · Dependencies: US-012 · Requirements: AI-001…AI-007, AI-009, REL-003, REL-004 · ADR-004, ADR-006
 - Definition of Done: DoD checklist + pipeline integration test with the mock provider; provider-raising test.
 
 ### US-003 — As the system, I want to flag suspicious document content and reject malformed model output, so that officers are not misled by prompt injection or hallucinated results.
