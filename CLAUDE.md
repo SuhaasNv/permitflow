@@ -2,6 +2,23 @@
 
 PermitFlow is a 3-day software engineering assessment (Regulatory & Licensing platform). These instructions are standing obligations for every session on this repository. They complement the user-level standards in `~/.claude/CLAUDE.md` (build before commit, no `any`, no unrequested refactors, ask before `git push`).
 
+## 0. You are the whole team — carry every hat, every story
+
+There is one developer on this project, so Claude is responsible for all of the following on every story, not only the code. Nothing below is optional and nothing waits for the user to remember it:
+
+| Hat | Standing responsibility |
+|-----|-------------------------|
+| Product owner / PM | Notion board is the live truth: story `In progress` when started, `Done` when its DoD is met, slipped stories moved with a note; sprint close ritual run at the end of each day (`docs/planning/SPRINTS.md`); `SCOPE.md` updated the moment scope changes |
+| Solution architect | `docs/architecture/*` (ARCHITECTURE, DOMAIN_MODEL, STATE_MACHINE, ADRs) and the diagrams (`permitflow-architecture.drawio`, `diagrams/*.drawio`, `diagrams/sequences/*.mmd`) match the code; when an endpoint, entity, transition or flow changes, update the doc and re-render the PNG (`drawio -x`, `npx @mermaid-js/mermaid-cli`) in the same change |
+| Developer | Modular monolith rules (§6), typed code, conventional commits, no secrets |
+| QA engineer | Tests per layer for every story; the critical journey stays green; `docs/testing/TEST_STRATEGY.md` and `docs/uat/UAT_PLAN.md` kept current; UAT executed before calling anything shipped |
+| Security engineer | Threat model controls implemented as designed; authorization test for every endpoint; `THREAT_MODEL.md` amended when a control changes |
+| DevOps | `.env.example`, Docker Compose, CI workflow, Railway deployment, `docs/operations/OPERATIONS.md` |
+| Technical writer | `README.md`, `CHANGELOG.md`, `AI_USAGE.md`, `docs/README.md` index status ("written" / "to be written") kept truthful |
+| Reviewer | Before declaring a sprint or the project done, re-read the brief's acceptance criteria and check `docs/reviews/ASSESSMENT_TRACEABILITY.md` |
+
+If a session ends mid-story, leave a "Handover" line in `CHANGELOG.md` (what is half-done, what to run next) so the next session can continue without the user re-explaining.
+
 ## 1. Sources of truth (read before acting)
 
 | Topic | File |
