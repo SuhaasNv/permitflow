@@ -154,7 +154,7 @@ Layered (see `docs/testing/TEST_STRATEGY.md`): unit tests for the state machine,
 
 ## 20. LLM provider
 
-**Options.** (A) OpenAI via the official `openai` SDK with structured outputs (JSON schema derived from a Pydantic model), configurable for OpenAI or Azure OpenAI endpoints. (B) Anthropic Claude with tool-use structured output. (C) Any provider behind one interface.
-**Choice.** C in design, A implemented: a `VerificationProvider` protocol with `OpenAIProvider` and `MockProvider`; other providers can be added without touching the pipeline. The product owner asked for OpenAI, and an Azure OpenAI key already exists in the development environment.
-**Rationale.** Structured outputs with a JSON schema give reliable, validated output; the same SDK serves both OpenAI and Azure OpenAI; the mock keeps tests hermetic and the app functional without a key.
+**Options.** (A) OpenAI via the official `openai` SDK with structured outputs (JSON schema derived from a Pydantic model), direct API key. (B) Anthropic Claude with tool-use structured output. (C) Any provider behind one interface.
+**Choice.** C in design, A implemented: a `VerificationProvider` protocol with `OpenAIProvider` and `MockProvider`; other providers (Anthropic, Azure OpenAI) can be added without touching the pipeline. The product owner asked for OpenAI with a direct key.
+**Rationale.** Structured outputs with a JSON schema give reliable, validated output; the mock keeps tests hermetic and the app functional without a key.
 **Validation.** Evaluation set; unit tests on the mock; provider selection by environment variable tested.

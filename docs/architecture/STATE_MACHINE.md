@@ -34,7 +34,9 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 |------|----|---------------|-------|----------------|
 | `draft` | `application_received` | operator (owner) | `is_complete` (all required sections valid, all required documents present) | Operator clicks Submit |
 | `application_received` | `under_review` | officer | — | Officer clicks Start review |
+| `application_received` | `rejected` | officer | — (note required) | Officer clicks Reject (e.g. duplicate or ineligible submission) |
 | `pre_site_resubmitted` | `under_review` | officer | — | Officer clicks Start review |
+| `pre_site_resubmitted` | `rejected` | officer | — (note required) | Officer clicks Reject |
 | `under_review` | `pending_pre_site_resubmission` | officer | `open_feedback_count ≥ 1` | Officer clicks Request resubmission |
 | `under_review` | `site_visit_scheduled` | officer | `open_feedback_count = 0` | Officer clicks Schedule site visit |
 | `under_review` | `rejected` | officer | — (note required) | Officer clicks Reject |
@@ -81,7 +83,8 @@ Terminal states: `approved`, `rejected`.
           ▼                               │                                     ▲
    post_site_clarification_resubmitted ───┘── route to approval ────────────────┘
 
-   reject (officer, note) is allowed from: under_review, pending_pre_site_resubmission,
+   reject (officer, note) is allowed from every non-terminal post-submission state:
+   application_received, under_review, pending_pre_site_resubmission, pre_site_resubmitted,
    site_visit_scheduled, site_visit_done, pending_approval ──────────────────▶ rejected
 ```
 

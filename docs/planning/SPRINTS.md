@@ -84,7 +84,7 @@ Sprint level — a sprint is Done when:
 
 **Exit criteria:** Sprint DoD + integration test for the whole loop (two rounds) + operator visibility test + audit sequence test.
 
-**Cut order if behind:** US-024 templates (keep free text) → US-031 site-visit UI (keep transitions in API) → compare UI reduced to a plain changed-fields table → OpenAI provider slips to Sprint 3 morning (mock stays default).
+**Cut order if behind:** follow `DELIVERY_PLAN.md` §Cut order — any-two-revision compare → static Zod schemas → queue filter / re-run / draft delete → notification bell → templates UI (endpoint stays). MUST stories (US-024 templates, US-031 outcome transitions) are never cut; their UI becomes plainer. The OpenAI provider may slip to Sprint 3 morning (mock stays default) without cutting anything.
 
 ## Sprint 3 — 19 September 2026 — "Ship it honestly"
 
@@ -103,4 +103,4 @@ Sprint level — a sprint is Done when:
 
 **Protected time:** from 16:00 on Day 3 no new features; only fixes, docs and review.
 
-**Cut order if behind:** admin epic → AI evaluation runner (keep the fixture set and document manually) → Playwright reduced to one shortest journey → nothing else.
+**Cut order if behind:** admin epic → AI evaluation runner (keep the fixture set and document manually) → p95/AI-health metrics → Playwright reduced to one shortest journey → nothing else. Same list as `DELIVERY_PLAN.md` §Cut order.

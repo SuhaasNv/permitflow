@@ -87,7 +87,7 @@ Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC
 
 **Main flow**
 1. Operator opens the application's History tab.
-2. Sees revisions (number, submitted at) and all feedback ever raised with states and rounds.
+2. Sees revisions (number, submitted at) and all released feedback with states and rounds (items withdrawn by the officer before release are never shown to the operator).
 
 **Alternative / error flows**
 - 1a. Operator requests another operator's application → 404.
@@ -128,7 +128,7 @@ Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC
 2. Officer opens it; changed sections and documents carry a "Changed" marker.
 3. Officer opens "Compare", selects the previous revision; each changed field shows old and new values; documents show added/removed/replaced.
 4. Feedback panel shows each earlier item with its state (`addressed` or still `open`) and the round it was raised in.
-5. Officer marks addressed items `resolved`, or leaves them open and adds new items.
+5. Officer clicks "Start review" (`pre_site_resubmitted` → `under_review`), then marks addressed items `resolved`, or leaves them open and adds new items (feedback changes are only possible in `under_review`).
 6. Officer either requests another round (UC2-A step 5) or advances the application (UC2-C).
 
 **Alternative / error flows**

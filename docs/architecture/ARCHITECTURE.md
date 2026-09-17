@@ -31,7 +31,7 @@ A modular monolith (ADR-001): one FastAPI backend, one React frontend, one Postg
         │                           │                 │
 ┌───────▼────────┐        ┌─────────▼───────┐  ┌──────▼─────────────┐
 │ PostgreSQL     │        │ File storage    │  │ LLM provider       │
-│ (JSON snapshots│        │ (local disk /   │  │ (OpenAI / Azure    │
+│ (JSON snapshots│        │ (local disk /   │  │ (OpenAI API,       │
 │  + relational) │        │  Railway volume)│  │  replaceable)      │
 └────────────────┘        └─────────────────┘  └────────────────────┘
 ```

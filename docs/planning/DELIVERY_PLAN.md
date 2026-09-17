@@ -50,7 +50,8 @@ Exit criteria: CI green on main; deployed URL passes UAT; all submission checkli
 5. Queue status filter, re-run verification action, draft document delete (SCOPE S1–S3).
 6. p95 latency and AI-health metrics (part of the admin epic anyway).
 7. Notification bell → plain notifications list page.
-8. Comment templates UI → free text only (templates endpoint stays, it is trivial).
+8. Comment templates UI → plain dropdown (templates endpoint stays; templates are M9 so they are never removed).
+9. Playwright reduced to the single shortest journey.
 
 Nothing on the MUST list in `SCOPE.md` is cut; if the MUST list is at risk, the answer is a smaller UI (plain tables) with the same API and tests, not fewer behaviours.
 

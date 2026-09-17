@@ -88,7 +88,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: DoD checklist + atomic submission integration test.
 
 ### US-016 — As an operator, I want to see the status "Pending Pre-Site Resubmission" and the officer's comments prominently at the top of my application, so that I immediately understand what is being asked.
-- Acceptance criteria: status badge shows the operator label; a feedback panel above the form lists every released open item with its target, message, author role and round; resolved and withdrawn items are shown collapsed; feedback the officer is still drafting (not yet released) is never returned to the operator.
+- Acceptance criteria: status badge shows the operator label; a feedback panel above the form lists every released open item with its target, message, author role and round; resolved items are shown collapsed; feedback the officer is still drafting or withdrew before release is never returned to the operator.
 - Priority: MVP · Day 2 · Dependencies: US-015, US-023, US-025 · Requirements: FR-009, FR-008 · Use case UC1-B
 - Definition of Done: DoD checklist + operator view test (labels, feedback present, no internal fields).
 
@@ -103,7 +103,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: DoD checklist + editability and resubmission integration tests.
 
 ### US-019 — As an operator, I want to see my revision history and all previous officer comments, so that nothing is lost between rounds and I understand the full context.
-- Acceptance criteria: a History tab lists every revision with its timestamp and every feedback item with its state and round; three rounds produce three revisions; Revision 1 is unchanged after Revision 3.
+- Acceptance criteria: a History tab lists every revision with its timestamp and every released feedback item with its state and round; three rounds produce three revisions; Revision 1 is unchanged after Revision 3.
 - Priority: MVP · Day 2 · Dependencies: US-018 · Requirements: FR-013, FR-014, AUD-001 · Use case UC1-C
 - Definition of Done: DoD checklist + multi-round integration test.
 
