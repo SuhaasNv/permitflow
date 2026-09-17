@@ -1,8 +1,8 @@
-import { RouterProvider } from "react-router-dom";
+import { RouterProvider } from 'react-router-dom'
 
-import { AppProviders } from "./app/providers";
-import { router } from "./app/router";
-import { AuthProvider } from "@/features/auth/AuthContext";
+import { AppProviders } from './app/providers'
+import { router } from './app/router'
+import { AuthProvider } from '@/features/auth/AuthContext'
 
 export default function App() {
   return (
@@ -11,5 +11,5 @@ export default function App() {
         <RouterProvider router={router} />
       </AuthProvider>
     </AppProviders>
-  );
+  )
 }

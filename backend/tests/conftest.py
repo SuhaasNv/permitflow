@@ -9,6 +9,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 os.environ["APP_ENV"] = "test"
+os.environ.setdefault("UPLOAD_DIR", "./data/test-uploads")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -70,3 +71,11 @@ def client() -> Iterator[TestClient]:
     app = create_app()
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def clean_uploads() -> Iterator[None]:
+    yield
+    import shutil
+
+    shutil.rmtree(get_settings().upload_dir, ignore_errors=True)

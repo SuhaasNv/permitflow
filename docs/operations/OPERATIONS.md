@@ -31,6 +31,10 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 
 `cd backend && uv run python scripts/seed.py` creates the demo operator and officer if they do not exist. `SEED_PASSWORD` sets their password (default `PermitFlow!2026`); set it to something else in any shared environment.
 
+## Uploads
+
+Files are written under `UPLOAD_DIR` as `<application_id>/<random>.<ext>` (never the client file name), atomically via a `.part` temp file. Deleting a document only clears `is_current`; the file stays for the revision history. Tests use `./data/test-uploads` and clean it after every test.
+
 ## Health
 
 `GET /api/v1/health` → `200 {"status":"ok","database":"ok"}` or `503 {"status":"degraded","database":"unreachable"}`. Provider configuration is never exposed here.

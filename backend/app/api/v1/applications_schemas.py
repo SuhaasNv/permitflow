@@ -19,11 +19,38 @@ class SectionView(BaseModel):
     editable: bool
 
 
+class VerificationView(BaseModel):
+    status: str
+    summary: str | None
+    issues: list[dict[str, Any]]
+    missing_information: list[str]
+    error_reason: str | None
+    finished_at: datetime | None
+
+
+class DocumentView(BaseModel):
+    id: uuid.UUID
+    document_type: str
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    uploaded_at: datetime
+    replaces_filename: str | None
+    verification: VerificationView | None
+
+
 class DocumentSlotView(BaseModel):
     type: str
     label: str
     present: bool
     editable: bool
+    document: DocumentView | None = None
+
+
+class UploadOut(BaseModel):
+    application: "ApplicationOperatorView"
+    document: DocumentView
+    unchanged: bool
 
 
 class CompletenessView(BaseModel):
@@ -65,3 +92,6 @@ class ApplicationOperatorView(BaseModel):
     revision_count: int
     created_at: datetime
     updated_at: datetime
+
+
+UploadOut.model_rebuild()
