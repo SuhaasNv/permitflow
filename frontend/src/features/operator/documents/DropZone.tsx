@@ -95,7 +95,7 @@ export function DropZone({ label, hint = 'PDF, PNG, JPG or TXT · up to 10 MB', 
       <div className="text-[15px] font-semibold">
         {over ? 'Drop to upload' : label}{' '}
         {!over ? (
-          <span className="font-semibold text-primary underline decoration-primary-line underline-offset-[3px]">browse files</span>
+          <span className="font-semibold text-primary underline decoration-primary-line underline-offset-[3px]">Browse files</span>
         ) : null}
       </div>
       <div className="mt-1 text-[13px] text-text-3">{hint}</div>

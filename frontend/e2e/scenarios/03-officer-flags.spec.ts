@@ -14,7 +14,7 @@ test('officer adds feedback, undoes a withdraw, requests resubmission; operator 
   await page.getByLabel(/About/).selectOption('section:premises')
   await page.getByLabel(/Feedback for the operator/).fill('Please confirm the premises unit number against your tenancy agreement.')
   await page.locator('form').getByRole('button', { name: 'Add feedback' }).click()
-  await expect(page.getByText('draft, not sent yet').first()).toBeVisible()
+  await expect(page.getByText('Draft, not sent yet').first()).toBeVisible()
 
   // a template on a document
   await page.getByRole('button', { name: 'Add feedback' }).click()
@@ -33,7 +33,7 @@ test('officer adds feedback, undoes a withdraw, requests resubmission; operator 
   await page.getByRole('button', { name: 'Request resubmission' }).click()
   await confirmDialog(page, 'Request resubmission')
   await expect(status(page)).toHaveText('Pending Pre-Site Resubmission')
-  await expect(page.getByText('sent to operator').first()).toBeVisible()
+  await expect(page.getByText('Sent to the operator').first()).toBeVisible()
   const trail = await auditSummaries(page)
   expect(trail.filter((s: string) => s.startsWith('Feedback added'))).toHaveLength(2)
   expect(trail.filter((s: string) => s.startsWith('Feedback withdrawn'))).toHaveLength(1)
