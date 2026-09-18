@@ -4,11 +4,8 @@ from sqlalchemy.orm import Session
 from app.models import Application
 from app.models.enums import ApplicationStatus, Role
 from tests.factories import login, make_user
-from tests.unit.test_form_schema import VALID_BUSINESS, VALID_PREMISES
-
-
-def _draft(client: TestClient, headers: dict[str, str]) -> str:
-    return str(client.post("/api/v1/applications", headers=headers).json()["id"])
+from tests.journeys import VALID_BUSINESS, VALID_PREMISES
+from tests.journeys import draft as _draft
 
 
 def test_save_valid_section_persists_and_marks_complete(client: TestClient, db: Session) -> None:

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 import { cn } from '@/lib/cn'
 
-export type StepState = 'done' | 'current' | 'todo' | 'attention'
+type StepState = 'done' | 'current' | 'todo' | 'attention'
 
 export interface Step {
   label: string

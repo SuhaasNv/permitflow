@@ -32,6 +32,12 @@ Components are extracted only where the prototype uses them in two or more place
 | `SaveIndicator` | dirty / saving / saved (relative time, refreshed every 5 s) | section form footer |
 | `Toast` (`ToastProvider`, `useToast`) | title, body, tone; bottom-right stack, four max, auto-dismiss 4.5 s (errors stay) | section saved, document uploaded / removed / unchanged |
 | `Alert` | tone icon, optional title, optional action slot | inline messages |
+| `QueueRow` (in `OfficerQueuePage`) | reference + revision, business + applicant, officer status badge, document-check state (checking / n to check / clear), last activity, next-action chip (ink when it is the officer's turn) | S-20 |
+| `CheckResult` | officer-facing verification: outcome, confidence, model, time, issues with code, field and evidence quote, missing information, fixed-vocabulary error reasons | S-21 |
+| `ReviewRail` (in `OfficerCasePage`) | server-driven action buttons (primary + secondary, disabled with reason), document-check counts, feedback placeholder | S-21 |
+| `FeedbackPanel` | items grouped by round with resolution badge and sent/draft state, anchor link to the target, Withdraw; composer (template select fills target and message, target select, textarea) with per-field 422 errors; locked reason when not under review | S-21 |
+| `FeedbackNotice` | operator-facing feedback: open items first with target, resolution (Needs your change / Changed, awaiting review / Resolved), round, message and a link to the target; compact mode folds earlier items | S-15, S-13 |
+| `ComparePanel` | revision selectors, change counts, field rows old (struck, red tint) → new (green tint) rendered with the schema's display rules, document add/remove/replace, Show unchanged | S-23 |
 | `Reveal` | scroll reveal (IntersectionObserver, once, delay for staggering; reveals immediately without the API) | landing sections |
 | `PageSkeleton`, `Skeleton` | shimmer placeholders in the shape of the final layout | every loading state |
 | `Badge` | neutral/info/warning/success/error/primary; dot | counts, upload state |
@@ -60,8 +66,8 @@ Components are extracted only where the prototype uses them in two or more place
 | `ChangedFieldValue` | new value highlighted + old value struck through | S-23 |
 | `CompletionCard` | percentage bar, sections/documents counts, or "items addressed n of m" | S-11, S-12, S-15 |
 | `RequiredDocumentsChecklist` | per-type status line | S-12, S-13 |
-| `NotificationsPanel` / `NotificationRow` | unread tint, title, body, time | S-17 |
-| `AuditTable` | when, event, actor, type (mono) | S-25, S-40 |
+| `NotificationsBell` | bell with unread badge; popover with unread tint, title, body, relative time, Mark all as read; Escape and outside click close it | S-17 |
+| `AuditTrail` | event type (mono), plain summary, actor and role or System, time; family filter with `aria-pressed`; collapsed until opened | S-25, S-40 |
 | `PersonaPicker` | prototype/demo only: seeded accounts | S-00 |
 
 ## Motion tokens

@@ -1,4 +1,3 @@
-import io
 import uuid
 
 from fastapi.testclient import TestClient
@@ -8,29 +7,9 @@ from sqlalchemy.orm import Session
 from app.models import Application, AuditEvent, Document, VerificationRun
 from app.models.enums import ApplicationStatus, Role
 from tests.factories import login, make_user
-
-PDF = b"%PDF-1.4\n%fake\n1 0 obj << >> endobj\n%%EOF\n"
-
-
-def _draft(client: TestClient, h: dict[str, str]) -> str:
-    return str(client.post("/api/v1/applications", headers=h).json()["id"])
-
-
-def _upload(
-    client: TestClient,
-    h: dict[str, str],
-    app_id: str,
-    dtype: str,
-    name: str,
-    data: bytes,
-    mime: str = "application/pdf",
-):  # type: ignore[no-untyped-def]
-    return client.post(
-        f"/api/v1/applications/{app_id}/documents",
-        headers=h,
-        data={"document_type": dtype},
-        files={"file": (name, io.BytesIO(data), mime)},
-    )
+from tests.journeys import PDF
+from tests.journeys import draft as _draft
+from tests.journeys import upload as _upload
 
 
 def test_upload_creates_document_pending_run_and_audit(client: TestClient, db: Session, tmp_path) -> None:  # type: ignore[no-untyped-def]

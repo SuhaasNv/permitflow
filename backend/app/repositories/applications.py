@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from sqlalchemy import func, select, text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound
@@ -45,13 +45,15 @@ class ApplicationRepository:
         )
         return list(self.db.scalars(stmt))
 
-    def count_for_operator(self, operator_id: uuid.UUID) -> int:
-        return int(
-            self.db.scalar(
-                select(func.count()).select_from(Application).where(Application.operator_id == operator_id)
-            )
-            or 0
+    def list_submitted(self) -> list[tuple[Application, User]]:
+        """Every non-draft application with its applicant, newest activity first (officer queue)."""
+        stmt = (
+            select(Application, User)
+            .join(User, User.id == Application.operator_id)
+            .where(Application.status != ApplicationStatus.DRAFT)
+            .order_by(Application.updated_at.desc())
         )
+        return [(row[0], row[1]) for row in self.db.execute(stmt)]
 
     def next_reference_no(self, year: int) -> str:
         n = int(self.db.scalar(text("SELECT nextval('application_reference_seq')")) or 0)

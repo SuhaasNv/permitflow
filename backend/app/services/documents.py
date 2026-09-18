@@ -1,6 +1,7 @@
 """Document upload, replacement, download and deletion (FR-004, SEC-005)."""
 
 import hashlib
+import urllib.parse
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -10,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import BadRequest, Forbidden, NotFound
 from app.core.settings import get_settings
-from app.domain.editability import editable_targets
 from app.domain.enums import ApplicationStatus, DocumentType, VerificationStatus
 from app.domain.uploads import (
     UploadRejected,
@@ -24,6 +24,7 @@ from app.models import Application, Document, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
+from app.services.applications import ApplicationService
 
 CHUNK = 64 * 1024
 
@@ -60,8 +61,10 @@ class DocumentService:
             raise BadRequest(exc.message, details={"reason": exc.reason}) from exc
 
         app = self.applications.get_for(operator, application_id, for_update=True)
-        _, editable_types = editable_targets(app.status, set(), set())  # open feedback wired in US-018
+        _, editable_types = ApplicationService(self.db).editable_for(app)
         if document_type not in editable_types:
+            if app.status == ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION:
+                raise Forbidden("The licensing officer did not ask for a new copy of this document.")
             raise Forbidden("This document is not open for changes.")
 
         # Stream to storage with a hard size cap; hash while streaming; check magic bytes on the first chunk.
@@ -171,7 +174,18 @@ class DocumentService:
         doc = self.documents.get_in_application(app.id, document_id)
         if doc is None:
             raise NotFound("Document not found.")
+        if not self.storage.exists(doc.stored_key):
+            raise NotFound("This file is no longer available.")
         return doc, self.storage.open(doc.stored_key)
+
+
+def content_disposition(filename: str) -> str:
+    """Attachment header safe for any name: ASCII fallback plus RFC 5987 UTF-8 form (headers are Latin-1)."""
+    ascii_name = (
+        "".join(ch if 32 <= ord(ch) < 127 and ch not in '"\\' else "_" for ch in filename) or "document"
+    )
+    utf8 = urllib.parse.quote(filename, safe="")
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8}"
 
 
 def _display_name(filename: str) -> str:

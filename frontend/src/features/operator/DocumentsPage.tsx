@@ -8,6 +8,7 @@ import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/sh
 import { cn } from '@/lib/cn'
 import { ApplicationHeader } from './ApplicationHeader'
 import { DocumentSlot } from './documents/DocumentSlot'
+import { FeedbackNotice } from './FeedbackNotice'
 import { applicationKeys, useApplication } from './queries'
 
 export function DocumentsPage() {
@@ -40,7 +41,7 @@ export function DocumentsPage() {
   }
   const view = app.data
   const c = view.completeness
-  const canDelete = view.status_label === 'Draft'
+  const canDelete = view.revision_count === 0 && view.can_edit
   const base = `/app/applications/${id}`
 
   return (
@@ -54,17 +55,24 @@ export function DocumentsPage() {
           </span>
         }
         actions={
-          <>
-            <Link to={`${base}/form`} className={buttonClasses('secondary')}>
-              Back to form
-            </Link>
-            <Link to={`${base}/review`} className={buttonClasses('primary')}>
-              Review and submit
-            </Link>
-          </>
+          view.can_edit ? (
+            <>
+              <Link to={`${base}/form`} className={buttonClasses('secondary')}>
+                Back to form
+              </Link>
+              <Link to={view.resubmit ? base : `${base}/review`} className={buttonClasses('primary')}>
+                {view.resubmit ? 'Back to application' : 'Review and submit'}
+              </Link>
+            </>
+          ) : undefined
         }
       />
 
+      {view.feedback.length > 0 ? (
+        <div className="mb-6">
+          <FeedbackNotice view={view} compact />
+        </div>
+      ) : null}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="pf-stagger flex flex-col gap-4">
           {view.document_slots.map((slot, i) => (
@@ -74,6 +82,8 @@ export function DocumentsPage() {
               slot={slot}
               index={i}
               canDelete={canDelete}
+              feedback={view.feedback.filter((f) => f.document_type === slot.type)}
+              lockedReason={view.resubmit ? 'The licensing officer did not ask for a new copy of this document.' : undefined}
               onUploaded={(r) => setView(r.application)}
               onDeleted={setView}
             />

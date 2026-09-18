@@ -39,7 +39,78 @@ Also in this sprint, not tied to a story: the public landing page (FR-031), the 
 - What to change tomorrow: keep the officer screens honest from the first commit (no "all caught up" when the list is not built); verify every screen in Claude in Chrome at three widths before calling a story Done; write the Playwright journey early on Day 3 so the Sprint 2 loop is protected.
 - Risk into Sprint 2: 19 stories on the plan. The cut order in `SPRINTS.md` applies; the OpenAI provider may slip to Sprint 3 morning without cutting anything.
 
-### Milestones during the sprint
+## Sprint 2 — 19 Sep 2026 — "The loop closes, twice"
+
+Sprint goal met: the officer opens a queue, reviews the submitted revision with AI-assisted document checks beside each document, adds contextual feedback from templates and requests a resubmission; the operator sees the feedback on top, can edit only the flagged targets, resubmits as Revision 2; the officer sees Changed and Addressed markers, compares any two revisions, resolves feedback, schedules and completes a site visit, routes to approval and decides; the operator sees the outcome with the officer's note. Every step is audited and notified. Demonstrated end to end in Chrome, twice around, at 1440, 820 and 390, and the live OpenAI provider verified through the API.
+
+Numbers at close: backend 620 tests (ruff, mypy strict, pytest on Postgres), frontend 28 tests (oxlint, tsc, vitest, vite build), all green locally. 33 commits on `dev` since `v0.1.0`, every one conventional, every story on its own branch merged with `--no-ff`. Remote CI has run for the branches pushed so far.
+
+### Shipped
+
+| Story | Outcome |
+|-------|---------|
+| US-020 Review queue | Done |
+| US-021 Case view + Start review | Done |
+| US-022 AI results beside documents | Done |
+| US-023 Contextual feedback | Done |
+| US-024 Comment templates | Done (7 templates) |
+| US-025 Status transitions + operator notification | Done |
+| US-032 Operator sees only the outcome | Done |
+| US-016 Resubmission view | Done |
+| US-017 Feedback anchored to section or document | Done |
+| US-018 Edit only flagged, resubmit | Done |
+| US-019 Operator history | Done |
+| US-026 Officer notified on resubmission | Done |
+| US-027 Highlights + revision compare | Done (any two revisions, SCOPE S4) |
+| US-028 Feedback resolution tracking | Done |
+| US-029 Audit trail | Done |
+| US-031 Site visit and outcome | Done |
+| US-013 Live verification status polish | Done |
+| US-002 OpenAI provider | Done (`gpt-4.1-mini`) |
+| US-003 Injection heuristic + malformed output | Done |
+| US-033 Operator edge cases (added 19 Sep) | Done |
+| US-034 Backend edge cases (added 19 Sep) | Done |
+
+Also in this sprint, not tied to a story: the tidy pass (layering, schemas package, dead code), `docs/design/USER_JOURNEY.md`, `docs/reviews/EDGE_CASE_REVIEW.md`, SCOPE assumption 10 (who the operator is), 20 as-built captures in `docs/design/screens/as-built/`.
+
+### Slipped
+
+- Nothing. Every story on the Sprint 2 plan is Done, including the two added on the day.
+
+### Retro
+
+- What slowed us: the first live OpenAI call exposed two prompt and schema defects at once (invented enum values, no date), and the full test run against the live key took four minutes. Lesson: pin the wire schema and force the mock in tests before the first live run, not after.
+- What went well: every officer and operator screen was verified in the browser at three widths before its story moved to Done; three independent edge-case reviews found 40 items and all the "now" ones shipped as two stories with tests, without breaking the loop (full suites and a browser smoke after the tidy pass).
+- What to change tomorrow: write the Playwright journey first thing so the loop is protected while the Day 3 documents are written; keep the admin epic strictly after the MUSTs (tests, CI, deployment, documents).
+- Risk into Sprint 3: Railway deployment needs the user's account; everything else is in our hands.
+
+### Milestones during the sprint (Sprint 2)
+
+- US-033 and US-034 Edge-case pass (three independent reviews, every finding and its fix or plan in `docs/reviews/EDGE_CASE_REVIEW.md`). Frontend (US-033): any 401 ends the session in one place and the sign-in page explains it; the token expiry signs out proactively; a network blip on reload no longer logs the user out; browser prompt on refresh or close with unsaved section input; Sign out asks first when a form is dirty; "Save and exit" saves the partial draft; a dirty section is never overwritten by another tab's save; submit is guarded against double fire and explains a 409; review and submitted pages redirect when the application is not in the right state; locked applications show no editing chrome; polling stops after 3 minutes and offers Re-run; Replace is hidden while a check runs; Re-run needs an editable slot; download errors surface as toasts; confirmation dialogs focus Cancel when destructive; over-promising copy removed ("10 working days", "by email"). Backend (US-034): login limiter keyed on the socket address with `TRUSTED_PROXIES`, no reset on success, constant-cost unknown email; `Content-Length` refused before the multipart body is read and no `.part` leftovers; RFC 5987 download names and 404 for missing files; `NaN` is a 422; injection beats model-declared unreadable; stale `pending` runs failed at startup and atomic run claim; re-run under row lock with `verification.requested` audit; `section.updated` audit with field names only; fixed error-reason vocabulary; notifications delivered after commit; batched operator list; admin download closed until US-072.
+
+- US-002 OpenAI provider + US-003 injection and malformed output: `AI_PROVIDER=openai` run live with `gpt-4.1-mini` (new default; measured against `gpt-4o-mini` and `gpt-5-mini`). The first live call exposed two defects, both fixed: the wire schema used plain strings so the model invented status, severity and code values (now pinned as JSON-schema enums and listed in the prompt, unit-tested), and the prompt carried no date so an expired certificate passed (today's date is now in the user message). Six live cases recorded in `docs/ai/AI_VERIFICATION_DESIGN.md`; an end-to-end upload through the API stored `provider=openai, model=gpt-4.1-mini`. The test suite now forces the mock provider regardless of `.env` (`TEST_LIVE_AI=1` opts in), after the first full run with the live key took four minutes and failed one assertion. US-003's criteria are met by the injection heuristic (now applied before the model's `unreadable` verdict), the strict wire and domain models (`raw_output_valid=false` on any malformed output) and the confidence bounds.
+
+- US-031 Site visit and outcome: the officer rail drives Schedule site visit → Mark site visit done → Route to approval → Approve (note optional) or Reject (note required) through the transition endpoint; the decision note is stored and served to the operator only with the final outcome; operator application page shows an outcome panel with the note; nothing can follow a decision (409). Covered by outcome and rejection tests and a browser run of the full path.
+
+- US-029 Audit trail + US-019 Operator history: `GET /officer/applications/{id}/audit` serves every event in order with actor name and role, a plain-language summary from `domain/audit_labels.py` and the payload; covered by a whole-journey sequence test (create → sections → uploads → checks → submit → review → feedback → release → resubmit → addressed → resolved). Operator views carry the revision list; `/app/applications/{id}/history` shows revisions, "what changed from Revision N-1" (owner-side compare) and every released feedback item by round. Case page gains a collapsible, filterable audit trail.
+
+- Tidy pass (audit by a read-only agent, 23 findings, all behaviour-neutral): Pydantic schemas moved from `app/api/v1/*_schemas.py` to `app/schemas/` so services no longer import the API layer (new layering tests); shared test journeys in `tests/journeys.py` replace cross-imports between test modules; dead helpers removed (`pending_runs`, limiter `reset`, `count_for_operator`, backend `ALLOWED_EXTENSIONS`); `PROMPT_VERSION` recorded in the verification audit payload; Vite template stylesheet, unused assets and `api/health.ts` removed; `Breadcrumb` in its own file; internal exports made private; `.gitignore` covers `data/`, `*.part`, coverage and generated prototype output; README status and AI verification section; artboard count and docs index corrected.
+
+- US-026, US-027, US-028 Officer resubmission review: officers are notified on resubmission and the queue shows "Review resubmission"; `domain/diff.py` (field-level form diff bound to the schema, documents by sha256) behind `GET /applications/{id}/compare?from&to` for owner or officer; the officer view carries `changed_sections`, `changed_document_types`, `previous_revision_number` and `addressed_unresolved_count`; `POST .../feedback/{fid}/resolve` (open or addressed → resolved, audited). Frontend: resubmitted banner, Changed / Replaced markers, compare panel with any-two-revision selectors (SCOPE S4 landed), "Addressed in Revision N" badges and Mark resolved, warning while addressed items stay unresolved.
+
+- US-016, US-017, US-018 Operator resubmission: the operator view lists released feedback only (never drafts or pre-release withdrawals, never the author) with resolution and round; editability now comes from open released feedback (`ApplicationService.editable_for`), so non-flagged sections and documents return 403 with a plain reason; `resubmit` readiness reports changed and untouched flagged targets; `POST /applications/{id}/resubmit` creates Revision N+1, marks changed items addressed, audits and notifies officers (422 `no_change`, 409 when the state moved). Frontend: feedback notice on top of the application with links to each target, inline officer comments on the flagged section and document slot, locked-with-reason on the rest, Respond to feedback and Resubmit actions with a confirmation that names untouched items, "Changes resubmitted" confirmation page. Verified with a full officer → operator → officer loop in the browser.
+
+- US-025 Status transitions + operator notification, US-032 operator sees only the outcome: the transition endpoint (US-021) now covers every officer edge with guards (request resubmission needs an open item and releases the round, site visit needs none, reject needs a note, stale version 409); every transition writes an operator notification in the same transaction with the operator label only; `GET /notifications`, `POST /notifications/{id}/read`, `POST /notifications/read-all` (own items only); operator views carry `needs_operator_action` so the dashboard no longer infers it from a colour. Frontend: bell with unread count and popover in the shell for every role. US-032 is satisfied by the serializer (operator views never carry the internal code; "Pending Approval" is the operator wording for the approval stage), covered by tests.
+
+- US-023 Contextual feedback + US-024 Comment templates: `Feedback` rows tied to a section key or a document type, created and withdrawn only while Under Review (409 otherwise), audited (`feedback.created`, `feedback.withdrawn`); seven templates in `domain/feedback_templates.py` served by `GET /officer/feedback-templates`; the officer view lists items by round with author, resolution and release state, and reports `feedback_editable` with a reason; requesting a resubmission releases every open item (`released_to_operator_at`, `feedback.released`). Frontend: feedback rail with composer (template fills target and message), Withdraw, inline "n open feedback" markers on sections and documents, Request resubmission becomes the primary action once an item is open.
+
+- US-022 AI results beside each document (officer): delivered by the case view (`CheckResult`: status, confidence, model, summary, issues with code, field and evidence, missing information, fixed error reasons) plus an officer re-run endpoint and button; the case polls every 2 s while a check runs.
+
+- US-021 Officer case view + Start review: `GET /officer/applications/{id}` serves the submitted revision's sections (never the working copy), current documents with full check detail (confidence, evidence, model), revision history and the transitions available now with guard reasons; `POST /officer/applications/{id}/transition` locks the row, checks `expected_version` (409), runs `domain/workflow.transition` (409 with allowed targets), writes `status.changed` with the officer as actor and notifies the operator in the same transaction. Frontend case workspace: key facts strip, submission sheet, documents with `CheckResult`, revision history, sticky review rail with server-driven actions, confirmation dialogs (note required to reject), stale-version reload banner. Verified in Chrome as the officer at 1440, 820 and 390.
+
+- US-020 Review queue: `GET /officer/applications` (officer only; operators and admins get 403) lists every non-draft application with applicant, internal status and officer label, a server-derived next action and whose turn it is (`domain/officer_actions.py`), revision count, open feedback count, document-check attention and checking counts, first submission and last activity, plus turn counts, in four queries. Frontend queue with Needs review / Waiting on operator / Decided / All tabs, 30 s refresh, honest empty states; case route placeholder until US-021.
+
+### Milestones during the sprint (Sprint 1)
 
 - Dashboard and My applications are now different screens: the dashboard groups work cards by who is waiting on whom (Needs your response, Drafts to finish, With the licensing office, Decided) with a documents checklist rail; My applications is the full table with client-side status filter tabs.
 

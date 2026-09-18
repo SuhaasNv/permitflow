@@ -60,6 +60,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 
 ---
 
+### US-034 — As the system, I want login, upload, verification and audit hardened against the near-misses found in review, so that abuse and restarts cannot corrupt or stall an application.
+- Acceptance criteria: the login limiter keys on the socket address and honours `X-Forwarded-For` only from `TRUSTED_PROXIES`; a successful login does not reset the failure window; unknown emails cost the same hash check; an upload whose `Content-Length` exceeds the cap is refused before the body is read and rejected uploads leave no partial file; downloads work for any file name and return 404 when the file is missing; `NaN` in a number field is a 422; injection phrases are flagged even when the model calls the document unreadable; runs left `pending` by a restart are failed on startup and the pending-to-running claim is atomic; re-run takes the row lock and is audited; section saves are audited with field names only; error reasons served to clients come from a fixed vocabulary; notifications are delivered only after the commit; admin cannot download documents until US-072 grants it.
+- Priority: MVP · Day 2 · Dependencies: US-001, US-012, US-002 · Requirements: SEC-005, SEC-010, REL-003, AUD-001 · Threat model T4, T5, T13 · Source: `docs/reviews/EDGE_CASE_REVIEW.md` items 17 to 31 · Branch `fix/us-034-backend-edge-cases`
+- Definition of Done: DoD checklist + `tests/integration/test_edge_cases.py` (11 regression tests).
+
 ## UC1 — Operator Submission & Resubmission
 
 ### US-010 — As an operator, I want to create a new licence application, so that I can start my submission.
@@ -113,6 +118,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: DoD checklist + multi-round integration test.
 
 ---
+
+### US-033 — As an operator, I want my unsaved work and my session protected from refreshes, expiry and other tabs, so that I never lose what I typed or get stuck on a dead page.
+- Acceptance criteria: a 401 from any request ends the session in one place and the sign-in page explains it, keeping the return path only within the role's own area; the token expiry signs out proactively; a network blip on reload does not sign out; refreshing or closing the tab with unsaved section input triggers the browser prompt; Sign out and in-app navigation ask first when a form is dirty; "Save and exit" saves the partial draft; a dirty section is never overwritten by another tab's save; submit cannot double-fire and a 409 is explained; the review and confirmation pages redirect when the application is not in the right state; locked applications show no editing chrome; polling stops after 3 minutes and offers Re-run; Replace is hidden while a check runs; download errors are shown; destructive dialogs focus Cancel; copy makes no promise the system cannot keep.
+- Priority: MVP · Day 2 · Dependencies: US-011, US-015 · Requirements: SEC-006, UX-002, REL-005 · Source: `docs/reviews/EDGE_CASE_REVIEW.md` items 1 to 16 · Branch `fix/us-033-operator-edge-cases`
+- Definition of Done: DoD checklist + `lib/unsaved.test.ts`, `queries.test.ts`, Chrome check of the sign-out guard and Save and exit.
 
 ## UC2 — Officer Review & Feedback
 

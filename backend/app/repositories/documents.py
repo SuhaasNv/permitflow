@@ -33,6 +33,11 @@ class DocumentRepository:
             select(Document).where(Document.id == document_id, Document.application_id == application_id)
         )
 
+    def get_many(self, ids: list[uuid.UUID]) -> list[Document]:
+        if not ids:
+            return []
+        return list(self.db.scalars(select(Document).where(Document.id.in_(ids))))
+
     def latest_run(self, document_id: uuid.UUID) -> VerificationRun | None:
         stmt = (
             select(VerificationRun)
@@ -62,3 +67,36 @@ class DocumentRepository:
     def add_run(self, run: VerificationRun) -> VerificationRun:
         self.db.add(run)
         return run
+
+    def present_types_for(self, application_ids: list[uuid.UUID]) -> dict[uuid.UUID, set[DocumentType]]:
+        """Current document types per application, one query."""
+        if not application_ids:
+            return {}
+        stmt = select(Document.application_id, Document.document_type).where(
+            Document.application_id.in_(application_ids), Document.is_current.is_(True)
+        )
+        out: dict[uuid.UUID, set[DocumentType]] = {}
+        for app_id, dtype in self.db.execute(stmt):
+            out.setdefault(app_id, set()).add(dtype)
+        return out
+
+    def latest_runs_for_applications(
+        self, application_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[VerificationRun]]:
+        """Latest verification run of every current document, grouped by application (officer queue)."""
+        if not application_ids:
+            return {}
+        docs = list(
+            self.db.scalars(
+                select(Document).where(
+                    Document.application_id.in_(application_ids), Document.is_current.is_(True)
+                )
+            )
+        )
+        runs = self.latest_runs([d.id for d in docs])
+        out: dict[uuid.UUID, list[VerificationRun]] = {}
+        for d in docs:
+            run = runs.get(d.id)
+            if run is not None:
+                out.setdefault(d.application_id, []).append(run)
+        return out

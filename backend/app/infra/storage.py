@@ -32,9 +32,14 @@ class LocalDiskStorage:
         path = self._path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".part")
-        with tmp.open("wb") as f:
-            for chunk in chunks:
-                f.write(chunk)
+        try:
+            with tmp.open("wb") as f:
+                for chunk in chunks:
+                    f.write(chunk)
+        except BaseException:
+            # A rejected upload (too large, wrong bytes) must not leave a partial file behind.
+            tmp.unlink(missing_ok=True)
+            raise
         os.replace(tmp, path)
 
     def open(self, key: str) -> Iterator[bytes]:

@@ -25,7 +25,7 @@ const POINTS: [string, string][] = [
 ]
 
 export function LoginPage() {
-  const { user, ready, signIn } = useAuth()
+  const { user, ready, signIn, endedReason } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -42,9 +42,10 @@ export function LoginPage() {
       const response = await login(values.email, values.password)
       signIn(response)
       const from = (location.state as { from?: string } | null)?.from
-      navigate(from && from !== '/login' ? from : homeFor(response.user.role), {
-        replace: true,
-      })
+      const home = homeFor(response.user.role)
+      const area = home.split('/')[1] ?? ''
+      // Only return to a path inside this role's own area; a stale path from another role lands on home.
+      navigate(from && from.startsWith(`/${area}/`) ? from : home, { replace: true })
     } catch (error) {
       if (error instanceof AppError && error.status === 429) {
         setServerError('Too many failed attempts. Sign-in is paused for a minute.')
@@ -66,6 +67,15 @@ export function LoginPage() {
           <h1 className="font-display text-[40px] leading-[1.05] tracking-[-0.01em]">Sign in</h1>
           <p className="mb-8 mt-3 text-[15px] leading-[22px] text-text-2">Use the email address and password you registered with.</p>
           <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+            {endedReason && !serverError ? (
+              <Alert tone="info">
+                <span>
+                  {endedReason === 'expired'
+                    ? 'Your session ended after 8 hours. Sign in again to continue where you left off.'
+                    : 'Your session is no longer valid. Sign in again to continue.'}
+                </span>
+              </Alert>
+            ) : null}
             {serverError ? (
               <Alert tone="error">
                 <span>{serverError}</span>

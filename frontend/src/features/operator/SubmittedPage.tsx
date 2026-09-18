@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
 import { buttonClasses } from '@/features/shared/Button'
@@ -11,10 +11,10 @@ const STEPS: [string, string, string][] = [
   [
     'Officer review',
     'A licensing officer reviews your form and documents. You will be notified if changes are needed.',
-    'Typically within 10 working days',
+    'You will see the status change here',
   ],
   ['Site visit', 'If the review is satisfactory, an officer will contact you to arrange a visit to the premises.', 'After review'],
-  ['Outcome', 'You will be notified of the final decision here and by email.', 'After the site visit'],
+  ['Outcome', 'The final decision appears on this page and on your dashboard.', 'After the site visit'],
 ]
 
 export function SubmittedPage() {
@@ -27,6 +27,7 @@ export function SubmittedPage() {
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   const view = app.data
+  if (view.revision_count === 0) return <Navigate to={`/app/applications/${id}`} replace />
   return (
     <div className="mx-auto max-w-3xl pt-4 sm:pt-8">
       <div className="pf-stagger text-center" role="status">
@@ -45,10 +46,13 @@ export function SubmittedPage() {
             <path className="pf-check" d="M20 6 9 17l-5-5" />
           </svg>
         </span>
-        <h1 className="font-display text-[44px] leading-[1.05] sm:text-[52px]">Application submitted</h1>
+        <h1 className="font-display text-[44px] leading-[1.05] sm:text-[52px]">
+          {view.revision_count > 1 ? 'Changes resubmitted' : 'Application submitted'}
+        </h1>
         <p className="mx-auto mt-4 max-w-[52ch] text-[16px] leading-6 text-text-2">
-          Your Food Establishment Licence application has been received by the licensing office. A copy of everything you entered and
-          uploaded is kept as Revision 1.
+          {view.revision_count > 1
+            ? `Your changes have been received by the licensing office and kept as Revision ${view.revision_count}. The officer will check the flagged items against your update.`
+            : 'Your Food Establishment Licence application has been received by the licensing office. A copy of everything you entered and uploaded is kept as Revision 1.'}
         </p>
         <dl className="mx-auto mt-8 grid max-w-[560px] grid-cols-1 divide-y divide-line border-y border-line text-left sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           <div className="px-5 py-4">
@@ -62,7 +66,7 @@ export function SubmittedPage() {
             </dd>
           </div>
           <div className="px-5 py-4">
-            <dt className="pf-eyebrow mb-1">Submitted</dt>
+            <dt className="pf-eyebrow mb-1">Last updated</dt>
             <dd className="text-[15px] font-medium tabular-nums">{formatDateTime(view.updated_at)}</dd>
           </div>
         </dl>
@@ -97,7 +101,7 @@ export function SubmittedPage() {
               </svg>
             </span>
             <div>
-              <div className="text-[15px] font-semibold">Submitted · Revision 1 recorded</div>
+              <div className="text-[15px] font-semibold">Submitted · Revision {view.revision_count} recorded</div>
               <div className="mt-0.5 text-[13px] leading-[19px] text-text-2">
                 The snapshot cannot be changed. Later revisions are compared against it.
               </div>

@@ -75,7 +75,7 @@ const STEPS: [string, string][] = [
   ['Apply in sections', 'Business, premises, operations and declarations. Each section validates as you go and saves as a draft.'],
   ['Upload and check', 'Each document is read and compared with your form so likely problems surface before you submit.'],
   ['Officer review', 'A licensing officer reviews the application. Feedback is tied to the exact section or document it concerns.'],
-  ['Site visit and outcome', 'After a satisfactory review and a visit to the premises, the decision appears here and by email.'],
+  ['Site visit and outcome', 'After a satisfactory review and a visit to the premises, the decision appears in your workspace.'],
 ]
 
 const JOURNEY: { label: string; tone: Tone; note: string }[] = [

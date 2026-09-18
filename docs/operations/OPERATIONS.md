@@ -19,9 +19,11 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `UPLOAD_DIR` | `./data/uploads` | backend | Local disk storage; Railway volume at `/data/uploads`. |
 | `UPLOAD_MAX_BYTES` | `10485760` | backend | 10 MB. |
 | `LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | backend | Failed attempts per IP per minute. |
+| `TRUSTED_PROXIES` | empty | Comma-separated proxy IPs whose `X-Forwarded-For` is trusted for the login rate limit; set to the platform edge IPs in production |
+| `TEST_LIVE_AI` | unset | tests | Set to `1` to let the pytest suite call the live OpenAI provider; otherwise tests force `AI_PROVIDER=mock` regardless of `.env`. |
 | `AI_PROVIDER` | `mock` | backend | `mock` or `openai`. |
 | `OPENAI_API_KEY` | empty | backend | Required when `AI_PROVIDER=openai`. |
-| `OPENAI_MODEL` | `gpt-4o-mini` | backend | |
+| `OPENAI_MODEL` | `gpt-4.1-mini` | backend | Structured outputs required; `gpt-4.1-mini` measured fastest and cheapest for extraction on 19 Sep 2026 (see `docs/ai/AI_VERIFICATION_DESIGN.md`). |
 | `AI_TIMEOUT_SECONDS` | `30` | backend | Per call. |
 | `AI_CONFIDENCE_THRESHOLD` | `0.6` | backend | Below this, `verified` becomes `needs_review`. |
 | `AI_MAX_TEXT_CHARS` | `20000` | backend | Extraction cap sent to the provider. |

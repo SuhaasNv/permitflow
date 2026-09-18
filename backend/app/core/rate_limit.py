@@ -37,10 +37,6 @@ class FailedLoginLimiter:
         with self._lock:
             self._prune(key, time.monotonic()).append(time.monotonic())
 
-    def reset(self, key: str) -> None:
-        with self._lock:
-            self._failures.pop(key, None)
-
     def clear(self) -> None:
         with self._lock:
             self._failures.clear()

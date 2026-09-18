@@ -53,6 +53,35 @@ class UploadOut(BaseModel):
     unchanged: bool
 
 
+class OperatorFeedbackView(BaseModel):
+    """Released feedback only. No author name or internal fields: the operator sees the licensing office."""
+
+    id: uuid.UUID
+    target_type: str
+    section_key: str | None
+    document_type: str | None
+    target_label: str
+    message: str
+    resolution: str
+    round: int
+    released_at: datetime
+    addressed_in_revision: int | None
+
+
+class ResubmitReadiness(BaseModel):
+    can_resubmit: bool
+    changed_sections: list[str]
+    changed_document_types: list[str]
+    # Open targets the operator has not changed yet.
+    untouched_targets: list[str]
+    reason: str | None
+
+
+class RevisionSummaryView(BaseModel):
+    number: int
+    submitted_at: datetime
+
+
 class CompletenessView(BaseModel):
     percent: int
     is_complete: bool
@@ -73,6 +102,8 @@ class ApplicationSummaryOut(BaseModel):
     premises_summary: str | None
     percent: int
     revision_count: int
+    # True when the licensing office is waiting on the operator (draft is not "waiting": it is theirs).
+    needs_operator_action: bool
     created_at: datetime
     updated_at: datetime
 
@@ -90,6 +121,12 @@ class ApplicationOperatorView(BaseModel):
     document_slots: list[DocumentSlotView]
     completeness: CompletenessView
     revision_count: int
+    needs_operator_action: bool
+    feedback: list[OperatorFeedbackView] = []
+    resubmit: ResubmitReadiness | None = None
+    revisions: list[RevisionSummaryView] = []
+    # Officer's note shown with the final outcome only (Approved or Rejected).
+    decision_note: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import type { DocumentSlotView } from '@/api/applications'
+import type { DocumentSlotView, OperatorFeedback } from '@/api/applications'
 import { AppError } from '@/api/client'
 import { deleteDocument, downloadDocument, rerunVerification, uploadDocument, validateFile } from '@/api/documents'
 import type { UploadResult } from '@/api/documents'
@@ -11,6 +11,7 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDateTime } from '@/lib/format'
+import { isCheckStale } from '../queries'
 import { DropZone } from './DropZone'
 import { VerificationBlock } from './VerificationBlock'
 
@@ -19,11 +20,14 @@ interface DocumentSlotProps {
   slot: DocumentSlotView
   index: number
   canDelete: boolean
+  feedback?: OperatorFeedback[]
+  lockedReason?: string
   onUploaded: (result: UploadResult) => void
   onDeleted: (view: UploadResult['application']) => void
 }
 
-type UploadState = { phase: 'idle' } | { phase: 'uploading'; name: string; fraction: number } | { phase: 'error'; message: string }
+type UploadState =
+  { phase: 'idle' } | { phase: 'uploading'; name: string; fraction: number } | { phase: 'error'; title: string; message: string }
 
 const FileIcon = ({ image }: { image: boolean }) => (
   <svg
@@ -55,7 +59,16 @@ const FileIcon = ({ image }: { image: boolean }) => (
 const RERUNNABLE = new Set(['verified', 'issues_found', 'needs_review', 'unreadable', 'failed', 'unavailable'])
 
 /** One required document type: empty drop zone, or the current file with its verification result. */
-export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded, onDeleted }: DocumentSlotProps) {
+export function DocumentSlot({
+  applicationId,
+  slot,
+  index,
+  canDelete,
+  feedback = [],
+  lockedReason,
+  onUploaded,
+  onDeleted,
+}: DocumentSlotProps) {
   const [state, setState] = useState<UploadState>({ phase: 'idle' })
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -65,7 +78,7 @@ export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded
   const start = async (file: File) => {
     const clientError = validateFile(file)
     if (clientError) {
-      setState({ phase: 'error', message: clientError })
+      setState({ phase: 'error', title: 'Upload not accepted', message: clientError })
       return
     }
     setState({ phase: 'uploading', name: file.name, fraction: 0 })
@@ -81,7 +94,11 @@ export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded
         toast.push({ title: 'Document uploaded', body: `${file.name} is attached and being checked.`, tone: 'success' })
       }
     } catch (error) {
-      setState({ phase: 'error', message: error instanceof Error ? error.message : 'Upload failed. Try again.' })
+      setState({
+        phase: 'error',
+        title: 'Upload did not complete',
+        message: error instanceof Error ? error.message : 'Upload failed. Try again.',
+      })
     }
   }
 
@@ -92,7 +109,11 @@ export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded
       onUploaded(await rerunVerification(applicationId, doc.id))
       setState({ phase: 'idle' })
     } catch (error) {
-      setState({ phase: 'error', message: error instanceof AppError ? error.message : 'Could not re-run the check.' })
+      setState({
+        phase: 'error',
+        title: 'Could not re-run the check',
+        message: error instanceof AppError ? error.message : 'Try again in a moment.',
+      })
     } finally {
       setBusy(false)
     }
@@ -106,16 +127,31 @@ export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded
       setConfirmDelete(false)
       toast.push({ title: 'Document removed', body: `${slot.label} is no longer attached.` })
     } catch (error) {
-      setState({ phase: 'error', message: error instanceof AppError ? error.message : 'Could not remove this file.' })
+      setState({
+        phase: 'error',
+        title: 'Could not remove this file',
+        message: error instanceof AppError ? error.message : 'Try again in a moment.',
+      })
     } finally {
       setBusy(false)
     }
   }
 
   const live = doc?.verification?.status === 'running' || doc?.verification?.status === 'pending'
+  const stale = Boolean(doc && live && isCheckStale(doc.uploaded_at))
+  const canRerun = Boolean(doc?.verification && slot.editable && (RERUNNABLE.has(doc.verification.status) || stale))
+
+  const download = async () => {
+    if (!doc) return
+    try {
+      await downloadDocument(applicationId, doc.id, doc.original_filename)
+    } catch (error) {
+      toast.push({ title: 'Download failed', body: error instanceof Error ? error.message : 'Try again in a moment.', tone: 'error' })
+    }
+  }
 
   return (
-    <section className="pf-surface overflow-hidden" aria-labelledby={`slot-${slot.type}`}>
+    <section id={`slot-${slot.type}`} className="pf-surface scroll-mt-24 overflow-hidden" aria-labelledby={`slot-title-${slot.type}`}>
       <div className="flex items-center gap-3.5 px-4 py-4 sm:px-5">
         <span
           className={cn(
@@ -128,7 +164,7 @@ export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             <span className="font-mono text-xs text-text-3">0{index + 1}</span>
-            <h3 id={`slot-${slot.type}`} className="text-[15px] font-semibold leading-[22px]">
+            <h3 id={`slot-title-${slot.type}`} className="text-[15px] font-semibold leading-[22px]">
               {slot.label}
             </h3>
           </div>
@@ -155,10 +191,26 @@ export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded
         )}
       </div>
 
+      {feedback
+        .filter((f) => f.resolution === 'open')
+        .map((f) => (
+          <div key={f.id} className="px-4 pb-4 sm:px-5">
+            <Alert tone="warning" title="The licensing office asked for a new copy">
+              {f.message}
+            </Alert>
+          </div>
+        ))}
+      {!slot.editable && lockedReason ? (
+        <div className="px-4 pb-4 sm:px-5">
+          <Alert tone="neutral">
+            <span>{lockedReason}</span>
+          </Alert>
+        </div>
+      ) : null}
       {state.phase === 'error' ? (
         <div className="px-4 pb-4 sm:px-5">
-          <Alert tone="error" title="Upload not accepted">
-            {state.message}
+          <Alert tone="error" title={state.title}>
+            <span className="break-words">{state.message}</span>
           </Alert>
         </div>
       ) : null}
@@ -178,26 +230,36 @@ export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded
         </div>
       ) : null}
 
-      {doc?.verification ? <VerificationBlock verification={doc.verification} /> : null}
+      <div aria-live="polite">{doc?.verification ? <VerificationBlock verification={doc.verification} stale={stale} /> : null}</div>
 
       {!doc && state.phase !== 'uploading' && slot.editable ? (
         <div className="px-4 pb-4 sm:px-5">
-          <DropZone label={`Drop your ${slot.label.toLowerCase()} here, or`} onFile={start} />
+          <DropZone
+            label={`Drop your ${slot.label.toLowerCase()} here, or`}
+            onFile={start}
+            onExtraFiles={(n) =>
+              toast.push({
+                title: 'One file per document',
+                body: `The first file was used; ${n} ${n === 1 ? 'other was' : 'others were'} ignored.`,
+                tone: 'info',
+              })
+            }
+          />
         </div>
       ) : null}
 
       {doc ? (
         <div className="flex flex-wrap items-center gap-1 border-t border-line bg-surface-2 px-3 py-2 sm:px-4">
-          <Button variant="ghost" size="sm" onClick={() => void downloadDocument(applicationId, doc.id, doc.original_filename)}>
+          <Button variant="ghost" size="sm" onClick={() => void download()}>
             Download
           </Button>
-          {doc.verification && RERUNNABLE.has(doc.verification.status) ? (
+          {canRerun ? (
             <Button variant="ghost" size="sm" loading={busy} onClick={() => void rerun()}>
               Re-run check
             </Button>
           ) : null}
-          {slot.editable ? (
-            <label className="inline-flex h-8 cursor-pointer items-center rounded-md px-3 text-[13px] font-semibold text-text-2 transition-colors hover:bg-neutral-soft hover:text-text">
+          {slot.editable && (!live || stale) ? (
+            <label className="inline-flex h-8 cursor-pointer items-center rounded-md px-3 text-[13px] font-semibold text-text-2 transition-colors hover:bg-neutral-soft hover:text-text has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus">
               Replace file
               <input
                 type="file"

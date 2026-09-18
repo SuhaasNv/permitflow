@@ -4,7 +4,7 @@ import type { SectionView } from '@/api/applications'
 import type { SectionDef } from '@/api/formSchema'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 
-function display(def: SectionDef['fields'][number], value: unknown): string {
+export function displayValue(def: SectionDef['fields'][number], value: unknown): string {
   if (value === undefined || value === null || value === '') return 'Not entered'
   if (def.kind === 'checkbox') return value === true ? 'Confirmed' : 'Not confirmed'
   if (def.kind === 'select') return def.options.find((o) => o.value === value)?.label ?? String(value)
@@ -54,7 +54,7 @@ export function SectionSummary({
             <div key={f.key} className="contents">
               <dt className="text-text-3 sm:py-0.5">{f.label}</dt>
               <dd className={empty ? 'text-text-3 sm:py-0.5' : 'font-medium sm:py-0.5'}>
-                {display(f, state.data[f.key])}
+                {displayValue(f, state.data[f.key])}
                 {state.errors[f.key] ? <span className="ml-2 text-xs font-medium text-error">{state.errors[f.key]}</span> : null}
               </dd>
             </div>

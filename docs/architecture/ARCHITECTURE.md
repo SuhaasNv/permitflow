@@ -50,6 +50,7 @@ api  ──▶  services  ──▶  domain
 Rules:
 - `api` never touches `repositories` or `models` directly; it calls services and maps exceptions to HTTP.
 - `domain` is pure Python: no SQLAlchemy, no FastAPI, no I/O. It contains the enumerations (`domain/enums.py`, re-exported by `models/enums.py` for the persistence layer), the state machine (`domain/workflow.py`: transition table, guards, `available_actions` for the UI), labels (`domain/labels.py`: the assessment table verbatim plus the badge tone), form schema, diff and resolution rules — the code a reviewer should read first.
+- `schemas` (`app/schemas/`): Pydantic request and response models shared by the API and the services. No ORM, no I/O; they may import `domain` enums. Services return these so routers stay thin, and the layering test forbids services, schemas and repositories from importing `app.api` or FastAPI.
 - `services` orchestrate: load via repositories, apply domain rules, mutate, write audit events, create notifications, commit. One service method = one transaction.
 - `infra.ai` exposes `VerificationProvider`; `services.verification` is the only caller. No other module imports `infra.ai`.
 - A unit test enforces the two most important rules (routers do not import repositories; domain does not import SQLAlchemy/FastAPI).
@@ -126,10 +127,10 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /auth/login | any | JWT |
 | GET | /auth/me | any | current user |
 | GET | /form-schema | any | sections/fields definition |
-| GET | /feedback-templates | any | comment templates |
+| GET | /officer/feedback-templates | officer | comment templates from `domain/feedback_templates.py` (key, title, suggested target, message); the officer edits before sending (built, US-024) |
 | GET | /applications | operator | own applications |
 | POST | /applications | operator | create draft |
-| GET | /applications/{id} | operator (own) | operator view: sections, documents + verification, feedback (all rounds), revisions summary, editability |
+| GET | /applications/{id} | operator (own) | operator view: sections, documents + verification, released feedback (all rounds, no author), `resubmit` readiness (changed and untouched flagged targets), editability from open released feedback, `needs_operator_action` (built) |
 | PATCH | /applications/{id}/sections/{key} | operator (own) | update a section of the working copy (checked against editability) |
 | POST | /applications/{id}/submit | operator (own) | draft → application_received |
 | POST | /applications/{id}/resubmit | operator (own) | pending_pre_site_resubmission → pre_site_resubmitted |
@@ -139,14 +140,15 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /applications/{id}/documents/{doc_id}/verify | owner or officer | re-run verification (only when the latest run is terminal); 202 |
 | GET | /applications/{id}/revisions | owner, officer or admin | list revisions |
 | GET | /applications/{id}/revisions/{n} | owner, officer or admin | snapshot |
-| GET | /applications/{id}/compare?from=n&to=m | owner, officer or admin | field and document diff |
-| GET | /officer/applications | officer | queue (all applications, internal status, counts) |
-| GET | /officer/applications/{id} | officer | officer view (internal status, officer label, audit, feedback, verification) |
-| POST | /officer/applications/{id}/transition | officer | `{ target, note?, expected_version }` |
-| POST | /officer/applications/{id}/feedback | officer | create feedback (only while `under_review`) |
-| POST | /officer/applications/{id}/feedback/{fid}/resolve | officer | addressed/open → resolved; `{fid}` must belong to `{id}` |
-| POST | /officer/applications/{id}/feedback/{fid}/withdraw | officer | open → withdrawn (only while `under_review`) |
-| GET | /officer/applications/{id}/audit | officer | audit trail |
+| GET | /applications/{id}/compare?from=n&to=m | owner or officer (admin with US-072) | field-level form diff and document add/remove/replace from `domain/diff.py`; 404 for unknown revisions (built, US-027) |
+| GET | /officer/applications | officer | queue: every non-draft application with applicant, internal status + officer label, server-derived next action and whose turn it is, revision count, open feedback count, document-check attention and checking counts, first submission and last activity; plus turn counts (built, US-020) |
+| GET | /officer/applications/{id} | officer | case view: current revision's sections, current documents with full verification detail (confidence, evidence, model), revision history, available transitions with guard reasons, `version` (built, US-021; feedback and audit lists join with US-023 and US-029) |
+| POST | /officer/applications/{id}/transition | officer | `{ target, note?, expected_version }`: row lock, version check (409 `version_conflict`), `domain/workflow.transition` (409 `invalid_transition` with `allowed`), `status.changed` audit with actor, operator notification in the same transaction (built, US-021; on `→ pending_pre_site_resubmission` every open item gets `released_to_operator_at` and `feedback.released` is audited, built with US-023) |
+| POST | /officer/applications/{id}/feedback | officer | create feedback tied to a section key or document type, optional template key; 422 per-field errors; 409 unless `under_review`; audit `feedback.created`; returns the officer view (built, US-023) |
+| POST | /officer/applications/{id}/feedback/{fid}/resolve | officer | open or addressed → resolved while the case is with the officer; audit `feedback.resolved`; `{fid}` must belong to `{id}` (built, US-028) |
+| POST | /officer/applications/{id}/feedback/{fid}/withdraw | officer | open → withdrawn; 409 unless `under_review` and open; `{fid}` must belong to `{id}`; audit `feedback.withdrawn` (built, US-023) |
+| POST | /officer/applications/{id}/documents/{doc_id}/verify | officer | re-run the AI check; same rules and audit as the operator re-run; returns the officer view (built, US-022) |
+| GET | /officer/applications/{id}/audit | officer | append-only audit trail with actor name and role, plain-language summary (`domain/audit_labels.py`) and payload, chronological (built, US-029) |
 | GET | /admin/overview | admin | counts by status, idle applications, today's submissions |
 | GET | /admin/ai-health | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
 | GET | /admin/audit-feed | admin | latest 50 audit events across applications |
@@ -154,8 +156,9 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /admin/users | admin | create user `{full_name, email, role}`; audit `user.created` |
 | PATCH | /admin/users/{id} | admin | change `role` and/or `is_active`; audit `user.role_changed` / `user.deactivated` / `user.reactivated`; 409 when it would remove the last active admin |
 | GET | /admin/applications/{id} | admin | officer view, read-only (mutations 403) |
-| GET | /notifications | any | own notifications |
-| POST | /notifications/{id}/read | any | mark read; scoped to the caller's own notifications |
+| GET | /notifications | any | own notifications (newest first, 50) plus `unread_count` (built, US-025) |
+| POST | /notifications/{id}/read | any | mark read; another user's id is 404 (built, US-025) |
+| POST | /notifications/read-all | any | mark every own notification read (built, US-025) |
 | GET | /health | public | `{status, database}`; 503 when the database ping fails; provider details are not exposed publicly (admin sees them in `/admin/ai-health`) |
 
 All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail": …}` bodies for 401/403/422 are replaced by explicit exception handlers so every error uses the standard shape (REL-001).

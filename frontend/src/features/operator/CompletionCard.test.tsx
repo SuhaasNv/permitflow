@@ -37,6 +37,11 @@ const view: ApplicationView = {
     missing: ['Section: Premises', 'Document: Floor plan'],
   },
   revision_count: 0,
+  needs_operator_action: false,
+  feedback: [],
+  resubmit: null,
+  revisions: [],
+  decision_note: null,
   created_at: '2026-09-18T00:00:00Z',
   updated_at: '2026-09-18T00:00:00Z',
 }

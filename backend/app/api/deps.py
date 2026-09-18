@@ -51,4 +51,5 @@ def require_role(*roles: Role) -> Callable[[User], User]:
 
 OperatorUser = Annotated[User, Depends(require_role(Role.OPERATOR))]
 OfficerUser = Annotated[User, Depends(require_role(Role.OFFICER))]
+# Admin routes arrive with US-070 (E4); the guard exists so the role is a first-class contract from Day 1.
 AdminUser = Annotated[User, Depends(require_role(Role.ADMIN))]

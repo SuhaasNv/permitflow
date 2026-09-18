@@ -74,8 +74,7 @@ def apply_rules(
 ) -> FinalOutcome:
     """Map the validated model output to the stored status (AI-004)."""
     issues: list[dict[str, Any]] = [i.model_dump(mode="json") for i in result.issues]
-    if result.status == "unreadable":
-        return FinalOutcome(VerificationStatus.UNREADABLE, issues)
+    # Injection first: a document that tells the checker to call itself unreadable must still reach a person.
     if injection_phrases:
         issues.append(
             {
@@ -86,6 +85,8 @@ def apply_rules(
             }
         )
         return FinalOutcome(VerificationStatus.NEEDS_REVIEW, issues)
+    if result.status == "unreadable":
+        return FinalOutcome(VerificationStatus.UNREADABLE, issues)
     if result.status == "issues_found":
         return FinalOutcome(VerificationStatus.ISSUES_FOUND, issues)
     if result.confidence < confidence_threshold:

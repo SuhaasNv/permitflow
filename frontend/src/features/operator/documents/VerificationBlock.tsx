@@ -82,7 +82,7 @@ function Icon({ kind }: { kind: Kind }) {
   )
 }
 
-const CHECK_STEPS = ['Reading the document', 'Extracting key details', 'Comparing with your application', 'Checking validity dates']
+const CHECK_STEPS = ['Reading the document', 'Extracting key details', 'Comparing with your application', 'Checking dates in the document']
 
 /** Visual progress through the check while the server run is pending/running. The result always comes from the server. */
 function CheckProgress({ started }: { started: boolean }) {
@@ -134,19 +134,21 @@ function CheckProgress({ started }: { started: boolean }) {
 }
 
 /** Operator-facing verification result: state, plain explanation, issues, what to do. No confidence numbers. */
-export function VerificationBlock({ verification }: { verification: VerificationView }) {
+export function VerificationBlock({ verification, stale = false }: { verification: VerificationView; stale?: boolean }) {
   const copy = COPY[verification.status]
   const live = verification.status === 'running' || verification.status === 'pending'
   const showSummary = Boolean(verification.summary) && !live
   const title =
-    verification.status === 'issues_found'
-      ? `${verification.issues.length} ${verification.issues.length === 1 ? 'issue' : 'issues'} to check`
-      : copy.title
+    live && stale
+      ? 'This check is taking longer than expected'
+      : verification.status === 'issues_found'
+        ? `${verification.issues.length} ${verification.issues.length === 1 ? 'issue' : 'issues'} to check`
+        : copy.title
+  const text = live && stale ? 'Your upload is safe. Re-run the check, or continue and let the officer review the document.' : copy.text
   return (
     <div
       key={verification.status}
       className="pf-enter-fast flex gap-3 border-t border-line px-4 py-4 sm:px-5"
-      aria-live="polite"
       data-verification={verification.status}
     >
       <span
@@ -162,8 +164,8 @@ export function VerificationBlock({ verification }: { verification: Verification
           <span className="text-sm font-semibold">{title}</span>
           <span className="text-xs text-text-3">AI-assisted check</span>
         </div>
-        <div className="mt-0.5 text-[13px] leading-[19px] text-text-2">{showSummary ? verification.summary : copy.text}</div>
-        {live ? <CheckProgress started={verification.status === 'running'} /> : null}
+        <div className="mt-0.5 text-[13px] leading-[19px] text-text-2">{showSummary ? verification.summary : text}</div>
+        {live && !stale ? <CheckProgress started={verification.status === 'running'} /> : null}
         {verification.issues.length > 0 ? (
           <ul className="mt-3 divide-y divide-line rounded-md border border-line bg-surface-2">
             {verification.issues.map((issue, i) => (

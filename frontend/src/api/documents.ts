@@ -1,5 +1,5 @@
 import type { ApplicationView } from './applications'
-import { API_URL, AppError, request } from './client'
+import { API_URL, AppError, notifyUnauthorized, request } from './client'
 import type { ApiErrorBody } from './client'
 
 export interface VerificationView {
@@ -32,8 +32,8 @@ export interface UploadResult {
   unchanged: boolean
 }
 
-export const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.txt']
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.txt']
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 /** Client-side pre-check mirroring the server rules (SEC-005); the server remains authoritative. */
 export function validateFile(file: File): string | null {
@@ -82,6 +82,7 @@ export function uploadDocument(
         resolve(parsed as UploadResult)
         return
       }
+      if (xhr.status === 401) notifyUnauthorized()
       const body = parsed as ApiErrorBody | null
       const requestId = xhr.getResponseHeader('X-Request-ID') ?? undefined
       reject(
@@ -111,18 +112,21 @@ export async function downloadDocument(applicationId: string, documentId: string
   const res = await fetch(`${API_URL}/applications/${applicationId}/documents/${documentId}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
-  if (!res.ok)
+  if (!res.ok) {
+    if (res.status === 401) notifyUnauthorized()
     throw new AppError(res.status, {
       code: 'http_error',
-      message: 'Could not download this file.',
+      message: res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.',
     })
+  }
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = filename
   a.click()
-  URL.revokeObjectURL(url)
+  // Some browsers start the download after click() returns; revoke once it has had time to begin.
+  setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
 
 export function rerunVerification(applicationId: string, documentId: string): Promise<UploadResult> {

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -25,6 +26,21 @@ class RevisionRepository:
             .where(ApplicationRevision.application_id == application_id)
         )
         return int(self.db.scalar(stmt) or 0)
+
+    def stats_for(self, application_ids: list[uuid.UUID]) -> dict[uuid.UUID, tuple[int, datetime | None]]:
+        """(revision count, first submission time) per application, in one query."""
+        if not application_ids:
+            return {}
+        stmt = (
+            select(
+                ApplicationRevision.application_id,
+                func.count(),
+                func.min(ApplicationRevision.submitted_at),
+            )
+            .where(ApplicationRevision.application_id.in_(application_ids))
+            .group_by(ApplicationRevision.application_id)
+        )
+        return {row[0]: (int(row[1]), row[2]) for row in self.db.execute(stmt)}
 
     def next_number(self, application_id: uuid.UUID) -> int:
         stmt = select(func.max(ApplicationRevision.revision_number)).where(

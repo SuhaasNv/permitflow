@@ -114,6 +114,10 @@ Terminal states: `approved`, `rejected`.
 | any officer transition | audit `status.changed`; notify operator `status_changed` with the operator label |
 | `→ approved` / `→ rejected` | store `decision_note`; audit `decision.recorded` |
 
+## Built (Sprint 2)
+
+Every transition in the table is exercised by `backend/tests/unit/test_workflow.py`; the officer edges run through `services/workflow.py`, the operator edges through `services/submission.py` and `services/resubmission.py`. Side effects marked in the table above for `→ pending_pre_site_resubmission` (release) and `→ pre_site_resubmitted` (Revision N+1, addressed, notify officers) are implemented and covered by `tests/integration/test_feedback.py` and `test_resubmission.py`.
+
 ## Concurrency
 
 Every mutating service locks the application row (`SELECT … FOR UPDATE`) for the duration of its transaction, then re-reads status and feedback before evaluating guards, so concurrent officer actions cannot both pass a guard. Officer status-changing requests additionally send `expected_version` (from the last read) and receive 409 `version_conflict` if the row moved, which protects against acting on a stale screen. Operator `submit`/`resubmit` do not send a version: the row lock plus the state machine (409 `invalid_transition` if the state moved) is sufficient (REL-007).

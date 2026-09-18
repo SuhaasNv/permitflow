@@ -9,10 +9,12 @@ interface DropZoneProps {
   disabled?: boolean
   compact?: boolean
   onFile: (file: File) => void
+  /** Called when more than one file is dropped; the first is still used. */
+  onExtraFiles?: (count: number) => void
 }
 
 /** Drag-and-drop area with a keyboard-reachable file picker (FR-004). The whole zone is the click target. */
-export function DropZone({ label, hint = 'PDF, PNG, JPG or TXT · up to 10 MB', disabled, compact, onFile }: DropZoneProps) {
+export function DropZone({ label, hint = 'PDF, PNG, JPG or TXT · up to 10 MB', disabled, compact, onFile, onExtraFiles }: DropZoneProps) {
   const [over, setOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const inputId = useId()
@@ -22,6 +24,7 @@ export function DropZone({ label, hint = 'PDF, PNG, JPG or TXT · up to 10 MB', 
     setOver(false)
     if (disabled) return
     const file = e.dataTransfer.files[0]
+    if (e.dataTransfer.files.length > 1) onExtraFiles?.(e.dataTransfer.files.length - 1)
     if (file) onFile(file)
   }
 
@@ -29,9 +32,14 @@ export function DropZone({ label, hint = 'PDF, PNG, JPG or TXT · up to 10 MB', 
     <div
       onDragOver={(e) => {
         e.preventDefault()
+        e.dataTransfer.dropEffect = disabled ? 'none' : 'copy'
         if (!disabled) setOver(true)
       }}
-      onDragLeave={() => setOver(false)}
+      onDragLeave={(e) => {
+        // Moving over a child fires dragleave on the parent; only clear when the cursor really left.
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+        setOver(false)
+      }}
       onDrop={onDrop}
       className={cn(
         'relative rounded-lg border-[1.5px] border-dashed text-center',

@@ -6,11 +6,13 @@ import { LandingPage } from '@/features/landing/LandingPage'
 import { RequireRole } from '@/features/auth/RequireRole'
 import { AdminOverviewPage } from '@/features/admin/OverviewPage'
 import { OfficerQueuePage } from '@/features/officer/QueuePage'
+import { OfficerCasePage } from '@/features/officer/CasePage'
 import { ApplicationPage } from '@/features/operator/ApplicationPage'
 import { DocumentsPage } from '@/features/operator/DocumentsPage'
 import { FormPage } from '@/features/operator/FormPage'
 import { ReviewPage } from '@/features/operator/ReviewPage'
 import { SubmittedPage } from '@/features/operator/SubmittedPage'
+import { HistoryPage } from '@/features/operator/HistoryPage'
 import { OperatorDashboardPage } from '@/features/operator/DashboardPage'
 import { ApplicationsPage } from '@/features/operator/ApplicationsPage'
 import { NotFoundPanel } from '@/features/shared/states'
@@ -30,6 +32,7 @@ export const router = createBrowserRouter([
           { path: '/app/applications/:id/documents', element: <DocumentsPage /> },
           { path: '/app/applications/:id/review', element: <ReviewPage /> },
           { path: '/app/applications/:id/submitted', element: <SubmittedPage /> },
+          { path: '/app/applications/:id/history', element: <HistoryPage /> },
           { path: '/app/applications/:id/form', element: <FormPage /> },
           {
             path: '/app/applications/:id/form/:sectionKey',
@@ -44,7 +47,10 @@ export const router = createBrowserRouter([
     children: [
       {
         element: <AppShell />,
-        children: [{ path: '/officer/queue', element: <OfficerQueuePage /> }],
+        children: [
+          { path: '/officer/queue', element: <OfficerQueuePage /> },
+          { path: '/officer/applications/:id', element: <OfficerCasePage /> },
+        ],
       },
     ],
   },

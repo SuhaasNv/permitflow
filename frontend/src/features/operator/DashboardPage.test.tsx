@@ -56,6 +56,7 @@ describe('OperatorDashboardPage', () => {
         premises_summary: null,
         percent: 0,
         revision_count: 0,
+        needs_operator_action: false,
         created_at: '2026-09-18T01:00:00Z',
         updated_at: '2026-09-18T01:00:00Z',
       },

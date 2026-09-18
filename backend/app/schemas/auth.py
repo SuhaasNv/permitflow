@@ -1,4 +1,4 @@
-"""Shared response schemas."""
+"""Auth schemas: login request, token, user."""
 
 import uuid
 from datetime import datetime

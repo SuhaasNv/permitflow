@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 
 import type { ApplicationView } from '@/api/applications'
-import { Breadcrumb } from '@/features/shared/PageHeader'
-import type { Crumb } from '@/features/shared/PageHeader'
+import { Breadcrumb } from '@/features/shared/Breadcrumb'
+import type { Crumb } from '@/features/shared/Breadcrumb'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import { formatDate } from '@/lib/format'
 
@@ -50,7 +51,14 @@ export function ApplicationHeader({ view, crumb, actions, aside }: ApplicationHe
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-text-3">
             <span>Created {formatDate(view.created_at)}</span>
-            {view.revision_count > 0 ? <span>· Revision {view.revision_count}</span> : null}
+            {view.revision_count > 0 ? (
+              <span>
+                · Revision {view.revision_count} ·{' '}
+                <Link to={`/app/applications/${view.id}/history`} className="font-medium text-text-2">
+                  History
+                </Link>
+              </span>
+            ) : null}
             {aside}
           </div>
         </div>

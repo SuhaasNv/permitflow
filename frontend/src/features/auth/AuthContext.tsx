@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
-import { setTokenProvider } from '@/api/client'
+import { AppError, setTokenProvider, setUnauthorizedHandler } from '@/api/client'
 import { setUploadTokenProvider } from '@/api/documents'
 import type { Role, TokenResponse, User } from '@/api/auth'
 import { me } from '@/api/auth'
@@ -14,11 +14,15 @@ interface StoredSession {
   expiresAt: string
 }
 
+export type EndedReason = 'expired' | 'unauthorized' | null
+
 interface AuthState {
   user: User | null
   token: string | null
   expiresAt: string | null
   ready: boolean
+  /** Why the last session ended without the user clicking Sign out, for the sign-in page to explain. */
+  endedReason: EndedReason
   signIn: (response: TokenResponse) => void
   signOut: () => void
 }
@@ -53,6 +57,7 @@ function writeStored(session: StoredSession | null): void {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<StoredSession | null>(() => readStored())
   const [ready, setReady] = useState(false)
+  const [endedReason, setEndedReason] = useState<EndedReason>(null)
 
   useEffect(() => {
     setTokenProvider(() => session?.token ?? null)
@@ -63,6 +68,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null)
     writeStored(null)
   }, [])
+
+  // A 401 from any request ends the session in one place; the sign-in page explains and keeps the return path.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setSession((current) => {
+        if (current) setEndedReason('unauthorized')
+        return null
+      })
+      writeStored(null)
+    })
+    return () => setUnauthorizedHandler(() => undefined)
+  }, [])
+
+  // Sign out proactively when the token expires, so the user is never left with a dead session.
+  useEffect(() => {
+    if (!session) return
+    const ms = new Date(session.expiresAt).getTime() - Date.now()
+    if (ms <= 0) {
+      setEndedReason('expired')
+      signOut()
+      return
+    }
+    const timer = setTimeout(
+      () => {
+        setEndedReason('expired')
+        signOut()
+      },
+      Math.min(ms, 2_147_000_000),
+    )
+    return () => clearTimeout(timer)
+  }, [session, signOut])
 
   // Re-validate a restored session against the server once (role or active flag may have changed).
   useEffect(() => {
@@ -77,8 +113,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return
         setSession((current) => (current ? { ...current, user } : current))
       })
-      .catch(() => {
-        if (!cancelled) signOut()
+      .catch((error: unknown) => {
+        // Only a definite rejection ends the session; a network blip keeps the token for a retry.
+        if (!cancelled && error instanceof AppError && (error.status === 401 || error.status === 403)) signOut()
       })
       .finally(() => {
         if (!cancelled) setReady(true)
@@ -97,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setSession(next)
     writeStored(next)
+    setEndedReason(null)
   }, [])
 
   const value = useMemo<AuthState>(
@@ -105,10 +143,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token: session?.token ?? null,
       expiresAt: session?.expiresAt ?? null,
       ready,
+      endedReason,
       signIn,
       signOut,
     }),
-    [session, ready, signIn, signOut],
+    [session, ready, endedReason, signIn, signOut],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

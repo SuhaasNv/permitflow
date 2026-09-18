@@ -48,3 +48,7 @@ git branch -d feat/us-010-create-application
 ```
 
 Sprint close: `docs/sprint-<n>-close` branch for `CHANGELOG.md` and doc updates, merged into `dev`; then `dev` → `main` with tag.
+
+## Branch history on GitHub
+
+Merged feature branches are kept on the remote (not deleted) so the development history is visible branch by branch: `feat/us-000-project-skeleton` through `feat/us-015-submit-application`, then `feat/frontend-redesign`, `feat/landing-polish` and `feat/dashboard-split` for the Sprint 1 design pass. Every one enters `dev` through a `--no-ff` merge, so the graph shows one side line per story. Locally, branches may be deleted after merge; the remote copy stays.

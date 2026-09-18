@@ -5,9 +5,9 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import { cn } from '@/lib/cn'
 import { formatDateTime, formatRelative } from '@/lib/format'
 
-export function rowAction(app: ApplicationSummary): string {
+function rowAction(app: ApplicationSummary): string {
   if (app.status_label === 'Draft') return 'Continue'
-  if (app.status_tone === 'warning') return 'Respond'
+  if (app.needs_operator_action) return 'Respond'
   return 'View'
 }
 
@@ -15,13 +15,13 @@ export function rowAction(app: ApplicationSummary): string {
 export type Bucket = 'waiting' | 'draft' | 'office' | 'decided'
 
 export function bucketOf(app: ApplicationSummary): Bucket {
-  if (app.status_tone === 'warning') return 'waiting'
+  if (app.needs_operator_action) return 'waiting'
   if (app.status_label === 'Draft') return 'draft'
   if (app.status_tone === 'success' || app.status_tone === 'error') return 'decided'
   return 'office'
 }
 
-export const ArrowIcon = (
+const ArrowIcon = (
   <svg
     width="14"
     height="14"
@@ -40,7 +40,7 @@ export const ArrowIcon = (
 
 /** One application as a table-like row (My applications). Whole row is the link. */
 export function ApplicationRow({ app }: { app: ApplicationSummary }) {
-  const needsYou = app.status_tone === 'warning'
+  const needsYou = app.needs_operator_action
   return (
     <li>
       <Link
@@ -88,7 +88,7 @@ export function ApplicationRow({ app }: { app: ApplicationSummary }) {
 
 /** One application as a compact work card (Dashboard): what it is, where it stands, what to do next. */
 export function ApplicationCard({ app }: { app: ApplicationSummary }) {
-  const needsYou = app.status_tone === 'warning'
+  const needsYou = app.needs_operator_action
   const draft = app.status_label === 'Draft'
   return (
     <li>
