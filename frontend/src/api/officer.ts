@@ -220,3 +220,17 @@ export function compareRevisions(id: string, from: number, to: number): Promise<
 export function resolveFeedback(id: string, feedbackId: string): Promise<OfficerApplication> {
   return request<OfficerApplication>(`/officer/applications/${id}/feedback/${feedbackId}/resolve`, { method: 'POST' })
 }
+
+export interface AuditEvent {
+  id: string
+  event_type: string
+  summary: string
+  actor_name: string | null
+  actor_role: string | null
+  payload: Record<string, unknown>
+  created_at: string
+}
+
+export function getAuditTrail(id: string): Promise<{ application_id: string; events: AuditEvent[] }> {
+  return request<{ application_id: string; events: AuditEvent[] }>(`/officer/applications/${id}/audit`)
+}
