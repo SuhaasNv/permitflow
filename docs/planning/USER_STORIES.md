@@ -134,7 +134,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 
 ### US-013 — As an operator, I want to see each document's AI verification status update in real time, so that I know about problems before I submit.
 - Acceptance criteria: after upload the card shows "Verifying…"; without a page reload it changes to Verified / Issues found (n) / Needs review / Unreadable / Failed / Unavailable; summary and issues are expandable. (Re-run action is SCOPE S2, not required for this story.)
-- Priority: MVP · Day 2 (pipeline Day 1) · Dependencies: US-012, US-002 · Requirements: FR-005, AI-002, AI-006 · Use case UC1-A
+- Priority: MVP · Day 1 (pulled forward from Day 2 with the pipeline) · Dependencies: US-012, US-002 · Requirements: FR-005, AI-002, AI-006 · Use case UC1-A
 - Definition of Done: DoD checklist + E2E asserts the card changes state without reload.
 
 ### US-014 — As an operator, I want a progress indicator of overall completion, so that I know what remains before I can submit.

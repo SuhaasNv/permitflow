@@ -74,6 +74,8 @@ Progress on S-15: "Items addressed n of m"; Resubmit enabled once n ≥ 1.
 | S-23 | as S-21 | nothing changed (cannot happen: resubmit requires change) | as S-21 | toast on resolve |
 | S-24 | table skeleton | single revision → disabled control with explanation | retry |: |
 | S-25 | rows skeleton | new application (only created event) | retry |: |
+| S-26 | viewer skeleton | not applicable (only linked while pending approval) | 409 when the application is no longer pending approval (link back to the case); fetch error with retry | PDF inline with the preview watermark; download fallback link |
+| S-11b (approved) | as S-11 | not applicable | download failed toast | outcome panel with the officer's note when present and Download licence (PDF) with number and validity |
 | S-40 | strip skeleton | provider none → "Provider: none (mock)" | retry |: |
 
 ## Partial failure

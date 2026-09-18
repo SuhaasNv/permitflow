@@ -1,6 +1,6 @@
 # Test strategy
 
-What each layer of tests protects, where it lives and how to run it. Written at the end of Sprint 2 (19 Sep 2026) from what exists; updated whenever a layer is added. Story: US-005. Requirements cross-reference: `../requirements/REQUIREMENTS.md`.
+What each layer of tests protects, where it lives and how to run it. Written at the end of Sprint 2 (18 Sep 2026) from what exists; updated whenever a layer is added. Story: US-005. Requirements cross-reference: `../requirements/REQUIREMENTS.md`.
 
 ## Principles
 
@@ -12,17 +12,17 @@ What each layer of tests protects, where it lives and how to run it. Written at 
 
 ## Layers
 
-| Layer | Where | Tool | Count at Sprint 2 close | Protects |
+| Layer | Where | Tool | Count (19 Sep 2026, Sprint 3) | Protects |
 |-------|-------|------|-------------------------|----------|
-| Backend unit | `backend/tests/unit/` | pytest | 12 files | Pure domain: `workflow` (528 parametrised transitions), `labels`, `form_schema`, `diff`, `uploads` (magic bytes, allowlist), `verification_rules` (injection check, evidence rules), `extraction`, `openai_wire` (pinned enums, date in prompt), `mock_provider`, `security` (hashing, tokens), `settings`, `layering` (api → services → domain, `domain/` imports nothing from FastAPI or SQLAlchemy) |
-| Backend integration | `backend/tests/integration/` | pytest + FastAPI `TestClient` + Postgres | 19 files | Every API endpoint through HTTP: create, sections, documents (upload limits, sha256 no-change, download), verification (claim, stale pending), submit (completeness guard, Revision 1), officer queue and case, feedback (create, withdraw, resolve, release), resubmission (readiness, locked targets, Revision N+1, addressed), compare, outcome, audit trail, notifications, auth (limiter, timing), health and error envelope, edge cases (`test_edge_cases.py`, from `../reviews/EDGE_CASE_REVIEW.md`) |
-| Frontend unit and component | `frontend/src/**/*.test.{ts,tsx}` | vitest + Testing Library + jsdom | 18 files, 46 tests | `zodFromSchema` (server schema to client validation), `format`, `unsaved` guard, `StatusBadge`, `NotificationsBell`, `LoginPage`, `RequireRole`, `CompletionCard`, `DashboardPage` grouping, `SectionForm` (save, lock, updated-elsewhere), operator `queries`, officer `QueuePage` and `CasePage` |
-| End to end | `frontend/e2e/journey.spec.ts` | Playwright (Chromium) | 1 journey, about 30 s | The critical loop against the running stack: operator applies, uploads four documents, submits; officer starts review, adds feedback, requests resubmission; operator sees the notice, cannot edit the untouched section, fixes the flagged one, resubmits; officer sees Changed and Addressed markers, resolves, schedules and completes the site visit, routes to approval and approves; operator sees the outcome |
+| Backend unit | `backend/tests/unit/` | pytest | 13 files, 635 tests | Pure domain: `workflow` (588 parametrised transitions over 14 states and 3 actors, plus guards), `labels`, `form_schema`, `diff`, `uploads` (magic bytes, allowlist), `verification_rules` (injection check, evidence rules), `extraction`, `openai_wire` (pinned enums, date in prompt), `mock_provider`, `security` (hashing, tokens), `settings`, `layering` (api → services → domain, `domain/` imports nothing from FastAPI or SQLAlchemy) |
+| Backend integration | `backend/tests/integration/` | pytest + FastAPI `TestClient` + Postgres | 22 files, 95 tests | Every API endpoint through HTTP: create, sections, documents (upload limits, sha256 no-change, download), verification (claim, stale pending), submit (completeness guard, Revision 1), officer queue and case, feedback (create, withdraw, resolve, release), resubmission (readiness, locked targets, Revision N+1, addressed), compare, outcome, audit trail, notifications, auth (limiter, timing), health and error envelope, edge cases (`test_edge_cases.py`, from `../reviews/EDGE_CASE_REVIEW.md`) |
+| Frontend unit and component | `frontend/src/**/*.test.{ts,tsx}` | vitest + Testing Library + jsdom | 18 files, 50 tests | `zodFromSchema` (server schema to client validation), `format`, `unsaved` guard, `StatusBadge`, `NotificationsBell`, `LoginPage`, `RequireRole`, `CompletionCard`, `DashboardPage` grouping, `SectionForm` (save, lock, updated-elsewhere), operator `queries`, officer `QueuePage` and `CasePage` |
+| End to end | `frontend/e2e/journey.spec.ts` | Playwright (Chromium) | 1 journey, about 30 s | The critical loop against the running stack: operator applies, uploads four documents, submits; officer starts review, adds feedback, requests resubmission; operator sees the notice, cannot edit the untouched section, fixes the flagged one, resubmits; officer sees Changed and Addressed markers, resolves, schedules and completes the site visit, routes to approval, previews the licence and approves; the officer downloads the licence from the case, the audit trail shows it issued, and the operator downloads it from the outcome panel (US-051) |
 | End to end, one spec per workflow (US-042) | `frontend/e2e/scenarios/01..06-*.spec.ts` | Playwright (Chromium) | 6 specs, about 70 s | Each workflow on its own, each ending on the audit trail: (1) apply through the UI and every AI check lands; (2) the submission reaches the queue and the review starts, both sides notified; (3) the officer flags with free text and a template, withdraws and undoes, requests resubmission, the operator sees it on top and locked elsewhere; (4) two resubmission rounds with compare, resolution and approval; (5) the operator withdraws with a reason, the officer is told; (6) rejection needs a note, the operator sees the outcome. Officer-side scenarios seed their application through the API (`E2E_API_URL`) so each stays short and independent |
 | Static | both | ruff, ruff format, mypy strict; oxlint, tsc strict, vite build | | Types and style. `any` is not used anywhere in the frontend; mypy runs in strict mode |
 | Secrets | repo | gitleaks (CI) | | No credentials committed |
 
-Backend total at Sprint 2 close: 620 tests.
+Backend total on 19 Sep 2026 (after US-051 and the run-through fixes): 730 tests. Sprint 2 close was 620.
 
 ## Shared journey helpers
 

@@ -16,7 +16,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `architecture/SOLUTIONING.md` | written | Options and choices for every significant engineering problem |
 | `architecture/ARCHITECTURE.md` | written | Layers, modules, API surface, request flows, boundaries |
 | `architecture/DOMAIN_MODEL.md` | written | Entities, verification vocabulary, issue codes, invariants |
-| `architecture/STATE_MACHINE.md` | written | 12 states + draft, labels, transitions, guards, feedback rules |
+| `architecture/STATE_MACHINE.md` | written | 12 states + draft + withdrawn, labels, transitions (incl. Return to review), guards, feedback rules |
 | `architecture/decisions/ADR-001 … ADR-009` | written | Architecture decision records |
 | `architecture/permitflow-architecture.drawio` / `.png` | written | Overall architecture diagram |
 | `architecture/diagrams/uc1-use-case`, `uc2-use-case`, `e4-admin-use-case` (`.drawio` / `.png`) | written | UML use case diagrams per epic |
@@ -41,7 +41,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Security
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `security/THREAT_MODEL.md` | written | Threats T1–T19, planned controls, validation, production gaps |
+| `security/THREAT_MODEL.md` | written | Threats T1–T20, planned controls, validation, production gaps |
 
 ## AI
 | Document | Status | Purpose |
@@ -67,13 +67,12 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
 | `operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |
 | `reviews/EDGE_CASE_REVIEW.md` | written (Sprint 2) | Three devil's-advocate reviews: every finding, its fix or its plan |
-| `reviews/BUG_HUNT_REVIEW.md` | written (19 Sep) | Three parallel bug hunts (backend, frontend, seams): 45 findings, what was fixed and what was kept |
-| `reviews/BUG_HUNT_REVIEW.md` | written (19 Sep) | Three parallel bug hunts (backend, frontend, seams): 45 findings, what was fixed and what was kept |
+| `reviews/BUG_HUNT_REVIEW.md` | written (19 Sep) | Three parallel bug hunts (backend, frontend, seams): 45 findings, what was fixed and what was kept; run-through findings R1 to R5 |
 | `reviews/LAYOUT_AUDIT.md` | written (19 Sep) | Layout audit at 390, 820, 1024, 1280 and 1440; findings tracked as US-043 and US-044 |
 | `reviews/PRODUCTION_READINESS_REVIEW.md` | to be written (Day 3) | Honest gap list with severity |
 | `reviews/ASSESSMENT_TRACEABILITY.md` | to be written (Day 3) | Brief requirement → implementation → test → evidence |
 | `reviews/FINAL_REVIEW.md` | to be written (Day 3) | What we built, tradeoffs, what AI got wrong |
-| `../CHANGELOG.md` | written (Sprint 1 closed; Sprint 2 in progress) | Milestones, sprint closes with Shipped / Slipped / Retro |
+| `../CHANGELOG.md` | written (Sprints 1 and 2 closed; Sprint 3 in progress) | Milestones, sprint closes with Shipped / Slipped / Retro |
 | `../README.md` | written (grows per story) | Setup, demo accounts, security, AI verification, tests, layout, branching |
 
 ## Review history

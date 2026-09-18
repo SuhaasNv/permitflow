@@ -163,11 +163,13 @@ Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC
 1. Officer sets `site_visit_scheduled` (operator sees "Pending Site Visit").
 2. Officer later sets `site_visit_done` (operator sees "Pending Post-Site Clarification").
 3. Because UC3 is deferred, officer sets `pending_approval` directly (officer sees "Route to Approval", operator sees "Pending Approval").
-4. Officer sets `approved` or `rejected` with a note. Operator sees "Approved" / "Rejected" and the note.
+4. Officer previews the licence certificate (watermarked, nothing stored) and sets `approved` (note optional; the certificate is issued in the same transaction, US-051) or `rejected` (note required). Operator sees "Approved" / "Rejected", the note, and after approval a Download licence (PDF) action.
 
 **Alternative / error flows**
 - 1a. `open` feedback items exist → 422 "Resolve or withdraw open feedback before scheduling a site visit" (`addressed` items do not block; the UI warns).
 - 4a. Operator attempts any status change → 403.
+- 4b. Documents still carry unresolved check results at approval → the Approve dialog warns; approval is not blocked (AI-005).
+- 4c. Officer notices something at `pending_approval` → Return to review (`under_review`), then feedback or a resubmission round as in UC2-A; no rejection needed.
 
 **Expected outcome:** Terminal state reached; full audit trail; operator never exposed to unmapped internal labels.
 

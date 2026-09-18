@@ -2,7 +2,7 @@
 
 A regulatory licensing platform: business operators apply for a Food Establishment Licence, licensing officers review, give contextual feedback and request targeted resubmissions, and every uploaded document is checked by an advisory AI verifier. Built as a 3-day engineering assessment.
 
-Status: Sprint 3 in progress (19 Sep 2026). Shipped: the operator application with checked uploads and submission (Sprint 1); the officer review loop with contextual feedback, resubmission of flagged parts only, revision compare and feedback resolution, notifications, audit trail and the live OpenAI provider (Sprint 2); withdrawal, draft deletion, feedback undo and reopen, the Playwright journey and scenario suite, the AI evaluation harness, CI with images to GHCR and Railway deployment (Sprint 3 so far). What exists today is listed in `CHANGELOG.md`; scope is in `SCOPE.md`; documentation index in `docs/README.md`.
+Status: Sprint 3 in progress (19 Sep 2026). Shipped: the operator application with checked uploads and submission (Sprint 1); the officer review loop with contextual feedback, resubmission of flagged parts only, revision compare and feedback resolution, notifications, audit trail and the live OpenAI provider (Sprint 2); withdrawal, draft deletion, feedback undo and reopen, the licence certificate issued on approval (officer preview, PDF download), Return to review from the decision step, the Playwright journey and scenario suite, the AI evaluation harness, two bug-hunt and run-through passes, CI with images to GHCR and Railway deployment (Sprint 3 so far). What exists today is listed in `CHANGELOG.md`; scope is in `SCOPE.md`; documentation index in `docs/README.md`.
 
 ## Run locally
 
@@ -47,7 +47,7 @@ cd frontend && npm test && npm run lint && npm run typecheck && npm run build
 
 Backend tests run against the real `permitflow_test` database: the Alembic migrations are applied from scratch at the start of the session and every table is truncated between tests. The AI provider is forced to `mock` in tests unless `TEST_LIVE_AI=1`.
 
-The critical journey (apply, submit, flag, fix only the flagged part, resubmit, compare, resolve, approve) runs in a real browser with Playwright against the running stack:
+The critical journey (apply, submit, flag, fix only the flagged part, resubmit, compare, resolve, approve, download the licence) runs in a real browser with Playwright against the running stack:
 
 ```bash
 # backend on :8000 with AI_PROVIDER=mock and seeded users, Vite on :3000

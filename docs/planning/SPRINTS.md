@@ -62,7 +62,7 @@ Closed 18 Sep 2026: goal met; US-002 OpenAI half moved to Sprint 2; retro in `CH
 
 **Cut order if behind:** progress indicator UI polish → CI skeleton (keep local checks) → nothing else; the rest is the foundation.
 
-## Sprint 2 — 19 September 2026 — "The loop closes, twice" — CLOSED
+## Sprint 2 — 18 September 2026 (afternoon) — "The loop closes, twice" — CLOSED
 
 Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done; retro in `CHANGELOG.md`.
 
@@ -96,7 +96,7 @@ Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done;
 
 **Cut order if behind:** follow `DELIVERY_PLAN.md` §Cut order — any-two-revision compare → static Zod schemas → queue filter / re-run / draft delete → notification bell → templates UI (endpoint stays). MUST stories (US-024 templates, US-031 outcome transitions) are never cut; their UI becomes plainer. The OpenAI provider may slip to Sprint 3 morning (mock stays default) without cutting anything.
 
-## Sprint 3 — 19 September 2026 — "Ship it honestly"
+## Sprint 3 — 18 to 19 September 2026 — "Ship it honestly"
 
 **Goal:** deployed, tested, documented, reviewed. Admin epic only if the core is stable by midday.
 

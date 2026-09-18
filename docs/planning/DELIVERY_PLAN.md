@@ -1,6 +1,6 @@
 # PermitFlow — 3-Day Delivery Plan
 
-Dates: design phase = 17 September 2026 (US-009, `docs/design/`); Day 1 = 18 September 2026, Day 2 = 19 September 2026, Day 3 = 20 September 2026. The plan adapts to progress; the final hours of Day 3 are protected for testing, deployment, documentation and review, not features.
+Dates as planned: design phase = 17 September 2026 (US-009, `docs/design/`); Day 1 = 18 September 2026, Day 2 = 19 September 2026, Day 3 = 20 September 2026. As executed (git history, Singapore time): design phase 17 Sep evening; Sprint 1 closed 18 Sep 02:16; Sprint 2 closed 18 Sep 13:48; Sprint 3 ran from 18 Sep afternoon into 19 Sep. The three sprints kept their scope and rituals; only the calendar compressed. The final hours of Day 3 are protected for testing, deployment, documentation and review, not features.
 
 ## Day 1 — Foundation and operator submission
 
