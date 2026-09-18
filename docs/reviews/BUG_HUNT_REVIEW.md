@@ -56,6 +56,17 @@ Three independent read-only reviews, run in parallel by agents with different br
 | S12 | Low | Stale counts and a missing link in TEST_STRATEGY; dates written as 20 Sep; a stray PNG | Corrected; image removed |
 | S13 | Low | `details.fields` has two shapes (dict from services, list from request validation); the UI reads the dict | Documented here; unreachable today because client limits mirror the server's |
 
+## Browser run-through with the demo documents (19 Sep 2026, US-051 branch)
+
+A full operator and officer journey in Chrome with `docs/demo/documents` (clean set, then the wrong file in the floor plan slot, Not fixed, a second resubmission, site visit, preview, approval, download) after the bug-hunt batch. Two more defects, fixed on `feat/us-051-licence-certificate`:
+
+| # | Severity | Finding | Fix |
+|---|----------|---------|-----|
+| R1 | High | Operator outcome panel, and with it the licence download, rendered only when the officer left a decision note; an approval without a note hid the licence | Panel renders whenever a note or a licence exists; note line optional; unit test |
+| R2 | Low | Feedback group heading read "Round N · Revision N" (the same number twice), so a reopened item looked stale once the application moved on | Both sides say "Raised against Revision N" |
+
+The certificate itself was also reworked on the same pass (real brand mark, wrapping values, signature strip pinned at the bottom, two-pass layout), recorded under US-051 in `CHANGELOG.md`.
+
 ## Not changed
 
 B5 and B6 are product choices, recorded above. S13 is documented rather than changed. Everything else shipped with the batch; all suites were green afterwards (backend, vitest, the Playwright journey and six scenarios).

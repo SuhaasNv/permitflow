@@ -47,3 +47,6 @@ playwright/.cache/
 docs/design/prototype-src/project/
 docs/design/prototype-src/static/
 docs/design/prototype-src/shots/
+
+# Personal study notes (not part of the deliverable)
+notes/
