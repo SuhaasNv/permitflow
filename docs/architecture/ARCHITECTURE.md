@@ -141,8 +141,8 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /applications/{id}/revisions/{n} | owner, officer or admin | snapshot |
 | GET | /applications/{id}/compare?from=n&to=m | owner, officer or admin | field and document diff |
 | GET | /officer/applications | officer | queue: every non-draft application with applicant, internal status + officer label, server-derived next action and whose turn it is, revision count, open feedback count, document-check attention and checking counts, first submission and last activity; plus turn counts (built, US-020) |
-| GET | /officer/applications/{id} | officer | officer view (internal status, officer label, audit, feedback, verification) |
-| POST | /officer/applications/{id}/transition | officer | `{ target, note?, expected_version }` |
+| GET | /officer/applications/{id} | officer | case view: current revision's sections, current documents with full verification detail (confidence, evidence, model), revision history, available transitions with guard reasons, `version` (built, US-021; feedback and audit lists join with US-023 and US-029) |
+| POST | /officer/applications/{id}/transition | officer | `{ target, note?, expected_version }`: row lock, version check (409 `version_conflict`), `domain/workflow.transition` (409 `invalid_transition` with `allowed`), `status.changed` audit with actor, operator notification in the same transaction (built, US-021; feedback release on request-resubmission joins with US-025) |
 | POST | /officer/applications/{id}/feedback | officer | create feedback (only while `under_review`) |
 | POST | /officer/applications/{id}/feedback/{fid}/resolve | officer | addressed/open → resolved; `{fid}` must belong to `{id}` |
 | POST | /officer/applications/{id}/feedback/{fid}/withdraw | officer | open → withdrawn (only while `under_review`) |
