@@ -86,6 +86,8 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 
 ## Sprint 3 (in progress, 19 Sep 2026)
 
+- US-050 Bug hunt: three parallel read-only reviews found 45 items (`docs/reviews/BUG_HUNT_REVIEW.md`); 43 fixed. Highlights: re-run results never landed for older documents (staleness now per run), raw internal status shown after a 409 (now reloads), previous account's cache surviving sign-out, Withdrawn filed under the wrong group, undo bypassing the site-visit guard, a restart leaving checks stuck forever, operators re-running checks after submission, and a deploy gate that tested the old container (now waits for the new rollout, plus Railway health checks).
+
 - US-049 Not fixed: an addressed item can be reopened by the officer with the same text (`POST .../feedback/{fid}/reopen`, audited, undo for 10 s); it becomes a draft until the next round is requested, so the officer no longer retypes feedback when the operator's change did not settle it. Scenario 04 now runs a not-fixed round.
 
 - Copy and template picker (user walkthrough, 19 Sep): the feedback template select offers "No template, write your own" and choosing it drops the template's text unless the officer edited it; "Draft, not sent yet" and "Sent to the operator" capitalised with a tooltip explaining when a draft reaches the operator; "Browse files" capitalised. Only intentional technical tokens (file names, issue codes, audit event types) still start lowercase.
