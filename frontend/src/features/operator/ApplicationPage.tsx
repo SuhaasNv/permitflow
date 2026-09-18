@@ -103,6 +103,23 @@ export function ApplicationPage() {
           ) : undefined
         }
       />
+      {view.decision_note !== null ? (
+        <section
+          className={cn(
+            'mb-6 rounded-lg border px-5 py-4',
+            view.status_tone === 'success' ? 'border-success-line bg-success-soft/50' : 'border-error-line bg-error-soft/50',
+          )}
+          aria-labelledby="outcome-title"
+        >
+          <h2 id="outcome-title" className="text-[15px] font-semibold">
+            {view.status_tone === 'success' ? 'Your licence application was approved' : 'Your licence application was not approved'}
+          </h2>
+          <p className="mt-1 text-sm leading-[21px] text-text-2">
+            <span className="font-medium text-text">Officer's note:</span> {view.decision_note}
+          </p>
+          <p className="mt-2 text-[13px] text-text-3">This decision is final. The full record stays available under History.</p>
+        </section>
+      ) : null}
       {view.feedback.length > 0 ? (
         <div className="mb-6">
           <FeedbackNotice view={view} />

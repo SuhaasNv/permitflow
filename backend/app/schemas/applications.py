@@ -125,6 +125,8 @@ class ApplicationOperatorView(BaseModel):
     feedback: list[OperatorFeedbackView] = []
     resubmit: ResubmitReadiness | None = None
     revisions: list[RevisionSummaryView] = []
+    # Officer's note shown with the final outcome only (Approved or Rejected).
+    decision_note: str | None = None
     created_at: datetime
     updated_at: datetime
 
