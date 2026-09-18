@@ -64,8 +64,9 @@ One Railway project (`permitflow`), two environments that share nothing:
 |---|---|---|
 | Deploys from | `dev` | `main` (release tags `v0.<sprint>.0`) |
 | Images | `ghcr.io/suhaasnv/permitflow-backend:dev`, `...-frontend:dev` | `:main` |
-| Frontend | https://frontend-development-afe2.up.railway.app | https://frontend-production-2d8b.up.railway.app |
-| API | https://backend-development-4e04.up.railway.app/api/v1 | https://backend-production-19cd.up.railway.app/api/v1 |
+| Frontend | https://frontend-development-afe2.up.railway.app | https://permitflow.space (also `www`; Railway host https://frontend-production-2d8b.up.railway.app) |
+| API | https://backend-development-4e04.up.railway.app/api/v1 | https://api.permitflow.space/api/v1 (Railway host https://backend-production-19cd.up.railway.app/api/v1) |
+| State (19 Sep 2026) | live: deployed on every merge to `dev`, seeded | configured (variables, volume, domains, approval rule); no image attached until the v0.3.0 release, so the hosts answer 404 until then |
 | Database | own Postgres 18 service | own Postgres 18 service |
 | Uploads | volume `uploads` at `/data/uploads` | own volume at `/data/uploads` |
 | AI | `AI_PROVIDER=openai`, `gpt-4.1-mini` | same |
@@ -98,6 +99,10 @@ The GitHub `production` environment only accepts deployments from `main`. Develo
 ### Seeding
 
 The database starts empty. `scripts/seed.py` creates the two demo accounts only (idempotent). It is not part of a deploy on purpose, a deploy must never touch data; run it once per environment: `railway ssh --environment development --service backend -- .venv/bin/python scripts/seed.py`. Development was seeded on 19 Sep 2026.
+
+### Custom domain (US-052)
+
+Production is served on the owner's domain. In Railway (production environment): frontend service → Settings → Networking → Custom domain `permitflow.space` and `www.permitflow.space`; backend service → `api.permitflow.space`. Railway shows the CNAME target for each; the owner adds those records at the registrar (apex may need the registrar's ALIAS/ANAME or Railway's provided A records). Then set, in production: backend `CORS_ORIGINS=https://permitflow.space,https://www.permitflow.space`, frontend `API_URL=https://api.permitflow.space/api/v1`; GitHub `production` environment variables `FRONTEND_URL=https://permitflow.space`, `BACKEND_URL=https://api.permitflow.space` so the deploy health gates check the real hosts. The railway.app hosts keep working. TLS is issued by Railway once DNS resolves (a few minutes to an hour).
 
 ### Rollback
 
