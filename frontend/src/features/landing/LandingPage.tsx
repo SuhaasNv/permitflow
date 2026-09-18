@@ -142,7 +142,7 @@ export function LandingPage() {
           <div className="pf-stagger">
             <div className="pf-eyebrow mb-5 text-primary">Food Establishment Licence · Singapore</div>
             <h1 className="font-display max-w-[16ch] text-[44px] leading-[1.02] tracking-[-0.015em] sm:text-[60px] lg:text-[72px]">
-              Apply once. Respond to the officer <em className="text-text-2">in the same place.</em>
+              <span className="text-primary">Apply once.</span> Respond to the officer <em className="text-text-2">in the same place.</em>
             </h1>
             <p className="mt-7 max-w-[54ch] text-[17px] leading-[27px] text-text-2 sm:text-lg sm:leading-[29px]">
               Complete the application in sections, upload your documents and see automatic checks before you submit. If the licensing
@@ -180,7 +180,7 @@ export function LandingPage() {
               <ol className="pf-stagger divide-y divide-line">
                 {NEED.map((item, i) => (
                   <li key={item.title} className="flex items-center gap-4 px-5 py-4">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-surface-3 text-text-2">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
                       {item.icon}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -298,9 +298,6 @@ export function LandingPage() {
           <span>© 2026 PermitFlow</span>
           <span className="hidden sm:inline">·</span>
           <span>A fictional licensing service built for an engineering assessment. Not a government service.</span>
-          <Link to="/login" className="text-text-2 no-underline hover:text-text sm:ml-auto">
-            Staff sign-in
-          </Link>
         </div>
       </footer>
     </div>
