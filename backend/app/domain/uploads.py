@@ -11,7 +11,6 @@ ALLOWED: dict[str, tuple[str, ...]] = {
     ".jpeg": ("image/jpeg",),
     ".txt": ("text/plain",),
 }
-ALLOWED_EXTENSIONS: tuple[str, ...] = tuple(ALLOWED)
 ALLOWED_LABEL = "PDF, PNG, JPG or TXT"
 
 

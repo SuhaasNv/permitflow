@@ -32,8 +32,8 @@ export interface UploadResult {
   unchanged: boolean
 }
 
-export const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.txt']
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.txt']
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 /** Client-side pre-check mirroring the server rules (SEC-005); the server remains authoritative. */
 export function validateFile(file: File): string | null {

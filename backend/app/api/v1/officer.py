@@ -5,14 +5,14 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, status
 
 from app.api.deps import DbSession, OfficerUser
-from app.api.v1.officer_schemas import (
+from app.domain.feedback_templates import TEMPLATES
+from app.schemas.officer import (
     FeedbackIn,
     FeedbackTemplateOut,
     OfficerApplicationOut,
     QueueOut,
     TransitionIn,
 )
-from app.domain.feedback_templates import TEMPLATES
 from app.services.feedback import FeedbackService
 from app.services.officer_queue import OfficerQueueService
 from app.services.officer_view import OfficerViewService

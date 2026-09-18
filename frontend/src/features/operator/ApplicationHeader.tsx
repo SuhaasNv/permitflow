@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 
 import type { ApplicationView } from '@/api/applications'
-import { Breadcrumb } from '@/features/shared/PageHeader'
-import type { Crumb } from '@/features/shared/PageHeader'
+import { Breadcrumb } from '@/features/shared/Breadcrumb'
+import type { Crumb } from '@/features/shared/Breadcrumb'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import { formatDate } from '@/lib/format'
 

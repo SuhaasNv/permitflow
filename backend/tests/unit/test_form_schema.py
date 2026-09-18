@@ -1,29 +1,7 @@
 from app.domain.completeness import compute
 from app.domain.enums import DocumentType
 from app.domain.form_schema import SECTION_KEYS, is_section_complete, validate_section
-
-VALID_BUSINESS = {
-    "business_name": "Kopi & Kaya Toast House Pte. Ltd.",
-    "uen": "202312345K",
-    "entity_type": "private_limited",
-    "contact_name": "Tan Wei Ling",
-    "contact_email": "weiling.tan@kopikaya.sg",
-    "contact_phone": "+65 9123 4567",
-}
-VALID_PREMISES = {
-    "address_line_1": "10 Jalan Besar #01-12",
-    "postal_code": "208787",
-    "premises_type": "shophouse",
-    "floor_area_sqm": 48,
-    "tenancy_expiry": "2027-10-31",
-}
-VALID_OPERATIONS = {
-    "cuisine_description": "Kaya toast, soft-boiled eggs, kopi and teh.",
-    "seating_capacity": 24,
-    "operating_hours": "Mon-Sun 7am-9pm",
-    "food_handlers_count": 4,
-}
-VALID_DECLARATIONS = {"information_accurate": True, "consent_to_inspection": True}
+from tests.journeys import VALID_BUSINESS, VALID_DECLARATIONS, VALID_OPERATIONS, VALID_PREMISES
 
 
 def test_valid_sections() -> None:

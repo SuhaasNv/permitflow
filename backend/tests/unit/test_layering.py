@@ -34,6 +34,29 @@ def test_api_does_not_touch_repositories_or_models_directly() -> None:
         assert not bad, f"{f.name} imports {bad}"
 
 
+def test_services_and_schemas_do_not_import_the_api_layer() -> None:
+    """Services build responses from `app.schemas`; the API layer is the only one that knows FastAPI."""
+    for folder in ("services", "schemas", "repositories"):
+        for f in (APP / folder).rglob("*.py"):
+            bad = {
+                m
+                for m in _imports(f)
+                if m.startswith("app.api") or m.split(".")[0] in {"fastapi", "starlette"}
+            }
+            assert not bad, f"{f.name} imports the API layer: {bad}"
+
+
+def test_schemas_are_free_of_orm_and_io() -> None:
+    for f in (APP / "schemas").rglob("*.py"):
+        bad = {
+            m
+            for m in _imports(f)
+            if m.startswith(("app.models.", "app.repositories", "app.infra", "app.services"))
+        }
+        bad = {m for m in bad if m != "app.models.enums"}
+        assert not bad, f"{f.name} imports {bad}"
+
+
 def test_only_verification_service_uses_ai_providers() -> None:
     for f in APP.rglob("*.py"):
         if "infra/ai" in str(f) or f.name == "verification.py":

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.enums import Role
 from tests.factories import login, make_user
-from tests.integration.test_feedback import _under_review
+from tests.journeys import under_review as _under_review
 
 
 def test_operator_lists_and_reads_own_notifications(client: TestClient, db: Session) -> None:

@@ -1,6 +1,12 @@
 """Build the operator-facing view of an application from the aggregate."""
 
-from app.api.v1.applications_schemas import (
+from app.domain import completeness as completeness_rules
+from app.domain.enums import ApplicationStatus, DocumentType
+from app.domain.form_schema import SECTIONS
+from app.domain.labels import operator_label, tone_for
+from app.domain.officer_actions import next_action
+from app.models import Application, Document, VerificationRun
+from app.schemas.applications import (
     ApplicationOperatorView,
     ApplicationSummaryOut,
     CompletenessView,
@@ -11,12 +17,6 @@ from app.api.v1.applications_schemas import (
     SectionView,
     VerificationView,
 )
-from app.domain import completeness as completeness_rules
-from app.domain.enums import ApplicationStatus, DocumentType
-from app.domain.form_schema import SECTIONS
-from app.domain.labels import operator_label, tone_for
-from app.domain.officer_actions import next_action
-from app.models import Application, Document, VerificationRun
 
 LICENCE_TITLE = "Food Establishment Licence"
 

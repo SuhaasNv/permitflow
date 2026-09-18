@@ -5,31 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import AuditEvent, Notification
-from tests.integration.test_feedback import _under_review
-from tests.unit.test_form_schema import VALID_PREMISES
-
-
-def _flag_and_request(client: TestClient, db: Session) -> tuple[str, dict[str, str], dict[str, str]]:
-    """Under review → one section item (premises) + one document item (floor plan) → request resubmission."""
-    app_id, op, off, version = _under_review(client, db)
-    r = client.post(
-        f"/api/v1/officer/applications/{app_id}/feedback",
-        headers=off,
-        json={"target_type": "section", "section_key": "premises", "message": "Confirm the address."},
-    )
-    r = client.post(
-        f"/api/v1/officer/applications/{app_id}/feedback",
-        headers=off,
-        json={"target_type": "document", "document_type": "floor_plan", "message": "Upload a clearer plan."},
-    )
-    version = r.json()["version"]
-    t = client.post(
-        f"/api/v1/officer/applications/{app_id}/transition",
-        headers=off,
-        json={"target": "pending_pre_site_resubmission", "expected_version": version},
-    )
-    assert t.status_code == 200, t.text
-    return app_id, op, off
+from tests.journeys import VALID_PREMISES
+from tests.journeys import flag_and_request as _flag_and_request
 
 
 def test_operator_sees_released_feedback_and_only_flagged_targets_are_editable(

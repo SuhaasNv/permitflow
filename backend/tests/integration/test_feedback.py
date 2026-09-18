@@ -3,19 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import AuditEvent, Feedback
-from tests.integration.test_officer_case import _submitted
-
-
-def _under_review(client: TestClient, db: Session) -> tuple[str, dict[str, str], dict[str, str], int]:
-    app_id, op, off = _submitted(client, db)
-    version = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()["version"]
-    r = client.post(
-        f"/api/v1/officer/applications/{app_id}/transition",
-        headers=off,
-        json={"target": "under_review", "expected_version": version},
-    )
-    assert r.status_code == 200
-    return app_id, op, off, r.json()["version"]
+from tests.journeys import submitted as _submitted
+from tests.journeys import under_review as _under_review
 
 
 def test_feedback_is_locked_until_the_review_starts(client: TestClient, db: Session) -> None:

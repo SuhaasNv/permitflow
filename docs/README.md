@@ -69,8 +69,8 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `reviews/PRODUCTION_READINESS_REVIEW.md` | to be written (Day 3) | Honest gap list with severity |
 | `reviews/ASSESSMENT_TRACEABILITY.md` | to be written (Day 3) | Brief requirement → implementation → test → evidence |
 | `reviews/FINAL_REVIEW.md` | to be written (Day 3) | What we built, tradeoffs, what AI got wrong |
-| `../CHANGELOG.md` | written (Sprint 1 closed 18 Sep 2026) | Milestones, sprint closes with Shipped / Slipped / Retro |
-| `../README.md` | written (skeleton, grows per story) | Setup and overview |
+| `../CHANGELOG.md` | written (Sprint 1 closed; Sprint 2 in progress) | Milestones, sprint closes with Shipped / Slipped / Retro |
+| `../README.md` | written (grows per story) | Setup, demo accounts, security, AI verification, tests, layout, branching |
 
 ## Review history
 - 18 Sep 2026 — UI/UX design phase: two independent design-critique passes on the prototype (pass 1 scored 6.6/10 with 11 rendering bugs and 15 fixes; all applied; pass 2 results recorded in `design/UI_DESIGN.md`). Scope changes from the phase: public landing page (M1, FR-031), admin user management (S7, FR-030, US-073, T19), upload validation and hash-based duplicate detection made explicit (M3, SEC-005).
