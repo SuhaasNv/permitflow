@@ -41,6 +41,7 @@ The aggregate root. Holds current status and the editable working copy of form d
 | draft_data | JSON | working copy edited by the operator between submissions; copied into a revision on submit |
 | current_revision_id | FK ApplicationRevision, nullable | latest submitted revision |
 | decision_note | text, nullable | officer note shown to the operator on approval/rejection |
+| feedback.previous_resolution | enum, nullable | resolution before the last withdraw or resolve, cleared on undo (US-039) |
 | withdrawal_reason | text, nullable | operator's reason when they withdrew (US-038); served to officers and, once withdrawn, to the owner |
 | version | int | optimistic concurrency token (REL-007) |
 | created_at, updated_at | datetime | |

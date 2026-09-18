@@ -39,4 +39,8 @@ class Feedback(TimestampMixin, Base):
         ForeignKey("application_revisions.id"), nullable=True
     )
     resolved_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # Resolution before the last withdraw or resolve, kept so the officer can undo it in time (US-039).
+    previous_resolution: Mapped[FeedbackResolution | None] = mapped_column(
+        str_enum(FeedbackResolution, "feedback_resolution", 16), nullable=True
+    )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

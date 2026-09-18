@@ -11,6 +11,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `Breadcrumbs` | items (label, href) | nested screens |
 | `PageHeader` | title, subtitle, actions slot | all |
 | `Stepper` (locked state) | steps carry `locked` while responding to feedback: lock glyph, not a link (US-040) | S-12 |
+| `Toast` (action) | optional action button (Undo) with a 10 s duration; pressing it closes the toast (US-039) | S-21 |
 | `SearchBox` | value, onChange, label (accessible name and placeholder); native clear | My applications, Review queue |
 | `StatusBar` | badge (role-aware), explanation, right meta, actions slot; `hasSteps` joins a `Stepper` band | application screens |
 | `Stepper` | steps (label, state done / current / attention / todo, href); equal-width grid, connectors fill on completion | S-11, S-12, S-13 |

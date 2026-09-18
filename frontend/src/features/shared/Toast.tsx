@@ -11,6 +11,8 @@ export interface ToastInput {
   tone?: ToastTone
   /** Milliseconds before auto-dismiss. Errors stay until dismissed. */
   duration?: number
+  /** One action inside the toast (for example Undo); the toast closes when it is pressed. */
+  action?: { label: string; onClick: () => void }
 }
 
 interface Toast extends ToastInput {
@@ -19,7 +21,8 @@ interface Toast extends ToastInput {
 }
 
 interface ToastApi {
-  push: (toast: ToastInput) => void
+  push: (toast: ToastInput) => number
+  dismiss: (id: number) => void
 }
 
 const ToastContext = createContext<ToastApi | null>(null)
@@ -65,6 +68,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           id,
           setTimeout(() => dismiss(id), duration),
         )
+      return id
     },
     [dismiss],
   )
@@ -77,7 +81,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const api = useMemo(() => ({ push }), [push])
+  const api = useMemo(() => ({ push, dismiss }), [push, dismiss])
 
   return (
     <ToastContext.Provider value={api}>
@@ -115,6 +119,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <div className="text-sm font-semibold leading-5 text-text">{t.title}</div>
               {t.body ? <div className="mt-0.5 text-[13px] leading-[18px] text-text-2">{t.body}</div> : null}
             </div>
+            {t.action ? (
+              <button
+                type="button"
+                onClick={() => {
+                  t.action?.onClick()
+                  dismiss(t.id)
+                }}
+                className="-my-1 shrink-0 self-center rounded-md border border-line-strong px-2.5 py-1 text-[13px] font-semibold text-text hover:border-text-3"
+              >
+                {t.action.label}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => dismiss(t.id)}
@@ -144,5 +160,5 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 /** No-op outside a provider so components stay testable in isolation. */
 export function useToast(): ToastApi {
   const api = useContext(ToastContext)
-  return api ?? { push: () => undefined }
+  return api ?? { push: () => 0, dismiss: () => undefined }
 }
