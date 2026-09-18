@@ -11,7 +11,12 @@ from app.domain.enums import ApplicationStatus, DocumentType
 from app.domain.uploads import too_large_message
 from app.models import Application, User
 from app.models.enums import Role
-from app.schemas.applications import ApplicationOperatorView, ApplicationSummaryOut, UploadOut
+from app.schemas.applications import (
+    ApplicationOperatorView,
+    ApplicationSummaryOut,
+    RevisionSummaryView,
+    UploadOut,
+)
 from app.schemas.compare import CompareOut
 from app.services.applications import ApplicationService
 from app.services.compare import CompareService
@@ -47,6 +52,10 @@ def _view(service: ApplicationService, app: Application) -> ApplicationOperatorV
         revision_count=service.revision_count(app),
         feedback=resub.released_feedback(app) if app.status != ApplicationStatus.DRAFT else [],
         resubmit=resub.readiness(app, [d for d, _ in documents]),
+        revisions=[
+            RevisionSummaryView(number=r.revision_number, submitted_at=r.submitted_at)
+            for r in service.revisions.list_for(app.id)
+        ],
     )
 
 

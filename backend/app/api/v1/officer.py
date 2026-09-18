@@ -7,12 +7,14 @@ from fastapi import APIRouter, BackgroundTasks, status
 from app.api.deps import DbSession, OfficerUser
 from app.domain.feedback_templates import TEMPLATES
 from app.schemas.officer import (
+    AuditTrailOut,
     FeedbackIn,
     FeedbackTemplateOut,
     OfficerApplicationOut,
     QueueOut,
     TransitionIn,
 )
+from app.services.audit_trail import AuditTrailService
 from app.services.feedback import FeedbackService
 from app.services.officer_queue import OfficerQueueService
 from app.services.officer_view import OfficerViewService
@@ -122,3 +124,9 @@ def resolve_feedback(
     """Mark an open or addressed item resolved (FR-024). Audited; 409 outside the officer's states."""
     FeedbackService(db).resolve(user, application_id, feedback_id)
     return OfficerViewService(db).get(user, application_id)
+
+
+@router.get("/applications/{application_id}/audit", response_model=AuditTrailOut)
+def audit_trail(application_id: uuid.UUID, user: OfficerUser, db: DbSession) -> AuditTrailOut:
+    """Append-only history of everything that happened to the application (FR-025, SEC-009)."""
+    return AuditTrailService(db).for_application(user, application_id)

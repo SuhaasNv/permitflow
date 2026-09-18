@@ -174,3 +174,18 @@ class TransitionIn(BaseModel):
     target: str
     note: str | None = Field(default=None, max_length=2000)
     expected_version: int
+
+
+class AuditEventOut(BaseModel):
+    id: uuid.UUID
+    event_type: str
+    summary: str
+    actor_name: str | None
+    actor_role: str | None
+    payload: dict[str, Any]
+    created_at: datetime
+
+
+class AuditTrailOut(BaseModel):
+    application_id: uuid.UUID
+    events: list[AuditEventOut]

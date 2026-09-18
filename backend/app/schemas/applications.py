@@ -77,6 +77,11 @@ class ResubmitReadiness(BaseModel):
     reason: str | None
 
 
+class RevisionSummaryView(BaseModel):
+    number: int
+    submitted_at: datetime
+
+
 class CompletenessView(BaseModel):
     percent: int
     is_complete: bool
@@ -119,6 +124,7 @@ class ApplicationOperatorView(BaseModel):
     needs_operator_action: bool
     feedback: list[OperatorFeedbackView] = []
     resubmit: ResubmitReadiness | None = None
+    revisions: list[RevisionSummaryView] = []
     created_at: datetime
     updated_at: datetime
 

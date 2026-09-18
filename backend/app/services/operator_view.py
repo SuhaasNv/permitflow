@@ -14,6 +14,7 @@ from app.schemas.applications import (
     DocumentView,
     OperatorFeedbackView,
     ResubmitReadiness,
+    RevisionSummaryView,
     SectionView,
     VerificationView,
 )
@@ -127,6 +128,7 @@ def operator_view(
     revision_count: int = 0,
     feedback: list[OperatorFeedbackView] | None = None,
     resubmit: ResubmitReadiness | None = None,
+    revisions: list[RevisionSummaryView] | None = None,
 ) -> ApplicationOperatorView:
     documents = documents or []
     docs_by_type = {d.document_type: (d, r) for d, r in documents}
@@ -182,6 +184,7 @@ def operator_view(
         needs_operator_action=_needs_operator(app.status),
         feedback=feedback or [],
         resubmit=resubmit,
+        revisions=revisions or [],
         created_at=app.created_at,
         updated_at=app.updated_at,
     )
