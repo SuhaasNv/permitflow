@@ -45,7 +45,16 @@ cd backend && uv run pytest && uv run ruff check . && uv run mypy
 cd frontend && npm test && npm run lint && npm run typecheck && npm run build
 ```
 
-Backend tests run against the real `permitflow_test` database: the Alembic migrations are applied from scratch at the start of the session and every table is truncated between tests.
+Backend tests run against the real `permitflow_test` database: the Alembic migrations are applied from scratch at the start of the session and every table is truncated between tests. The AI provider is forced to `mock` in tests unless `TEST_LIVE_AI=1`.
+
+The critical journey (apply, submit, flag, fix only the flagged part, resubmit, compare, resolve, approve) runs in a real browser with Playwright against the running stack:
+
+```bash
+# backend on :8000 with AI_PROVIDER=mock and seeded users, Vite on :3000
+cd frontend && npm run e2e        # or npm run e2e:ui
+```
+
+Layers and what each protects: `docs/testing/TEST_STRATEGY.md`.
 
 ## Environment variables
 
