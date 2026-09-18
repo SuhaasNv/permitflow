@@ -56,3 +56,12 @@ pdftotext docs/demo/documents/with_issues/business_profile.pdf - | grep 20235555
 ## Disclaimer
 
 Every document is fictional and says so in its footer and body: "Fictional document produced for a software demonstration. Not issued by any authority." The registrar, the design studio, the landlord, the training institute, all persons, identification numbers, reference numbers and signatures are invented. No real company, UEN, logo or government crest is used. Do not present these files as genuine records.
+
+## Verified against the live check (19 Sep 2026, gpt-4.1-mini)
+
+| Set | business_profile | floor_plan | tenancy_agreement | food_hygiene_certificate |
+|-----|------------------|------------|-------------------|--------------------------|
+| clean | Verified | Verified | Verified | Verified |
+| with_issues | Issues found (UEN mismatch) | Verified | Issues found (address mismatch) | Issues found (expired) |
+
+Quirk worth knowing before a demo: on the expired certificate the model also reported the "fictional document" disclaimer as possible prompt injection text. It is a false positive of the model, not of the platform's own injection heuristic, and it shows the "advisory only" stance well: the officer decides.
