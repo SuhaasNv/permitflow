@@ -18,6 +18,7 @@ What each layer of tests protects, where it lives and how to run it. Written at 
 | Backend integration | `backend/tests/integration/` | pytest + FastAPI `TestClient` + Postgres | 16 files | Every API endpoint through HTTP: create, sections, documents (upload limits, sha256 no-change, download), verification (claim, stale pending), submit (completeness guard, Revision 1), officer queue and case, feedback (create, withdraw, resolve, release), resubmission (readiness, locked targets, Revision N+1, addressed), compare, outcome, audit trail, notifications, auth (limiter, timing), health and error envelope, edge cases (`test_edge_cases.py`, from `../reviews/EDGE_CASE_REVIEW.md`) |
 | Frontend unit and component | `frontend/src/**/*.test.{ts,tsx}` | vitest + Testing Library + jsdom | 13 files, 28 tests | `zodFromSchema` (server schema to client validation), `format`, `unsaved` guard, `StatusBadge`, `NotificationsBell`, `LoginPage`, `RequireRole`, `CompletionCard`, `DashboardPage` grouping, `SectionForm` (save, lock, updated-elsewhere), operator `queries`, officer `QueuePage` and `CasePage` |
 | End to end | `frontend/e2e/journey.spec.ts` | Playwright (Chromium) | 1 journey, about 30 s | The critical loop against the running stack: operator applies, uploads four documents, submits; officer starts review, adds feedback, requests resubmission; operator sees the notice, cannot edit the untouched section, fixes the flagged one, resubmits; officer sees Changed and Addressed markers, resolves, schedules and completes the site visit, routes to approval and approves; operator sees the outcome |
+| End to end, one spec per workflow (US-042) | `frontend/e2e/scenarios/01..06-*.spec.ts` | Playwright (Chromium) | 6 specs, about 70 s | Each workflow on its own, each ending on the audit trail: (1) apply through the UI and every AI check lands; (2) the submission reaches the queue and the review starts, both sides notified; (3) the officer flags with free text and a template, withdraws and undoes, requests resubmission, the operator sees it on top and locked elsewhere; (4) two resubmission rounds with compare, resolution and approval; (5) the operator withdraws with a reason, the officer is told; (6) rejection needs a note, the operator sees the outcome. Officer-side scenarios seed their application through the API (`E2E_API_URL`) so each stays short and independent |
 | Static | both | ruff, ruff format, mypy strict; oxlint, tsc strict, vite build | | Types and style. `any` is not used anywhere in the frontend; mypy runs in strict mode |
 | Secrets | repo | gitleaks (CI) | | No credentials committed |
 
@@ -40,7 +41,9 @@ cd frontend && npm test                  # vitest, once
 cd frontend && npm run test:watch
 
 # End to end (backend on :8000 with AI_PROVIDER=mock and seeded users, Vite on :3000)
-cd frontend && npm run e2e
+cd frontend && npm run e2e               # journey + six scenarios
+cd frontend && npx playwright test e2e/scenarios
+E2E_API_URL=http://localhost:8001/api/v1 npm run e2e   # when the backend runs on another port
 cd frontend && npm run e2e:ui            # Playwright UI mode
 E2E_BASE_URL=https://staging.example npm run e2e   # against a deployed environment
 ```

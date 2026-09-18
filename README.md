@@ -51,7 +51,7 @@ The critical journey (apply, submit, flag, fix only the flagged part, resubmit, 
 
 ```bash
 # backend on :8000 with AI_PROVIDER=mock and seeded users, Vite on :3000
-cd frontend && npm run e2e        # or npm run e2e:ui
+cd frontend && npm run e2e        # journey plus six scenario specs (E2E_API_URL if the backend is not on :8000)
 ```
 
 Layers and what each protects: `docs/testing/TEST_STRATEGY.md`.

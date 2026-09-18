@@ -1,13 +1,14 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Critical-journey E2E (US-005). Runs against a backend on :8000 with the mock AI provider and the Vite
- * dev server on :3000. Locally: `npm run e2e` (expects both servers up, as in README "Run locally").
+ * Critical-journey E2E (US-005) and one scenario per workflow (US-042, `e2e/scenarios`). Runs against
+ * the Vite dev server on :3000 and a backend with the mock AI provider (E2E_API_URL, default :8000; the
+ * scenarios seed data through it). Locally: `npm run e2e` (expects both servers up, as in README).
  * In CI the workflow starts both before this config runs (see .github/workflows/ci.yml).
  */
 export default defineConfig({
   testDir: './e2e',
-  timeout: 90_000,
+  timeout: 120_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
   workers: 1,

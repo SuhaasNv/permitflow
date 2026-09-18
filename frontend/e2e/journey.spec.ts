@@ -5,7 +5,8 @@ const PASSWORD = process.env.SEED_PASSWORD ?? 'PermitFlow!2026'
 const OPERATOR = 'operator@permitflow.example.sg'
 const OFFICER = 'officer@permitflow.example.sg'
 
-const TXT = 'Tenancy agreement between landlord and tenant. Business profile ACRA UEN. Floor plan kitchen. Food hygiene certificate. '.repeat(3)
+const TXT =
+  'Tenancy agreement between landlord and tenant. Business profile ACRA UEN. Floor plan kitchen. Food hygiene certificate. '.repeat(3)
 
 async function signIn(page: Page, email: string) {
   await page.goto('/login')
@@ -27,7 +28,10 @@ async function fillSection(page: Page, values: Record<string, string>, selects: 
 }
 
 async function upload(page: Page, slot: string, filename: string) {
-  await page.locator(`#slot-${slot} input[type=file]`).first().setInputFiles({ name: filename, mimeType: 'text/plain', buffer: Buffer.from(TXT) })
+  await page
+    .locator(`#slot-${slot} input[type=file]`)
+    .first()
+    .setInputFiles({ name: filename, mimeType: 'text/plain', buffer: Buffer.from(TXT) })
   await expect(page.locator(`#slot-${slot}`).getByText('Uploaded')).toBeVisible()
 }
 
@@ -76,8 +80,11 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
   await expect(page).toHaveURL(/\/documents$/)
 
   // ---- Operator: upload four documents; the mock check runs in the background and lands without a reload ----
-  for (const slot of ['business_profile', 'floor_plan', 'tenancy_agreement', 'food_hygiene_certificate']) await upload(page, slot, `${slot}.txt`)
-  await expect(page.locator('[data-verification]').first()).toHaveAttribute('data-verification', /verified|issues_found|needs_review/, { timeout: 30_000 })
+  for (const slot of ['business_profile', 'floor_plan', 'tenancy_agreement', 'food_hygiene_certificate'])
+    await upload(page, slot, `${slot}.txt`)
+  await expect(page.locator('[data-verification]').first()).toHaveAttribute('data-verification', /verified|issues_found|needs_review/, {
+    timeout: 30_000,
+  })
 
   // ---- Operator: review and submit ----
   await page.goto(`${appUrl}/review`)
@@ -89,7 +96,10 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
 
   // ---- Officer: review, feedback, request resubmission ----
   await signIn(page, OFFICER)
-  await page.getByRole('link', { name: new RegExp(reference) }).first().click()
+  await page
+    .getByRole('link', { name: new RegExp(reference) })
+    .first()
+    .click()
   await expect(page.locator('main span[data-tone]').first()).toHaveText('Application Received')
   await page.getByRole('button', { name: 'Start review' }).click()
   await page.locator('dialog[open]').getByRole('button', { name: 'Start review' }).click()
@@ -133,7 +143,10 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
 
   // ---- Officer: see what changed, resolve, route to a decision ----
   await signIn(page, OFFICER)
-  await page.getByRole('link', { name: new RegExp(reference) }).first().click()
+  await page
+    .getByRole('link', { name: new RegExp(reference) })
+    .first()
+    .click()
   await expect(page.getByText('Revision 2 resubmitted')).toBeVisible()
   await expect(page.getByText('Changed in Revision 2').first()).toBeVisible()
   await expect(page.locator('section:has(#compare-title)').getByText('1 section')).toBeVisible()
@@ -152,7 +165,10 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
     await page.waitForTimeout(300)
   }
   await page.getByRole('button', { name: 'Approve' }).click()
-  await page.locator('dialog[open]').getByLabel(/Note to the operator/).fill('Premises meet the requirements.')
+  await page
+    .locator('dialog[open]')
+    .getByLabel(/Note to the operator/)
+    .fill('Premises meet the requirements.')
   await page.locator('dialog[open]').getByRole('button', { name: 'Approve' }).click()
   await expect(page.locator('main span[data-tone]').first()).toHaveText('Approved')
   await page.locator('section:has(#audit-title)').getByRole('button', { name: 'Show' }).click()
