@@ -98,7 +98,7 @@ Estimated cost per verification with `gpt-4.1-mini`: well under one cent for a 2
 | Injection phrases detected | `needs_review` + issue | "Needs officer review" with the flagged phrase |
 | Process restart mid-run | stale `running` → `failed`, reason `interrupted` (only runs older than timeout + grace) | re-run available |
 
-## Live run record (19 Sep 2026, `gpt-4.1-mini`, prompt 2026-09-19.2)
+## Live run record (19 Sep 2026, `gpt-4.1-mini`, prompt 2026-09-19.2; prompt 2026-09-19.3 adds the disclaimer rule, see `AI_EVALUATION.md`)
 
 | Case | Outcome | Confidence | Issues | Latency |
 |------|---------|------------|--------|---------|
