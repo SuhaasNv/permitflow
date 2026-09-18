@@ -1,7 +1,9 @@
 """Renders the licence certificate as a single A4 PDF page with reportlab (US-051).
 
-Pure function of the data: same input, same bytes (modulo reportlab's timestamps, which are pinned).
-Text is real text, so pypdf can read it back in tests and an officer can search it.
+Pure function of the data: same input, same bytes (reportlab's `invariant` mode pins its timestamps and
+document id). Text is real text, so pypdf can read it back in tests and an officer can search it. Fonts
+are the base 14 (Helvetica, Courier), so the certificate renders Latin text only; a CJK-capable font is a
+known limitation recorded in SCOPE.md.
 """
 
 from io import BytesIO
@@ -10,6 +12,7 @@ from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.utils import simpleSplit
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
 
 from app.domain.licence import ISSUER, LICENCE_TITLE, LicenceData
@@ -53,13 +56,33 @@ def _brand_mark(c: canvas.Canvas, x: float, y: float, size: float) -> None:
     c.restoreState()
 
 
+def _clip(text: str, font: str, size: float, max_width: float) -> str:
+    """Trim a single line that cannot be broken (no spaces) so it ends with an ellipsis inside the width."""
+    if stringWidth(text, font, size) <= max_width:
+        return text
+    while text and stringWidth(text + "...", font, size) > max_width:
+        text = text[:-1]
+    return text + "..."
+
+
+def _wrap(text: str, font: str, size: float, max_width: float) -> list[str]:
+    """simpleSplit never breaks inside a word; clip any line that is still too wide."""
+    return [_clip(line, font, size, max_width) for line in simpleSplit(text, font, size, max_width)] or [""]
+
+
 def _fit_lines(text: str, font: str, size: float, max_width: float, floor: float) -> tuple[float, list[str]]:
     """Largest size at or above the floor at which the text fits in two lines; the lines themselves."""
     while True:
         lines = simpleSplit(text, font, size, max_width)
         if len(lines) <= 2 or size <= floor:
-            return size, lines
+            return size, [_clip(line, font, size, max_width) for line in lines[:2]]
         size -= 0.5
+
+
+def _fit_size(text: str, font: str, size: float, max_width: float, floor: float) -> float:
+    while size > floor and stringWidth(text, font, size) > max_width:
+        size -= 0.5
+    return size
 
 
 STRIP_TOP = 42 * mm  # signature strip, measured from the page margin
@@ -70,13 +93,13 @@ def render_licence_pdf(data: LicenceData) -> bytes:
     """Two passes: measure where the body ends with the base spacing, then draw for real with the
     slack shared across the four vertical gaps so a short certificate does not leave a hole above
     the signature strip and a long one still clears it."""
-    dry = canvas.Canvas(BytesIO(), pagesize=A4)
+    dry = canvas.Canvas(BytesIO(), pagesize=A4, invariant=1)
     y_end = _draw_page(dry, data, extra=0)
     slack = y_end - (16 * mm + STRIP_TOP + GAP_ABOVE_STRIP)
     extra = max(0.0, min(slack / 4, 6 * mm))
 
     buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4, pageCompression=0)
+    c = canvas.Canvas(buffer, pagesize=A4, pageCompression=0, invariant=1)
     c.setTitle(f"{LICENCE_TITLE} {data.licence_no}")
     c.setAuthor(ISSUER)
     c.setSubject("Fictional licence certificate produced by PermitFlow for a software demonstration")
@@ -176,8 +199,8 @@ def _draw_page(c: canvas.Canvas, data: LicenceData, *, extra: float) -> float:
     c.setLineWidth(0.8)
     c.line(left, y, right, y)
     for label, value, font in rows:
-        lines = simpleSplit(value, font, value_size, value_w)
-        row_h = pad * 2 + line_h * max(1, len(lines))
+        lines = _wrap(value, font, value_size, value_w)
+        row_h = pad * 2 + line_h * len(lines)
         baseline = y - pad - 4.1 * mm
         c.setFillColor(MUTED)
         c.setFont("Helvetica", 8.5)
@@ -231,8 +254,9 @@ def _draw_page(c: canvas.Canvas, data: LicenceData, *, extra: float) -> float:
     c.setLineWidth(0.8)
     c.line(sig_x, sig_y, right, sig_y)
     c.setFillColor(INK)
-    c.setFont("Helvetica-Bold", 10.5)
-    c.drawString(sig_x, sig_y - 5 * mm, data.approved_by)
+    name_pt = _fit_size(data.approved_by, "Helvetica-Bold", 10.5, sig_w, 8.5)
+    c.setFont("Helvetica-Bold", name_pt)
+    c.drawString(sig_x, sig_y - 5 * mm, _clip(data.approved_by, "Helvetica-Bold", name_pt, sig_w))
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 8.5)
     c.drawString(sig_x, sig_y - 9.5 * mm, f"Licensing officer, {UNIT}")

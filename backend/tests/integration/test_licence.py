@@ -81,3 +81,17 @@ def test_rejection_issues_no_licence(client: TestClient, db: Session) -> None:
     assert db.scalar(select(Licence).where(Licence.application_id == uuid.UUID(app_id))) is None
     assert client.get(f"/api/v1/applications/{app_id}/licence", headers=op).status_code == 404
     assert client.get(f"/api/v1/applications/{app_id}", headers=op).json()["licence"] is None
+
+
+def test_licence_year_follows_the_singapore_date() -> None:
+    """Between 00:00 and 08:00 SGT on 1 January the UTC year is still the old one (run-through fix L2)."""
+    from datetime import UTC, date, datetime
+
+    from app.domain.licence import licence_number, validity
+    from app.services import licence as licence_service
+
+    fixed = datetime(2026, 12, 31, 20, 0, tzinfo=UTC)
+    issued_on = fixed.astimezone(licence_service.LOCAL_TZ).date()
+    assert issued_on == date(2027, 1, 1)
+    assert licence_number(issued_on.year, 1) == "FEL-2027-000001"
+    assert validity(issued_on) == (date(2027, 1, 1), date(2027, 12, 31))

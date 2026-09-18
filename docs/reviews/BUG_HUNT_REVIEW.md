@@ -73,6 +73,17 @@ A follow-up read-only audit of the Document checks card (same day) confirmed the
 | R4 | Low | "Analysed" counted documents still checking or never checked | Label is "Documents" |
 | R5 | Low | Provider could answer `verified` with issues listed, or `issues_found` with none; mock never does, OpenAI could | Domain model settles status from the issue list (validator + unit test) |
 
+A last read-only bug hunt on the day's changes (US-051, Return to review, the checks fixes, prompt 2026-09-19.3) found no High or Medium items and six Low ones, all fixed on `fix/us-050-last-day-bugs`:
+
+| # | Severity | Finding | Fix |
+|---|----------|---------|-----|
+| R6 | Low | Licence number used the UTC year while the printed dates are Singapore dates: between 00:00 and 08:00 SGT on 1 January the number and the dates disagreed | Year taken from the Singapore date; test |
+| R7 | Low | Renderer docstring claimed deterministic bytes; reportlab wrote a timestamp and a time-based id | `invariant=1` on both canvases; test asserts identical bytes |
+| R8 | Low | Unbreakable long values (no spaces) ran past the frame; a long officer name crossed the signature block | Lines clipped with an ellipsis after shrinking; officer name shrinks then clips; test at schema maxima |
+| R9 | Low | Non-Latin business names print as boxes (base-14 fonts) | Documented as a known limitation in `SCOPE.md`; a CJK font is a follow-up |
+| R10 | Low | Frontend showed licence dates one day early west of UTC (`new Date("2026-09-19")` is UTC midnight) | `formatDate` builds date-only values in local time; test run under `TZ=America/New_York` |
+| R11 | Low | Return-to-review dialog said the operator is told "the review continues"; the notification says a review has started | Dialog copy matches the notification |
+
 The certificate itself was also reworked on the same pass (real brand mark, wrapping values, signature strip pinned at the bottom, two-pass layout), recorded under US-051 in `CHANGELOG.md`.
 
 ## Not changed

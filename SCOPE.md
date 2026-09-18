@@ -74,6 +74,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | Rate limiting, WAF, DDoS protection | **Simplified** (in-memory limiter on auth endpoints) | Infra-level concern. | Edge rate limiting, WAF rules. |
 | Officer assignment / workload routing | **Omitted** | Not in the acceptance criteria. | Assignment model, queue ownership, reassignment audit. |
 | Virus scanning of uploads | **Omitted** (type/size allowlist and magic-byte check only) | Requires ClamAV or a vendor. | Scan on upload, quarantine state. |
+| Non-Latin text on the licence certificate | **Limitation** (the PDF uses the base-14 fonts, so Chinese, Tamil or other non-Latin business names print as boxes; Latin accents are fine) | A CJK-capable TrueType font is an asset and licence decision, not a code change. | Register a Noto Sans font in the renderer and cover it in the render test. |
 
 ## Assumptions (where the assessment is ambiguous)
 
@@ -93,6 +94,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 14. **Drafts are not records:** a draft that was never submitted can be deleted outright by its owner (rows, files and audit events). Only submission creates the licensing record; after that an application can be withdrawn but never deleted (US-045, 19 Sep).
 15. **Document slots:** exactly one current document per required type; no free-form "other" slot in the MVP (feedback targets a type, and multi-file slots would need per-file targets).
 16. **Third-party AI processing:** extracted document text (capped) and the relevant form section are sent to OpenAI for verification. This is a data-transfer decision a regulator would have to approve; the MVP documents it and the production gap (region, retention, redaction) in the threat model rather than pretending it is solved.
+17. **"Operators cannot see the internal approval stage" versus the brief's own table:** the brief's status table gives operators the label "Pending Approval" for the internal `pending_approval` status, and its UC2 criteria say operators never see the approval stage. We follow the table (the operator sees "Pending Approval" as a waiting state, like "Pending Site Visit") and the spirit of the criteria: no operator response ever carries an internal status code, the officer-only labels ("Route to Approval") never reach an operator, and the decision note is served only with the final outcome (FR-026, US-032).
 
 ## Design phase (17–18 Sep 2026)
 
@@ -102,7 +104,7 @@ A UI/UX design phase was run between solutioning and implementation: design dire
 
 Re-read at the Sprint 1 close: M1 to M7 and M16, M17 are built for the operator side; M18 (tests) and M19 (CI skeleton) are partial by plan; nothing was added to or removed from MUST; S2 (re-run check) and S3 (delete while draft) landed with M3/M4; C1 landed as part of the dashboard redesign. No scope change.
 
-## Sprint 2 check (19 Sep 2026)
+## Sprint 2 check (18 Sep 2026)
 
 Re-read at the Sprint 2 close: M8 to M15 (officer review, feedback, resubmission, compare, resolution, outcome, audit, notifications) are built and verified in the browser; M2 (OpenAI provider) is live with `gpt-4.1-mini`; S2 (officer re-run) and S4 (any-two-revision compare) landed. Two stories were added for the edge-case pass (US-033, US-034); nothing was removed from MUST. Assumption 10 (who the operator is) was written down. Remaining MUST items are the E2E half of M18, the Playwright, Docker-build and deployment half of M19, and M20 (final documents), all Sprint 3.
 

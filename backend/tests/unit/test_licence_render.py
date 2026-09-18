@@ -66,3 +66,23 @@ def test_pdf_carries_every_fact_as_text() -> None:
         )
     )
     assert "PREVIEW" in PdfReader(BytesIO(preview)).pages[0].extract_text()
+
+
+def test_render_is_deterministic_and_clips_unbreakable_text() -> None:
+    long_form = {
+        "business": {"business_name": "A" * 120, "uen": "202355555E", "entity_type": "private_limited"},
+        "premises": {"address_line_1": "B" * 200, "postal_code": "208787"},
+    }
+    data = build_licence_data(
+        licence_no="FEL-2026-000009",
+        reference_no="PF-2026-001009",
+        form_data=long_form,
+        holder_name="C" * 120,
+        approved_by="Officer With A Very Long Name Indeed For The Signature Strip",
+        issued_on=date(2026, 9, 19),
+    )
+    first, second = render_licence_pdf(data), render_licence_pdf(data)
+    assert first == second
+    text = PdfReader(BytesIO(first)).pages[0].extract_text()
+    assert "..." in text  # unbreakable values are clipped, never drawn past the frame
+    assert "FEL-2026-000009" in text
