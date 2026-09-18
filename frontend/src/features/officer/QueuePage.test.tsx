@@ -74,4 +74,35 @@ describe('OfficerQueuePage', () => {
     expect(await screen.findByText('PF-2026-001006')).toBeInTheDocument()
     expect(screen.queryByText('PF-2026-001005')).not.toBeInTheDocument()
   })
+
+  it('searches by reference, business, address or applicant within the current tab', async () => {
+    const other: QueueItem = {
+      ...base,
+      id: 'a3',
+      reference_no: 'PF-2026-001007',
+      business_name: 'Nasi Lemak Corner',
+      premises_summary: '5 Tampines Street 11',
+      applicant_name: 'Lim Ah Kow',
+    }
+    vi.spyOn(api, 'getQueue').mockResolvedValue({
+      items: [base, other],
+      officer_turn_count: 2,
+      waiting_on_operator_count: 0,
+      decided_count: 0,
+    })
+    renderPage()
+    expect(await screen.findByText('PF-2026-001007')).toBeInTheDocument()
+    const box = screen.getByRole('searchbox', { name: /Search reference/ })
+    await userEvent.type(box, 'tampines')
+    expect(screen.queryByText('PF-2026-001005')).not.toBeInTheDocument()
+    expect(screen.getByText('PF-2026-001007')).toBeInTheDocument()
+    await userEvent.clear(box)
+    await userEvent.type(box, 'ah kow')
+    expect(screen.getByText('PF-2026-001007')).toBeInTheDocument()
+    await userEvent.clear(box)
+    await userEvent.type(box, 'nowhere')
+    expect(screen.getByText(/No applications match "nowhere"/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(screen.getByText('PF-2026-001005')).toBeInTheDocument()
+  })
 })
