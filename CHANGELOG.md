@@ -86,6 +86,8 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 
 ## Sprint 3 (in progress, 19 Sep 2026)
 
+- US-048 Session warning: the top bar no longer announces the expiry time all day; it stays silent until 30 minutes remain, then counts down every minute and is emphasised in the last 5. Expiry behaviour itself is unchanged.
+
 - US-007 Deployment (approval gate): production deployments wait for the owner's approval on the GitHub `production` environment and only accept `main`; the Deploy workflow also runs by hand for either environment. First automatic development deployment went through the whole chain (push, CI, deploy, health gates) on 20 Sep.
 - US-007 Deployment: `frontend/Dockerfile` (nginx, runtime `config.js`), both images pushed to GHCR by CI, `deploy.yml` redeploys Railway from the images with health gates; Railway project with `development` and `production` environments (own Postgres, volume, secrets, domains). Development deployed from `dev` and seeded on 20 Sep; a live scenario passed. Settings accept plain `postgresql://` URLs and `TRUSTED_PROXIES=*`.
 

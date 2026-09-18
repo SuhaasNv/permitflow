@@ -11,7 +11,7 @@ Operator applies and submits → officer reviews with AI-assisted document check
 | Step | Where | What the operator does | What the system does | Status the operator sees |
 |------|-------|------------------------|----------------------|--------------------------|
 | 1 | Landing S-01 | Reads what the licence needs (four documents), signs in | Signed-in users never see the landing page | |
-| 2 | Sign in S-02 | Email and password (seeded account) | JWT for 8 hours; 10 failed attempts per address pause sign-in for a minute; a dead session ends in one place and the sign-in page says why | |
+| 2 | Sign in S-02 | Email and password (seeded account) | JWT for 8 hours; 10 failed attempts per address pause sign-in for a minute; the top bar warns only in the last 30 minutes ("Session ends in 12 min"); a dead session ends in one place and the sign-in page says why | |
 | 3 | Dashboard S-10 | Sees a greeting, one summary line and work cards grouped by who is waiting on whom; clicks New application | Draft created with a sequential reference, `application.created` audited | Draft |
 | 4 | Application S-11 | Sees the four numbered sections, the documents row and the completion card; Continue application | Editability computed by the state machine: everything open while draft | Draft |
 | 5 | Form S-12 | Fills a section; Save section, Save and continue, or Save and exit (saves the partial draft first) | Zod validation as they type, server validation on save (422 per field), row lock, `section.updated` audit with field names only; refresh or tab close with unsaved input prompts first; another tab's save never wipes local typing | Draft |
