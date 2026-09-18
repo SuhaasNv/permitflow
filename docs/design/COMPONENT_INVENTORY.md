@@ -35,6 +35,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `QueueRow` (in `OfficerQueuePage`) | reference + revision, business + applicant, officer status badge, document-check state (checking / n to check / clear), last activity, next-action chip (ink when it is the officer's turn) | S-20 |
 | `CheckResult` | officer-facing verification: outcome, confidence, model, time, issues with code, field and evidence quote, missing information, fixed-vocabulary error reasons | S-21 |
 | `ReviewRail` (in `OfficerCasePage`) | server-driven action buttons (primary + secondary, disabled with reason), document-check counts, feedback placeholder | S-21 |
+| `FeedbackPanel` | items grouped by round with resolution badge and sent/draft state, anchor link to the target, Withdraw; composer (template select fills target and message, target select, textarea) with per-field 422 errors; locked reason when not under review | S-21 |
 | `Reveal` | scroll reveal (IntersectionObserver, once, delay for staggering; reveals immediately without the API) | landing sections |
 | `PageSkeleton`, `Skeleton` | shimmer placeholders in the shape of the final layout | every loading state |
 | `Badge` | neutral/info/warning/success/error/primary; dot | counts, upload state |

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.officer_schemas import (
     ActionOut,
     ApplicantOut,
+    FeedbackOut,
     OfficerApplicationOut,
     OfficerDocumentOut,
     OfficerSectionOut,
@@ -17,19 +18,30 @@ from app.api.v1.officer_schemas import (
 )
 from app.core.errors import NotFound
 from app.domain import completeness as completeness_rules
-from app.domain.enums import ApplicationStatus, VerificationStatus
+from app.domain.enums import ApplicationStatus, FeedbackResolution, VerificationStatus
 from app.domain.form_schema import SECTIONS
 from app.domain.labels import officer_label, tone_for
 from app.domain.workflow import Actor, TransitionContext, available_actions
-from app.models import Application, ApplicationRevision, Document, User, VerificationRun
+from app.models import Application, ApplicationRevision, Document, Feedback, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
 from app.repositories.users import UserRepository
+from app.services.feedback import target_label
 from app.services.operator_view import LICENCE_TITLE
 
 _NOTE_REQUIRED_TARGETS = {ApplicationStatus.REJECTED}
+
+_FEEDBACK_LOCK: dict[ApplicationStatus, str] = {
+    ApplicationStatus.APPLICATION_RECEIVED: "Start the review to add feedback.",
+    ApplicationStatus.PRE_SITE_RESUBMITTED: "Start the review of this resubmission to add feedback.",
+    ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION: (
+        "Feedback is frozen while the operator responds; it reopens when they resubmit."
+    ),
+    ApplicationStatus.APPROVED: "This application is decided.",
+    ApplicationStatus.REJECTED: "This application is decided.",
+}
 
 
 class OfficerViewService:
@@ -55,7 +67,8 @@ class OfficerViewService:
         applicant = self.users.get(app.operator_id)
         if applicant is None:
             raise NotFound("Application not found.")
-        open_count = self.feedback.open_counts([app.id]).get(app.id, 0)
+        feedback = self.feedback.list_for(app.id)
+        open_count = sum(1 for f in feedback if f.resolution == FeedbackResolution.OPEN)
         ctx = TransitionContext(open_feedback_count=open_count, has_note=False)
         actions = [
             ActionOut(
@@ -72,7 +85,7 @@ class OfficerViewService:
             if a.requires_note and not a.enabled:
                 a.enabled = True
                 a.reason = None
-        return _assemble(app, current, revisions, docs, runs, applicant, actions, self.users)
+        return _assemble(app, current, revisions, docs, runs, applicant, actions, feedback, self.users)
 
 
 def _assemble(
@@ -83,6 +96,7 @@ def _assemble(
     runs: dict[uuid.UUID, VerificationRun],
     applicant: User,
     actions: list[ActionOut],
+    feedback: list[Feedback],
     users: UserRepository,
 ) -> OfficerApplicationOut:
     form = current.form_data if current else app.draft_data
@@ -131,11 +145,41 @@ def _assemble(
     )
     business = (form.get("business") or {}).get("business_name")
     premises = (form.get("premises") or {}).get("address_line_1")
-    submitters: dict[uuid.UUID, str] = {}
-    for r in revisions:
-        if r.submitted_by not in submitters:
-            u = users.get(r.submitted_by)
-            submitters[r.submitted_by] = u.full_name if u else ""
+    names: dict[uuid.UUID, str] = {}
+
+    def name_of(user_id: uuid.UUID) -> str:
+        if user_id not in names:
+            u = users.get(user_id)
+            names[user_id] = u.full_name if u else ""
+        return names[user_id]
+
+    submitters = {r.submitted_by: name_of(r.submitted_by) for r in revisions}
+    revision_numbers = {r.id: r.revision_number for r in revisions}
+    feedback_out = [
+        FeedbackOut(
+            id=f.id,
+            target_type=f.target_type.value,
+            section_key=f.section_key,
+            document_type=f.document_type.value if f.document_type else None,
+            target_label=target_label(f),
+            message=f.message,
+            template_key=f.template_key,
+            resolution=f.resolution.value,
+            raised_in_revision=revision_numbers.get(f.raised_in_revision_id, 0),
+            author_name=name_of(f.author_id),
+            created_at=f.created_at,
+            released_to_operator_at=f.released_to_operator_at,
+            addressed_in_revision=(
+                revision_numbers.get(f.addressed_in_revision_id) if f.addressed_in_revision_id else None
+            ),
+            resolved_at=f.resolved_at,
+        )
+        for f in feedback
+    ]
+    editable = app.status == ApplicationStatus.UNDER_REVIEW
+    locked_reason = (
+        None if editable else _FEEDBACK_LOCK.get(app.status, "Feedback is closed for this status.")
+    )
     return OfficerApplicationOut(
         id=app.id,
         reference_no=app.reference_no,
@@ -160,6 +204,10 @@ def _assemble(
             for r in revisions
         ],
         current_revision_number=current.revision_number if current else 0,
+        feedback=feedback_out,
+        open_feedback_count=sum(1 for f in feedback if f.resolution == FeedbackResolution.OPEN),
+        feedback_editable=editable,
+        feedback_locked_reason=locked_reason,
         actions=actions,
         decision_note=app.decision_note,
         version=app.version,

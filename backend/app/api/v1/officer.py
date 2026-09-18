@@ -5,7 +5,15 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, status
 
 from app.api.deps import DbSession, OfficerUser
-from app.api.v1.officer_schemas import OfficerApplicationOut, QueueOut, TransitionIn
+from app.api.v1.officer_schemas import (
+    FeedbackIn,
+    FeedbackTemplateOut,
+    OfficerApplicationOut,
+    QueueOut,
+    TransitionIn,
+)
+from app.domain.feedback_templates import TEMPLATES
+from app.services.feedback import FeedbackService
 from app.services.officer_queue import OfficerQueueService
 from app.services.officer_view import OfficerViewService
 from app.services.verification import VerificationService, run_verification
@@ -55,3 +63,51 @@ def officer_rerun_check(
     background.add_task(run_verification, run.id)
     service = OfficerViewService(db)
     return service.get(user, application_id)
+
+
+@router.get("/feedback-templates", response_model=list[FeedbackTemplateOut])
+def feedback_templates(user: OfficerUser) -> list[FeedbackTemplateOut]:
+    """Predefined comment templates (FR-018, US-024). The officer edits the text before sending."""
+    return [
+        FeedbackTemplateOut(
+            key=t.key,
+            title=t.title,
+            target_type=t.target_type.value,
+            section_key=t.section_key,
+            document_type=t.document_type.value if t.document_type else None,
+            message=t.message,
+        )
+        for t in TEMPLATES
+    ]
+
+
+@router.post(
+    "/applications/{application_id}/feedback",
+    response_model=OfficerApplicationOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_feedback(
+    application_id: uuid.UUID, payload: FeedbackIn, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """Add a feedback item tied to a section or a document type; only while Under Review (409 otherwise)."""
+    FeedbackService(db).create(
+        user,
+        application_id,
+        target_type=payload.target_type,
+        section_key=payload.section_key,
+        document_type=payload.document_type,
+        message=payload.message,
+        template_key=payload.template_key,
+    )
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
+    "/applications/{application_id}/feedback/{feedback_id}/withdraw", response_model=OfficerApplicationOut
+)
+def withdraw_feedback(
+    application_id: uuid.UUID, feedback_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """Withdraw an open item; only while Under Review (409 otherwise)."""
+    FeedbackService(db).withdraw(user, application_id, feedback_id)
+    return OfficerViewService(db).get(user, application_id)

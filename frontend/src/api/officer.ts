@@ -94,6 +94,40 @@ export interface VerificationSummary {
   other: number
 }
 
+export interface FeedbackItem {
+  id: string
+  target_type: 'section' | 'document'
+  section_key: string | null
+  document_type: string | null
+  target_label: string
+  message: string
+  template_key: string | null
+  resolution: 'open' | 'addressed' | 'resolved' | 'withdrawn'
+  raised_in_revision: number
+  author_name: string
+  created_at: string
+  released_to_operator_at: string | null
+  addressed_in_revision: number | null
+  resolved_at: string | null
+}
+
+export interface FeedbackTemplate {
+  key: string
+  title: string
+  target_type: 'section' | 'document'
+  section_key: string | null
+  document_type: string | null
+  message: string
+}
+
+export interface FeedbackInput {
+  target_type: 'section' | 'document'
+  section_key?: string | null
+  document_type?: string | null
+  message: string
+  template_key?: string | null
+}
+
 export interface OfficerApplication {
   id: string
   reference_no: string
@@ -110,6 +144,10 @@ export interface OfficerApplication {
   verification_summary: VerificationSummary
   revisions: Revision[]
   current_revision_number: number
+  feedback: FeedbackItem[]
+  open_feedback_count: number
+  feedback_editable: boolean
+  feedback_locked_reason: string | null
   actions: OfficerAction[]
   decision_note: string | null
   version: number
@@ -134,4 +172,16 @@ export function transitionApplication(
 
 export function rerunOfficerCheck(id: string, documentId: string): Promise<OfficerApplication> {
   return request<OfficerApplication>(`/officer/applications/${id}/documents/${documentId}/verify`, { method: 'POST' })
+}
+
+export function getFeedbackTemplates(): Promise<FeedbackTemplate[]> {
+  return request<FeedbackTemplate[]>('/officer/feedback-templates')
+}
+
+export function createFeedback(id: string, body: FeedbackInput): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/feedback`, { method: 'POST', body })
+}
+
+export function withdrawFeedback(id: string, feedbackId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/feedback/${feedbackId}/withdraw`, { method: 'POST' })
 }

@@ -88,6 +88,10 @@ const view: OfficerApplication = {
   verification_summary: { total: 1, verified: 0, issues_found: 1, needs_review: 0, checking: 0, other: 0 },
   revisions: [{ id: 'r1', number: 1, submitted_at: '2026-09-18T01:40:00Z', submitted_by: 'Tan Wei Ling' }],
   current_revision_number: 1,
+  feedback: [],
+  open_feedback_count: 0,
+  feedback_editable: false,
+  feedback_locked_reason: 'Start the review to add feedback.',
   actions: [
     { target: 'under_review', label: 'Start review', enabled: true, reason: null, requires_note: false },
     { target: 'rejected', label: 'Reject', enabled: true, reason: null, requires_note: true },
@@ -114,6 +118,7 @@ describe('OfficerCasePage', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.spyOn(formApi, 'getFormSchema').mockResolvedValue(schema as never)
+    vi.spyOn(api, 'getFeedbackTemplates').mockResolvedValue([])
   })
 
   it('shows the submission, the check evidence and the internal status label', async () => {
@@ -147,5 +152,55 @@ describe('OfficerCasePage', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Reject' }).at(-1)!)
     expect(await screen.findByText(/Write a note for the operator/)).toBeInTheDocument()
     expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('adds feedback tied to a section while under review', async () => {
+    const underReview: OfficerApplication = {
+      ...view,
+      status: 'under_review',
+      status_label: 'Under Review',
+      feedback_editable: true,
+      feedback_locked_reason: null,
+      actions: [],
+    }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(underReview)
+    const spy = vi.spyOn(api, 'createFeedback').mockResolvedValue({
+      ...underReview,
+      open_feedback_count: 1,
+      feedback: [
+        {
+          id: 'f1',
+          target_type: 'section',
+          section_key: 'business',
+          document_type: null,
+          target_label: 'Business details',
+          message: 'Please confirm the UEN.',
+          template_key: null,
+          resolution: 'open',
+          raised_in_revision: 1,
+          author_name: 'Rahim',
+          created_at: '2026-09-19T01:00:00Z',
+          released_to_operator_at: null,
+          addressed_in_revision: null,
+          resolved_at: null,
+        },
+      ],
+    })
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Add feedback' }))
+    await userEvent.selectOptions(screen.getByLabelText(/About/), 'section:business')
+    await userEvent.type(screen.getByLabelText(/Feedback for the operator/), 'Please confirm the UEN.')
+    await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }))
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith('a1', {
+        target_type: 'section',
+        section_key: 'business',
+        document_type: null,
+        message: 'Please confirm the UEN.',
+        template_key: null,
+      }),
+    )
+    expect(await screen.findByText('1 open feedback')).toBeInTheDocument()
+    expect(screen.getByText('draft, not sent yet')).toBeInTheDocument()
   })
 })

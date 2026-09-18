@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { getOfficerApplication, getQueue, rerunOfficerCheck, transitionApplication } from '@/api/officer'
+import type { FeedbackInput } from '@/api/officer'
+import {
+  createFeedback,
+  getFeedbackTemplates,
+  getOfficerApplication,
+  getQueue,
+  rerunOfficerCheck,
+  transitionApplication,
+  withdrawFeedback,
+} from '@/api/officer'
 
 export const officerKeys = {
   queue: ['officer', 'queue'] as const,
@@ -37,6 +46,32 @@ export function useRerunCheck(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (documentId: string) => rerunOfficerCheck(id, documentId),
+    onSuccess: (view) => {
+      qc.setQueryData(officerKeys.case(id), view)
+      void qc.invalidateQueries({ queryKey: officerKeys.queue })
+    },
+  })
+}
+
+export function useFeedbackTemplates() {
+  return useQuery({ queryKey: ['officer', 'feedback-templates'], queryFn: getFeedbackTemplates, staleTime: Infinity })
+}
+
+export function useCreateFeedback(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: FeedbackInput) => createFeedback(id, body),
+    onSuccess: (view) => {
+      qc.setQueryData(officerKeys.case(id), view)
+      void qc.invalidateQueries({ queryKey: officerKeys.queue })
+    },
+  })
+}
+
+export function useWithdrawFeedback(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (feedbackId: string) => withdrawFeedback(id, feedbackId),
     onSuccess: (view) => {
       qc.setQueryData(officerKeys.case(id), view)
       void qc.invalidateQueries({ queryKey: officerKeys.queue })
