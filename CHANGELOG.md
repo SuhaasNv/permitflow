@@ -39,7 +39,52 @@ Also in this sprint, not tied to a story: the public landing page (FR-031), the 
 - What to change tomorrow: keep the officer screens honest from the first commit (no "all caught up" when the list is not built); verify every screen in Claude in Chrome at three widths before calling a story Done; write the Playwright journey early on Day 3 so the Sprint 2 loop is protected.
 - Risk into Sprint 2: 19 stories on the plan. The cut order in `SPRINTS.md` applies; the OpenAI provider may slip to Sprint 3 morning without cutting anything.
 
-## Sprint 2 (in progress, 19 Sep 2026)
+## Sprint 2 — 19 Sep 2026 — "The loop closes, twice"
+
+Sprint goal met: the officer opens a queue, reviews the submitted revision with AI-assisted document checks beside each document, adds contextual feedback from templates and requests a resubmission; the operator sees the feedback on top, can edit only the flagged targets, resubmits as Revision 2; the officer sees Changed and Addressed markers, compares any two revisions, resolves feedback, schedules and completes a site visit, routes to approval and decides; the operator sees the outcome with the officer's note. Every step is audited and notified. Demonstrated end to end in Chrome, twice around, at 1440, 820 and 390, and the live OpenAI provider verified through the API.
+
+Numbers at close: backend 620 tests (ruff, mypy strict, pytest on Postgres), frontend 28 tests (oxlint, tsc, vitest, vite build), all green locally. 33 commits on `dev` since `v0.1.0`, every one conventional, every story on its own branch merged with `--no-ff`. Remote CI has run for the branches pushed so far.
+
+### Shipped
+
+| Story | Outcome |
+|-------|---------|
+| US-020 Review queue | Done |
+| US-021 Case view + Start review | Done |
+| US-022 AI results beside documents | Done |
+| US-023 Contextual feedback | Done |
+| US-024 Comment templates | Done (7 templates) |
+| US-025 Status transitions + operator notification | Done |
+| US-032 Operator sees only the outcome | Done |
+| US-016 Resubmission view | Done |
+| US-017 Feedback anchored to section or document | Done |
+| US-018 Edit only flagged, resubmit | Done |
+| US-019 Operator history | Done |
+| US-026 Officer notified on resubmission | Done |
+| US-027 Highlights + revision compare | Done (any two revisions, SCOPE S4) |
+| US-028 Feedback resolution tracking | Done |
+| US-029 Audit trail | Done |
+| US-031 Site visit and outcome | Done |
+| US-013 Live verification status polish | Done |
+| US-002 OpenAI provider | Done (`gpt-4.1-mini`) |
+| US-003 Injection heuristic + malformed output | Done |
+| US-033 Operator edge cases (added 19 Sep) | Done |
+| US-034 Backend edge cases (added 19 Sep) | Done |
+
+Also in this sprint, not tied to a story: the tidy pass (layering, schemas package, dead code), `docs/design/USER_JOURNEY.md`, `docs/reviews/EDGE_CASE_REVIEW.md`, SCOPE assumption 10 (who the operator is), 20 as-built captures in `docs/design/screens/as-built/`.
+
+### Slipped
+
+- Nothing. Every story on the Sprint 2 plan is Done, including the two added on the day.
+
+### Retro
+
+- What slowed us: the first live OpenAI call exposed two prompt and schema defects at once (invented enum values, no date), and the full test run against the live key took four minutes. Lesson: pin the wire schema and force the mock in tests before the first live run, not after.
+- What went well: every officer and operator screen was verified in the browser at three widths before its story moved to Done; three independent edge-case reviews found 40 items and all the "now" ones shipped as two stories with tests, without breaking the loop (full suites and a browser smoke after the tidy pass).
+- What to change tomorrow: write the Playwright journey first thing so the loop is protected while the Day 3 documents are written; keep the admin epic strictly after the MUSTs (tests, CI, deployment, documents).
+- Risk into Sprint 3: Railway deployment needs the user's account; everything else is in our hands.
+
+### Milestones during the sprint (Sprint 2)
 
 - US-033 and US-034 Edge-case pass (three independent reviews, every finding and its fix or plan in `docs/reviews/EDGE_CASE_REVIEW.md`). Frontend (US-033): any 401 ends the session in one place and the sign-in page explains it; the token expiry signs out proactively; a network blip on reload no longer logs the user out; browser prompt on refresh or close with unsaved section input; Sign out asks first when a form is dirty; "Save and exit" saves the partial draft; a dirty section is never overwritten by another tab's save; submit is guarded against double fire and explains a 409; review and submitted pages redirect when the application is not in the right state; locked applications show no editing chrome; polling stops after 3 minutes and offers Re-run; Replace is hidden while a check runs; Re-run needs an editable slot; download errors surface as toasts; confirmation dialogs focus Cancel when destructive; over-promising copy removed ("10 working days", "by email"). Backend (US-034): login limiter keyed on the socket address with `TRUSTED_PROXIES`, no reset on success, constant-cost unknown email; `Content-Length` refused before the multipart body is read and no `.part` leftovers; RFC 5987 download names and 404 for missing files; `NaN` is a 422; injection beats model-declared unreadable; stale `pending` runs failed at startup and atomic run claim; re-run under row lock with `verification.requested` audit; `section.updated` audit with field names only; fixed error-reason vocabulary; notifications delivered after commit; batched operator list; admin download closed until US-072.
 

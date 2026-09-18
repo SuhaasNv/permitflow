@@ -99,6 +99,10 @@ A UI/UX design phase was run between solutioning and implementation: design dire
 
 Re-read at the Sprint 1 close: M1 to M7 and M16, M17 are built for the operator side; M18 (tests) and M19 (CI skeleton) are partial by plan; nothing was added to or removed from MUST; S2 (re-run check) and S3 (delete while draft) landed with M3/M4; C1 landed as part of the dashboard redesign. No scope change.
 
+## Sprint 2 check (19 Sep 2026)
+
+Re-read at the Sprint 2 close: M8 to M15 (officer review, feedback, resubmission, compare, resolution, outcome, audit, notifications) are built and verified in the browser; M2 (OpenAI provider) is live with `gpt-4.1-mini`; S2 (officer re-run) and S4 (any-two-revision compare) landed. Two stories were added for the edge-case pass (US-033, US-034); nothing was removed from MUST. Assumption 10 (who the operator is) was written down. Remaining MUST items are the E2E half of M18, the Playwright, Docker-build and deployment half of M19, and M20 (final documents), all Sprint 3.
+
 ## What "done" means for this MVP
 
 A reviewer can clone the repo, follow the README, log in as an operator and an officer, and complete two full rounds of submission → review → resubmission → comparison, with AI verification running (or explicitly unavailable), all covered by passing CI. See `docs/planning/DEFINITION_OF_DONE.md`.

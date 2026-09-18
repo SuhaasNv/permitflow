@@ -62,7 +62,9 @@ Closed 18 Sep 2026: goal met; US-002 OpenAI half moved to Sprint 2; retro in `CH
 
 **Cut order if behind:** progress indicator UI polish → CI skeleton (keep local checks) → nothing else; the rest is the foundation.
 
-## Sprint 2 — 19 September 2026 — "The loop closes, twice"
+## Sprint 2 — 19 September 2026 — "The loop closes, twice" — CLOSED
+
+Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done; retro in `CHANGELOG.md`.
 
 **Goal:** the officer reviews, gives contextual feedback and requests resubmission; the operator sees feedback on top, edits only flagged targets and resubmits; the officer sees highlights, compares revisions, tracks resolution and advances to an outcome; the audit trail and notifications work; OpenAI provider is wired. Two full rounds work end to end.
 
