@@ -2,7 +2,7 @@
 
 Three independent devil's-advocate reviews were run against the Sprint 1 code: the operator journey (frontend), the backend and workflow, and the product and UX gaps against the requirements. Each returned up to 20 findings ranked by impact. This file records every finding, what was done about it and where, so a reviewer can see the near-misses as well as the fixes. Items marked "later" carry the sprint in which they are planned or the reason they are deferred.
 
-Stories: US-033 (operator, items 1 to 16) and US-034 (system, items 17 to 31) in `docs/planning/USER_STORIES.md` and on the Notion board. Branches: `fix/us-033-operator-edge-cases`, `fix/us-034-backend-edge-cases`. Verification: `backend/tests/integration/test_edge_cases.py`, `frontend/src/lib/unsaved.test.ts`, `frontend/src/features/operator/queries.test.ts`, plus the existing suites.
+Stories: US-033 (operator, items 1 to 16) and US-034 (system, items 17 to 31) in `docs/planning/USER_STORIES.md` and on the Notion board. Branches: `fix/us-033-operator-edge-cases`, `fix/us-034-backend-edge-cases`. The two merge commits on `dev` carry the branches' working names (`fix/operator-edge-cases`, `fix/backend-edge-cases`); the pushed branch refs use the story names above. Verification: `backend/tests/integration/test_edge_cases.py`, `frontend/src/lib/unsaved.test.ts`, `frontend/src/features/operator/queries.test.ts`, plus the existing suites.
 
 ## Fixed now
 

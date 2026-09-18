@@ -87,6 +87,8 @@ Closed 18 Sep 2026: goal met; US-002 OpenAI half moved to Sprint 2; retro in `CH
 | US-013 | Live verification status polish | MVP |
 | US-002 | OpenAI provider | MVP |
 | US-003 | Injection heuristic + malformed output handling | MVP |
+| US-033 | Operator edge cases from the review pass (session, unsaved input, submit races, locked chrome) | MVP (added 19 Sep) |
+| US-034 | Backend edge cases from the review pass (limiter, upload cap, stale runs, audit, downloads) | MVP (added 19 Sep) |
 
 **Exit criteria:** Sprint DoD + integration test for the whole loop (two rounds) + operator visibility test + audit sequence test.
 
