@@ -23,7 +23,14 @@ import { FeedbackPanel } from './FeedbackPanel'
 import type { Target } from './FeedbackPanel'
 import { useOfficerApplication, useRerunCheck, useTransition } from './queries'
 
-const ACTION_COPY: Record<string, { title: string; body: string; confirm: string; danger?: boolean }> = {
+interface ActionCopy {
+  title: string
+  body: string
+  confirm: string
+  danger?: boolean
+}
+
+const ACTION_COPY: Record<string, ActionCopy> = {
   under_review: {
     title: 'Start reviewing this application?',
     body: 'The status becomes Under Review and the operator is told a review has started. You can add feedback while it is under review.',
@@ -51,6 +58,15 @@ const ACTION_COPY: Record<string, { title: string; body: string; confirm: string
     body: 'This is final and cannot be undone. The operator sees Rejected and your note, which is required.',
     confirm: 'Reject',
     danger: true,
+  },
+}
+
+// The same target can be reached from different places; the label tells them apart.
+const ACTION_COPY_BY_LABEL: Record<string, ActionCopy | undefined> = {
+  'Return to review': {
+    title: 'Return this application to review?',
+    body: 'The status goes back to Under Review so you can add feedback or request a resubmission. The operator is told the review continues.',
+    confirm: 'Return to review',
   },
 }
 
@@ -285,7 +301,7 @@ export function OfficerCasePage() {
     )
   }
 
-  const copy = pending ? ACTION_COPY[pending.target] : null
+  const copy = pending ? (ACTION_COPY_BY_LABEL[pending.label] ?? ACTION_COPY[pending.target]) : null
 
   return (
     <>

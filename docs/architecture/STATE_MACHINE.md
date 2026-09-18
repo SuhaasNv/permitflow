@@ -55,6 +55,7 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `post_site_clarification_resubmitted` | `pending_approval` | officer | — | UC3 (deferred) |
 | `pending_approval` | `approved` | officer | — (note optional) | Officer clicks Approve; side effect: the licence certificate is issued in the same transaction (`licence.issued`, US-051) |
 | `pending_approval` | `rejected` | officer | — (note required) | Officer clicks Reject |
+| `pending_approval` | `under_review` | officer | — | Officer clicks Return to review (US-031 follow-up, 19 Sep 2026): something noticed at the decision step is handled with feedback or a resubmission instead of a rejection |
 | any post-submission, non-terminal state | `withdrawn` | operator (owner) | — (reason optional) | Operator clicks Withdraw application (US-038); `POST /applications/{id}/withdraw` |
 
 Everything not listed is invalid and returns HTTP 409 `invalid_transition` with `details.allowed` for the caller's role. Role mismatches on a listed transition also return 409 (`details.kind = "forbidden"`): the transition table encodes the actor, and the role-gated routers already answered 403 before a wrong role could reach it. The `admin` role has no transitions: it is read-only on applications.
@@ -84,6 +85,8 @@ Terminal states: `approved`, `rejected`, `withdrawn`.
           │ resubmit                      │                  └▶ approved      rejected
           ▼                               │                                     ▲
    post_site_clarification_resubmitted ───┘── route to approval ────────────────┘
+
+   pending_approval ──return to review (officer)──▶ under_review
 
    reject (officer, note) is allowed from every non-terminal post-submission state:
    application_received, under_review, pending_pre_site_resubmission, pre_site_resubmitted,

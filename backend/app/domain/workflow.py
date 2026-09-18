@@ -142,6 +142,8 @@ TRANSITIONS: tuple[Transition, ...] = (
         S.POST_SITE_CLARIFICATION_RESUBMITTED, S.PENDING_APPROVAL, Actor.OFFICER, None, "Route to approval"
     ),
     Transition(S.PENDING_APPROVAL, S.APPROVED, Actor.OFFICER, None, "Approve"),
+    # An officer who notices something at the decision step can go back instead of rejecting.
+    Transition(S.PENDING_APPROVAL, S.UNDER_REVIEW, Actor.OFFICER, None, "Return to review"),
 )
 TRANSITIONS += tuple(
     Transition(src, S.REJECTED, Actor.OFFICER, _needs_note, "Reject") for src in _REJECT_SOURCES
