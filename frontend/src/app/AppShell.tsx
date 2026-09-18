@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router-dom'
 
 import type { Role } from '@/api/auth'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -221,6 +221,8 @@ export function AppShell() {
           <div key={pageKey} className="pf-enter mx-auto w-full max-w-[1360px] px-4 py-6 sm:px-8 sm:py-8 lg:px-10">
             <Outlet />
           </div>
+          {/* New pages open at the top; Back and Forward return to the remembered position. */}
+          <ScrollRestoration />
         </main>
       </div>
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/95 backdrop-blur md:hidden">

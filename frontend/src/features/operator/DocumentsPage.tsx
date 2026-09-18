@@ -24,7 +24,7 @@ export function DocumentsPage() {
   if (app.isPending) {
     return (
       <PageSkeleton label="Loading documents">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="flex flex-col gap-4">
             <Skeleton className="h-40" />
             <Skeleton className="h-40" />
@@ -73,7 +73,7 @@ export function DocumentsPage() {
           <FeedbackNotice view={view} compact />
         </div>
       ) : null}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="pf-stagger flex flex-col gap-4">
           {view.document_slots.map((slot, i) => (
             <DocumentSlot

@@ -50,7 +50,8 @@ export function NotificationsBell({ role }: { role: Role }) {
   const items = query.data?.items ?? []
 
   return (
-    <div ref={ref} className="relative">
+    // Below sm the popover is positioned against the sticky header (full width, 12px gutters), not the bell.
+    <div ref={ref} className="sm:relative">
       <button
         type="button"
         className={cn(
@@ -77,7 +78,7 @@ export function NotificationsBell({ role }: { role: Role }) {
         </svg>
         {unread > 0 ? (
           <span
-            className="absolute right-1.5 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-semibold leading-none text-white"
+            className="absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-semibold leading-none text-white"
             aria-hidden="true"
           >
             {unread > 9 ? '9+' : unread}
@@ -88,7 +89,7 @@ export function NotificationsBell({ role }: { role: Role }) {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="pf-enter-fast absolute right-0 top-12 z-40 w-[min(380px,calc(100vw-24px))] overflow-hidden rounded-lg border border-line bg-surface shadow-[var(--shadow-2)]"
+          className="pf-enter-fast absolute inset-x-3 top-[60px] z-40 overflow-hidden rounded-lg border border-line bg-surface shadow-[var(--shadow-2)] sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[min(380px,calc(100vw-24px))]"
         >
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <span className="text-sm font-semibold">Notifications</span>

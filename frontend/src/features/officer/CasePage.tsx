@@ -199,7 +199,7 @@ export function OfficerCasePage() {
   if (app.isPending || schema.isPending) {
     return (
       <PageSkeleton label="Loading case">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <Skeleton className="h-[480px]" />
           <Skeleton className="h-72" />
         </div>
@@ -314,7 +314,7 @@ export function OfficerCasePage() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-6">
           <section className="pf-surface px-5 py-6 sm:px-7" aria-labelledby="submission-title">
             <div className="mb-2 flex items-baseline justify-between">
@@ -349,7 +349,7 @@ export function OfficerCasePage() {
                         <StatusBadge label={`Changed in Revision ${view.current_revision_number}`} tone="info" />
                       ) : null}
                     </div>
-                    <dl className="grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[220px_minmax(0,1fr)]">
+                    <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[220px_minmax(0,1fr)]">
                       {def.fields.map((f) => {
                         const value = section.data[f.key]
                         const empty = value === undefined || value === null || value === ''

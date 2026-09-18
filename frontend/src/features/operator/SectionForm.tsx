@@ -286,7 +286,7 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
             Another tab or device saved this section. Your unsaved edits are still here; saving will overwrite the other version.
           </Alert>
         ) : null}
-        <div className="grid gap-5 sm:grid-cols-2 sm:gap-x-6">{section.fields.map(render)}</div>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-x-6">{section.fields.map(render)}</div>
       </div>
       {editable ? (
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3.5 sm:px-7">

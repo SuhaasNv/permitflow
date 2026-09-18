@@ -48,7 +48,7 @@ function Group({ title, hint, tone, count, children }: { title: string; hint: st
         <span className="font-mono text-xs text-text-3">{count}</span>
         <span className="hidden text-[13px] text-text-3 sm:inline">· {hint}</span>
       </div>
-      <ul className="pf-stagger grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{children}</ul>
+      <ul className="pf-stagger grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{children}</ul>
     </section>
   )
 }
@@ -58,7 +58,7 @@ function DashboardSkeleton() {
     <div className="flex flex-col gap-8" aria-busy="true" aria-label="Loading dashboard">
       <div className="flex flex-col gap-3">
         <Skeleton className="h-4 w-40" />
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-32" />
           ))}
@@ -66,7 +66,7 @@ function DashboardSkeleton() {
       </div>
       <div className="flex flex-col gap-3">
         <Skeleton className="h-4 w-48" />
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {[0, 1].map((i) => (
             <Skeleton key={i} className="h-32" />
           ))}
@@ -166,7 +166,7 @@ export function OperatorDashboardPage() {
       ) : apps.isError ? (
         <ErrorPanel error={apps.error} onRetry={() => void apps.refetch()} />
       ) : apps.data.length === 0 ? (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
           <EmptyPanel
             title="No applications yet"
             description="Start a new application to apply for a Food Establishment Licence. It takes about 20 minutes and you can save a draft at any point."
@@ -175,7 +175,7 @@ export function OperatorDashboardPage() {
           <WhatYouNeed />
         </div>
       ) : (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="flex flex-col gap-9">
             {GROUPS.filter((g) => g.key !== 'decided' && grouped[g.key].length > 0).map((g) => (
               <Group key={g.key} title={g.title} hint={g.hint} tone={g.tone} count={grouped[g.key].length}>

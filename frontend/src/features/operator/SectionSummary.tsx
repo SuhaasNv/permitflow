@@ -47,7 +47,7 @@ export function SectionSummary({
           </Link>
         ) : null}
       </div>
-      <dl className="grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[220px_minmax(0,1fr)]">
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[220px_minmax(0,1fr)]">
         {def.fields.map((f) => {
           const empty = state.data[f.key] === undefined || state.data[f.key] === null || state.data[f.key] === ''
           return (

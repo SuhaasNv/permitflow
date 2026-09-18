@@ -59,7 +59,7 @@ export function ReviewPage() {
   if (app.isPending || schema.isPending) {
     return (
       <PageSkeleton label="Loading review">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <Skeleton className="h-96" />
           <Skeleton className="h-64" />
         </div>
@@ -98,7 +98,7 @@ export function ReviewPage() {
     <>
       <ApplicationHeader view={view} crumb="Review and submit" />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex flex-col gap-5">
           {submit.isError && !missing.length ? (
             <Alert tone="error" title={submitError?.status === 409 ? 'Already submitted' : 'Could not submit'}>

@@ -128,7 +128,7 @@ export function LoginPage() {
           </h2>
           <dl className="mt-12 divide-y divide-white/15 border-t border-white/15">
             {POINTS.map(([title, text]) => (
-              <div key={title} className="grid gap-1 py-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-6">
+              <div key={title} className="grid grid-cols-1 gap-1 py-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-6">
                 <dt className="text-[15px] font-semibold">{title}</dt>
                 <dd className="text-[14px] leading-[21px] text-[#c5cbd3]">{text}</dd>
               </div>

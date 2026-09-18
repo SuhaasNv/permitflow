@@ -46,7 +46,7 @@ export function HistoryPage() {
   return (
     <>
       <ApplicationHeader view={view} crumb="History" />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex flex-col gap-6">
           <section className="pf-surface overflow-hidden" aria-labelledby="rev-title">
             <div className="border-b border-line px-5 py-4 sm:px-7">
@@ -107,7 +107,7 @@ export function HistoryPage() {
                     .map((s) => (
                       <div key={s.key} className="px-5 py-4 sm:px-7">
                         <h3 className="mb-2 text-[15px] font-semibold">{s.title}</h3>
-                        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[200px_minmax(0,1fr)_minmax(0,1fr)]">
+                        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[200px_minmax(0,1fr)_minmax(0,1fr)]">
                           {s.fields.map((f) => {
                             const def = fieldDef(s.key, f.key)
                             return (

@@ -113,7 +113,7 @@ export function ComparePanel({ view }: { view: OfficerApplication }) {
                   )}
                 </div>
                 {s.fields.length > 0 ? (
-                  <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[200px_minmax(0,1fr)_minmax(0,1fr)]">
+                  <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[200px_minmax(0,1fr)_minmax(0,1fr)]">
                     <dt className="hidden text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 sm:block">Field</dt>
                     <dt className="hidden text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 sm:block">
                       Revision {compare.data.from_revision}

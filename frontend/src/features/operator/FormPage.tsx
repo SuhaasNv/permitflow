@@ -45,7 +45,7 @@ export function FormPage() {
     return (
       <PageSkeleton label="Loading form">
         <Skeleton className="h-16" />
-        <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
           <Skeleton className="h-56" />
           <Skeleton className="h-96" />
         </div>
@@ -144,7 +144,7 @@ export function FormPage() {
         <Stepper steps={steps} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[232px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[232px_minmax(0,1fr)]">
         <aside className="hidden flex-col gap-4 lg:flex">
           <nav aria-label="Form sections" className="flex flex-col gap-0.5">
             <div className="pf-eyebrow px-3 pb-2">Sections</div>
