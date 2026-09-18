@@ -122,6 +122,7 @@ Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done;
 | US-047 | Landing hero band and accent | Nice-to-have (added 19 Sep) |
 | US-048 | Session warning only in the last 30 minutes | MVP (added 19 Sep) |
 | US-049 | Not fixed: reopen an addressed item for the next round | MVP (added 19 Sep) |
+| US-050 | Bug hunt: three parallel reviews, 45 findings fixed or recorded | MVP (added 19 Sep) |
 | US-070–073 | Admin oversight dashboard | Nice-to-have (only after US-005/006/007 are Done) |
 
 **Exit criteria:** Sprint DoD + UAT plan executed on the deployed URL + production readiness review + assessment traceability + final review written honestly.
