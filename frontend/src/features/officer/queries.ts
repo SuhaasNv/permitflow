@@ -4,6 +4,7 @@ import type { FeedbackInput } from '@/api/officer'
 import {
   compareRevisions,
   createFeedback,
+  getAuditTrail,
   getFeedbackTemplates,
   getOfficerApplication,
   getQueue,
@@ -99,4 +100,8 @@ export function useResolveFeedback(id: string) {
       void qc.invalidateQueries({ queryKey: officerKeys.queue })
     },
   })
+}
+
+export function useAuditTrail(id: string, enabled: boolean) {
+  return useQuery({ queryKey: ['officer', 'audit', id], queryFn: () => getAuditTrail(id), enabled, staleTime: 10_000 })
 }

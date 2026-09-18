@@ -148,7 +148,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /officer/applications/{id}/feedback/{fid}/resolve | officer | open or addressed → resolved while the case is with the officer; audit `feedback.resolved`; `{fid}` must belong to `{id}` (built, US-028) |
 | POST | /officer/applications/{id}/feedback/{fid}/withdraw | officer | open → withdrawn; 409 unless `under_review` and open; `{fid}` must belong to `{id}`; audit `feedback.withdrawn` (built, US-023) |
 | POST | /officer/applications/{id}/documents/{doc_id}/verify | officer | re-run the AI check; same rules and audit as the operator re-run; returns the officer view (built, US-022) |
-| GET | /officer/applications/{id}/audit | officer | audit trail |
+| GET | /officer/applications/{id}/audit | officer | append-only audit trail with actor name and role, plain-language summary (`domain/audit_labels.py`) and payload, chronological (built, US-029) |
 | GET | /admin/overview | admin | counts by status, idle applications, today's submissions |
 | GET | /admin/ai-health | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
 | GET | /admin/audit-feed | admin | latest 50 audit events across applications |

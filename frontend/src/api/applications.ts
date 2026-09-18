@@ -83,6 +83,7 @@ export interface ApplicationView {
   needs_operator_action: boolean
   feedback: OperatorFeedback[]
   resubmit: ResubmitReadiness | null
+  revisions: { number: number; submitted_at: string }[]
   created_at: string
   updated_at: string
 }
@@ -105,4 +106,8 @@ export function submitApplication(id: string): Promise<ApplicationView> {
 
 export function resubmitApplication(id: string): Promise<ApplicationView> {
   return request<ApplicationView>(`/applications/${id}/resubmit`, { method: 'POST' })
+}
+
+export function compareMyRevisions(id: string, from: number, to: number): Promise<import('./officer').Compare> {
+  return request<import('./officer').Compare>(`/applications/${id}/compare?from=${from}&to=${to}`)
 }

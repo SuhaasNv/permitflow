@@ -17,6 +17,7 @@ import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDate, formatDateTime, formatRelative } from '@/lib/format'
 import { CheckResult } from './CheckResult'
+import { AuditTrail } from './AuditTrail'
 import { ComparePanel } from './ComparePanel'
 import { FeedbackPanel } from './FeedbackPanel'
 import type { Target } from './FeedbackPanel'
@@ -480,12 +481,13 @@ export function OfficerCasePage() {
               ))}
             </ol>
             <p className="border-t border-line px-5 py-3 text-xs text-text-3 sm:px-7">
-              The audit trail arrives with US-029.{' '}
               <Link to="/officer/queue" className="text-text-2">
                 Back to the queue
               </Link>
             </p>
           </section>
+
+          <AuditTrail applicationId={id} />
         </div>
         <ReviewRail view={view} targets={targets} busy={transition.isPending} onAction={(a) => setPending(a)} />
       </div>
