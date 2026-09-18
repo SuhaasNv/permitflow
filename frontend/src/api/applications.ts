@@ -87,6 +87,8 @@ export interface ApplicationView {
   decision_note: string | null
   /** Owner may withdraw: after submission, before a decision. */
   can_withdraw: boolean
+  /** Drafts can be deleted outright (US-045). */
+  can_delete: boolean
   /** The operator's own reason, served once withdrawn. */
   withdrawal_reason: string | null
   created_at: string
@@ -111,6 +113,10 @@ export function submitApplication(id: string): Promise<ApplicationView> {
 
 export function resubmitApplication(id: string): Promise<ApplicationView> {
   return request<ApplicationView>(`/applications/${id}/resubmit`, { method: 'POST' })
+}
+
+export function deleteDraft(id: string): Promise<void> {
+  return request<void>(`/applications/${id}`, { method: 'DELETE' })
 }
 
 export function withdrawApplication(id: string, reason: string | null): Promise<ApplicationView> {

@@ -22,6 +22,7 @@ from app.schemas.compare import CompareOut
 from app.services.applications import ApplicationService
 from app.services.compare import CompareService
 from app.services.documents import DocumentService, content_disposition
+from app.services.draft_deletion import DraftDeletionService
 from app.services.operator_view import document_view, operator_view, summary
 from app.services.resubmission import ResubmissionService
 from app.services.submission import SubmissionService
@@ -112,6 +113,12 @@ def resubmit_application(
     422 `no_change` when nothing flagged changed; 409 when the status does not allow it."""
     app = ResubmissionService(db).resubmit(user, application_id)
     return _view(ApplicationService(db), app)
+
+
+@router.delete("/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_draft(application_id: uuid.UUID, user: OperatorUser, db: DbSession) -> None:
+    """Delete a draft outright, files included (US-045). 409 once submitted: withdraw instead."""
+    DraftDeletionService(db).delete(user, application_id)
 
 
 @router.post("/{application_id}/withdraw", response_model=ApplicationOperatorView)

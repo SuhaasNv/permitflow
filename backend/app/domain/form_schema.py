@@ -165,6 +165,10 @@ SECTIONS: tuple[SectionDef, ...] = (
 )
 
 SECTION_KEYS: tuple[str, ...] = tuple(s.key for s in SECTIONS)
+
+# Server-stamped values stored beside the form fields. Not entered by the operator, tolerated by the
+# validator, compared by the diff: re-confirming the declarations is a change (US-041 follow-up).
+STAMPED_FIELDS: dict[str, tuple[tuple[str, str], ...]] = {"declarations": (("confirmed_at", "Confirmed on"),)}
 _SECTION_INDEX: dict[str, SectionDef] = {s.key: s for s in SECTIONS}
 
 REQUIRED_DOCUMENT_TYPES: tuple[DocumentType, ...] = (
@@ -245,7 +249,7 @@ def validate_section(key: str, data: dict[str, Any], *, allow_missing: bool = Fa
     if section is None:
         raise KeyError(key)
     errors: dict[str, str] = {}
-    known = {f.key for f in section.fields}
+    known = {f.key for f in section.fields} | {k for k, _ in STAMPED_FIELDS.get(key, ())}
     for extra in set(data) - known:
         errors[extra] = "Unknown field."
     for f in section.fields:

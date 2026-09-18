@@ -133,6 +133,8 @@ class ApplicationOperatorView(BaseModel):
     decision_note: str | None = None
     # Withdrawal (US-038): allowed after submission and before a decision; reason served once withdrawn.
     can_withdraw: bool = False
+    # Drafts can be deleted outright (US-045).
+    can_delete: bool = False
     withdrawal_reason: str | None = None
     created_at: datetime
     updated_at: datetime

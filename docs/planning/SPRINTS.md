@@ -117,6 +117,8 @@ Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done;
 | US-042 | Playwright scenario suite: one spec per workflow, audit asserted | MVP (added 19 Sep) |
 | US-043 | Layout audit fixes (`docs/reviews/LAYOUT_AUDIT.md`) | MVP (added 19 Sep) |
 | US-044 | Unhandled errors inside CORS; engine pool sizing | MVP (added 19 Sep) |
+| US-045 | Delete draft | MVP (added 19 Sep) |
+| US-046 | Password show/hide; leaner sign-in copy | Nice-to-have (added 19 Sep) |
 | US-070–073 | Admin oversight dashboard | Nice-to-have (only after US-005/006/007 are Done) |
 
 **Exit criteria:** Sprint DoD + UAT plan executed on the deployed URL + production readiness review + assessment traceability + final review written honestly.

@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import AuditEvent, Notification
-from tests.journeys import VALID_PREMISES
+from tests.journeys import VALID_PREMISES, add_feedback, transition, under_review
 from tests.journeys import flag_and_request as _flag_and_request
 
 
@@ -106,3 +106,26 @@ def test_replacing_a_flagged_document_counts_as_a_change(client: TestClient, db:
     assert (
         by_label["Floor plan"]["resolution"] == "addressed" and by_label["Premises"]["resolution"] == "open"
     )
+
+
+def test_reconfirming_declarations_counts_as_the_change(client: TestClient, db: Session) -> None:
+    """Feedback on Declarations can only be answered by confirming again (the values cannot differ)."""
+    app_id, op, off, _ = under_review(client, db)
+    add_feedback(
+        client, off, app_id, target_type="section", section_key="declarations", message="Please re-confirm."
+    )
+    transition(client, off, app_id, "pending_pre_site_resubmission")
+    before = client.get(f"/api/v1/applications/{app_id}", headers=op).json()
+    assert before["resubmit"]["can_resubmit"] is False
+    r = client.patch(
+        f"/api/v1/applications/{app_id}/sections/declarations",
+        headers=op,
+        json={"information_accurate": True, "consent_to_inspection": True},
+    )
+    assert r.status_code == 200, r.text
+    view = r.json()
+    assert view["resubmit"]["can_resubmit"] is True and "declarations" in view["resubmit"]["changed_sections"]
+    assert client.post(f"/api/v1/applications/{app_id}/resubmit", headers=op).status_code == 200
+    compare = client.get(f"/api/v1/applications/{app_id}/compare?from=1&to=2", headers=op).json()
+    decl = next(s for s in compare["sections"] if s["key"] == "declarations")
+    assert decl["changed"] is True and decl["fields"][0]["label"] == "Confirmed on"

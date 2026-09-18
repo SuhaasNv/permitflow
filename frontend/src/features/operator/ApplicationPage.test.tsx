@@ -37,6 +37,7 @@ const submitted: ApplicationView = {
   revisions: [{ number: 1, submitted_at: '2026-09-18T00:00:00Z' }],
   decision_note: null,
   can_withdraw: true,
+  can_delete: false,
   withdrawal_reason: null,
   created_at: '2026-09-18T00:00:00Z',
   updated_at: '2026-09-18T00:00:00Z',
@@ -76,6 +77,26 @@ describe('ApplicationPage withdraw (US-038)', () => {
     expect(await screen.findByText('You withdrew this application')).toBeInTheDocument()
     expect(screen.getByText(/Your reason:/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Withdraw application' })).not.toBeInTheDocument()
+  })
+
+  it('discards an untouched draft after confirmation and returns to the list (US-045)', async () => {
+    vi.spyOn(api, 'getApplication').mockResolvedValue({
+      ...submitted,
+      status_label: 'Draft',
+      status_tone: 'neutral',
+      can_edit: true,
+      can_withdraw: false,
+      can_delete: true,
+      revision_count: 0,
+      revisions: [],
+      completeness: { ...submitted.completeness, percent: 0, is_complete: false, sections_complete: 0, documents_present: 0 },
+    })
+    const remove = vi.spyOn(api, 'deleteDraft').mockResolvedValue(undefined)
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Discard draft' }))
+    expect(await screen.findByRole('dialog', { name: 'Discard this draft?' })).toBeInTheDocument()
+    await userEvent.click(screen.getAllByRole('button', { name: 'Discard draft' }).at(-1)!)
+    expect(remove).toHaveBeenCalledWith('a1')
   })
 
   it('does not offer withdrawal when the server says it is not allowed', async () => {
