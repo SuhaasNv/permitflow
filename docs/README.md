@@ -62,7 +62,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Quality, operations, reviews (produced during implementation)
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `testing/TEST_STRATEGY.md` | to be written (Day 3) | Layers, what each layer protects, how to run |
+| `testing/TEST_STRATEGY.md` | written (19 Sep) | Layers, what each layer protects, how to run |
 | `uat/UAT_PLAN.md` | to be written (Day 3) | Acceptance scenarios and results on the deployed URL |
 | `operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
 | `operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |

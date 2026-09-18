@@ -97,7 +97,7 @@ export function ApplicationPage() {
                 </Link>
               ) : null}
               <Link to={`/app/applications/${id}/form${nextSection ? `/${nextSection.key}` : ''}`} className={buttonClasses('primary')}>
-                Continue application
+                {view.completeness.percent === 0 ? 'Start application' : 'Continue application'}
               </Link>
             </>
           ) : undefined

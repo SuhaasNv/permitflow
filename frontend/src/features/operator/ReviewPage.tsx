@@ -76,7 +76,9 @@ export function ReviewPage() {
   const view = app.data
   const base = `/app/applications/${id}`
   // Review is only for an editable application; a submitted or decided one shows its own page.
-  if (!view.can_edit) return <Navigate to={base} replace />
+  // Locked applications go back to their page, except right after this page's own submit succeeded:
+  // the mutation's data lands before its navigation to the confirmation page.
+  if (!view.can_edit && !submit.isSuccess && !submit.isPending) return <Navigate to={base} replace />
   const withAttention = view.document_slots.filter((s) => s.document?.verification && ATTENTION.has(s.document.verification.status))
   const stillChecking = view.document_slots.filter(
     (s) => s.document?.verification && (s.document.verification.status === 'pending' || s.document.verification.status === 'running'),
