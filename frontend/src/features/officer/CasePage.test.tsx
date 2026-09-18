@@ -207,7 +207,7 @@ describe('OfficerCasePage', () => {
       }),
     )
     expect(await screen.findByText('1 open feedback')).toBeInTheDocument()
-    expect(screen.getByText('draft, not sent yet')).toBeInTheDocument()
+    expect(screen.getByText('Draft, not sent yet')).toBeInTheDocument()
   })
 
   it('offers Withdraw only on an unsent draft item, and Undo after withdrawing (US-039)', async () => {

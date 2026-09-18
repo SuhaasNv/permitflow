@@ -67,9 +67,14 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
   }
 
   const pickTemplate = (key: string) => {
+    const previous = templates.data?.find((x) => x.key === templateKey)
     setTemplateKey(key)
     const t = templates.data?.find((x) => x.key === key)
-    if (!t) return
+    if (!t) {
+      // Back to "No template": drop the template's text unless the officer already edited it.
+      if (previous && message === previous.message) setMessage('')
+      return
+    }
     setMessage(t.message)
     const suggested = targets.find((x) => (t.section_key ? x.key === t.section_key : t.document_type ? x.key === t.document_type : false))
     if (suggested) setTarget(suggested.value)
@@ -165,9 +170,14 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                           tone={RESOLUTION[f.resolution].tone}
                         />
                         {f.released_to_operator_at ? (
-                          <span className="text-[11px] text-text-3">sent to operator</span>
+                          <span className="text-[11px] text-text-3">Sent to the operator</span>
                         ) : f.resolution === 'open' ? (
-                          <span className="text-[11px] text-text-3">draft, not sent yet</span>
+                          <span
+                            className="text-[11px] text-text-3"
+                            title="Reaches the operator when you request a resubmission. Until then you can edit or withdraw it."
+                          >
+                            Draft, not sent yet
+                          </span>
                         ) : null}
                       </div>
                       <p className="mt-1.5 text-[13px] leading-[19px] text-text-2">{f.message}</p>
@@ -238,7 +248,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
             ) : null}
             <SelectField
               label="Template"
-              placeholder="Start from a common issue"
+              placeholder="No template, write your own"
               value={templateKey}
               onChange={(e) => pickTemplate(e.target.value)}
               options={(templates.data ?? []).map((t: FeedbackTemplate) => ({ value: t.key, label: t.title }))}

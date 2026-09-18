@@ -86,6 +86,8 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 
 ## Sprint 3 (in progress, 19 Sep 2026)
 
+- Copy and template picker (user walkthrough, 20 Sep): the feedback template select offers "No template, write your own" and choosing it drops the template's text unless the officer edited it; "Draft, not sent yet" and "Sent to the operator" capitalised with a tooltip explaining when a draft reaches the operator; "Browse files" capitalised. Only intentional technical tokens (file names, issue codes, audit event types) still start lowercase.
+
 - US-048 Session warning: the top bar no longer announces the expiry time all day; it stays silent until 30 minutes remain, then counts down every minute and is emphasised in the last 5. Expiry behaviour itself is unchanged.
 
 - US-007 Deployment (approval gate): production deployments wait for the owner's approval on the GitHub `production` environment and only accept `main`; the Deploy workflow also runs by hand for either environment. First automatic development deployment went through the whole chain (push, CI, deploy, health gates) on 20 Sep.

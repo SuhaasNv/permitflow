@@ -109,13 +109,13 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
   await page.getByLabel(/About/).selectOption('section:premises')
   await page.getByLabel(/Feedback for the operator/).fill('Please confirm the premises unit number against your tenancy agreement.')
   await page.locator('form').getByRole('button', { name: 'Add feedback' }).click()
-  await expect(page.getByText('draft, not sent yet')).toBeVisible()
+  await expect(page.getByText('Draft, not sent yet')).toBeVisible()
   await expect(page.locator('#target-section-premises').getByText('1 open feedback')).toBeVisible()
 
   await page.getByRole('button', { name: 'Request resubmission' }).click()
   await page.locator('dialog[open]').getByRole('button', { name: 'Request resubmission' }).click()
   await expect(page.locator('main span[data-tone]').first()).toHaveText('Pending Pre-Site Resubmission')
-  await expect(page.getByText('sent to operator')).toBeVisible()
+  await expect(page.getByText('Sent to the operator')).toBeVisible()
   await signOut(page)
 
   // ---- Operator: only the flagged section is editable; fix it and resubmit ----
