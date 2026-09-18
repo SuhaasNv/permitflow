@@ -65,6 +65,21 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: MVP · Day 2 · Dependencies: US-001, US-012, US-002 · Requirements: SEC-005, SEC-010, REL-003, AUD-001 · Threat model T4, T5, T13 · Source: `docs/reviews/EDGE_CASE_REVIEW.md` items 17 to 31 · Branch `fix/us-034-backend-edge-cases`
 - Definition of Done: DoD checklist + `tests/integration/test_edge_cases.py` (11 regression tests).
 
+### US-035 — As an operator or officer, I want the side rail to reach the bottom of the window while I scroll, so that the workspace never shows a broken edge.
+- Acceptance criteria: after scrolling past the top notice bar the side rail still ends at the bottom of the window with its footer visible; holds on every operator and officer screen, expanded and collapsed; short pages gain no scrollbar.
+- Priority: MVP · Day 3 (hotfix, added 19 Sep from a screenshot) · Dependencies: US-001 · Requirements: UX-001 · Branch `fix/rail-gap`
+- Definition of Done: Playwright measurement on dashboard, my applications, application, history, queue and case: rail bottom equals viewport height.
+
+### US-036 — As an operator or officer, I want to search my list by reference, business, address or applicant, so that I can open the right application without scrolling.
+- Acceptance criteria: My applications and the review queue carry a search box beside the status tabs; matching is case-insensitive and every word of the query must appear in the reference, business name, premises address or (officer only) applicant name; search combines with the active tab; no match shows the query and a Clear search action; fits 1440, 820 and 390.
+- Priority: Nice-to-have · Day 3 (added 19 Sep on request) · Dependencies: US-020, US-010 · Requirements: UX-003 · Branch `feat/us-036-list-search` · Client-side over the loaded list, same pattern as SCOPE S1
+- Definition of Done: unit test for the matcher, component tests on both pages, screenshots at three widths.
+
+### US-037 — As an officer or operator on a phone, I want every screen to fit the width of the phone and every navigation to open at the top of the page, so that I never scroll sideways or land mid-page.
+- Acceptance criteria: the officer case page (documents, check results, compare panel, revision history, review rail) fits 390 px with no horizontal scroll; opening a new page scrolls to the top while Back and Forward keep the browser's remembered position; verified on every operator and officer route at 390 and 820.
+- Priority: MVP · Day 3 (hotfix, added 19 Sep from iPhone 12 Pro screenshots) · Dependencies: US-021 · Requirements: UX-001 · Branch `fix/us-037-phone-layout`
+- Definition of Done: Playwright measurement of `scrollWidth` on every route at 390; scroll position check after navigation.
+
 ## UC1 — Operator Submission & Resubmission
 
 ### US-010 — As an operator, I want to create a new licence application, so that I can start my submission.

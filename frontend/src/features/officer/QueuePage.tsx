@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom'
 
 import type { QueueItem } from '@/api/officer'
 import { PageHeader } from '@/features/shared/PageHeader'
+import { SearchBox } from '@/features/shared/SearchBox'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import { EmptyPanel, ErrorPanel, Skeleton } from '@/features/shared/states'
 import { cn } from '@/lib/cn'
 import { formatDate, formatDateTime, formatRelative } from '@/lib/format'
+import { matchesQuery } from '@/lib/search'
 import { useQueue } from './queries'
 
 type Filter = 'all' | 'mine' | 'operator' | 'decided'
@@ -128,6 +130,7 @@ function Row({ item }: { item: QueueItem }) {
 export function OfficerQueuePage() {
   const queue = useQueue()
   const [filter, setFilter] = useState<Filter>('mine')
+  const [query, setQuery] = useState('')
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = { all: 0, mine: 0, operator: 0, decided: 0 }
@@ -138,7 +141,11 @@ export function OfficerQueuePage() {
     return c
   }, [queue.data])
 
-  const shown = (queue.data?.items ?? []).filter((i) => filter === 'all' || bucket(i) === filter)
+  const shown = (queue.data?.items ?? []).filter(
+    (i) =>
+      (filter === 'all' || bucket(i) === filter) &&
+      matchesQuery(query, [i.reference_no, i.business_name, i.premises_summary, i.applicant_name]),
+  )
   const summary = queue.data
     ? `${queue.data.officer_turn_count} ${queue.data.officer_turn_count === 1 ? 'needs' : 'need'} review · ${queue.data.waiting_on_operator_count} waiting on operators · ${queue.data.decided_count} decided`
     : 'Submitted applications, newest activity first.'
@@ -177,27 +184,31 @@ export function OfficerQueuePage() {
         />
       ) : (
         <section className="pf-surface overflow-hidden" aria-label="Review queue">
-          <div
-            className="flex flex-wrap items-center gap-1 border-b border-line px-3 py-2.5 sm:px-4"
-            role="tablist"
-            aria-label="Filter queue"
-          >
-            {FILTERS.map((f) => (
-              <button
-                key={f.key}
-                type="button"
-                role="tab"
-                aria-selected={filter === f.key}
-                onClick={() => setFilter(f.key)}
-                className={cn(
-                  'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors duration-[var(--dur-fast)]',
-                  filter === f.key ? 'bg-surface-3 text-text' : 'text-text-2 hover:bg-neutral-soft hover:text-text',
-                )}
-              >
-                {f.label}
-                <span className="font-mono text-[11px] text-text-3">{counts[f.key]}</span>
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2.5 sm:px-4">
+            <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label="Filter queue">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={filter === f.key}
+                  onClick={() => setFilter(f.key)}
+                  className={cn(
+                    'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors duration-[var(--dur-fast)]',
+                    filter === f.key ? 'bg-surface-3 text-text' : 'text-text-2 hover:bg-neutral-soft hover:text-text',
+                  )}
+                >
+                  {f.label}
+                  <span className="font-mono text-[11px] text-text-3">{counts[f.key]}</span>
+                </button>
+              ))}
+            </div>
+            <SearchBox
+              value={query}
+              onChange={setQuery}
+              label="Search reference, business, address or applicant"
+              className="w-full sm:ml-auto sm:w-80"
+            />
           </div>
           <div className="hidden grid-cols-[130px_minmax(0,1fr)_200px_130px] gap-x-4 border-b border-line bg-surface-2 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 lg:grid xl:grid-cols-[150px_minmax(0,1fr)_230px_130px_120px_150px]">
             <span>Reference</span>
@@ -211,7 +222,18 @@ export function OfficerQueuePage() {
           </div>
           {shown.length === 0 ? (
             <p className="px-5 py-12 text-center text-sm text-text-2">
-              {filter === 'mine' ? 'You are all caught up. Nothing is waiting for your review.' : 'No applications match this filter.'}
+              {query.trim() ? (
+                <>
+                  No applications match "{query.trim()}".{' '}
+                  <button type="button" className="font-semibold text-text-2 hover:text-text" onClick={() => setQuery('')}>
+                    Clear search
+                  </button>
+                </>
+              ) : filter === 'mine' ? (
+                'You are all caught up. Nothing is waiting for your review.'
+              ) : (
+                'No applications match this filter.'
+              )}
             </p>
           ) : (
             <ul key={filter} className="pf-stagger divide-y divide-line">
