@@ -70,7 +70,9 @@ docs/      requirements, architecture, ADRs, design system and prototype, planni
 
 ## Branching and deployment
 
-`main` is production, `dev` is integration, work happens on `feat/*` branches: `docs/operations/BRANCHING.md`. Two Railway environments are planned: `development` from `dev` and `production` from `main`.
+`main` is production, `dev` is integration, work happens on `feat/*` branches: `docs/operations/BRANCHING.md`.
+
+Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway pulls them. Push to `dev` deploys the `development` environment, push to `main` deploys `production`, each with its own database, uploads volume and secrets, gated on health after deploy. Development: https://frontend-development-afe2.up.railway.app. Details, secrets, seeding and rollback: `docs/operations/OPERATIONS.md`.
 
 ## CI
 
@@ -84,7 +86,9 @@ docs/      requirements, architecture, ADRs, design system and prototype, planni
 | Secret scan | gitleaks over the full history |
 | AI verification | Configuration audit, provider contract tests, the golden set through the real pipeline on the mock provider (blocking at 100 %), verdict in the run summary and as an artifact |
 | Dependency audit | pip-audit and npm audit (production dependencies), reported in the run summary, non-blocking |
-| Docker build | Builds `backend/Dockerfile` with the GitHub Actions cache (no push) |
+| Images | Builds the backend and frontend images; on `dev` and `main` pushes them to GHCR tagged with the branch and `sha-<commit>` |
+
+`deploy.yml` runs after a green CI on `dev` or `main` and redeploys the matching Railway environment from the new images (see Branching and deployment).
 
 The E2E job waits for the backend and frontend suites, so a broken unit test never spends the browser minutes.
 
@@ -94,4 +98,4 @@ Every uploaded document is checked in the background against the application for
 
 **CI for the AI.** The `ai` job in `ci.yml` audits the configuration (pinned wire schema, prompt version, default model, provider wiring), runs the provider contract tests, then runs fourteen golden cases (the demo PDFs, edge cases and two prompt-injection styles) through the real pipeline with the mock provider and fails below 100 %; the verdict is written to the run summary. The same set is run by hand against OpenAI whenever the prompt or model changes and the result is recorded with the date in `docs/ai/AI_EVALUATION.md` (14 of 14 on 20 Sep 2026). A dependency audit job (pip-audit, npm audit on production dependencies) reports without blocking.
 
-Sections on deployment, AI usage and "what I would do next" are added as the corresponding stories land (see `docs/planning/SPRINTS.md`).
+Sections on AI usage and "what I would do next" are added as the corresponding stories land (see `docs/planning/SPRINTS.md`).

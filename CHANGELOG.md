@@ -86,6 +86,8 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 
 ## Sprint 3 (in progress, 19 Sep 2026)
 
+- US-007 Deployment: `frontend/Dockerfile` (nginx, runtime `config.js`), both images pushed to GHCR by CI, `deploy.yml` redeploys Railway from the images with health gates; Railway project with `development` and `production` environments (own Postgres, volume, secrets, domains). Development deployed from `dev` and seeded on 20 Sep; a live scenario passed. Settings accept plain `postgresql://` URLs and `TRUSTED_PROXIES=*`.
+
 - US-004 AI evaluation harness: `backend/evals/` runs fourteen golden cases (demo PDFs, edge cases, two injection styles) through the real pipeline; mock 12 of 12 counted (two documented mock gaps), OpenAI 14 of 14; a blocking `ai` CI job with a configuration audit and a run-summary verdict; a non-blocking dependency audit job. The mock provider learned long-form dates and a missing tenancy expiry along the way.
 
 - Version chip: the release version (`frontend/package.json`, injected by Vite) shows in the side rail footer and the landing footer; bumping it is part of the release step in BRANCHING.md. First remote CI run after the push caught one ruff line-length slip from the site visit rename; fixed.

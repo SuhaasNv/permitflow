@@ -54,6 +54,53 @@ JSON lines on stdout: one `request` line per request with `request_id`, method, 
 
 `.github/workflows/ci.yml`: backend (ruff, mypy, pytest on a Postgres service), frontend (lint, typecheck, vitest, build), E2E (the full stack started inside the job: Postgres service, `alembic upgrade head`, `scripts/seed.py`, uvicorn on :8000 with `AI_PROVIDER=mock` and a CI-only `JWT_SECRET`, `vite preview` on :3000, then `npm run e2e`), gitleaks, and a Docker build of the backend image. The E2E job needs the two test suites first. On failure it prints the last 200 lines of both server logs and uploads `playwright-report` and `test-results` as an artifact for seven days. Nothing in CI deploys: deployment is Railway's job (below).
 
-## Deployment (planned, US-007)
+## Deployment (US-007)
 
-Two Railway environments: `development` (deploys from `dev`) and `production` (deploys from `main`), each with its own PostgreSQL and its own variables. Backend from `backend/Dockerfile` with a volume at `/data/uploads`; frontend as a static site built with `VITE_API_URL` pointing at that environment's API.
+### Shape
+
+One Railway project (`permitflow`), two environments that share nothing:
+
+| | development | production |
+|---|---|---|
+| Deploys from | `dev` | `main` (release tags `v0.<sprint>.0`) |
+| Images | `ghcr.io/suhaasnv/permitflow-backend:dev`, `...-frontend:dev` | `:main` |
+| Frontend | https://frontend-development-afe2.up.railway.app | https://frontend-production-2d8b.up.railway.app |
+| API | https://backend-development-4e04.up.railway.app/api/v1 | https://backend-production-19cd.up.railway.app/api/v1 |
+| Database | own Postgres 18 service | own Postgres 18 service |
+| Uploads | volume `uploads` at `/data/uploads` | own volume at `/data/uploads` |
+| AI | `AI_PROVIDER=openai`, `gpt-4.1-mini` | same |
+
+Two images, built once in CI and pulled by Railway (Railway never builds): `backend/Dockerfile` (uvicorn, runs `alembic upgrade head` on start) and `frontend/Dockerfile` (Vite build served by nginx; the API URL is written into `config.js` at container start from `API_URL`, so one image serves both environments). Images are public packages on GHCR, tagged `sha-<commit>` and with the branch name.
+
+### Continuous deployment, one push at a time
+
+1. Push to `dev` (or `main`). `ci.yml` runs: backend, frontend, AI verification, gitleaks, dependency audit, then the E2E job against a stack started in the runner.
+2. Green → the `images` job builds both images and pushes them to GHCR (`:dev` or `:main`, plus `sha-<commit>`). Pull requests build but never push.
+3. `deploy.yml` runs when CI completed successfully on that branch. Using the environment's `RAILWAY_TOKEN` it calls `railway redeploy --from-source` for `backend` and `frontend` in the matching Railway environment, which pulls the new images.
+4. Post-deploy gates: `/api/v1/health` and `/healthz` must answer 200 within about seven minutes, and the frontend's `config.js` must name that environment's API. A failed gate marks the deployment red; the previous containers keep serving until the new ones are healthy (Railway's default).
+
+Development and production cannot affect each other: separate databases, volumes, secrets, URLs, and a project token scoped to one environment each.
+
+### Secrets and variables
+
+| Where | Name | Purpose |
+|---|---|---|
+| Railway backend service (per environment) | `APP_ENV`, `DATABASE_URL` (`${{Postgres.DATABASE_URL}}`), `JWT_SECRET` (distinct per environment), `JWT_EXPIRES_MINUTES`, `CORS_ORIGINS` (that environment's frontend URL), `UPLOAD_DIR=/data/uploads`, `TRUSTED_PROXIES=*` (the Railway edge is the only peer), `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `PORT=8000` | runtime configuration |
+| Railway frontend service (per environment) | `PORT=8080`, `API_URL` | written into `config.js` at start |
+| GitHub environment secret (`development`, `production`) | `RAILWAY_TOKEN` | a Railway **project token** scoped to that one environment (Project settings, Tokens); created by the owner in the dashboard |
+| GitHub repository variable | `RAILWAY_PROJECT_ID` | which project to redeploy |
+| GitHub environment variables | `BACKEND_URL`, `FRONTEND_URL` | the post-deploy gates |
+
+`postgresql://` URLs from Railway are accepted as-is: settings add the `+psycopg` driver.
+
+### Seeding
+
+The database starts empty. `scripts/seed.py` creates the two demo accounts only (idempotent). It is not part of a deploy on purpose, a deploy must never touch data; run it once per environment: `railway ssh --environment development --service backend -- .venv/bin/python scripts/seed.py`. Development was seeded on 20 Sep 2026.
+
+### Rollback
+
+Every image carries a `sha-<commit>` tag. Point the service at the previous tag in the Railway dashboard (or re-run `deploy.yml` on the earlier commit). Migrations are forward-only; a rollback that needs a schema change is a new migration.
+
+### Verified
+
+Development: both health endpoints 200 after the first commit, demo accounts seeded, and `e2e/scenarios/02-reaches-officer.spec.ts` passed against the live URLs (20 Sep 2026).
