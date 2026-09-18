@@ -2,8 +2,9 @@
 
 Wired fully in Sprint 2 (US-002 Day 2); the mock provider covers Sprint 1."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Literal, cast
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict
 
@@ -63,7 +64,9 @@ class WireResult(BaseModel):
 
 def build_messages(request: VerificationRequest, today: date | None = None) -> list[dict[str, str]]:
     # The model has no clock: without today's date it cannot judge expiry (found in the live run of 19 Sep).
-    today = today or date.today()
+    # The date is Singapore's, not the container's UTC date: after 00:00 SGT a certificate that expires
+    # "today" is already expired for the licensing office (run-through finding R12).
+    today = today or datetime.now(ZoneInfo("Asia/Singapore")).date()
     user = (
         f"Today's date: {today.isoformat()}. Treat any validity or expiry date before today as expired.\n"
         f"Document type: {request.document_type} ({request.document_type_description}).\n"
