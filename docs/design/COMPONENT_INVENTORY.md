@@ -32,6 +32,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `SaveIndicator` | dirty / saving / saved (relative time, refreshed every 5 s) | section form footer |
 | `Toast` (`ToastProvider`, `useToast`) | title, body, tone; bottom-right stack, four max, auto-dismiss 4.5 s (errors stay) | section saved, document uploaded / removed / unchanged |
 | `Alert` | tone icon, optional title, optional action slot | inline messages |
+| `QueueRow` (in `OfficerQueuePage`) | reference + revision, business + applicant, officer status badge, document-check state (checking / n to check / clear), last activity, next-action chip (ink when it is the officer's turn) | S-20 |
 | `Reveal` | scroll reveal (IntersectionObserver, once, delay for staggering; reveals immediately without the API) | landing sections |
 | `PageSkeleton`, `Skeleton` | shimmer placeholders in the shape of the final layout | every loading state |
 | `Badge` | neutral/info/warning/success/error/primary; dot | counts, upload state |

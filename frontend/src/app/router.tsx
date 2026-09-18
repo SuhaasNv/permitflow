@@ -6,6 +6,7 @@ import { LandingPage } from '@/features/landing/LandingPage'
 import { RequireRole } from '@/features/auth/RequireRole'
 import { AdminOverviewPage } from '@/features/admin/OverviewPage'
 import { OfficerQueuePage } from '@/features/officer/QueuePage'
+import { OfficerCasePage } from '@/features/officer/CasePage'
 import { ApplicationPage } from '@/features/operator/ApplicationPage'
 import { DocumentsPage } from '@/features/operator/DocumentsPage'
 import { FormPage } from '@/features/operator/FormPage'
@@ -44,7 +45,10 @@ export const router = createBrowserRouter([
     children: [
       {
         element: <AppShell />,
-        children: [{ path: '/officer/queue', element: <OfficerQueuePage /> }],
+        children: [
+          { path: '/officer/queue', element: <OfficerQueuePage /> },
+          { path: '/officer/applications/:id', element: <OfficerCasePage /> },
+        ],
       },
     ],
   },
