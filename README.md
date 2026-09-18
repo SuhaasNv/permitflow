@@ -2,7 +2,7 @@
 
 A regulatory licensing platform built for a 3-day full-stack assessment. Business operators apply for a Food Establishment Licence through a guided form with checked uploads; licensing officers review the submission, leave feedback tied to a specific section or document, and request a resubmission in which only the flagged parts reopen; every status change, feedback round and decision is audited; approval issues a licence certificate the business can download. An advisory AI verifier reads each uploaded document and compares it with the form before anyone submits; it never decides anything.
 
-**Try it:** development environment https://frontend-development-afe2.up.railway.app (demo accounts below). Production goes live with the v0.3.0 release on https://permitflow.space. Local setup takes about ten minutes (below).
+**Try it:** development environment https://dev.permitflow.space (until the DNS records land: https://frontend-development-afe2.up.railway.app), demo accounts below. Production goes live with the v0.3.0 release on https://permitflow.space. Local setup takes about ten minutes (below).
 
 **What is built, deferred and mocked:** `SCOPE.md`. Use cases 1 and 2 are complete (submission with real-time AI checks, unlimited resubmission rounds, officer review with contextual feedback, templates, revision compare, resolution tracking, audit trail, role-specific status labels); use case 3 (site-visit checklist) is deferred with its two statuses present in the state machine. Beyond the brief: withdrawal, draft deletion, feedback undo and reopen, a licence certificate, a landing page.
 
@@ -78,7 +78,7 @@ docs/      requirements, architecture, ADRs, design system and prototype, planni
 
 `main` is production, `dev` is integration, work happens on `feat/*` branches: `docs/operations/BRANCHING.md`.
 
-Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway pulls them. Push to `dev` deploys the `development` environment automatically; push to `main` prepares a `production` deployment that waits for the owner's approval in GitHub Actions before Railway is touched. Each environment has its own database, uploads volume and secrets, and every deployment is gated on health afterwards. Either can be redeployed by hand from the Deploy workflow. Development: https://frontend-development-afe2.up.railway.app (API https://backend-development-4e04.up.railway.app/api/v1). Production: https://permitflow.space and https://api.permitflow.space from the v0.3.0 release (US-052); until then the production hosts answer 404 by design. Details, secrets, seeding and rollback: `docs/operations/OPERATIONS.md`.
+Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway pulls them. Push to `dev` deploys the `development` environment automatically; push to `main` prepares a `production` deployment that waits for the owner's approval in GitHub Actions before Railway is touched. Each environment has its own database, uploads volume and secrets, and every deployment is gated on health afterwards. Either can be redeployed by hand from the Deploy workflow. Hosts (US-052): production https://permitflow.space and https://api.permitflow.space from the v0.3.0 release (until then they answer 404 by design); development https://dev.permitflow.space and https://api.dev.permitflow.space (Railway fallbacks: https://frontend-development-afe2.up.railway.app, https://backend-development-4e04.up.railway.app/api/v1). Details, secrets, seeding and rollback: `docs/operations/OPERATIONS.md`.
 
 ## CI
 
