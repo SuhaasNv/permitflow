@@ -18,15 +18,15 @@ test('two resubmission rounds: fix, resubmit, compare, resolve, again, then appr
   await expect(page.getByRole('heading', { name: 'Changes resubmitted' })).toBeVisible()
   await signOut(page)
 
-  // ---- officer reviews round 1, resolves, asks for a second change ----
+  // ---- officer reviews round 1: the premises change is not good enough (Not fixed), plus a second item ----
   await signIn(page, OFFICER)
   await openCase(page, app.reference)
   await expect(page.getByText('Revision 2 resubmitted')).toBeVisible()
   await expect(page.getByText('Addressed in Revision 2').first()).toBeVisible()
   await page.getByRole('button', { name: 'Start review' }).click()
   await confirmDialog(page, 'Start review')
-  await page.getByRole('button', { name: 'Mark resolved' }).click()
-  await expect(page.locator('aside').getByText('Resolved', { exact: true }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Not fixed' }).click()
+  await expect(page.locator('aside')).toContainText('Draft, not sent yet')
   await page.getByRole('button', { name: 'Add feedback' }).click()
   await page.getByLabel(/About/).selectOption('section:operations')
   await page.getByLabel(/Feedback for the operator/).fill('State the opening hours per day.')
@@ -36,11 +36,17 @@ test('two resubmission rounds: fix, resubmit, compare, resolve, again, then appr
   await expect(status(page)).toHaveText('Pending Pre-Site Resubmission')
   await signOut(page)
 
-  // ---- round 2: only operations is open now; premises is locked again ----
+  // ---- round 2: premises (reopened, same text) and operations are open; business is locked ----
   await signIn(page, OPERATOR)
-  await page.goto(`${app.url}/form/premises`)
+  await page.goto(app.url)
+  await expect(page.getByText('The licensing office asked for 2 changes')).toBeVisible()
+  await page.goto(`${app.url}/form/business`)
   await expect(page.getByText('did not ask for changes here')).toBeVisible()
-  await page.goto(`${app.url}/form/operations`)
+  await page.goto(`${app.url}/form/premises`)
+  await expect(page.getByText('Please confirm the premises unit number.')).toBeVisible()
+  await page.locator('[name="address_line_1"]').fill('10 Jalan Besar #01-12')
+  await page.getByRole('button', { name: 'Save and continue' }).click()
+  await expect(page).toHaveURL(/\/form\/operations$/)
   await page.locator('[name="operating_hours"]').fill('Mon-Sun 7:00am to 9:00pm')
   await page.getByRole('button', { name: 'Save and go to resubmit' }).click()
   await page.getByRole('button', { name: 'Resubmit' }).click()
@@ -59,6 +65,8 @@ test('two resubmission rounds: fix, resubmit, compare, resolve, again, then appr
   await expect(page.locator('section:has(#compare-title)').getByText('Operations').first()).toBeVisible()
   await page.getByRole('button', { name: 'Start review' }).click()
   await confirmDialog(page, 'Start review')
+  await page.getByRole('button', { name: 'Mark resolved' }).first().click()
+  await expect(page.locator('aside').getByText('Resolved', { exact: true }).first()).toBeVisible()
   await page.getByRole('button', { name: 'Mark resolved' }).click()
   for (const [action, confirm] of [
     ['Mark site visit scheduled', 'Mark scheduled'],
@@ -75,7 +83,8 @@ test('two resubmission rounds: fix, resubmit, compare, resolve, again, then appr
   const trail = await auditSummaries(page)
   expect(trail.filter((s: string) => /^Revision \d resubmitted/.test(s))).toHaveLength(2)
   expect(trail.filter((s: string) => s.startsWith('Feedback on') && s.endsWith('addressed in Revision 2'))).toHaveLength(1)
-  expect(trail.filter((s: string) => s.startsWith('Feedback on') && s.endsWith('addressed in Revision 3'))).toHaveLength(1)
+  expect(trail.filter((s: string) => s.startsWith('Feedback on') && s.endsWith('addressed in Revision 3'))).toHaveLength(2)
+  expect(trail.filter((s: string) => s.includes('not fixed'))).toHaveLength(1)
   expect(trail.filter((s: string) => s.endsWith('resolved'))).toHaveLength(2)
   expect(trail).toContain('Status: Route to Approval → Approved')
 })

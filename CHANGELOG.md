@@ -86,6 +86,8 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 
 ## Sprint 3 (in progress, 19 Sep 2026)
 
+- US-049 Not fixed: an addressed item can be reopened by the officer with the same text (`POST .../feedback/{fid}/reopen`, audited, undo for 10 s); it becomes a draft until the next round is requested, so the officer no longer retypes feedback when the operator's change did not settle it. Scenario 04 now runs a not-fixed round.
+
 - Copy and template picker (user walkthrough, 20 Sep): the feedback template select offers "No template, write your own" and choosing it drops the template's text unless the officer edited it; "Draft, not sent yet" and "Sent to the operator" capitalised with a tooltip explaining when a draft reaches the operator; "Browse files" capitalised. Only intentional technical tokens (file names, issue codes, audit event types) still start lowercase.
 
 - US-048 Session warning: the top bar no longer announces the expiry time all day; it stays silent until 30 minutes remain, then counts down every minute and is emphasised in the last 5. Expiry behaviour itself is unchanged.

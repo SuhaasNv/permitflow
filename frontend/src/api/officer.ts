@@ -220,6 +220,10 @@ export function compareRevisions(id: string, from: number, to: number): Promise<
   return request<Compare>(`/applications/${id}/compare?from=${from}&to=${to}`)
 }
 
+export function reopenFeedback(id: string, feedbackId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/feedback/${feedbackId}/reopen`, { method: 'POST' })
+}
+
 export function restoreFeedback(id: string, feedbackId: string): Promise<OfficerApplication> {
   return request<OfficerApplication>(`/officer/applications/${id}/feedback/${feedbackId}/restore`, { method: 'POST' })
 }
