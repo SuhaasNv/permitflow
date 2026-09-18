@@ -37,4 +37,42 @@ Acceptance scenarios for PermitFlow, run by a person in a browser against a depl
 | 19 Sep 2026 | Development (Railway) | dev at `7231fc6` | U2 (scenario 02 spec against the live URLs), health gates | Pass | Recorded in `OPERATIONS.md` "Verified" |
 | 19 Sep 2026 | CI (full stack in the job) | every merge to `dev` | journey + 01 to 06 | Pass | Playwright report attached on failure only |
 | 19 Sep 2026 | Development on the domain | dev at `8d75c31` | U2 (scenario 02 against https://dev.permitflow.space), health gates in deploy run #6 | Pass | US-052 |
+| 19 Sep 2026 | Development on the domain, full persona run (below) | dev at `8d75c31` | U1 to U5, U8, U11, plus undo, notifications, history, compare, audit | 26 of 26 steps pass; one Low finding (R12, fixed) | Sprint 3 acceptance before the release |
 | to run | Production | v0.3.0 | U1, U2, U5, U10, U11 on https://permitflow.space after the approval gate | | Recorded here after the release |
+
+## Run 3 record, step by step (Sprint 3 acceptance)
+
+Environment: https://dev.permitflow.space, API https://api.dev.permitflow.space, OpenAI gpt-4.1-mini, prompt 2026-09-19.3. Application PF-2026-001002.
+
+| Step | Persona | Action | Observed | Result |
+|------|---------|--------|----------|--------|
+| 1 | Operator | Sign in on the domain | Dashboard with 2 earlier applications (scenario runs), bell 2 unread | Pass |
+| 2 | Operator | New application | Draft PF-2026-001002 created, four sections Not started, 0 of 4 documents | Pass |
+| 3 | Operator | Business, Premises, Operations, Declarations, Save and continue each | Each section marked complete in the stepper; stepper moved to the next step | Pass |
+| 4 | Operator | Upload clean business profile, floor plan, tenancy; expired certificate | Three Verified within about 10 s; certificate "2 issues to check": expired 3 Jan 2025 (HIGH), personal certificate note (LOW). No false injection finding on the demo footer | Pass |
+| 5 | Operator | Review and submit, confirm | "Application submitted", Revision 1, status Submitted | Pass |
+| note | | Model text says "today's date 18 September 2026" (UTC date in the prompt; SGT is 19 Sep) | Low, fix: Singapore date in the prompt | Finding R12 |
+| 6 | Officer | Sign in | Queue: PF-2026-001002 on top, Application Received, "1 to check", bell 3 unread | Pass |
+| note | | Queue "Submitted 18 Sep 2026" on an older row was first read as a mismatch; checked against the page text and the API: rows submitted before midnight SGT read 18 Sep, later ones 19 Sep. Not a defect | Withdrawn |
+| 7 | Officer | Start review (dialog) | Under Review; case shows Documents 4, Verified 3, Issues found 1 | Pass |
+| 8 | Officer | Add feedback with the "certificate expired" template | Item on Food hygiene certificate, "Draft, not sent yet", 1 open | Pass |
+| 9 | Officer | Withdraw the item, then Undo from the toast | "Feedback withdrawn" toast with Undo; after Undo "Undone. The item is back where it was", item Open again | Pass (US-039) |
+| 10 | Officer | Request resubmission (dialog) | Pending Pre-Site Resubmission; item "Sent to the operator"; panel says feedback is frozen until the operator responds | Pass |
+| 11 | Officer | Open the notifications bell | Popover lists three "New application" items with Mark all as read | Pass |
+| 12 | Operator | Sign in | Dashboard: "Needs your response 1" card with Respond; two others "With the licensing office" | Pass |
+| 13 | Operator | Respond, then "Respond to feedback" | Landed directly on the flagged certificate slot (#slot-food_hygiene_certificate); other slots read "The licensing officer did not ask for a new copy" | Pass (US-041) |
+| 14 | Operator | Replace file with the clean certificate | Checking, then Verified in about 8 s | Pass |
+| 15 | Operator | Go to resubmit; Resubmit (dialog) | "Ready to resubmit: 1 of 1 flagged item changed"; "Changes resubmitted", Revision 2, Pre-Site Resubmitted | Pass |
+| 16 | Operator | History page | Revisions R1 and R2 with times, "What changed from Revision 1", feedback "Changed, awaiting review", "Raised against Revision 1" | Pass |
+| 17 | Officer | Sign in, open the case | Pre-Site Resubmitted, "Revision 2 resubmitted: 0 sections and 1 document changed", Verified 4 | Pass |
+| 18 | Officer | Start review; Compare revisions | Under Review; compare "0 sections and 1 document changed", certificate Replaced; document badge "Replaced in Revision 2"; feedback "Addressed in Revision 2" | Pass |
+| 19 | Officer | Mark resolved | Item Resolved, 0 open | Pass |
+| 20 | Officer | Mark site visit scheduled, Mark site visit done, Route to approval (three dialogs) | Route to Approval; Approve, Return to review, Reject and Preview licence offered | Pass |
+| 21 | Officer | Return to review (dialog) | Under Review again with the review actions; audit "Route to Approval → Under Review" | Pass (US-031 follow-up) |
+| 22 | Officer | Scheduled, done, route again | Route to Approval | Pass |
+| 23 | Officer | Preview licence | In-app PDF, new layout with the brand mark, "PREVIEW, NOT ISSUED" watermark, placeholder FEL-2026-000000 | Pass |
+| 24 | Officer | Approve with a note | No unresolved-checks warning (all Verified, correct); Approved; rail shows Licence FEL-2026-000001, valid 19 Sep 2026 to 18 Sep 2027, code, Download licence (PDF); note shown | Pass |
+| 25 | Officer | Audit trail (Show) | 37 append-only events in order incl. feedback.withdrawn, feedback.restored (undo), feedback.released, document.replaced, feedback.addressed, the Return to review status change, licence.issued, status Approved | Pass |
+| 26 | Operator | Sign in, open the application | Outcome panel: "Your licence application was approved", officer's note, Download licence (PDF), "Licence FEL-2026-000001, valid 19 Sep 2026 to 18 Sep 2027"; feedback "Resolved by the officer"; API download 200 with filename FEL-2026-000001.pdf, text carries the number and business, no watermark | Pass |
+
+Result: 26 of 26 steps pass on the deployed development environment over the custom domain, plus the role guard (an operator opening the officer queue gets "Not available for your role"). One Low finding (R12, the verifier's date line in UTC), fixed before the v0.3.0 release.
