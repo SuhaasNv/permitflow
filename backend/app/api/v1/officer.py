@@ -127,6 +127,17 @@ def resolve_feedback(
 
 
 @router.post(
+    "/applications/{application_id}/feedback/{feedback_id}/reopen", response_model=OfficerApplicationOut
+)
+def reopen_feedback(
+    application_id: uuid.UUID, feedback_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """Not fixed (US-049): an addressed item is open again for the next round. 409 unless Under Review."""
+    FeedbackService(db).reopen(user, application_id, feedback_id)
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
     "/applications/{application_id}/feedback/{feedback_id}/restore", response_model=OfficerApplicationOut
 )
 def restore_feedback(

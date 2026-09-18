@@ -287,6 +287,11 @@ Not in the assessment brief; added as a product decision (SCOPE.md, S7). Read-on
 - Priority: MVP · Day 3 (added 19 Sep from phone screenshots) · Dependencies: US-023, US-028 · Requirements: FR-018, FR-024, AUD-001 · Branch `feat/us-039-feedback-undo`
 - Definition of Done: backend tests for the release rule and undo (window, audit, authorization); component test for the toast undo; browser check at 390 and 1440.
 
+### US-049 — As an officer reviewing a resubmission, I want to mark an addressed item as not fixed so it reopens with the same text, so that I can request the next round without retyping the feedback.
+- Acceptance criteria: Not fixed on an addressed item (only while Under Review) sets it back to Open with the same message and target, takes it out of the operator's view until the next round is requested (freeze rule kept), is audited as `feedback.reopened` and counts as open so Request resubmission is available; Undo for 10 s like withdraw and resolve; the operator then sees the item as Needs your change again with the same text and history keeps both rounds.
+- Priority: MVP · Day 3 (from the user's walkthrough, 20 Sep: a replaced document flips the item to Addressed, leaving nothing open to send) · Dependencies: US-028, US-039 · Requirements: FR-024 · Branch `feat/us-049-reopen-feedback`
+- Definition of Done: `tests/integration/test_feedback_reopen.py`; scenario 04 extended with a not-fixed round; STATE_MACHINE, ARCHITECTURE, USER_JOURNEY updated.
+
 ## UC3 — On-Site Assessment & Post-Site Clarification (DEFERRED)
 
 Deferred per `SCOPE.md`. The post-site states and transitions exist and are unit-tested in the state machine; the checklist data model and screens are not built.

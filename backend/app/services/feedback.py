@@ -133,6 +133,36 @@ class FeedbackService:
         self.db.refresh(item)
         return item
 
+    def reopen(self, officer: User, application_id: uuid.UUID, feedback_id: uuid.UUID) -> Feedback:
+        """Not fixed (US-049): addressed → open with the same text, as a draft for the next round.
+
+        Only while Under Review, like create and withdraw. The item leaves the operator's view until the
+        officer requests the next resubmission (release), which keeps the freeze rule intact.
+        """
+        app = self.applications.get_for(officer, application_id, for_update=True)
+        item = self.feedback.get_in_application(app.id, feedback_id)
+        if item is None:
+            raise NotFound("Feedback not found.")
+        if app.status != ApplicationStatus.UNDER_REVIEW:
+            raise Conflict("Feedback can be reopened only while the application is Under Review.")
+        if item.resolution != FeedbackResolution.ADDRESSED:
+            raise Conflict("Only an addressed item can be marked as not fixed.")
+        item.previous_resolution = item.resolution
+        item.resolution = FeedbackResolution.OPEN
+        item.released_to_operator_at = None
+        item.resolved_by = officer.id
+        item.resolved_at = datetime.now(UTC)
+        self.audit.record(
+            application_id=app.id,
+            actor_id=officer.id,
+            event_type="feedback.reopened",
+            payload={"feedback_id": str(item.id), "target": target_label(item)},
+        )
+        app.version += 1
+        self.db.commit()
+        self.db.refresh(item)
+        return item
+
     def resolve(self, officer: User, application_id: uuid.UUID, feedback_id: uuid.UUID) -> Feedback:
         """open or addressed → resolved, by officer action, while the application is with the officer."""
         app = self.applications.get_for(officer, application_id, for_update=True)
@@ -178,6 +208,9 @@ class FeedbackService:
         undone = item.resolution
         item.resolution = previous
         item.previous_resolution = None
+        if undone == FeedbackResolution.OPEN and previous == FeedbackResolution.ADDRESSED:
+            # Undoing "not fixed": the item goes back to the operator's view as addressed.
+            item.released_to_operator_at = item.resolved_at
         item.resolved_by = None
         item.resolved_at = None
         self.audit.record(
@@ -207,6 +240,9 @@ def restorable(item: Feedback, status: ApplicationStatus, officer_id: uuid.UUID,
         return status == ApplicationStatus.UNDER_REVIEW
     if item.resolution == FeedbackResolution.RESOLVED:
         return status in _RESOLVABLE_STATES
+    reopened = item.resolution == FeedbackResolution.OPEN
+    if reopened and item.previous_resolution == FeedbackResolution.ADDRESSED:
+        return status == ApplicationStatus.UNDER_REVIEW
     return False
 
 

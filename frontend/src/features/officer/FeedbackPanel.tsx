@@ -10,7 +10,14 @@ import type { Tone } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { formatDateTime } from '@/lib/format'
-import { useCreateFeedback, useFeedbackTemplates, useResolveFeedback, useRestoreFeedback, useWithdrawFeedback } from './queries'
+import {
+  useCreateFeedback,
+  useFeedbackTemplates,
+  useReopenFeedback,
+  useResolveFeedback,
+  useRestoreFeedback,
+  useWithdrawFeedback,
+} from './queries'
 
 const UNDO_MS = 10_000
 
@@ -35,6 +42,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
   const withdraw = useWithdrawFeedback(view.id)
   const resolve = useResolveFeedback(view.id)
   const restore = useRestoreFeedback(view.id)
+  const reopen = useReopenFeedback(view.id)
   const canResolve = ['under_review', 'pre_site_resubmitted', 'site_visit_scheduled', 'site_visit_done', 'pending_approval'].includes(
     view.status,
   )
@@ -199,6 +207,23 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                             }
                           >
                             Mark resolved
+                          </button>
+                        ) : null}
+                        {/* Not fixed (US-049): the operator's change did not settle it; reopen for the next round. */}
+                        {f.resolution === 'addressed' && view.feedback_editable ? (
+                          <button
+                            type="button"
+                            className="whitespace-nowrap py-1 font-semibold text-warning hover:underline"
+                            disabled={reopen.isPending}
+                            title="Reopens this item with the same text so you can request another resubmission."
+                            onClick={() =>
+                              reopen.mutate(f.id, {
+                                onSuccess: () => offerUndo('Marked not fixed', `${f.target_label} is open again for the next round.`, f.id),
+                                onError: (e) => toast.push({ title: 'Could not reopen', body: e.message, tone: 'error' }),
+                              })
+                            }
+                          >
+                            Not fixed
                           </button>
                         ) : null}
                         {f.resolution === 'open' && view.feedback_editable ? (
