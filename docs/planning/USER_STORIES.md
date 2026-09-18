@@ -76,7 +76,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: unit test for the matcher, component tests on both pages, screenshots at three widths.
 
 ### US-037 — As an officer or operator on a phone, I want every screen to fit the width of the phone and every navigation to open at the top of the page, so that I never scroll sideways or land mid-page.
-- Acceptance criteria: the officer case page (documents, check results, compare panel, revision history, review rail) fits 390 px with no horizontal scroll; opening a new page scrolls to the top while Back and Forward keep the browser's remembered position; verified on every operator and officer route at 390 and 820.
+- Acceptance criteria: the officer case page (documents, check results, compare panel, revision history, review rail) and the operator dashboard fit 390 px with no horizontal scroll; the notifications popover fits the phone width below the header and the unread badge does not cover the bell; opening a new page scrolls to the top while Back and Forward keep the browser's remembered position; verified on every operator and officer route at 390 and 820.
 - Priority: MVP · Day 3 (hotfix, added 19 Sep from iPhone 12 Pro screenshots) · Dependencies: US-021 · Requirements: UX-001 · Branch `fix/us-037-phone-layout`
 - Definition of Done: Playwright measurement of `scrollWidth` on every route at 390; scroll position check after navigation.
 

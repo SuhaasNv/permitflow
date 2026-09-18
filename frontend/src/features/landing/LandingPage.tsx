@@ -207,7 +207,7 @@ export function LandingPage() {
       {/* How it works: four steps on a single rule, revealed in sequence. */}
       <section id="how" className="border-b border-line bg-bg">
         <div className="mx-auto max-w-[1440px] px-5 py-16 sm:px-10 lg:py-20">
-          <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-16">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-16">
             <Reveal>
               <div className="pf-eyebrow mb-3">How it works</div>
               <h2 className="font-display text-[34px] leading-[1.1] sm:text-[40px]">Four steps, one record.</h2>
@@ -215,7 +215,7 @@ export function LandingPage() {
                 Every revision you submit, every comment from the licensing office and every status change stays with the application.
               </p>
             </Reveal>
-            <ol className="grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+            <ol className="grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
               {STEPS.map(([title, desc], i) => (
                 <Reveal key={title} as="li" delay={i * 90} className="relative border-t border-line-strong pt-5">
                   <span className="absolute -top-px left-0 h-px w-10 bg-primary" aria-hidden="true" />
@@ -244,7 +244,7 @@ export function LandingPage() {
           <Reveal as="div" threshold={0.35} className="relative mt-10">
             <span className="absolute left-0 top-0 hidden h-px w-full bg-line lg:block" aria-hidden="true" />
             <span className="pf-journey-line absolute left-0 top-0 hidden h-px w-full bg-ink lg:block" aria-hidden="true" />
-            <ol className="grid gap-6 sm:grid-cols-3 lg:grid-cols-6">
+            <ol className="grid grid-cols-1 gap-6 sm:grid-cols-3 lg:grid-cols-6">
               {JOURNEY.map((s, i) => (
                 <li key={s.label} className="relative pt-5" style={{ transitionDelay: `${200 + i * 180}ms` }}>
                   <span className="absolute left-0 top-0 h-px w-full bg-line lg:hidden" aria-hidden="true" />
@@ -274,7 +274,7 @@ export function LandingPage() {
             <div className="pf-eyebrow mb-3 text-[#aeb6c2]">Automatic document checks</div>
             <h2 className="font-display text-[34px] leading-[1.1] sm:text-[40px]">Checks help you. Officers decide.</h2>
           </Reveal>
-          <dl className="grid gap-8 text-[15px] leading-[23px] sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-8 text-[15px] leading-[23px] sm:grid-cols-2">
             <Reveal delay={100} className="border-t border-white/20 pt-4">
               <dt className="mb-2 font-semibold">What the check does</dt>
               <dd className="text-[#c5cbd3]">

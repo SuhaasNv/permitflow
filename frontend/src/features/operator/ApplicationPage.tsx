@@ -40,7 +40,7 @@ export function ApplicationPage() {
   if (app.isPending) {
     return (
       <PageSkeleton label="Loading application">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
         </div>
@@ -132,7 +132,7 @@ export function ApplicationPage() {
             : view.resubmit.reason}
         </p>
       ) : null}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section className="pf-surface overflow-hidden" aria-labelledby="sections-title">
           <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
             <h2 id="sections-title" className="text-[15px] font-semibold">
