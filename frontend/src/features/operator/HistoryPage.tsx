@@ -161,7 +161,7 @@ export function HistoryPage() {
             its state, so nothing is lost between rounds.
           </p>
           <p className="mt-3">
-            <Link to={`/app/applications/${id}`} className="font-semibold">
+            <Link to={`/app/applications/${id}`} className="inline-block py-2 font-semibold sm:py-0">
               Back to the application
             </Link>
           </p>

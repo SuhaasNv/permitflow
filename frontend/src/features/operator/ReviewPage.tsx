@@ -165,7 +165,7 @@ export function ReviewPage() {
                     tone={view.completeness.documents_present === view.completeness.documents_total ? 'success' : 'neutral'}
                   />
                   {view.can_edit ? (
-                    <Link to={`${base}/documents`} className="ml-auto text-[13px] font-semibold">
+                    <Link to={`${base}/documents`} className="ml-auto inline-block py-2 text-[13px] font-semibold sm:py-0">
                       Manage
                     </Link>
                   ) : null}
@@ -178,7 +178,7 @@ export function ReviewPage() {
                         <span className="min-w-0 flex-1">
                           <span className="font-medium">{slot.label}</span>
                           {slot.document ? (
-                            <span className="ml-2 break-all text-[13px] text-text-3">{slot.document.original_filename}</span>
+                            <span className="ml-2 break-words text-[13px] text-text-3">{slot.document.original_filename}</span>
                           ) : null}
                         </span>
                         <StatusBadge label={s.label} tone={s.tone} live={s.label === 'Checking'} />

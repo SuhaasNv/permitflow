@@ -204,19 +204,16 @@
   .pf-btn-primary::before {
     background: var(--color-primary-hover);
   }
-  .pf-btn-secondary::before {
-    background: var(--color-surface-3);
-    transform: translateY(101%);
-  }
+  /* Secondary and ghost buttons: no sweep, a plain background change (US-043, user feedback). */
+  .pf-btn-secondary::before,
   .pf-btn-ghost::before {
-    background: var(--color-neutral-soft);
-    transform: scaleX(0);
-    transform-origin: center;
-    transition: transform var(--dur-base) var(--ease-out);
+    display: none;
   }
-  .pf-btn-ghost:hover::before,
-  .pf-btn-ghost:focus-visible::before {
-    transform: scaleX(1);
+  .pf-btn-secondary:hover {
+    background: var(--color-surface-2);
+  }
+  .pf-btn-ghost:hover {
+    background: var(--color-neutral-soft);
   }
   .pf-btn:disabled::before {
     display: none;

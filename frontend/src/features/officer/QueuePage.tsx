@@ -78,7 +78,7 @@ function Row({ item }: { item: QueueItem }) {
         to={`/officer/applications/${item.id}`}
         className={cn(
           'group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-4 text-text no-underline sm:px-5',
-          'lg:grid-cols-[130px_minmax(0,1fr)_200px_130px] xl:grid-cols-[150px_minmax(0,1fr)_230px_130px_120px_150px]',
+          'lg:grid-cols-[130px_minmax(0,1fr)_200px_130px] 2xl:grid-cols-[150px_minmax(0,1fr)_230px_130px_120px_150px]',
           'transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out)] hover:bg-surface-2 hover:text-text focus-visible:bg-surface-2',
         )}
       >
@@ -94,16 +94,16 @@ function Row({ item }: { item: QueueItem }) {
           <div className="truncate text-[13px] text-text-3">
             {item.applicant_name}
             {item.premises_summary ? ` · ${item.premises_summary}` : ''}
-            <span className="xl:hidden"> · {formatRelative(item.last_activity_at)}</span>
+            <span className="2xl:hidden"> · {formatRelative(item.last_activity_at)}</span>
           </div>
         </div>
         <div className="col-start-1 lg:col-start-auto">
           <StatusBadge label={item.status_label} tone={item.status_tone} />
-          <div className="mt-1.5 hidden lg:block xl:hidden">
+          <div className="mt-1.5 hidden lg:block 2xl:hidden">
             <ChecksCell item={item} />
           </div>
         </div>
-        <div className="hidden xl:block">
+        <div className="hidden 2xl:block">
           <ChecksCell item={item} />
         </div>
         <div className="hidden text-[13px] tabular-nums text-text-2 xl:block" title={formatDateTime(item.last_activity_at)}>
@@ -194,7 +194,7 @@ export function OfficerQueuePage() {
                   aria-selected={filter === f.key}
                   onClick={() => setFilter(f.key)}
                   className={cn(
-                    'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors duration-[var(--dur-fast)]',
+                    'inline-flex h-10 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors duration-[var(--dur-fast)] sm:h-8',
                     filter === f.key ? 'bg-surface-3 text-text' : 'text-text-2 hover:bg-neutral-soft hover:text-text',
                   )}
                 >
@@ -207,17 +207,18 @@ export function OfficerQueuePage() {
               value={query}
               onChange={setQuery}
               label="Search reference, business, address or applicant"
+              placeholder="Search the queue"
               className="w-full sm:ml-auto sm:w-80"
             />
           </div>
-          <div className="hidden grid-cols-[130px_minmax(0,1fr)_200px_130px] gap-x-4 border-b border-line bg-surface-2 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 lg:grid xl:grid-cols-[150px_minmax(0,1fr)_230px_130px_120px_150px]">
+          <div className="hidden grid-cols-[130px_minmax(0,1fr)_200px_130px] gap-x-4 border-b border-line bg-surface-2 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 lg:grid 2xl:grid-cols-[150px_minmax(0,1fr)_230px_130px_120px_150px]">
             <span>Reference</span>
             <span>Business · applicant</span>
             <span>
-              Status<span className="xl:hidden"> · checks</span>
+              Status<span className="2xl:hidden"> · checks</span>
             </span>
-            <span className="hidden xl:block">Document checks</span>
-            <span className="hidden xl:block">Last activity</span>
+            <span className="hidden 2xl:block">Document checks</span>
+            <span className="hidden 2xl:block">Last activity</span>
             <span />
           </div>
           {shown.length === 0 ? (

@@ -86,6 +86,8 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 
 ## Sprint 3 (in progress, 19 Sep 2026)
 
+- US-043 Layout audit fixes (`docs/reviews/LAYOUT_AUDIT.md`, all High, Medium and Low items): operator table stacked until `lg`, queue six columns from `2xl`, case sheet labels stacked at `lg`, audit trail stacked until `xl`, review rail scrolls inside the viewport and renders first on phones, stepper labels no longer collide, alert actions wrap under the text on phones, 40 px tap targets on phones, evidence quotes wrap, shorter search placeholders, filename and acronym copy, decided applications skip the confirmation page. From user feedback: no hover sweep on secondary and ghost buttons, Review card padding, Document checks without underlines, application card no longer stretches, and a note that the site visit steps change the status only.
+
 - US-046 Sign-in: show/hide password toggle inside the field (accessible name, never submits); the helper text about the attempt limit and shared sign-in removed (the limiter and its 429 message stay).
 
 - US-045 Delete draft: `DELETE /applications/{id}` removes a never-submitted draft with its files, runs and audit events (409 once submitted, ownership enforced); the application page offers Discard draft (nothing entered) or Delete draft behind a danger dialog. Same branch fixes the Declarations dead end on resubmission: re-confirming stamps `confirmed_at`, which the diff reports as "Confirmed on", so feedback on Declarations can be answered.

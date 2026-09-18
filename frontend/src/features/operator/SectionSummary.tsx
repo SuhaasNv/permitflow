@@ -42,12 +42,12 @@ export function SectionSummary({
           <StatusBadge label={state.started ? 'Needs attention' : 'Not started'} tone={state.started ? 'warning' : 'neutral'} />
         )}
         {editHref ? (
-          <Link to={editHref} className="ml-auto text-[13px] font-semibold">
+          <Link to={editHref} className="ml-auto inline-block py-2 text-[13px] font-semibold sm:py-0">
             Edit
           </Link>
         ) : null}
       </div>
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[220px_minmax(0,1fr)]">
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[minmax(120px,220px)_minmax(0,1fr)]">
         {def.fields.map((f) => {
           const empty = state.data[f.key] === undefined || state.data[f.key] === null || state.data[f.key] === ''
           return (
