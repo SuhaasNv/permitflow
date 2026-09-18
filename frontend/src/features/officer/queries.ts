@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { getOfficerApplication, getQueue, transitionApplication } from '@/api/officer'
+import { getOfficerApplication, getQueue, rerunOfficerCheck, transitionApplication } from '@/api/officer'
 
 export const officerKeys = {
   queue: ['officer', 'queue'] as const,
@@ -26,6 +26,17 @@ export function useTransition(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: { target: string; note?: string; expected_version: number }) => transitionApplication(id, body),
+    onSuccess: (view) => {
+      qc.setQueryData(officerKeys.case(id), view)
+      void qc.invalidateQueries({ queryKey: officerKeys.queue })
+    },
+  })
+}
+
+export function useRerunCheck(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (documentId: string) => rerunOfficerCheck(id, documentId),
     onSuccess: (view) => {
       qc.setQueryData(officerKeys.case(id), view)
       void qc.invalidateQueries({ queryKey: officerKeys.queue })

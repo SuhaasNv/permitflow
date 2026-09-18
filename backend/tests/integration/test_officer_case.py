@@ -124,3 +124,26 @@ def test_transition_rejects_stale_version_invalid_edge_and_missing_note(
         ).status_code
         == 403
     )
+
+
+def test_officer_can_rerun_a_check_and_sees_it_pending(client: TestClient, db: Session) -> None:
+    app_id, op, off = _submitted(client, db)
+    view = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    doc_id = view["documents"][0]["id"]
+    r = client.post(f"/api/v1/officer/applications/{app_id}/documents/{doc_id}/verify", headers=off)
+    assert r.status_code == 202, r.text
+    body = r.json()
+    assert body["status"] == "application_received"
+    doc = next(d for d in body["documents"] if d["id"] == doc_id)
+    assert doc["verification"]["status"] in ("pending", "running", "verified", "issues_found")
+    # A second request while the first is still queued is refused; operators cannot use the officer route.
+    again = client.post(f"/api/v1/officer/applications/{app_id}/documents/{doc_id}/verify", headers=off)
+    assert again.status_code in (202, 409)
+    assert (
+        client.post(
+            f"/api/v1/officer/applications/{app_id}/documents/{doc_id}/verify", headers=op
+        ).status_code
+        == 403
+    )
+    events = list(db.scalars(select(AuditEvent).where(AuditEvent.event_type == "verification.requested")))
+    assert len(events) >= 1

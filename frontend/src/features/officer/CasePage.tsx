@@ -17,7 +17,7 @@ import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDate, formatDateTime, formatRelative } from '@/lib/format'
 import { CheckResult } from './CheckResult'
-import { useOfficerApplication, useTransition } from './queries'
+import { useOfficerApplication, useRerunCheck, useTransition } from './queries'
 
 const ACTION_COPY: Record<string, { title: string; body: string; confirm: string; danger?: boolean }> = {
   under_review: {
@@ -183,6 +183,7 @@ export function OfficerCasePage() {
   const app = useOfficerApplication(id)
   const schema = useFormSchema()
   const transition = useTransition(id)
+  const rerun = useRerunCheck(id)
   const toast = useToast()
   const [pending, setPending] = useState<OfficerAction | null>(null)
   const [note, setNote] = useState('')
@@ -373,6 +374,23 @@ export function OfficerCasePage() {
                   {d.verification ? (
                     <div className="mt-4 rounded-md border border-line bg-surface-2 px-4 py-3.5">
                       <CheckResult verification={d.verification} />
+                      {d.verification.status !== 'pending' && d.verification.status !== 'running' ? (
+                        <div className="mt-3 flex justify-end border-t border-line pt-2.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            loading={rerun.isPending && rerun.variables === d.id}
+                            disabled={rerun.isPending}
+                            onClick={() =>
+                              rerun.mutate(d.id, {
+                                onError: (e) => toast.push({ title: 'Could not re-run the check', body: e.message, tone: 'error' }),
+                              })
+                            }
+                          >
+                            Re-run check
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </li>

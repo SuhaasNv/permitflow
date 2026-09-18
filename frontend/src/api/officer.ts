@@ -131,3 +131,7 @@ export function transitionApplication(
 ): Promise<OfficerApplication> {
   return request<OfficerApplication>(`/officer/applications/${id}/transition`, { method: 'POST', body })
 }
+
+export function rerunOfficerCheck(id: string, documentId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/documents/${documentId}/verify`, { method: 'POST' })
+}
