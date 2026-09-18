@@ -18,6 +18,10 @@ class Settings(BaseSettings):
 
     app_env: Literal["development", "test", "production"] = "development"
     database_url: str = "postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow"
+    # Connection pool (US-044): sized for one uvicorn worker serving the demo load; exhaustion is a fast 503.
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_timeout_seconds: int = 5
     test_database_url: str = "postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow_test"
 
     jwt_secret: str = ""

@@ -19,6 +19,7 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `UPLOAD_DIR` | `./data/uploads` | backend | Local disk storage; Railway volume at `/data/uploads`. |
 | `UPLOAD_MAX_BYTES` | `10485760` | backend | 10 MB. |
 | `LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | backend | Failed attempts per IP per minute. |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_TIMEOUT_SECONDS` | 10 / 20 / 5 | SQLAlchemy pool per process; when every connection is busy for longer than the timeout the request is answered 503 `unavailable` (US-044). Size for the number of uvicorn workers times concurrent requests |
 | `TRUSTED_PROXIES` | empty | Comma-separated proxy IPs whose `X-Forwarded-For` is trusted for the login rate limit; set to the platform edge IPs in production |
 | `TEST_LIVE_AI` | unset | tests | Set to `1` to let the pytest suite call the live OpenAI provider; otherwise tests force `AI_PROVIDER=mock` regardless of `.env`. |
 | `AI_PROVIDER` | `mock` | backend | `mock` or `openai`. |

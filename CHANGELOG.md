@@ -86,6 +86,8 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 
 ## Sprint 3 (in progress, 19 Sep 2026)
 
+- US-044 Errors inside CORS and pool sizing: an innermost middleware answers unhandled exceptions with the JSON envelope and request id (the browser now reads it instead of reporting the server unreachable); an exhausted pool answers 503 after 5 s; pool size, overflow and timeout are settings documented in OPERATIONS.
+
 - US-043 Layout audit fixes (`docs/reviews/LAYOUT_AUDIT.md`, all High, Medium and Low items): operator table stacked until `lg`, queue six columns from `2xl`, case sheet labels stacked at `lg`, audit trail stacked until `xl`, review rail scrolls inside the viewport and renders first on phones, stepper labels no longer collide, alert actions wrap under the text on phones, 40 px tap targets on phones, evidence quotes wrap, shorter search placeholders, filename and acronym copy, decided applications skip the confirmation page. From user feedback: no hover sweep on secondary and ghost buttons, Review card padding, Document checks without underlines, application card no longer stretches, and a note that the site visit steps change the status only.
 
 - US-046 Sign-in: show/hide password toggle inside the field (accessible name, never submits); the helper text about the attempt limit and shared sign-in removed (the limiter and its 429 message stay).
