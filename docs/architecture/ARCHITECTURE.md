@@ -155,8 +155,9 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /admin/users | admin | create user `{full_name, email, role}`; audit `user.created` |
 | PATCH | /admin/users/{id} | admin | change `role` and/or `is_active`; audit `user.role_changed` / `user.deactivated` / `user.reactivated`; 409 when it would remove the last active admin |
 | GET | /admin/applications/{id} | admin | officer view, read-only (mutations 403) |
-| GET | /notifications | any | own notifications |
-| POST | /notifications/{id}/read | any | mark read; scoped to the caller's own notifications |
+| GET | /notifications | any | own notifications (newest first, 50) plus `unread_count` (built, US-025) |
+| POST | /notifications/{id}/read | any | mark read; another user's id is 404 (built, US-025) |
+| POST | /notifications/read-all | any | mark every own notification read (built, US-025) |
 | GET | /health | public | `{status, database}`; 503 when the database ping fails; provider details are not exposed publicly (admin sees them in `/admin/ai-health`) |
 
 All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail": …}` bodies for 401/403/422 are replaced by explicit exception handlers so every error uses the standard shape (REL-001).

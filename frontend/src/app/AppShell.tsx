@@ -6,6 +6,7 @@ import type { Role } from '@/api/auth'
 import { useAuth } from '@/features/auth/AuthContext'
 import { Dialog } from '@/features/shared/Dialog'
 import { Logo } from '@/features/shared/Logo'
+import { NotificationsBell } from '@/features/shared/NotificationsBell'
 import { hasUnsaved, setUnsaved } from '@/lib/unsaved'
 import { cn } from '@/lib/cn'
 
@@ -146,6 +147,7 @@ export function AppShell() {
         </button>
         <Logo />
         <div className="ml-auto flex items-center gap-1">
+          <NotificationsBell role={user.role} />
           <div className="flex items-center gap-2.5 px-1 py-1">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-[11px] font-semibold tracking-wide text-white">
               {initials(user.full_name)}

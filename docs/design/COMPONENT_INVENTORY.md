@@ -64,7 +64,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `ChangedFieldValue` | new value highlighted + old value struck through | S-23 |
 | `CompletionCard` | percentage bar, sections/documents counts, or "items addressed n of m" | S-11, S-12, S-15 |
 | `RequiredDocumentsChecklist` | per-type status line | S-12, S-13 |
-| `NotificationsPanel` / `NotificationRow` | unread tint, title, body, time | S-17 |
+| `NotificationsBell` | bell with unread badge; popover with unread tint, title, body, relative time, Mark all as read; Escape and outside click close it | S-17 |
 | `AuditTable` | when, event, actor, type (mono) | S-25, S-40 |
 | `PersonaPicker` | prototype/demo only: seeded accounts | S-00 |
 

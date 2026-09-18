@@ -12,6 +12,7 @@ export interface ApplicationSummary {
   premises_summary: string | null
   percent: number
   revision_count: number
+  needs_operator_action: boolean
   created_at: string
   updated_at: string
 }
@@ -58,6 +59,7 @@ export interface ApplicationView {
   document_slots: DocumentSlotView[]
   completeness: Completeness
   revision_count: number
+  needs_operator_action: boolean
   created_at: string
   updated_at: string
 }
