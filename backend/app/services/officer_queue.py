@@ -12,9 +12,12 @@ from app.repositories.revisions import RevisionRepository
 from app.schemas.officer import QueueItemOut, QueueOut
 from app.services.operator_view import LICENCE_TITLE
 
+# Anything that is not a clean "verified" and not still running needs an officer's eyes, including a
+# document the checker could not read (the operator is told an officer will look at it).
 _ATTENTION = {
     VerificationStatus.ISSUES_FOUND,
     VerificationStatus.NEEDS_REVIEW,
+    VerificationStatus.UNREADABLE,
     VerificationStatus.FAILED,
     VerificationStatus.UNAVAILABLE,
 }

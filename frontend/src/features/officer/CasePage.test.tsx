@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
@@ -135,6 +135,27 @@ describe('OfficerCasePage', () => {
     expect(screen.getByText('confidence 70%')).toBeInTheDocument()
     expect(screen.getByText('ACRA business profile')).toBeInTheDocument()
     expect(screen.getByText('wrong_document_type')).toBeInTheDocument()
+  })
+
+  it('shows the hidden check rows only when they are non-zero', async () => {
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({
+      ...view,
+      verification_summary: { total: 4, verified: 1, issues_found: 1, needs_review: 0, checking: 1, other: 1 },
+    })
+    renderPage()
+    const card = (await screen.findByRole('heading', { name: 'Document checks' })).closest('section')!
+    expect(within(card).getByText('Documents').nextElementSibling).toHaveTextContent('4')
+    expect(within(card).getByText('Still checking').nextElementSibling).toHaveTextContent('1')
+    expect(within(card).getByText('Not checked').nextElementSibling).toHaveTextContent('1')
+    expect(screen.queryByText('Analysed')).not.toBeInTheDocument()
+  })
+
+  it('hides Still checking and Not checked when they are zero', async () => {
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(view)
+    renderPage()
+    await screen.findByRole('heading', { name: 'Document checks' })
+    expect(screen.queryByText('Still checking')).not.toBeInTheDocument()
+    expect(screen.queryByText('Not checked')).not.toBeInTheDocument()
   })
 
   it('starts the review through the transition endpoint with the expected version', async () => {

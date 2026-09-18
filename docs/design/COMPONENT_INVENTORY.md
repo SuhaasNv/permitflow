@@ -36,7 +36,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `SaveIndicator` | dirty / saving / saved (relative time, refreshed every 5 s) | section form footer |
 | `Toast` (`ToastProvider`, `useToast`) | title, body, tone; bottom-right stack, four max, auto-dismiss 4.5 s (errors stay) | section saved, document uploaded / removed / unchanged |
 | `Alert` | tone icon, optional title, optional action slot | inline messages |
-| `QueueRow` (in `OfficerQueuePage`) | reference + revision, business + applicant, officer status badge, document-check state (checking / n to check / clear), last activity, next-action chip (ink when it is the officer's turn) | S-20 |
+| `QueueRow` (in `OfficerQueuePage`) | reference + revision, business + applicant, officer status badge, document-check state (checking / n to check / clear; "to check" counts issues, needs review, unreadable, failed and unavailable, the same set the case card shows as anything but Verified), last activity, next-action chip (ink when it is the officer's turn) | S-20 |
 | `CheckResult` | officer-facing verification: outcome, confidence, model, time, issues with code, field and evidence quote, missing information, fixed-vocabulary error reasons | S-21 |
 | `ReviewRail` (in `OfficerCasePage`) | server-driven action buttons (primary + secondary, disabled with reason), document-check counts, feedback placeholder | S-21 |
 | `FeedbackPanel` | items grouped by round with resolution badge and sent/draft state, anchor link to the target, Withdraw; composer (template select fills target and message, target select, textarea) with per-field 422 errors; locked reason when not under review | S-21 |
