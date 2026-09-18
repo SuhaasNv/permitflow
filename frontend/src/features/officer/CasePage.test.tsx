@@ -188,6 +188,7 @@ describe('OfficerCasePage', () => {
           released_to_operator_at: null,
           addressed_in_revision: null,
           resolved_at: null,
+          can_undo: false,
         },
       ],
     })
@@ -207,5 +208,51 @@ describe('OfficerCasePage', () => {
     )
     expect(await screen.findByText('1 open feedback')).toBeInTheDocument()
     expect(screen.getByText('draft, not sent yet')).toBeInTheDocument()
+  })
+
+  it('offers Withdraw only on an unsent draft item, and Undo after withdrawing (US-039)', async () => {
+    const draftItem = {
+      id: 'f1',
+      target_type: 'section' as const,
+      section_key: 'business',
+      document_type: null,
+      target_label: 'Business details',
+      message: 'Please confirm the UEN.',
+      template_key: null,
+      resolution: 'open' as const,
+      raised_in_revision: 1,
+      author_name: 'Rahim',
+      created_at: '2026-09-19T01:00:00Z',
+      released_to_operator_at: null,
+      addressed_in_revision: null,
+      resolved_at: null,
+      can_undo: false,
+    }
+    const underReview = {
+      ...view,
+      status: 'under_review',
+      status_label: 'Under Review',
+      feedback_editable: true,
+      feedback_locked_reason: null,
+      actions: [],
+      open_feedback_count: 1,
+      feedback: [draftItem],
+    }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(underReview)
+    const withdrawn = {
+      ...underReview,
+      open_feedback_count: 0,
+      feedback: [{ ...draftItem, resolution: 'withdrawn' as const, can_undo: true }],
+    }
+    const withdraw = vi.spyOn(api, 'withdrawFeedback').mockResolvedValue(withdrawn)
+    const restore = vi.spyOn(api, 'restoreFeedback').mockResolvedValue(underReview)
+    renderPage()
+    expect(await screen.findByRole('button', { name: 'Withdraw' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mark resolved' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+    await waitFor(() => expect(withdraw).toHaveBeenCalledWith('a1', 'f1'))
+    await userEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(restore).toHaveBeenCalledWith('a1', 'f1'))
+    expect(await screen.findByRole('button', { name: 'Withdraw' })).toBeInTheDocument()
   })
 })

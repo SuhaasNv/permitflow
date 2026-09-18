@@ -57,5 +57,7 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
             return f"Feedback on {p.get('target', '')} addressed in Revision {p.get('revision_number', '')}"
         case "feedback.resolved":
             return f"Feedback on {p.get('target', '')} resolved"
+        case "feedback.restored":
+            return f"Feedback on {p.get('target', '')} restored to {p.get('to', '')} (undo)"
         case _:
             return event_type

@@ -10,7 +10,9 @@ import type { Tone } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { formatDateTime } from '@/lib/format'
-import { useCreateFeedback, useFeedbackTemplates, useResolveFeedback, useWithdrawFeedback } from './queries'
+import { useCreateFeedback, useFeedbackTemplates, useResolveFeedback, useRestoreFeedback, useWithdrawFeedback } from './queries'
+
+const UNDO_MS = 10_000
 
 const RESOLUTION: Record<FeedbackItem['resolution'], { label: string; tone: Tone }> = {
   open: { label: 'Open', tone: 'warning' },
@@ -32,15 +34,37 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
   const create = useCreateFeedback(view.id)
   const withdraw = useWithdrawFeedback(view.id)
   const resolve = useResolveFeedback(view.id)
+  const restore = useRestoreFeedback(view.id)
   const canResolve = ['under_review', 'pre_site_resubmitted', 'site_visit_scheduled', 'site_visit_done', 'pending_approval'].includes(
     view.status,
   )
   const toast = useToast()
-  const [composing, setComposing] = useState(false)
+  const [composingRequested, setComposing] = useState(false)
   const [target, setTarget] = useState('')
   const [templateKey, setTemplateKey] = useState('')
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // The case can stop being editable under the officer (status moved, operator withdrew): the composer is derived closed.
+  const composing = composingRequested && view.feedback_editable
+
+  /** Undo for 10 s (the server accepts a little longer). */
+  const offerUndo = (title: string, body: string, feedbackId: string) => {
+    toast.push({
+      title,
+      body,
+      tone: 'success',
+      duration: UNDO_MS,
+      action: {
+        label: 'Undo',
+        onClick: () =>
+          restore.mutate(feedbackId, {
+            onSuccess: () => toast.push({ title: 'Undone', body: 'The item is back where it was.', tone: 'neutral' }),
+            onError: (e) => toast.push({ title: 'Could not undo', body: e.message, tone: 'error' }),
+          }),
+      },
+    })
+  }
 
   const pickTemplate = (key: string) => {
     setTemplateKey(key)
@@ -147,19 +171,19 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                         ) : null}
                       </div>
                       <p className="mt-1.5 text-[13px] leading-[19px] text-text-2">{f.message}</p>
-                      <div className="mt-1.5 flex items-center justify-between text-[11px] text-text-3">
-                        <span>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-3">
+                        <span className="min-w-0 flex-1 basis-full sm:basis-auto">
                           {f.author_name} · {formatDateTime(f.created_at)}
                         </span>
-                        {(f.resolution === 'addressed' || f.resolution === 'open') && canResolve ? (
+                        {/* Resolve only what the operator has seen; an unsent draft can only be withdrawn (US-039). */}
+                        {(f.resolution === 'addressed' || f.resolution === 'open') && canResolve && f.released_to_operator_at ? (
                           <button
                             type="button"
-                            className="mr-3 font-semibold text-success hover:underline"
+                            className="whitespace-nowrap py-1 font-semibold text-success hover:underline"
                             disabled={resolve.isPending}
                             onClick={() =>
                               resolve.mutate(f.id, {
-                                onSuccess: () =>
-                                  toast.push({ title: 'Marked resolved', body: `${f.target_label} is resolved.`, tone: 'success' }),
+                                onSuccess: () => offerUndo('Marked resolved', `${f.target_label} is resolved.`, f.id),
                                 onError: (e) => toast.push({ title: 'Could not resolve', body: e.message, tone: 'error' }),
                               })
                             }
@@ -170,10 +194,11 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                         {f.resolution === 'open' && view.feedback_editable ? (
                           <button
                             type="button"
-                            className="font-semibold text-text-2 hover:text-text"
+                            className="whitespace-nowrap py-1 font-semibold text-text-2 hover:text-text"
                             disabled={withdraw.isPending}
                             onClick={() =>
                               withdraw.mutate(f.id, {
+                                onSuccess: () => offerUndo('Feedback withdrawn', `${f.target_label} item removed.`, f.id),
                                 onError: (e) => toast.push({ title: 'Could not withdraw', body: e.message, tone: 'error' }),
                               })
                             }

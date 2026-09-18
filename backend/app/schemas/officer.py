@@ -118,6 +118,8 @@ class FeedbackOut(BaseModel):
     released_to_operator_at: datetime | None
     addressed_in_revision: int | None
     resolved_at: datetime | None
+    # True while the calling officer can undo their own withdraw or resolve (US-039).
+    can_undo: bool = False
 
 
 class FeedbackIn(BaseModel):

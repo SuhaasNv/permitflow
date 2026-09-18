@@ -44,7 +44,7 @@ def transition_application(
     app = WorkflowService(db).transition(
         user, application_id, payload.target, note=payload.note, expected_version=payload.expected_version
     )
-    return OfficerViewService(db).build(app)
+    return OfficerViewService(db).build(app, viewer=user)
 
 
 @router.post(
@@ -123,6 +123,17 @@ def resolve_feedback(
 ) -> OfficerApplicationOut:
     """Mark an open or addressed item resolved (FR-024). Audited; 409 outside the officer's states."""
     FeedbackService(db).resolve(user, application_id, feedback_id)
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
+    "/applications/{application_id}/feedback/{feedback_id}/restore", response_model=OfficerApplicationOut
+)
+def restore_feedback(
+    application_id: uuid.UUID, feedback_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """Undo the caller's own withdraw or resolve within the grace window (US-039). 409 once it has closed."""
+    FeedbackService(db).restore(user, application_id, feedback_id)
     return OfficerViewService(db).get(user, application_id)
 
 

@@ -70,7 +70,7 @@ Progress on S-15: "Items addressed n of m"; Resubmit enabled once n ≥ 1.
 | S-15 | status bar + feedback skeleton | no released feedback (read-only view) | 403 non-flagged, 422 no change, 409 conflict | toast "Resubmitted"; status bar updates |
 | S-16 | list skeleton | single revision ("Compare available after your first resubmission") | retry |: |
 | S-20 | strip + rows skeleton | "No applications in the queue" / filtered empty | retry |: |
-| S-21 | facts + sections skeleton | feedback rail empty ("No feedback yet: use Comment on a section or document") | 409 stale (reload banner), composer disabled with reason | toast per feedback action |
+| S-21 | facts + sections skeleton | feedback rail empty ("No feedback yet: use Comment on a section or document") | 409 stale (reload banner), composer disabled with reason and closed automatically when the case locks | toast per feedback action; Withdraw and Mark resolved toasts carry Undo for 10 s; Mark resolved only on items sent to the operator (US-039) |
 | S-23 | as S-21 | nothing changed (cannot happen: resubmit requires change) | as S-21 | toast on resolve |
 | S-24 | table skeleton | single revision → disabled control with explanation | retry |: |
 | S-25 | rows skeleton | new application (only created event) | retry |: |
