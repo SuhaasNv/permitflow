@@ -171,6 +171,33 @@ describe('OfficerCasePage', () => {
     expect(await screen.findByText('Under Review')).toBeInTheDocument()
   })
 
+  it('warns in the Approve dialog when checks are unresolved, and stays silent when they are not', async () => {
+    const approvable = {
+      ...view,
+      status: 'pending_approval',
+      status_label: 'Route to Approval',
+      actions: [{ target: 'approved', label: 'Approve', enabled: true, reason: null, requires_note: false }],
+    }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({
+      ...approvable,
+      verification_summary: { total: 4, verified: 2, issues_found: 1, needs_review: 0, checking: 0, other: 1 },
+    })
+    const { unmount } = renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    expect(await screen.findByText('2 documents still have unresolved check results')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Approve' }).at(-1)).toBeEnabled()
+    unmount()
+
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({
+      ...approvable,
+      verification_summary: { total: 4, verified: 4, issues_found: 0, needs_review: 0, checking: 0, other: 0 },
+    })
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    expect(await screen.findByRole('dialog', { name: 'Approve this application?' })).toBeInTheDocument()
+    expect(screen.queryByText(/unresolved check results/)).not.toBeInTheDocument()
+  })
+
   it('requires a note before rejecting', async () => {
     vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(view)
     const spy = vi.spyOn(api, 'transitionApplication')
