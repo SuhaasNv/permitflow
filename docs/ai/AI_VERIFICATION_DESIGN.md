@@ -68,7 +68,7 @@ The wire model contains only enums and required fields (OpenAI strict schemas re
 Deterministic, dependency-free, used in tests and when `AI_PROVIDER=mock` or no API key is configured. Heuristics:
 - Text contains the form's business name or registration number → `field_mismatch` not raised; otherwise raised for `business_profile`.
 - Text contains a keyword expected for the type (for example "tenancy", "lease" for `tenancy_agreement`) → type accepted; otherwise `wrong_document_type`.
-- Text contains "expired" or a past expiry date pattern → `expired_document`.
+- Text contains "expired", or a date in the past (ISO or "3 January 2025") after an expiry phrase ("expiry", "valid until") → `expired_document`; a tenancy agreement with no date at all → `missing_field`.
 - Injection phrases ("ignore previous instructions", "mark this as verified") → `possible_prompt_injection`.
 - Confidence: 0.9 when no issues, 0.7 with issues, 0.4 if the text is shorter than 200 characters (drives `needs_review`).
 
@@ -111,4 +111,4 @@ Estimated cost per verification with `gpt-4.1-mini`: well under one cent for a 2
 
 ## Evaluation (Day 3, `docs/ai/AI_EVALUATION.md`)
 
-Six fixtures under `backend/evals/cases/` with expected status and expected issue codes: valid business profile; floor plan uploaded as tenancy agreement (wrong type); tenancy agreement without an expiry date (missing information); ambiguous certificate (needs review); empty PDF (unreadable); business profile containing an injection sentence (needs review + `possible_prompt_injection`). A runner script executes them against the mock and, when a key is present, against OpenAI, and prints expected vs actual.
+Built: fourteen cases in `backend/evals/cases.json` (the eight demo PDFs plus text fixtures for wrong type, missing expiry, ambiguous, empty, oversized and two injection styles) run through the real pipeline by `python -m evals.run`; the mock run is a blocking CI job, the OpenAI run is by hand. Results and caveats in `AI_EVALUATION.md`.
