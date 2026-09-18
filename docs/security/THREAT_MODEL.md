@@ -22,6 +22,11 @@ Scope: the MVP as designed (this document is written before implementation and w
 - **Validation:** Integration tests for read/update/submit/document download/revisions/compare as the wrong operator → 404; sub-resource checks: a document or feedback id from application B used under application A's path → 404; `/notifications/{id}/read` for another user's notification → 404; `/applications/{id}/withdraw` as another operator → 404 (US-038).
 - **Gap:** none material for MVP.
 
+### T1a Unhandled error leaks nothing and stays readable — Medium (availability)
+- **Risk:** an unexpected exception or an exhausted database pool answers a bare 500 outside the CORS layer; the browser cannot read it, the request id is lost and the user is told the server is unreachable.
+- **Mitigation:** an innermost middleware (inside CORS) answers every unhandled exception with the standard error body and request id, and an exhausted pool with 503 after a 5 s timeout; the pool is sized per environment (US-044).
+- **Validation:** `test_unhandled_error_carries_cors_headers_and_request_id`.
+
 ### T2 Operator invokes officer-only functionality (vertical escalation) — High
 - **Risk:** Operator changes status, creates feedback, reads audit trail or the queue.
 - **Mitigation:** `require_role(Role.officer)` dependency on officer routers and `require_role(Role.admin)` on admin routers; workflow transition table also encodes the allowed role, so even a mis-mounted route cannot perform an officer transition as an operator or admin. Admin is read-only on applications by construction (no admin route calls a mutating service).

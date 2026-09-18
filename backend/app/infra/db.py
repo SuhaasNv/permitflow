@@ -15,7 +15,15 @@ _session_factory: sessionmaker[Session] | None = None
 def get_engine() -> Engine:
     global _engine, _session_factory
     if _engine is None:
-        _engine = create_engine(get_settings().effective_database_url, pool_pre_ping=True, future=True)
+        settings = get_settings()
+        _engine = create_engine(
+            settings.effective_database_url,
+            pool_pre_ping=True,
+            future=True,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+            pool_timeout=settings.db_pool_timeout_seconds,
+        )
         _session_factory = sessionmaker(bind=_engine, expire_on_commit=False, class_=Session)
     return _engine
 

@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import TimeoutError as PoolTimeout
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 
@@ -39,9 +40,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
+_INTERNAL_MESSAGE = "Something went wrong. Quote the request id when reporting it."
+
+
+def _error_response(request: Request, status: int, code: str, message: str) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", None)
+    return JSONResponse(
+        status_code=status,
+        content={"error": {"code": code, "message": message, "details": {"request_id": request_id}}},
+    )
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="PermitFlow API", version="0.1.0", lifespan=lifespan, docs_url="/api/docs")
+
+    # Added first, so it sits inside CORS: an unhandled error or an exhausted pool is answered with the
+    # standard error body and the CORS headers, instead of a bare 500 the browser cannot read (US-044).
+    @app.middleware("http")
+    async def catch_unhandled(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        try:
+            return await call_next(request)
+        except PoolTimeout:
+            logger.warning("db_pool_exhausted", extra={"extra_fields": {"path": request.url.path}})
+            return _error_response(request, 503, "unavailable", "The server is busy. Try again in a moment.")
+        except Exception:
+            request_id = getattr(request.state, "request_id", None)
+            logger.exception("unhandled", extra={"extra_fields": {"request_id": request_id}})
+            return _error_response(request, 500, "internal_error", _INTERNAL_MESSAGE)
 
     app.add_middleware(
         CORSMiddleware,
@@ -96,18 +124,10 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
+        # Fallback for errors raised in the outer middlewares themselves; the usual path is catch_unhandled.
         request_id = getattr(request.state, "request_id", None)
         logger.exception("unhandled", extra={"extra_fields": {"request_id": request_id}})
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": {
-                    "code": "internal_error",
-                    "message": "Something went wrong. Quote the request id when reporting it.",
-                    "details": {"request_id": request_id},
-                }
-            },
-        )
+        return _error_response(request, 500, "internal_error", _INTERNAL_MESSAGE)
 
     app.include_router(api_router, prefix="/api/v1")
     return app
