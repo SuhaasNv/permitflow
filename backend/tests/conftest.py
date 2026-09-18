@@ -10,6 +10,10 @@ from pathlib import Path
 
 os.environ["APP_ENV"] = "test"
 os.environ.setdefault("UPLOAD_DIR", "./data/test-uploads")
+# Tests never call a paid provider, whatever the developer's .env says (the live check is a manual step,
+# recorded in docs/ai/AI_VERIFICATION_DESIGN.md). Set TEST_LIVE_AI=1 to run the suite against OpenAI.
+if os.environ.get("TEST_LIVE_AI") != "1":
+    os.environ["AI_PROVIDER"] = "mock"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
