@@ -29,6 +29,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `design/UI_DESIGN.md` | written | Direction, personality, what is avoided, motion, accessibility, assumptions |
 | `design/DESIGN_SYSTEM.md` | written | Tokens, type scale, status / verification / feedback vocabularies as rendered |
 | `design/UI_FLOW.md` | written | Information architecture; operator and officer flows mapped to states and endpoints |
+| `design/USER_JOURNEY.md` | written (Sprint 2) | The journey as built, step by step for the operator and the officer, with what the system does at each step |
 | `design/SCREEN_INVENTORY.md` | written | Every screen with ID, persona, requirements, actions, states, responsive notes, priority |
 | `design/COMPONENT_INVENTORY.md` | written | Reusable components and where they are used |
 | `design/UI_STATES.md` | written | Loading / empty / error / permission states; upload → verification and feedback lifecycles |

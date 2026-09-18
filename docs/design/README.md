@@ -10,6 +10,7 @@ Status: written (UI/UX design phase, 17 to 18 Sep 2026, after solutioning and be
 |----------|---------|
 | `UI_DESIGN.md` | Design direction, visual personality, what we deliberately avoid, motion principles |
 | `DESIGN_SYSTEM.md` | Tokens (colour, type, spacing, radius, elevation), status and verification vocabularies as rendered |
+| `USER_JOURNEY.md` | The journey as built after Sprint 2: every step, screen, system action and status for both personas |
 | `UI_FLOW.md` | Operator and officer flows screen by screen, with state-machine and feedback-lifecycle mapping |
 | `SCREEN_INVENTORY.md` | Every screen: ID, persona, purpose, use case, requirements, actions, states, responsive notes, priority |
 | `COMPONENT_INVENTORY.md` | Reusable components, their variants and where they are used |
