@@ -19,6 +19,7 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `UPLOAD_DIR` | `./data/uploads` | backend | Local disk storage; Railway volume at `/data/uploads`. |
 | `UPLOAD_MAX_BYTES` | `10485760` | backend | 10 MB. |
 | `LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | backend | Failed attempts per IP per minute. |
+| `TRUSTED_PROXIES` | empty | Comma-separated proxy IPs whose `X-Forwarded-For` is trusted for the login rate limit; set to the platform edge IPs in production |
 | `AI_PROVIDER` | `mock` | backend | `mock` or `openai`. |
 | `OPENAI_API_KEY` | empty | backend | Required when `AI_PROVIDER=openai`. |
 | `OPENAI_MODEL` | `gpt-4o-mini` | backend | |

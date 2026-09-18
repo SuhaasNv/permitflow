@@ -1,6 +1,7 @@
 """Document upload, replacement, download and deletion (FR-004, SEC-005)."""
 
 import hashlib
+import urllib.parse
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -171,7 +172,18 @@ class DocumentService:
         doc = self.documents.get_in_application(app.id, document_id)
         if doc is None:
             raise NotFound("Document not found.")
+        if not self.storage.exists(doc.stored_key):
+            raise NotFound("This file is no longer available.")
         return doc, self.storage.open(doc.stored_key)
+
+
+def content_disposition(filename: str) -> str:
+    """Attachment header safe for any name: ASCII fallback plus RFC 5987 UTF-8 form (headers are Latin-1)."""
+    ascii_name = (
+        "".join(ch if 32 <= ord(ch) < 127 and ch not in '"\\' else "_" for ch in filename) or "document"
+    )
+    utf8 = urllib.parse.quote(filename, safe="")
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8}"
 
 
 def _display_name(filename: str) -> str:

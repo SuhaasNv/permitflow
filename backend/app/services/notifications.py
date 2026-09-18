@@ -20,19 +20,22 @@ class EmailNotifier:
 
 
 class NotificationService:
+    """Notification rows are written in the caller's transaction; delivery is queued until `flush_sent()`
+    is called after the commit, so a failed commit never sends a message for something that did not happen."""
+
     def __init__(self, db: Session, notifier: EmailNotifier | None = None) -> None:
         self.repo = NotificationRepository(db)
         self.notifier = notifier or EmailNotifier()
+        self._outbox: list[tuple[uuid.UUID, str]] = []
 
     def notify_officers(self, app: Application, kind: NotificationKind, title: str, body: str) -> int:
-        """Every active officer (no assignment model in the MVP). Same transaction as the caller's commit."""
+        """Every active officer (no assignment model in the MVP)."""
         items = [
             Notification(user_id=uid, application_id=app.id, kind=kind, title=title, body=body)
             for uid in self.repo.active_officer_ids()
         ]
         self.repo.add_all(items)
-        for item in items:
-            self.notifier.send(item.user_id, title)
+        self._outbox.extend((item.user_id, title) for item in items)
         return len(items)
 
     def notify_user(
@@ -41,4 +44,13 @@ class NotificationService:
         self.repo.add_all(
             [Notification(user_id=user_id, application_id=app.id, kind=kind, title=title, body=body)]
         )
-        self.notifier.send(user_id, title)
+        self._outbox.append((user_id, title))
+
+    def flush_sent(self) -> int:
+        """Deliver everything queued since the last flush. Call after the transaction committed."""
+        sent = 0
+        for user_id, title in self._outbox:
+            self.notifier.send(user_id, title)
+            sent += 1
+        self._outbox.clear()
+        return sent

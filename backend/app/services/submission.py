@@ -75,5 +75,6 @@ class SubmissionService:
             f"{business} · Food Establishment Licence · Revision {number}",
         )
         self.db.commit()
+        self.notifications.flush_sent()
         self.db.refresh(app)
         return app

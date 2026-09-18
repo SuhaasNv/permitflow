@@ -65,6 +65,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `uat/UAT_PLAN.md` | to be written (Day 3) | Acceptance scenarios and results on the deployed URL |
 | `operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
 | `operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |
+| `reviews/EDGE_CASE_REVIEW.md` | written (Sprint 2) | Three devil's-advocate reviews: every finding, its fix or its plan |
 | `reviews/PRODUCTION_READINESS_REVIEW.md` | to be written (Day 3) | Honest gap list with severity |
 | `reviews/ASSESSMENT_TRACEABILITY.md` | to be written (Day 3) | Brief requirement → implementation → test → evidence |
 | `reviews/FINAL_REVIEW.md` | to be written (Day 3) | What we built, tradeoffs, what AI got wrong |

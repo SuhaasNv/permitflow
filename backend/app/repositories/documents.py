@@ -63,6 +63,18 @@ class DocumentRepository:
         self.db.add(run)
         return run
 
+    def present_types_for(self, application_ids: list[uuid.UUID]) -> dict[uuid.UUID, set[DocumentType]]:
+        """Current document types per application, one query."""
+        if not application_ids:
+            return {}
+        stmt = select(Document.application_id, Document.document_type).where(
+            Document.application_id.in_(application_ids), Document.is_current.is_(True)
+        )
+        out: dict[uuid.UUID, set[DocumentType]] = {}
+        for app_id, dtype in self.db.execute(stmt):
+            out.setdefault(app_id, set()).add(dtype)
+        return out
+
     def latest_runs_for_applications(
         self, application_ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, list[VerificationRun]]:

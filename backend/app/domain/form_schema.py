@@ -4,6 +4,7 @@ Single source for both the server-side validation and the client (served at GET 
 which the frontend builds its Zod validators).
 """
 
+import math
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -211,7 +212,7 @@ def _validate_field(f: FieldDef, value: Any) -> str | None:  # noqa: PLR0911 - o
             return "Choose one of the options."
         return None
     if f.kind in ("number", "integer"):
-        if isinstance(value, bool) or not isinstance(value, int | float):
+        if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
             return "Must be a number."
         if f.kind == "integer" and int(value) != value:
             return "Must be a whole number."
