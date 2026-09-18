@@ -3,6 +3,7 @@
 notification are written in the same transaction."""
 
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -56,6 +57,20 @@ class WorkflowService:
             ) from exc
         previous = app.status
         app.status = resolved
+        if resolved == ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION:
+            # Release this round's feedback to the operator and freeze it (STATE_MACHINE side effects).
+            now = datetime.now(UTC)
+            released = []
+            for item in self.feedback.open_for(app.id):
+                if item.released_to_operator_at is None:
+                    item.released_to_operator_at = now
+                    released.append(str(item.id))
+            self.audit.record(
+                application_id=app.id,
+                actor_id=officer.id,
+                event_type="feedback.released",
+                payload={"feedback_ids": released},
+            )
         if note is not None and resolved in (ApplicationStatus.APPROVED, ApplicationStatus.REJECTED):
             app.decision_note = note
         app.version += 1

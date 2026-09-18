@@ -17,6 +17,8 @@ import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDate, formatDateTime, formatRelative } from '@/lib/format'
 import { CheckResult } from './CheckResult'
+import { FeedbackPanel } from './FeedbackPanel'
+import type { Target } from './FeedbackPanel'
 import { useOfficerApplication, useRerunCheck, useTransition } from './queries'
 
 const ACTION_COPY: Record<string, { title: string; body: string; confirm: string; danger?: boolean }> = {
@@ -77,7 +79,17 @@ function KeyFacts({ view }: { view: OfficerApplication }) {
   )
 }
 
-function ReviewRail({ view, onAction, busy }: { view: OfficerApplication; onAction: (action: OfficerAction) => void; busy: boolean }) {
+function ReviewRail({
+  view,
+  targets,
+  onAction,
+  busy,
+}: {
+  view: OfficerApplication
+  targets: Target[]
+  onAction: (action: OfficerAction) => void
+  busy: boolean
+}) {
   const s = view.verification_summary
   const primary = view.actions.find((a) => a.enabled && !a.requires_note)
   const rest = view.actions.filter((a) => a !== primary)
@@ -147,14 +159,7 @@ function ReviewRail({ view, onAction, busy }: { view: OfficerApplication; onActi
         </p>
       </section>
 
-      <section className="pf-surface" aria-labelledby="fb-title">
-        <div className="px-5 py-4">
-          <h2 id="fb-title" className="text-[15px] font-semibold">
-            Feedback
-          </h2>
-          <p className="mt-1 text-[13px] leading-[19px] text-text-3">Contextual feedback on sections and documents arrives with US-023.</p>
-        </div>
-      </section>
+      <FeedbackPanel view={view} targets={targets} />
     </aside>
   )
 }
@@ -207,6 +212,17 @@ export function OfficerCasePage() {
   if (schema.isError) return <ErrorPanel error={schema.error} onRetry={() => void schema.refetch()} />
 
   const view = app.data
+  const targets: Target[] = [
+    ...view.sections.map((sec) => ({ value: `section:${sec.key}`, label: sec.title, target_type: 'section' as const, key: sec.key })),
+    ...view.documents.map((d) => ({
+      value: `document:${d.document_type}`,
+      label: d.label,
+      target_type: 'document' as const,
+      key: d.document_type,
+    })),
+  ]
+  const openFor = (type: 'section' | 'document', key: string) =>
+    view.feedback.filter((f) => f.resolution === 'open' && (type === 'section' ? f.section_key === key : f.document_type === key))
   const error = transition.error instanceof AppError ? transition.error : null
   const stale = error?.status === 409 && error.code === 'version_conflict'
 
@@ -292,13 +308,21 @@ export function OfficerCasePage() {
                 const section = view.sections.find((s) => s.key === def.key)
                 if (!section) return null
                 return (
-                  <section key={def.key} className="py-6 first:pt-0 last:pb-0" aria-labelledby={`case-${def.key}`}>
+                  <section
+                    key={def.key}
+                    id={`target-section-${def.key}`}
+                    className="scroll-mt-24 py-6 first:pt-0 last:pb-0"
+                    aria-labelledby={`case-${def.key}`}
+                  >
                     <div className="mb-4 flex flex-wrap items-center gap-3">
                       <span className="font-mono text-[13px] text-text-3">0{i + 1}</span>
                       <h3 id={`case-${def.key}`} className="text-[17px] font-semibold leading-6">
                         {def.title}
                       </h3>
                       {!section.complete ? <StatusBadge label="Incomplete" tone="warning" /> : null}
+                      {openFor('section', def.key).length ? (
+                        <StatusBadge label={`${openFor('section', def.key).length} open feedback`} tone="warning" />
+                      ) : null}
                     </div>
                     <dl className="grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[220px_minmax(0,1fr)]">
                       {def.fields.map((f) => {
@@ -330,7 +354,7 @@ export function OfficerCasePage() {
             </div>
             <ol className="divide-y divide-line">
               {view.documents.map((d, i) => (
-                <li key={d.id} className="px-5 py-5 sm:px-7">
+                <li key={d.id} id={`target-document-${d.document_type}`} className="scroll-mt-24 px-5 py-5 sm:px-7">
                   <div className="flex items-start gap-3.5">
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-ink text-white">
                       <svg
@@ -353,6 +377,9 @@ export function OfficerCasePage() {
                         <span className="font-mono text-xs text-text-3">0{i + 1}</span>
                         <h3 className="text-[15px] font-semibold leading-[22px]">{d.label}</h3>
                         {!d.in_current_revision ? <StatusBadge label="Uploaded after submission" tone="info" /> : null}
+                        {openFor('document', d.document_type).length ? (
+                          <StatusBadge label={`${openFor('document', d.document_type).length} open feedback`} tone="warning" />
+                        ) : null}
                       </div>
                       <div className="truncate text-[13px] text-text-3">
                         <span className="text-text-2">{d.original_filename}</span> · {formatBytes(d.size_bytes)} · uploaded{' '}
@@ -431,7 +458,7 @@ export function OfficerCasePage() {
             </p>
           </section>
         </div>
-        <ReviewRail view={view} busy={transition.isPending} onAction={(a) => setPending(a)} />
+        <ReviewRail view={view} targets={targets} busy={transition.isPending} onAction={(a) => setPending(a)} />
       </div>
 
       <Dialog

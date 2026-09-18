@@ -102,6 +102,41 @@ class VerificationSummaryOut(BaseModel):
     other: int
 
 
+class FeedbackOut(BaseModel):
+    id: uuid.UUID
+    target_type: str
+    section_key: str | None
+    document_type: str | None
+    target_label: str
+    message: str
+    template_key: str | None
+    resolution: str
+    # Revision number the item was raised against (the "round").
+    raised_in_revision: int
+    author_name: str
+    created_at: datetime
+    released_to_operator_at: datetime | None
+    addressed_in_revision: int | None
+    resolved_at: datetime | None
+
+
+class FeedbackIn(BaseModel):
+    target_type: str
+    section_key: str | None = None
+    document_type: str | None = None
+    message: str = Field(max_length=2000)
+    template_key: str | None = None
+
+
+class FeedbackTemplateOut(BaseModel):
+    key: str
+    title: str
+    target_type: str
+    section_key: str | None
+    document_type: str | None
+    message: str
+
+
 class OfficerApplicationOut(BaseModel):
     id: uuid.UUID
     reference_no: str
@@ -118,6 +153,11 @@ class OfficerApplicationOut(BaseModel):
     verification_summary: VerificationSummaryOut
     revisions: list[RevisionOut]
     current_revision_number: int
+    feedback: list[FeedbackOut]
+    open_feedback_count: int
+    # Feedback can be created or withdrawn only while under review; the reason explains why not.
+    feedback_editable: bool
+    feedback_locked_reason: str | None
     actions: list[ActionOut]
     decision_note: str | None
     version: int

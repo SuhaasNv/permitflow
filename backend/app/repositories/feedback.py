@@ -23,3 +23,27 @@ class FeedbackRepository:
             .group_by(Feedback.application_id)
         )
         return {row[0]: int(row[1]) for row in self.db.execute(stmt)}
+
+    def list_for(self, application_id: uuid.UUID) -> list[Feedback]:
+        stmt = (
+            select(Feedback)
+            .where(Feedback.application_id == application_id)
+            .order_by(Feedback.created_at.asc(), Feedback.id.asc())
+        )
+        return list(self.db.scalars(stmt))
+
+    def open_for(self, application_id: uuid.UUID) -> list[Feedback]:
+        stmt = select(Feedback).where(
+            Feedback.application_id == application_id, Feedback.resolution == FeedbackResolution.OPEN
+        )
+        return list(self.db.scalars(stmt))
+
+    def get_in_application(self, application_id: uuid.UUID, feedback_id: uuid.UUID) -> Feedback | None:
+        """Sub-resource check: the item must belong to the application (SEC-002)."""
+        return self.db.scalar(
+            select(Feedback).where(Feedback.id == feedback_id, Feedback.application_id == application_id)
+        )
+
+    def add(self, item: Feedback) -> Feedback:
+        self.db.add(item)
+        return item
