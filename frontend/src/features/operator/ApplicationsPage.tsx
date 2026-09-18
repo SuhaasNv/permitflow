@@ -101,7 +101,7 @@ export function ApplicationsPage() {
                   aria-selected={filter === f.key}
                   onClick={() => setFilter(f.key)}
                   className={cn(
-                    'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors duration-[var(--dur-fast)]',
+                    'inline-flex h-10 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors duration-[var(--dur-fast)] sm:h-8',
                     filter === f.key ? 'bg-surface-3 text-text' : 'text-text-2 hover:bg-neutral-soft hover:text-text',
                   )}
                 >
@@ -114,10 +114,11 @@ export function ApplicationsPage() {
               value={query}
               onChange={setQuery}
               label="Search reference, business or address"
+              placeholder="Search applications"
               className="w-full sm:ml-auto sm:w-72"
             />
           </div>
-          <div className="hidden grid-cols-[168px_minmax(0,1fr)_220px_120px_112px] gap-x-4 border-b border-line bg-surface-2 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 md:grid">
+          <div className="hidden grid-cols-[168px_minmax(0,1fr)_220px_120px_112px] gap-x-4 border-b border-line bg-surface-2 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 lg:grid">
             <span>Reference</span>
             <span>Business</span>
             <span>Status</span>

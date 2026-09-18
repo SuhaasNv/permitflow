@@ -5,13 +5,15 @@ import { cn } from '@/lib/cn'
 interface SearchBoxProps {
   value: string
   onChange: (value: string) => void
-  /** Accessible name; also the placeholder. */
+  /** Accessible name. */
   label: string
+  /** Short placeholder; defaults to the label. */
+  placeholder?: string
   className?: string
 }
 
 /** Compact search input for list screens. Filters client-side; the parent decides what "matches" means. */
-export function SearchBox({ value, onChange, label, className }: SearchBoxProps) {
+export function SearchBox({ value, onChange, label, placeholder, className }: SearchBoxProps) {
   const id = useId()
   return (
     <div className={cn('relative', className)}>
@@ -37,11 +39,11 @@ export function SearchBox({ value, onChange, label, className }: SearchBoxProps)
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={label}
+        placeholder={placeholder ?? label}
         autoComplete="off"
         spellCheck={false}
         className={cn(
-          'h-8 w-full rounded-md border border-line-strong bg-surface pl-8 pr-2.5 text-[13px] text-text placeholder:text-text-3/70',
+          'h-10 w-full rounded-md border border-line-strong bg-surface pl-8 pr-2.5 text-[13px] sm:h-8 text-text placeholder:text-text-3/70',
           'transition-[border-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
           'hover:border-text-3 focus:border-focus focus:shadow-[0_0_0_3px_rgba(23,92,211,0.16)] focus:outline-none',
           '[&::-webkit-search-cancel-button]:cursor-pointer',

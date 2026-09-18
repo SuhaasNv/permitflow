@@ -87,7 +87,11 @@ export function Stepper({ steps, className }: { steps: Step[]; className?: strin
           </>
         )
         return (
-          <li key={step.label} className="relative flex flex-col items-center" aria-current={step.state === 'current' ? 'step' : undefined}>
+          <li
+            key={step.label}
+            className="relative flex min-w-0 flex-col items-center"
+            aria-current={step.state === 'current' ? 'step' : undefined}
+          >
             {!last ? (
               <span className="absolute left-[calc(50%+18px)] right-[calc(-50%+18px)] top-[13px] h-px bg-line" aria-hidden="true">
                 <span
@@ -101,13 +105,16 @@ export function Stepper({ steps, className }: { steps: Step[]; className?: strin
             {step.to && step.state !== 'todo' && step.state !== 'locked' ? (
               <Link
                 to={step.to}
-                className="group flex flex-col items-center rounded-md px-1 no-underline hover:text-text"
+                className="group flex w-full flex-col items-center rounded-md px-1 no-underline hover:text-text"
                 aria-label={`${step.label}: ${step.state === 'done' ? 'complete' : step.state === 'attention' ? 'needs attention' : 'current step'}`}
               >
                 {inner}
               </Link>
             ) : (
-              <span className="flex flex-col items-center px-1" aria-label={step.state === 'locked' ? `${step.label}: locked` : undefined}>
+              <span
+                className="flex w-full flex-col items-center px-1"
+                aria-label={step.state === 'locked' ? `${step.label}: locked` : undefined}
+              >
                 {inner}
               </span>
             )}

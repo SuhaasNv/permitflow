@@ -235,7 +235,7 @@ export function DocumentSlot({
       {!doc && state.phase !== 'uploading' && slot.editable ? (
         <div className="px-4 pb-4 sm:px-5">
           <DropZone
-            label={`Drop your ${slot.label.toLowerCase()} here, or`}
+            label={`Drop your ${slot.label} file here, or`}
             onFile={start}
             onExtraFiles={(n) =>
               toast.push({
@@ -291,7 +291,7 @@ export function DocumentSlot({
         onCancel={() => setConfirmDelete(false)}
       >
         <p>
-          {doc?.original_filename} will be removed from this application. You can upload another {slot.label.toLowerCase()} afterwards.
+          {doc?.original_filename} will be removed from this application. You can upload another {slot.label} afterwards.
         </p>
       </Dialog>
     </section>

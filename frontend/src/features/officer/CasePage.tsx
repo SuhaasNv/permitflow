@@ -57,11 +57,13 @@ const ACTION_COPY: Record<string, { title: string; body: string; confirm: string
 function KeyFacts({ view }: { view: OfficerApplication }) {
   const current = view.revisions[view.revisions.length - 1]
   return (
-    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-[13px] sm:grid-cols-4">
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-[13px] sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
       <div>
         <dt className="text-text-3">Applicant</dt>
         <dd className="font-medium">{view.applicant.full_name}</dd>
-        <dd className="truncate text-text-3">{view.applicant.email}</dd>
+        <dd className="truncate text-text-3" title={view.applicant.email}>
+          {view.applicant.email}
+        </dd>
       </div>
       <div>
         <dt className="text-text-3">Submitted</dt>
@@ -96,9 +98,9 @@ function ReviewRail({
   const primary = view.actions.find((a) => a.enabled && !a.requires_note)
   const rest = view.actions.filter((a) => a !== primary)
   return (
-    <aside className="flex flex-col gap-5 lg:sticky lg:top-[88px] lg:self-start">
+    <aside className="order-first flex flex-col gap-5 lg:order-none lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-104px)] lg:self-start lg:overflow-y-auto">
       <section className="pf-surface" aria-labelledby="review-title">
-        <div className="px-5 pt-5">
+        <div className={cn('px-5 pt-5', view.actions.length === 0 && 'pb-5')}>
           <h2 id="review-title" className="text-[17px] font-semibold leading-6">
             Review
           </h2>
@@ -139,6 +141,12 @@ function ReviewRail({
                   ))}
               </ul>
             ) : null}
+            {view.actions.some((a) => a.target === 'site_visit_scheduled' || a.target === 'site_visit_done') ? (
+              <p className="mt-1 text-xs leading-[17px] text-text-3">
+                The site visit steps change the status only. The visit checklist and post-visit clarification rounds are out of scope for
+                this release.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </section>
@@ -170,7 +178,7 @@ function ReviewRail({
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: 'success' | 'warning' | 'info' }) {
   return (
-    <div className="flex items-baseline justify-between border-b border-line py-1.5 last:border-b-0">
+    <div className="flex items-baseline justify-between py-1">
       <dt className="text-text-2">{label}</dt>
       <dd
         className={cn(
@@ -356,7 +364,7 @@ export function OfficerCasePage() {
                         <StatusBadge label={`Changed in Revision ${view.current_revision_number}`} tone="info" />
                       ) : null}
                     </div>
-                    <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[220px_minmax(0,1fr)]">
+                    <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[minmax(120px,220px)_minmax(0,1fr)] lg:grid-cols-1 xl:grid-cols-[minmax(120px,220px)_minmax(0,1fr)]">
                       {def.fields.map((f) => {
                         const value = section.data[f.key]
                         const empty = value === undefined || value === null || value === ''
@@ -477,8 +485,8 @@ export function OfficerCasePage() {
               {view.revisions.map((r) => (
                 <li key={r.id} className="flex items-baseline gap-4 px-5 py-3 text-sm sm:px-7">
                   <span className="font-mono text-xs text-text-3">R{r.number}</span>
-                  <span className="font-medium">Revision {r.number}</span>
-                  <span className="text-text-3">
+                  <span className="whitespace-nowrap font-medium">Revision {r.number}</span>
+                  <span className="min-w-0 flex-1 text-text-3">
                     submitted {formatDateTime(r.submitted_at)} by {r.submitted_by}
                   </span>
                   {r.number === view.current_revision_number ? (
@@ -488,7 +496,7 @@ export function OfficerCasePage() {
               ))}
             </ol>
             <p className="border-t border-line px-5 py-3 text-xs text-text-3 sm:px-7">
-              <Link to="/officer/queue" className="text-text-2">
+              <Link to="/officer/queue" className="inline-block py-2 text-text-2 sm:py-0">
                 Back to the queue
               </Link>
             </p>
@@ -497,6 +505,7 @@ export function OfficerCasePage() {
           <AuditTrail applicationId={id} />
         </div>
         <ReviewRail view={view} targets={targets} busy={transition.isPending} onAction={(a) => setPending(a)} />
+        {/* Below lg the rail renders first (order) so the officer's actions are not the last thing on the page. */}
       </div>
 
       <Dialog
