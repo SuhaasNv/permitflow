@@ -218,6 +218,49 @@
   .pf-btn:disabled::before {
     display: none;
   }
+  /* Landing hero band: deep ink with a faint red light and a cooler one drifting slowly (19 Sep). */
+  .pf-band-glow {
+    position: absolute;
+    width: 60%;
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    filter: blur(60px);
+    opacity: 0.4;
+    will-change: transform;
+  }
+  .pf-band-glow-a {
+    top: -20%;
+    right: -15%;
+    background: #a8192a;
+    animation: pf-drift-a 18s ease-in-out infinite alternate;
+  }
+  .pf-band-glow-b {
+    bottom: -25%;
+    left: -20%;
+    background: #2c3a52;
+    animation: pf-drift-b 22s ease-in-out infinite alternate;
+  }
+  @keyframes pf-drift-a {
+    from {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    to {
+      transform: translate3d(-12%, 18%, 0) scale(1.15);
+    }
+  }
+  @keyframes pf-drift-b {
+    from {
+      transform: translate3d(0, 0, 0) scale(1.05);
+    }
+    to {
+      transform: translate3d(16%, -14%, 0) scale(0.95);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pf-band-glow {
+      animation: none;
+    }
+  }
   /* Scroll reveal: hidden until Reveal adds is-in. */
   .pf-reveal {
     opacity: 0;
