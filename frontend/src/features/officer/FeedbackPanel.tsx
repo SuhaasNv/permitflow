@@ -151,7 +151,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
             .map(([round, items]) => (
               <div key={round} className="px-5 py-3">
                 <div className="pf-eyebrow mb-2">
-                  Round {round} · Revision {round}
+                  Raised against Revision {round}
                 </div>
                 <ul className="pf-stagger flex flex-col gap-2.5">
                   {items.map((f) => (
