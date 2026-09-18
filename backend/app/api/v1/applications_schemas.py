@@ -73,6 +73,8 @@ class ApplicationSummaryOut(BaseModel):
     premises_summary: str | None
     percent: int
     revision_count: int
+    # True when the licensing office is waiting on the operator (draft is not "waiting": it is theirs).
+    needs_operator_action: bool
     created_at: datetime
     updated_at: datetime
 
@@ -90,6 +92,7 @@ class ApplicationOperatorView(BaseModel):
     document_slots: list[DocumentSlotView]
     completeness: CompletenessView
     revision_count: int
+    needs_operator_action: bool
     created_at: datetime
     updated_at: datetime
 

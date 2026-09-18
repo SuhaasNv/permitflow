@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models import Notification, User
@@ -27,6 +28,22 @@ class NotificationRepository:
         return self.db.scalar(
             select(Notification).where(Notification.id == notification_id, Notification.user_id == user_id)
         )
+
+    def unread_count(self, user_id: uuid.UUID) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(Notification)
+            .where(Notification.user_id == user_id, Notification.read_at.is_(None))
+        )
+        return int(self.db.scalar(stmt) or 0)
+
+    def mark_all_read(self, user_id: uuid.UUID, at: datetime) -> int:
+        result = self.db.execute(
+            update(Notification)
+            .where(Notification.user_id == user_id, Notification.read_at.is_(None))
+            .values(read_at=at)
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
     def active_officer_ids(self) -> list[uuid.UUID]:
         stmt = select(User.id).where(User.role == Role.OFFICER, User.is_active.is_(True))

@@ -13,6 +13,7 @@ from app.domain import completeness as completeness_rules
 from app.domain.enums import ApplicationStatus, DocumentType
 from app.domain.form_schema import SECTIONS
 from app.domain.labels import operator_label, tone_for
+from app.domain.officer_actions import next_action
 from app.models import Application, Document, VerificationRun
 
 LICENCE_TITLE = "Food Establishment Licence"
@@ -50,6 +51,19 @@ _EXPLANATIONS: dict[ApplicationStatus, str] = {
 }
 
 
+def _needs_operator(status: ApplicationStatus) -> bool:
+    action = next_action(status)
+    return (
+        status != ApplicationStatus.DRAFT
+        and not action.officer_turn
+        and status
+        not in (
+            ApplicationStatus.APPROVED,
+            ApplicationStatus.REJECTED,
+        )
+    )
+
+
 def _present_types(app: Application, present: set[DocumentType] | None) -> set[DocumentType]:
     return present or set()
 
@@ -70,6 +84,7 @@ def summary(
         premises_summary=premises if isinstance(premises, str) and premises else None,
         percent=comp.percent,
         revision_count=revision_count,
+        needs_operator_action=_needs_operator(app.status),
         created_at=app.created_at,
         updated_at=app.updated_at,
     )
@@ -160,6 +175,7 @@ def operator_view(
             missing=list(comp.missing),
         ),
         revision_count=revision_count,
+        needs_operator_action=_needs_operator(app.status),
         created_at=app.created_at,
         updated_at=app.updated_at,
     )
