@@ -174,7 +174,7 @@ export function ApplicationPage() {
           </p>
         </section>
       ) : null}
-      {view.decision_note !== null ? (
+      {view.decision_note !== null || view.licence !== null ? (
         <section
           className={cn(
             'mb-6 rounded-lg border px-5 py-4',
@@ -185,9 +185,11 @@ export function ApplicationPage() {
           <h2 id="outcome-title" className="text-[15px] font-semibold">
             {view.status_tone === 'success' ? 'Your licence application was approved' : 'Your licence application was not approved'}
           </h2>
-          <p className="mt-1 text-sm leading-[21px] text-text-2">
-            <span className="font-medium text-text">Officer's note:</span> {view.decision_note}
-          </p>
+          {view.decision_note !== null ? (
+            <p className="mt-1 text-sm leading-[21px] text-text-2">
+              <span className="font-medium text-text">Officer's note:</span> {view.decision_note}
+            </p>
+          ) : null}
           {view.licence ? (
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Button
