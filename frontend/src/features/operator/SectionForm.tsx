@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { Resolver } from 'react-hook-form'
 import { useForm } from 'react-hook-form'
 
@@ -13,6 +13,11 @@ import { SaveIndicator } from '@/features/shared/SaveIndicator'
 import { useToast } from '@/features/shared/Toast'
 import type { SectionValues } from '@/lib/zodFromSchema'
 import { defaultsFor, sectionSchema, toPayload } from '@/lib/zodFromSchema'
+
+export interface SectionFormHandle {
+  /** Save the current values as a draft (partial allowed). Resolves true when saved, false when validation blocked it. */
+  saveDraft: () => Promise<boolean>
+}
 
 export interface SectionFormProps {
   section: SectionDef
@@ -30,17 +35,10 @@ function fieldError(errors: Record<string, { message?: string } | undefined>, ke
   return errors[key]?.message
 }
 
-export function SectionForm({
-  section,
-  data,
-  editable,
-  saving,
-  savedAt = null,
-  isLast,
-  stepLabel,
-  onSave,
-  onDirtyChange,
-}: SectionFormProps) {
+export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(function SectionForm(
+  { section, data, editable, saving, savedAt = null, isLast, stepLabel, onSave, onDirtyChange }: SectionFormProps,
+  ref,
+) {
   const draftSchema = sectionSchema(section, 'draft')
   const completeSchema = sectionSchema(section, 'complete')
   // The schema is built at runtime from the server definition, so its static type is a generic record.
@@ -53,14 +51,23 @@ export function SectionForm({
   const toast = useToast()
   const [summary, setSummary] = useState<string[]>([])
   const [serverError, setServerError] = useState<string | null>(null)
+  const [updatedElsewhere, setUpdatedElsewhere] = useState(false)
   const summaryRef = useRef<HTMLDivElement>(null)
+  // True while our own save is in flight: the server data that comes back is ours, not another tab's.
+  const savingRef = useRef(false)
 
   const dirty = form.formState.isDirty
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange])
 
-  // Re-seed when the section (or its saved data) changes.
+  // Re-seed when the section (or its saved data) changes. Never wipe what the user is typing: if the form is
+  // dirty when new server data arrives (another tab saved), keep the edits and say so.
   useEffect(() => {
+    if (form.formState.isDirty && !savingRef.current) {
+      setUpdatedElsewhere(true)
+      return
+    }
     form.reset(defaultsFor(section, data))
+    setUpdatedElsewhere(false)
     setSummary([])
     setServerError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,6 +92,7 @@ export function SectionForm({
           return
         }
       }
+      savingRef.current = true
       try {
         await onSave(toPayload(values), andContinue)
         form.reset(values)
@@ -97,8 +105,36 @@ export function SectionForm({
         } else {
           setServerError(error instanceof Error ? error.message : 'Could not save this section. Your entries are still here; try again.')
         }
+      } finally {
+        savingRef.current = false
       }
     })
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      saveDraft: () =>
+        new Promise<boolean>((resolve) => {
+          void form.handleSubmit(
+            async (values) => {
+              savingRef.current = true
+              try {
+                await onSave(toPayload(values), false)
+                form.reset(values)
+                resolve(true)
+              } catch (error) {
+                setServerError(error instanceof Error ? error.message : 'Could not save this section.')
+                resolve(false)
+              } finally {
+                savingRef.current = false
+              }
+            },
+            () => resolve(false),
+          )()
+        }),
+    }),
+    [form, onSave],
+  )
 
   const errors = form.formState.errors as Record<string, { message?: string } | undefined>
 
@@ -198,6 +234,26 @@ export function SectionForm({
             <span>{serverError}</span>
           </Alert>
         ) : null}
+        {updatedElsewhere ? (
+          <Alert
+            tone="warning"
+            title="This section was updated elsewhere"
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  form.reset(defaultsFor(section, data))
+                  setUpdatedElsewhere(false)
+                }}
+              >
+                Discard my edits
+              </Button>
+            }
+          >
+            Another tab or device saved this section. Your unsaved edits are still here; saving will overwrite the other version.
+          </Alert>
+        ) : null}
         <div className="grid gap-5 sm:grid-cols-2 sm:gap-x-6">{section.fields.map(render)}</div>
       </div>
       {editable ? (
@@ -213,4 +269,4 @@ export function SectionForm({
       ) : null}
     </form>
   )
-}
+})

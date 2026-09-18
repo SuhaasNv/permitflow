@@ -116,11 +116,12 @@ export function OperatorDashboardPage() {
   const newApplication = (
     <Button
       loading={create.isPending}
-      onClick={() =>
+      onClick={() => {
+        if (create.isPending) return
         create.mutate(undefined, {
           onSuccess: (view) => navigate(`/app/applications/${view.id}`),
         })
-      }
+      }}
     >
       <svg
         width="16"

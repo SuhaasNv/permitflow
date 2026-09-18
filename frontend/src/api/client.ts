@@ -30,6 +30,15 @@ export function setTokenProvider(fn: () => string | null): void {
   tokenProvider = fn
 }
 
+/** Called once per 401 so the session can end cleanly (redirect to sign-in with a return path). */
+let unauthorizedHandler: () => void = () => undefined
+export function setUnauthorizedHandler(fn: () => void): void {
+  unauthorizedHandler = fn
+}
+export function notifyUnauthorized(): void {
+  unauthorizedHandler()
+}
+
 function isApiErrorBody(value: unknown): value is ApiErrorBody {
   if (typeof value !== 'object' || value === null) return false
   const err = (value as { error?: unknown }).error
@@ -80,6 +89,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     }
   }
   if (!response.ok) {
+    if (response.status === 401) notifyUnauthorized()
     if (isApiErrorBody(parsed)) throw new AppError(response.status, parsed.error, requestId)
     throw new AppError(response.status, { code: 'http_error', message: `Request failed (${response.status})` }, requestId)
   }

@@ -1,15 +1,17 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
-import { buttonClasses } from '@/features/shared/Button'
+import { Button } from '@/features/shared/Button'
 import { Dialog } from '@/features/shared/Dialog'
 import { Stepper } from '@/features/shared/Stepper'
 import type { Step } from '@/features/shared/Stepper'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
 import { cn } from '@/lib/cn'
+import { guardUnload, setUnsaved } from '@/lib/unsaved'
 import { ApplicationHeader } from './ApplicationHeader'
 import { SectionForm } from './SectionForm'
+import type { SectionFormHandle } from './SectionForm'
 import { useApplication, useFormSchema, useUpdateSection } from './queries'
 
 export function FormPage() {
@@ -19,10 +21,22 @@ export function FormPage() {
   const schema = useFormSchema()
   const update = useUpdateSection(id)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [exiting, setExiting] = useState(false)
+  const formRef = useRef<SectionFormHandle>(null)
   // A ref, not state: the blocker must see "clean" synchronously right after a successful save.
   const dirtyRef = useRef(false)
   const onDirtyChange = useCallback((d: boolean) => {
     dirtyRef.current = d
+    setUnsaved(d)
+  }, [])
+
+  // Refresh, tab close or an external link while dirty: the browser asks first. Cleared on unmount.
+  useEffect(() => {
+    const stop = guardUnload()
+    return () => {
+      stop()
+      setUnsaved(false)
+    }
   }, [])
 
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirtyRef.current && currentLocation.pathname !== nextLocation.pathname)
@@ -84,6 +98,7 @@ export function FormPage() {
   const save = async (payload: Record<string, unknown>, andContinue: boolean) => {
     await update.mutateAsync({ key: section.key, data: payload })
     dirtyRef.current = false
+    setUnsaved(false)
     setSavedAt(Date.now())
     if (andContinue) {
       const next = sections[activeIndex + 1]
@@ -102,9 +117,26 @@ export function FormPage() {
           </span>
         }
         actions={
-          <Link to={base} className={buttonClasses('secondary')}>
+          <Button
+            variant="secondary"
+            loading={exiting}
+            onClick={async () => {
+              // Saves the draft first (partial values allowed), then leaves. Validation errors keep you here.
+              if (!dirtyRef.current) {
+                navigate(base)
+                return
+              }
+              setExiting(true)
+              try {
+                const ok = await formRef.current?.saveDraft()
+                if (ok) navigate(base)
+              } finally {
+                setExiting(false)
+              }
+            }}
+          >
             Save and exit
-          </Link>
+          </Button>
         }
       />
 
@@ -161,6 +193,7 @@ export function FormPage() {
         </aside>
         <div key={section.key} className="pf-enter-fast min-w-0">
           <SectionForm
+            ref={formRef}
             section={section}
             data={state.data}
             editable={state.editable}

@@ -40,7 +40,7 @@ export function DocumentsPage() {
   }
   const view = app.data
   const c = view.completeness
-  const canDelete = view.status_label === 'Draft'
+  const canDelete = view.revision_count === 0 && view.can_edit
   const base = `/app/applications/${id}`
 
   return (
@@ -54,14 +54,16 @@ export function DocumentsPage() {
           </span>
         }
         actions={
-          <>
-            <Link to={`${base}/form`} className={buttonClasses('secondary')}>
-              Back to form
-            </Link>
-            <Link to={`${base}/review`} className={buttonClasses('primary')}>
-              Review and submit
-            </Link>
-          </>
+          view.can_edit ? (
+            <>
+              <Link to={`${base}/form`} className={buttonClasses('secondary')}>
+                Back to form
+              </Link>
+              <Link to={`${base}/review`} className={buttonClasses('primary')}>
+                Review and submit
+              </Link>
+            </>
+          ) : undefined
         }
       />
 

@@ -41,6 +41,8 @@ Also in this sprint, not tied to a story: the public landing page (FR-031), the 
 
 ## Sprint 2 (in progress, 19 Sep 2026)
 
+- Edge-case pass (three independent reviews, see `docs/reviews/EDGE_CASE_REVIEW.md`). Frontend: any 401 ends the session in one place and the sign-in page explains it; the token expiry signs out proactively; a network blip on reload no longer logs the user out; browser prompt on refresh or close with unsaved section input; Sign out asks first when a form is dirty; "Save and exit" saves the partial draft; a dirty section is never overwritten by another tab's save; submit is guarded against double fire and explains a 409; review and submitted pages redirect when the application is not in the right state; locked applications show no editing chrome; polling stops after 3 minutes and offers Re-run; Replace is hidden while a check runs; Re-run needs an editable slot; download errors surface as toasts; confirmation dialogs focus Cancel when destructive; over-promising copy removed ("10 working days", "by email").
+
 - US-020 Review queue: `GET /officer/applications` (officer only; operators and admins get 403) lists every non-draft application with applicant, internal status and officer label, a server-derived next action and whose turn it is (`domain/officer_actions.py`), revision count, open feedback count, document-check attention and checking counts, first submission and last activity, plus turn counts, in four queries. Frontend queue with Needs review / Waiting on operator / Decided / All tabs, 30 s refresh, honest empty states; case route placeholder until US-021.
 
 ### Milestones during the sprint (Sprint 1)

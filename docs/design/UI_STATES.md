@@ -18,7 +18,10 @@ UX-002 requires explicit loading, empty, error and success states for every data
 | Not found (404) | "Application not found" with back link | SEC-002 (other operators' applications look like 404) |
 | Stale version (409 `version_conflict`) | banner "This application changed since you opened it: Reload" | REL-007 |
 | Invalid transition (409 `invalid_transition`) | dialog error line listing allowed actions | SEC-004 |
-| Session expired (401) | redirect to login with "Your session ended: sign in again"; return path kept | SEC-006 |
+| Session expired (401) | any 401 (or the token's own expiry timer) ends the session in one place; sign-in page shows "Your session ended" and honours the return path only inside the role's own area | SEC-006 (built) |
+| Unsaved changes | browser "leave site?" prompt on refresh or close while a section is dirty; in-app navigation and Sign out show the "Leave without saving?" / "Sign out without saving?" dialog with Stay focused; "Save and exit" saves the partial draft first | built |
+| Updated elsewhere | a dirty section is never overwritten by data from another tab: warning with "Discard my edits" | built |
+| Check taking too long | after 3 minutes pending or running, polling stops, the block says so and Re-run is offered | built |
 | Offline / network | toast "You appear to be offline"; retries on reconnect for reads |: |
 
 ## Upload → verification lifecycle (S-12, S-15)
