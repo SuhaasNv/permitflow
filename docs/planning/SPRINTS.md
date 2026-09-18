@@ -110,6 +110,9 @@ Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done;
 | US-035 | Side rail reaches the bottom while scrolling (hotfix) | MVP (added 19 Sep) |
 | US-036 | Search in My applications and the review queue | Nice-to-have (added 19 Sep) |
 | US-037 | Phone width fit on the officer case + scroll to top on navigation (hotfix) | MVP (added 19 Sep) |
+| US-038 | Withdraw application (operator) | Nice-to-have (added 19 Sep) |
+| US-039 | Feedback decisions: resolve only released items, 10 s undo, composer lock | MVP (added 19 Sep) |
+| US-040 | Flagged-section markers in the form rail and stepper | MVP (added 19 Sep) |
 | US-070–073 | Admin oversight dashboard | Nice-to-have (only after US-005/006/007 are Done) |
 
 **Exit criteria:** Sprint DoD + UAT plan executed on the deployed URL + production readiness review + assessment traceability + final review written honestly.

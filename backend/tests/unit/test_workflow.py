@@ -12,6 +12,7 @@ from app.domain.workflow import (
     actor_for_role,
     allowed_targets,
     available_actions,
+    can_withdraw,
     is_terminal,
     transition,
 )
@@ -45,14 +46,27 @@ def test_every_combination(source: S, target: S, actor: Actor) -> None:
 
 
 def test_terminal_states_have_no_outgoing_edges() -> None:
-    for s in (S.APPROVED, S.REJECTED):
+    for s in (S.APPROVED, S.REJECTED, S.WITHDRAWN):
         assert is_terminal(s)
         assert not [t for t in TRANSITIONS if t.source == s]
 
 
+def test_withdraw_possible_from_every_non_terminal_post_submission_state() -> None:
+    for s in S:
+        if s in (S.DRAFT, S.APPROVED, S.REJECTED, S.WITHDRAWN):
+            assert not can_withdraw(s)
+            assert S.WITHDRAWN not in allowed_targets(s, Actor.OPERATOR), s
+            continue
+        assert can_withdraw(s)
+        assert S.WITHDRAWN in allowed_targets(s, Actor.OPERATOR), s
+        # officers never withdraw on the operator's behalf
+        assert S.WITHDRAWN not in allowed_targets(s, Actor.OFFICER), s
+        assert transition(s, S.WITHDRAWN, Actor.OPERATOR, TransitionContext()) == S.WITHDRAWN
+
+
 def test_reject_possible_from_every_non_terminal_post_submission_state() -> None:
     for s in S:
-        if s in (S.DRAFT, S.APPROVED, S.REJECTED):
+        if s in (S.DRAFT, S.APPROVED, S.REJECTED, S.WITHDRAWN):
             continue
         if s in (
             S.AWAITING_POST_SITE_CLARIFICATION,

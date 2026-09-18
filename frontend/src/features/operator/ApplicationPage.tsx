@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
 import { Button, buttonClasses } from '@/features/shared/Button'
+import { TextAreaField } from '@/features/shared/Controls'
 import { Dialog } from '@/features/shared/Dialog'
 import { useToast } from '@/features/shared/Toast'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
@@ -10,7 +11,7 @@ import { cn } from '@/lib/cn'
 import { ApplicationHeader } from './ApplicationHeader'
 import { CompletionCard } from './CompletionCard'
 import { FeedbackNotice, targetHref } from './FeedbackNotice'
-import { useApplication, useResubmitApplication } from './queries'
+import { useApplication, useResubmitApplication, useWithdrawApplication } from './queries'
 
 const ArrowIcon = (
   <svg
@@ -36,6 +37,9 @@ export function ApplicationPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const [confirm, setConfirm] = useState(false)
+  const withdraw = useWithdrawApplication(id)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
+  const [reason, setReason] = useState('')
 
   if (app.isPending) {
     return (
@@ -73,6 +77,21 @@ export function ApplicationPage() {
     })
   }
 
+  const withdrawn = view.withdrawal_reason !== null || view.status_label === 'Withdrawn'
+  const doWithdraw = () => {
+    if (withdraw.isPending) return
+    withdraw.mutate(reason.trim() || null, {
+      onSuccess: () => {
+        setWithdrawOpen(false)
+        toast.push({ title: 'Application withdrawn', body: 'The licensing office has been told.', tone: 'success' })
+      },
+      onError: (e) => {
+        setWithdrawOpen(false)
+        toast.push({ title: 'Could not withdraw', body: e.message, tone: 'error' })
+      },
+    })
+  }
+
   return (
     <>
       <ApplicationHeader
@@ -103,6 +122,25 @@ export function ApplicationPage() {
           ) : undefined
         }
       />
+      {withdrawn ? (
+        <section className="mb-6 rounded-lg border border-line bg-surface-2 px-5 py-4" aria-labelledby="outcome-title">
+          <h2 id="outcome-title" className="text-[15px] font-semibold">
+            You withdrew this application
+          </h2>
+          <p className="mt-1 text-sm leading-[21px] text-text-2">
+            {view.withdrawal_reason ? (
+              <>
+                <span className="font-medium text-text">Your reason:</span> {view.withdrawal_reason}
+              </>
+            ) : (
+              'No reason was given.'
+            )}
+          </p>
+          <p className="mt-2 text-[13px] text-text-3">
+            The licensing office will not review it further. Start a new application if you need a licence later.
+          </p>
+        </section>
+      ) : null}
       {view.decision_note !== null ? (
         <section
           className={cn(
@@ -221,8 +259,44 @@ export function ApplicationPage() {
             </li>
           </ol>
         </section>
-        <CompletionCard view={view} />
+        <div className="flex flex-col gap-6">
+          <CompletionCard view={view} />
+          {view.can_withdraw ? (
+            <section className="pf-surface px-5 py-4" aria-labelledby="withdraw-title">
+              <h2 id="withdraw-title" className="text-[15px] font-semibold">
+                No longer need this licence?
+              </h2>
+              <p className="mt-1 text-[13px] leading-[19px] text-text-2">
+                You can withdraw the application at any point before a decision. The licensing office is told and stops the review.
+              </p>
+              <Button variant="danger" size="sm" className="mt-3" onClick={() => setWithdrawOpen(true)}>
+                Withdraw application
+              </Button>
+            </section>
+          ) : null}
+        </div>
       </div>
+      <Dialog
+        open={withdrawOpen}
+        title="Withdraw this application?"
+        confirmLabel="Withdraw application"
+        danger
+        busy={withdraw.isPending}
+        onConfirm={doWithdraw}
+        onCancel={() => setWithdrawOpen(false)}
+      >
+        <p>
+          <b>{view.reference_no}</b> is closed for good and the licensing office stops its review. This cannot be undone; you would need to
+          start a new application.
+        </p>
+        <TextAreaField
+          label="Reason"
+          help="Shared with the licensing office."
+          value={reason}
+          maxLength={1000}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </Dialog>
       <Dialog
         open={confirm}
         title="Resubmit this application?"

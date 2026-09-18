@@ -103,9 +103,11 @@ function ReviewRail({
             Review
           </h2>
           <p className="mt-1 text-[13px] leading-[19px] text-text-2">
-            {view.actions.length === 0
-              ? 'No further action is available for this application.'
-              : 'Every status change is recorded with your name in the audit trail.'}
+            {view.status === 'withdrawn'
+              ? 'The operator withdrew this application. Nothing further can happen to it.'
+              : view.actions.length === 0
+                ? 'No further action is available for this application.'
+                : 'Every status change is recorded with your name in the audit trail.'}
           </p>
         </div>
         {view.actions.length > 0 ? (
@@ -266,6 +268,11 @@ export function OfficerCasePage() {
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           <StatusBadge label={view.status_label} tone={view.status_tone} size="lg" live={view.verification_summary.checking > 0} />
           {view.decision_note ? <span className="text-sm text-text-2">Note: {view.decision_note}</span> : null}
+          {view.status === 'withdrawn' ? (
+            <span className="text-sm text-text-2">
+              Withdrawn by the operator{view.withdrawal_reason ? `: ${view.withdrawal_reason}` : ' without a reason'}
+            </span>
+          ) : null}
         </div>
         <div className="mt-5 border-t border-line pt-4">
           <KeyFacts view={view} />

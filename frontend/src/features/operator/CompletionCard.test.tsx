@@ -42,6 +42,8 @@ const view: ApplicationView = {
   resubmit: null,
   revisions: [],
   decision_note: null,
+  can_withdraw: false,
+  withdrawal_reason: null,
   created_at: '2026-09-18T00:00:00Z',
   updated_at: '2026-09-18T00:00:00Z',
 }

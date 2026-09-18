@@ -85,6 +85,10 @@ export interface ApplicationView {
   resubmit: ResubmitReadiness | null
   revisions: { number: number; submitted_at: string }[]
   decision_note: string | null
+  /** Owner may withdraw: after submission, before a decision. */
+  can_withdraw: boolean
+  /** The operator's own reason, served once withdrawn. */
+  withdrawal_reason: string | null
   created_at: string
   updated_at: string
 }
@@ -107,6 +111,10 @@ export function submitApplication(id: string): Promise<ApplicationView> {
 
 export function resubmitApplication(id: string): Promise<ApplicationView> {
   return request<ApplicationView>(`/applications/${id}/resubmit`, { method: 'POST' })
+}
+
+export function withdrawApplication(id: string, reason: string | null): Promise<ApplicationView> {
+  return request<ApplicationView>(`/applications/${id}/withdraw`, { method: 'POST', body: { reason } })
 }
 
 export function compareMyRevisions(id: string, from: number, to: number): Promise<import('./officer').Compare> {

@@ -4,7 +4,7 @@ To be implemented in `backend/app/domain/workflow.py` (ADR-003). The transition 
 
 ## States and role-specific labels
 
-The twelve states from the assessment plus one pre-submission state (`draft`, an engineering assumption needed for "save and return"; never visible to officers).
+The twelve states from the assessment plus one pre-submission state (`draft`, an engineering assumption needed for "save and return"; never visible to officers) and one operator-initiated terminal state (`withdrawn`, US-038).
 
 | Internal code | Assessment internal status | Officer label | Operator label |
 |---------------|----------------------------|---------------|----------------|
@@ -21,6 +21,7 @@ The twelve states from the assessment plus one pre-submission state (`draft`, an
 | `pending_approval` | Pending Approval | Route to Approval | Pending Approval |
 | `approved` | Approved | Approved | Approved |
 | `rejected` | Rejected | Rejected | Rejected |
+| `withdrawn` | — (assumption, US-038) | Withdrawn | Withdrawn |
 
 Labels are copied verbatim from the assessment table, including "Awaiting Post-Site Resubmission" as the officer label for `pending_post_site_resubmission`.
 
@@ -54,10 +55,11 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `post_site_clarification_resubmitted` | `pending_approval` | officer | — | UC3 (deferred) |
 | `pending_approval` | `approved` | officer | — (note optional) | Officer clicks Approve |
 | `pending_approval` | `rejected` | officer | — (note required) | Officer clicks Reject |
+| any post-submission, non-terminal state | `withdrawn` | operator (owner) | — (reason optional) | Operator clicks Withdraw application (US-038); `POST /applications/{id}/withdraw` |
 
 Everything not listed is invalid and returns HTTP 409 `invalid_transition` with `allowed_targets` for the caller's role. Role mismatches on a listed transition return 403. The `admin` role has no transitions: it is read-only on applications.
 
-Terminal states: `approved`, `rejected`.
+Terminal states: `approved`, `rejected`, `withdrawn`.
 
 ## Diagram
 
@@ -86,6 +88,9 @@ Terminal states: `approved`, `rejected`.
    reject (officer, note) is allowed from every non-terminal post-submission state:
    application_received, under_review, pending_pre_site_resubmission, pre_site_resubmitted,
    site_visit_scheduled, site_visit_done, pending_approval ──────────────────▶ rejected
+
+   withdraw (operator, reason optional) is allowed from every non-terminal post-submission
+   state, including the UC3 states ─────────────────────────────────────────▶ withdrawn
 ```
 
 ## Feedback lifecycle rules (prevent stuck applications)

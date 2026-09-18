@@ -26,6 +26,7 @@ _ACTIONS: dict[S, NextAction] = {
     S.PENDING_APPROVAL: NextAction("Decide", True),
     S.APPROVED: NextAction("View", False),
     S.REJECTED: NextAction("View", False),
+    S.WITHDRAWN: NextAction("View", False),
 }
 
 
@@ -34,4 +35,4 @@ def next_action(status: S) -> NextAction:
 
 
 def is_decided(status: S) -> bool:
-    return status in (S.APPROVED, S.REJECTED)
+    return status in (S.APPROVED, S.REJECTED, S.WITHDRAWN)

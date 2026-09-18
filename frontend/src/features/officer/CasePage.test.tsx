@@ -101,6 +101,7 @@ const view: OfficerApplication = {
     { target: 'rejected', label: 'Reject', enabled: true, reason: null, requires_note: true },
   ],
   decision_note: null,
+  withdrawal_reason: null,
   version: 3,
   created_at: '2026-09-18T01:00:00Z',
   updated_at: '2026-09-18T01:40:00Z',

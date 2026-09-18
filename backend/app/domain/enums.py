@@ -27,6 +27,7 @@ class ApplicationStatus(enum.StrEnum):
     PENDING_APPROVAL = "pending_approval"
     APPROVED = "approved"
     REJECTED = "rejected"
+    WITHDRAWN = "withdrawn"
 
 
 class DocumentType(enum.StrEnum):
