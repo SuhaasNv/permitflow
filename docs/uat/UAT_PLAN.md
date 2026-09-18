@@ -36,4 +36,5 @@ Acceptance scenarios for PermitFlow, run by a person in a browser against a depl
 | 19 Sep 2026 | Local (OpenAI live) | dev at `cf40e89` | U1 to U4, U7, U9 (second run-through with the planted-issue set; application rejected at approval because a document still carried a mismatch) | Pass with one gap | No way back from Pending Approval: became U8 (Return to review) and the approve warning (U9), both shipped |
 | 19 Sep 2026 | Development (Railway) | dev at `7231fc6` | U2 (scenario 02 spec against the live URLs), health gates | Pass | Recorded in `OPERATIONS.md` "Verified" |
 | 19 Sep 2026 | CI (full stack in the job) | every merge to `dev` | journey + 01 to 06 | Pass | Playwright report attached on failure only |
+| 19 Sep 2026 | Development on the domain | dev at `8d75c31` | U2 (scenario 02 against https://dev.permitflow.space), health gates in deploy run #6 | Pass | US-052 |
 | to run | Production | v0.3.0 | U1, U2, U5, U10, U11 on https://permitflow.space after the approval gate | | Recorded here after the release |
