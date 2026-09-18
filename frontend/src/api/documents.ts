@@ -131,6 +131,40 @@ export async function downloadDocument(applicationId: string, documentId: string
   setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
 
+async function fetchPdf(path: string): Promise<Blob> {
+  const token = tokenGetter()
+  const res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  if (!res.ok) {
+    if (res.status === 401) notifyUnauthorized()
+    throw new AppError(res.status, {
+      code: 'http_error',
+      message:
+        res.status === 404
+          ? 'This file is not available.'
+          : res.status === 409
+            ? 'Not available in this state.'
+            : 'Could not fetch this file.',
+    })
+  }
+  return res.blob()
+}
+
+/** The issued licence certificate (US-051), saved as <licence_no>.pdf. */
+export async function downloadLicence(applicationId: string, licenceNo: string): Promise<void> {
+  const blob = await fetchPdf(`/applications/${applicationId}/licence`)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${licenceNo}.pdf`
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1500)
+}
+
+/** Officer preview of the certificate before approving (US-051): the watermarked PDF as a blob, nothing stored. */
+export function fetchLicencePreview(applicationId: string): Promise<Blob> {
+  return fetchPdf(`/officer/applications/${applicationId}/licence/preview`)
+}
+
 export function rerunVerification(applicationId: string, documentId: string): Promise<UploadResult> {
   return request<UploadResult>(`/applications/${applicationId}/documents/${documentId}/verify`, { method: 'POST' })
 }

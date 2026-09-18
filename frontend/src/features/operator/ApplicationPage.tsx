@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
+import { downloadLicence } from '@/api/documents'
 import { Alert } from '@/features/shared/Alert'
 import { Button, buttonClasses } from '@/features/shared/Button'
 import { TextAreaField } from '@/features/shared/Controls'
@@ -10,6 +11,7 @@ import { Dialog } from '@/features/shared/Dialog'
 import { useToast } from '@/features/shared/Toast'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
 import { cn } from '@/lib/cn'
+import { formatDate } from '@/lib/format'
 import { ApplicationHeader } from './ApplicationHeader'
 import { CompletionCard } from './CompletionCard'
 import { FeedbackNotice, targetHref } from './FeedbackNotice'
@@ -172,7 +174,7 @@ export function ApplicationPage() {
           </p>
         </section>
       ) : null}
-      {view.decision_note !== null ? (
+      {view.decision_note !== null || view.licence !== null ? (
         <section
           className={cn(
             'mb-6 rounded-lg border px-5 py-4',
@@ -183,9 +185,28 @@ export function ApplicationPage() {
           <h2 id="outcome-title" className="text-[15px] font-semibold">
             {view.status_tone === 'success' ? 'Your licence application was approved' : 'Your licence application was not approved'}
           </h2>
-          <p className="mt-1 text-sm leading-[21px] text-text-2">
-            <span className="font-medium text-text">Officer's note:</span> {view.decision_note}
-          </p>
+          {view.decision_note !== null ? (
+            <p className="mt-1 text-sm leading-[21px] text-text-2">
+              <span className="font-medium text-text">Officer's note:</span> {view.decision_note}
+            </p>
+          ) : null}
+          {view.licence ? (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button
+                size="sm"
+                onClick={() =>
+                  void downloadLicence(id, view.licence?.licence_no ?? 'licence').catch((e: unknown) =>
+                    toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                  )
+                }
+              >
+                Download licence (PDF)
+              </Button>
+              <span className="text-[13px] text-text-2">
+                Licence {view.licence.licence_no}, valid {formatDate(view.licence.valid_from)} to {formatDate(view.licence.valid_to)}.
+              </span>
+            </div>
+          ) : null}
           <p className="mt-2 text-[13px] text-text-3">This decision is final. The full record stays available under History.</p>
         </section>
       ) : null}

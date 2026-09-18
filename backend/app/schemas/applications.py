@@ -2,7 +2,7 @@
 appear here by construction (ADR-005, FR-026)."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -110,6 +110,16 @@ class ApplicationSummaryOut(BaseModel):
     updated_at: datetime
 
 
+class LicenceView(BaseModel):
+    """Issued on approval (US-051). Served to the owner and officers; never before approval."""
+
+    licence_no: str
+    issued_at: datetime
+    valid_from: date
+    valid_to: date
+    verification_code: str
+
+
 class WithdrawIn(BaseModel):
     reason: str | None = Field(default=None, max_length=1000)
 
@@ -137,6 +147,7 @@ class ApplicationOperatorView(BaseModel):
     can_withdraw: bool = False
     # Drafts can be deleted outright (US-045).
     can_delete: bool = False
+    licence: LicenceView | None = None
     withdrawal_reason: str | None = None
     created_at: datetime
     updated_at: datetime

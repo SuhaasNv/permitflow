@@ -18,6 +18,7 @@ from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
 from app.repositories.users import UserRepository
+from app.schemas.applications import LicenceView
 from app.schemas.officer import (
     ActionOut,
     ApplicantOut,
@@ -31,6 +32,7 @@ from app.schemas.officer import (
 )
 from app.services.compare import CompareService
 from app.services.feedback import restorable, target_label
+from app.services.licence import LicenceService, licence_view
 from app.services.operator_view import LICENCE_TITLE
 
 _NOTE_REQUIRED_TARGETS = {ApplicationStatus.REJECTED}
@@ -100,6 +102,7 @@ class OfficerViewService:
             self.users,
             changed=(changed_sections, changed_docs, previous_no),
             viewer_id=viewer.id if viewer else None,
+            licence=licence_view(LicenceService(self.db).for_application(app.id)),
         )
 
 
@@ -115,6 +118,7 @@ def _assemble(
     users: UserRepository,
     changed: tuple[set[str], set[DocumentType], int | None] = (set(), set(), None),
     viewer_id: uuid.UUID | None = None,
+    licence: LicenceView | None = None,
 ) -> OfficerApplicationOut:
     now = datetime.now(UTC)
     form = current.form_data if current else app.draft_data
@@ -234,6 +238,7 @@ def _assemble(
         actions=actions,
         decision_note=app.decision_note,
         withdrawal_reason=app.withdrawal_reason,
+        licence=licence,
         version=app.version,
         created_at=app.created_at,
         updated_at=app.updated_at,

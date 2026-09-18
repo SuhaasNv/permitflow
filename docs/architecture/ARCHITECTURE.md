@@ -62,6 +62,7 @@ Rules:
 | auth | users | `authenticate(email, password) -> Token`, `current_user()` |
 | applications | applications | `create`, `get_for(user, id)`, `list_for(user)`, `update_draft(user, id, section, data)`, `transition(officer, id, target, note, expected_version)` |
 | revisions | application_revisions | `submit(operator, id)`, `resubmit(operator, id)`, `list(id)`, `compare(id, from_no, to_no)` |
+| licence | licences, audit_events | `issue(app, officer)` from the approval transaction; `preview`; `open_for_download` (US-051) |
 | withdrawal | applications, audit_events, notifications | `withdraw(operator, id, reason)` (US-038) |
 | documents | documents | `upload(user, id, type, file)`, `replace`, `download`, `list` |
 | verification | verification_runs | `enqueue(document_id)`, `run_verification(document_id)`, `latest(document_id)`, `rerun` |
@@ -151,6 +152,8 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /officer/applications/{id}/feedback/{fid}/reopen | officer | addressed → open with the same text, draft until the next round; audited `feedback.reopened` (built, US-049) |
 | POST | /officer/applications/{id}/feedback/{fid}/restore | officer | undo the caller's own withdraw or resolve within 15 s; audited `feedback.restored` (built, US-039) |
 | DELETE | /applications/{id} | operator (own) | delete a draft outright with files, runs and audit events; 409 once submitted (built, US-045) |
+| GET | /applications/{id}/licence | owner or officer | the issued certificate as PDF; 404 before approval (built, US-051) |
+| GET | /officer/applications/{id}/licence/preview | officer | watermarked certificate while pending approval; nothing stored (built, US-051) |
 | POST | /applications/{id}/withdraw | operator (own) | any post-submission non-terminal → withdrawn, optional reason, officers notified (built, US-038) |
 | POST | /applications/{id}/documents | operator (own) | upload / replace by type |
 | DELETE | /applications/{id}/documents/{doc_id} | operator (own) | remove a document while in `draft` only |

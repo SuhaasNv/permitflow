@@ -67,7 +67,7 @@ export function FeedbackNotice({ view, compact = false }: { view: ApplicationVie
                   ) : (
                     <StatusBadge label={RESOLUTION[f.resolution].label} tone={RESOLUTION[f.resolution].tone} />
                   )}
-                  <span className="text-xs text-text-3">Round {f.round}</span>
+                  <span className="text-xs text-text-3">Raised against Revision {f.round}</span>
                 </div>
                 <p className="mt-1 text-sm leading-[21px] text-text-2">{f.message}</p>
               </div>

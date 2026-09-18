@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, status
+from fastapi import APIRouter, BackgroundTasks, Response, status
 
 from app.api.deps import DbSession, OfficerUser
 from app.domain.feedback_templates import TEMPLATES
@@ -16,6 +16,7 @@ from app.schemas.officer import (
 )
 from app.services.audit_trail import AuditTrailService
 from app.services.feedback import FeedbackService
+from app.services.licence import LicenceService
 from app.services.officer_queue import OfficerQueueService
 from app.services.officer_view import OfficerViewService
 from app.services.verification import VerificationService, run_verification
@@ -146,6 +147,13 @@ def restore_feedback(
     """Undo the caller's own withdraw or resolve within the grace window (US-039). 409 once it has closed."""
     FeedbackService(db).restore(user, application_id, feedback_id)
     return OfficerViewService(db).get(user, application_id)
+
+
+@router.get("/applications/{application_id}/licence/preview")
+def preview_licence(application_id: uuid.UUID, user: OfficerUser, db: DbSession) -> Response:
+    """What the certificate will say if the officer approves now (US-051). Watermarked; nothing is stored."""
+    pdf = LicenceService(db).preview(user, application_id)
+    return Response(content=pdf, media_type="application/pdf", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/applications/{application_id}/audit", response_model=AuditTrailOut)

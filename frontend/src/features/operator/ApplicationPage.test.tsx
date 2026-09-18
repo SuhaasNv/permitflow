@@ -39,6 +39,7 @@ const submitted: ApplicationView = {
   can_withdraw: true,
   can_delete: false,
   withdrawal_reason: null,
+  licence: null,
   created_at: '2026-09-18T00:00:00Z',
   updated_at: '2026-09-18T00:00:00Z',
 }
@@ -109,5 +110,31 @@ describe('ApplicationPage withdraw (US-038)', () => {
     renderPage()
     expect((await screen.findAllByText('Business details')).length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: 'Withdraw application' })).not.toBeInTheDocument()
+  })
+})
+
+describe('ApplicationPage outcome (US-051)', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('offers the licence download after approval even when the officer left no note', async () => {
+    vi.spyOn(api, 'getApplication').mockResolvedValue({
+      ...submitted,
+      status_label: 'Approved',
+      status_tone: 'success',
+      can_withdraw: false,
+      decision_note: null,
+      licence: {
+        licence_no: 'FEL-2026-000005',
+        issued_at: '2026-09-19T00:00:00Z',
+        valid_from: '2026-09-19',
+        valid_to: '2027-09-18',
+        verification_code: 'ABCD-EFGH',
+      },
+    })
+    renderPage()
+    expect(await screen.findByText('Your licence application was approved')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download licence (PDF)' })).toBeInTheDocument()
+    expect(screen.getByText(/Licence FEL-2026-000005/)).toBeInTheDocument()
+    expect(screen.queryByText(/Officer's note:/)).not.toBeInTheDocument()
   })
 })

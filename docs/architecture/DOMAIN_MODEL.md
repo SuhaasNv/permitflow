@@ -43,6 +43,7 @@ The aggregate root. Holds current status and the editable working copy of form d
 | decision_note | text, nullable | officer note shown to the operator on approval/rejection |
 | feedback.previous_resolution | enum, nullable | resolution before the last withdraw or resolve, cleared on undo (US-039) |
 | draft_data.declarations.confirmed_at | stamped string | set by the server when the declarations are saved while responding to feedback; the diff reports it as "Confirmed on" so a re-confirmation counts as the change (US-041 follow-up) |
+| licences (table) | one per approved application | `licence_no` (`FEL-<year>-<n>`, sequence `licence_no_seq`), `revision_number`, `issued_by`, `issued_at`, `valid_from`, `valid_to` (Singapore calendar dates, one year), `verification_code`, `stored_key`, `sha256`; written by the approval transaction (US-051) |
 | withdrawal_reason | text, nullable | operator's reason when they withdrew (US-038); served to officers and, once withdrawn, to the owner |
 | version | int | optimistic concurrency token (REL-007) |
 | created_at, updated_at | datetime | |
