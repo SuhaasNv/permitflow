@@ -173,12 +173,12 @@ export function AppShell() {
         <nav
           aria-label="Main"
           className={cn(
-            'sticky top-14 hidden h-[calc(100vh-56px-28px)] shrink-0 flex-col border-r border-line bg-surface md:flex',
+            'hidden shrink-0 flex-col border-r border-line bg-surface md:flex',
             'transition-[width] duration-[var(--dur-base)] ease-[var(--ease-out)]',
             collapsed ? 'w-16' : 'w-[232px]',
           )}
         >
-          <div className="flex flex-col gap-0.5 p-3">
+          <div className="sticky top-14 flex flex-col gap-0.5 p-3">
             <div
               className={cn(
                 'pf-eyebrow overflow-hidden whitespace-nowrap px-[11px] transition-[opacity,height,padding] duration-[var(--dur-fast)]',
@@ -210,7 +210,9 @@ export function AppShell() {
               </NavLink>
             ))}
           </div>
-          <div className={cn('mt-auto border-t border-line p-4 text-xs leading-[18px] text-text-3', collapsed && 'hidden')}>
+          <div
+            className={cn('sticky bottom-0 mt-auto border-t border-line bg-surface p-4 text-xs leading-[18px] text-text-3', collapsed && 'hidden')}
+          >
             <div className="font-medium text-text-2">PermitFlow</div>
             <div>Fictional assessment product</div>
           </div>
