@@ -41,7 +41,9 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
             changed = len(p.get("changed_sections") or []) + len(p.get("changed_document_types") or [])
             if number == 1:
                 return "Revision 1 submitted"
-            return f"Revision {number} resubmitted ({changed} {'target' if changed == 1 else 'targets'} changed)"
+            return (
+                f"Revision {number} resubmitted ({changed} {'target' if changed == 1 else 'targets'} changed)"
+            )
         case "status.changed":
             return f"Status: {_status(p.get('from'))} → {_status(p.get('to'))}"
         case "feedback.created":

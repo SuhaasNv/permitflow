@@ -84,6 +84,7 @@ export interface ApplicationView {
   feedback: OperatorFeedback[]
   resubmit: ResubmitReadiness | null
   revisions: { number: number; submitted_at: string }[]
+  decision_note: string | null
   created_at: string
   updated_at: string
 }

@@ -185,6 +185,11 @@ def operator_view(
         feedback=feedback or [],
         resubmit=resubmit,
         revisions=revisions or [],
+        decision_note=(
+            app.decision_note
+            if app.status in (ApplicationStatus.APPROVED, ApplicationStatus.REJECTED)
+            else None
+        ),
         created_at=app.created_at,
         updated_at=app.updated_at,
     )
