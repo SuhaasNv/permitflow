@@ -29,9 +29,9 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: DoD checklist + unit tests for each malformed case and the heuristic.
 
 ### US-004 — As an engineer, I want a small AI evaluation set with expected outcomes, so that provider behaviour can be checked and documented honestly.
-- Acceptance criteria: six cases (valid, wrong document type, missing information, ambiguous, empty, prompt injection); a runner script prints a results table; results recorded in `docs/ai/AI_EVALUATION.md`.
-- Priority: Nice-to-have · Day 3 · Dependencies: US-002 · Requirements: AI-008
-- Definition of Done: runner executes against mock and OpenAI providers; document updated.
+- Acceptance criteria: a golden set with expected outcomes (built: fourteen cases, the eight demo PDFs plus wrong type, missing information, ambiguous, empty, oversized and two prompt-injection styles) run through the real pipeline by `backend/evals/run.py`; a results table, a JSON report and a pass threshold; the mock run is a blocking CI job with a configuration audit; the OpenAI run is by hand and recorded with its date in `docs/ai/AI_EVALUATION.md`.
+- Priority: Nice-to-have · Day 3 · Dependencies: US-002, US-006 · Requirements: AI-008 · Branch `feat/us-004-ai-evaluation`
+- Definition of Done: runner executes against mock and OpenAI providers; CI job green; document updated.
 
 ### US-005 — As an engineer, I want unit, integration and end-to-end tests for the critical journey, so that regressions are caught before they ship.
 - Acceptance criteria: unit tests for the state machine (every state/target/role), labels, diff, editability, AI validation; integration tests for the full loop and authorization; one Playwright journey (submit → flag → fix only flagged → resubmit → compare); all green in CI.

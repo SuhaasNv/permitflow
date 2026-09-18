@@ -82,6 +82,8 @@ docs/      requirements, architecture, ADRs, design system and prototype, planni
 | Frontend | `npm ci`, oxlint, tsc, vitest, vite build |
 | E2E | Starts Postgres, migrates and seeds, serves the backend on :8000 with the mock provider, builds the frontend and serves it with `vite preview` on :3000, then runs the Playwright journey and the six scenario specs; server logs and the Playwright report are attached when it fails |
 | Secret scan | gitleaks over the full history |
+| AI verification | Configuration audit, provider contract tests, the golden set through the real pipeline on the mock provider (blocking at 100 %), verdict in the run summary and as an artifact |
+| Dependency audit | pip-audit and npm audit (production dependencies), reported in the run summary, non-blocking |
 | Docker build | Builds `backend/Dockerfile` with the GitHub Actions cache (no push) |
 
 The E2E job waits for the backend and frontend suites, so a broken unit test never spends the browser minutes.
@@ -89,5 +91,7 @@ The E2E job waits for the backend and frontend suites, so a broken unit test nev
 ## AI verification
 
 Every uploaded document is checked in the background against the application form (`backend/app/services/verification.py`): text is extracted (PDF and TXT; images are stored but reported as unreadable), sent to a provider behind the `VerificationProvider` interface, and the structured result is validated and post-processed by deterministic rules before it is stored. `AI_PROVIDER=mock` (default) uses a deterministic provider with no network; `AI_PROVIDER=openai` uses the OpenAI API with `OPENAI_API_KEY` and `OPENAI_MODEL` (default `gpt-4.1-mini`). Results are advisory: they never change an application's status, and the operator sees a plain-language outcome while the officer also sees confidence, evidence and the model used. Design and prompt contract: `docs/ai/AI_VERIFICATION_DESIGN.md`.
+
+**CI for the AI.** The `ai` job in `ci.yml` audits the configuration (pinned wire schema, prompt version, default model, provider wiring), runs the provider contract tests, then runs fourteen golden cases (the demo PDFs, edge cases and two prompt-injection styles) through the real pipeline with the mock provider and fails below 100 %; the verdict is written to the run summary. The same set is run by hand against OpenAI whenever the prompt or model changes and the result is recorded with the date in `docs/ai/AI_EVALUATION.md` (14 of 14 on 20 Sep 2026). A dependency audit job (pip-audit, npm audit on production dependencies) reports without blocking.
 
 Sections on deployment, AI usage and "what I would do next" are added as the corresponding stories land (see `docs/planning/SPRINTS.md`).

@@ -47,7 +47,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | Document | Status | Purpose |
 |----------|--------|---------|
 | `ai/AI_VERIFICATION_DESIGN.md` | written | Pipeline, prompt contract, output schema, rules, failure handling |
-| `ai/AI_EVALUATION.md` | to be written (Day 3) | Evaluation set and results against mock and OpenAI |
+| `ai/AI_EVALUATION.md` | written (20 Sep) | Evaluation set and results against mock and OpenAI |
 | `../AI_USAGE.md` | to be written (Day 3) | How AI tools were used to build PermitFlow |
 
 ## Planning

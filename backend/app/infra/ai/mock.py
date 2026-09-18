@@ -17,6 +17,13 @@ _KEYWORDS: dict[str, tuple[str, ...]] = {
     "food_hygiene_certificate": ("hygiene", "food safety", "certificate"),
 }
 _DATE_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
+# "3 January 2025", "31 Oct 2027": the way the demo documents and most scanned paperwork write dates.
+_LONG_DATE_RE = re.compile(
+    r"\b(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{4})\b", re.IGNORECASE
+)
+_MONTH_NAMES = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+_MONTHS = {m: i for i, m in enumerate(_MONTH_NAMES, 1)}
+_EXPIRY_WORDS = re.compile(r"(expir(?:y|es|ed|ation)|valid (?:until|till|to|through))", re.IGNORECASE)
 
 
 class MockProvider:
@@ -67,8 +74,15 @@ class MockProvider:
                         evidence=found[-1],
                     )
                 )
-            if not found:
+            if not found and not _LONG_DATE_RE.search(text):
                 missing.append("tenancy expiry date")
+                issues.append(
+                    Issue(
+                        code=IssueCode.MISSING_FIELD,
+                        severity="medium",
+                        message="No tenancy term or expiry date could be found in the document.",
+                    )
+                )
 
         if "expired" in lowered or _has_past_expiry(text):
             issues.append(
@@ -101,10 +115,26 @@ def _short(description: str) -> str:
 
 
 def _has_past_expiry(text: str) -> bool:
-    m = re.search(r"expir(?:y|es|ed)[^0-9]{0,20}(\d{4})-(\d{2})-(\d{2})", text, re.IGNORECASE)
-    if not m:
-        return False
-    try:
-        return date(int(m.group(1)), int(m.group(2)), int(m.group(3))) < date.today()
-    except ValueError:
-        return False
+    """A date that follows an expiry phrase ("expiry", "valid until") and lies in the past."""
+    for m in _EXPIRY_WORDS.finditer(text):
+        window = text[m.end() : m.end() + 40]
+        found = _parse_date(window)
+        if found is not None:
+            return found < date.today()
+    return False
+
+
+def _parse_date(text: str) -> date | None:
+    iso = _DATE_RE.search(text)
+    if iso:
+        try:
+            return date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
+        except ValueError:
+            return None
+    long = _LONG_DATE_RE.search(text)
+    if long:
+        try:
+            return date(int(long.group(3)), _MONTHS[long.group(2).lower()[:3]], int(long.group(1)))
+        except (ValueError, KeyError):
+            return None
+    return None

@@ -86,6 +86,8 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 
 ## Sprint 3 (in progress, 19 Sep 2026)
 
+- US-004 AI evaluation harness: `backend/evals/` runs fourteen golden cases (demo PDFs, edge cases, two injection styles) through the real pipeline; mock 12 of 12 counted (two documented mock gaps), OpenAI 14 of 14; a blocking `ai` CI job with a configuration audit and a run-summary verdict; a non-blocking dependency audit job. The mock provider learned long-form dates and a missing tenancy expiry along the way.
+
 - Version chip: the release version (`frontend/package.json`, injected by Vite) shows in the side rail footer and the landing footer; bumping it is part of the release step in BRANCHING.md. First remote CI run after the push caught one ruff line-length slip from the site visit rename; fixed.
 
 - US-006 CI complete: an `e2e` job starts the whole stack inside GitHub Actions (Postgres service, migrations, seed, uvicorn on the mock provider, `vite preview` of the production build) and runs the journey plus the six scenarios, uploading the Playwright report on failure; a `docker` job builds the backend image with the Actions cache. Verified locally with the same recipe (preview build, all seven specs green) and a local image build.
