@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
 import { Alert } from '@/features/shared/Alert'
@@ -11,7 +11,8 @@ import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/sh
 import { ApplicationHeader } from './ApplicationHeader'
 import { CompletionCard } from './CompletionCard'
 import { SectionSummary } from './SectionSummary'
-import { useApplication, useFormSchema, useSubmitApplication } from './queries'
+import { applicationKeys, useApplication, useFormSchema, useSubmitApplication } from './queries'
+import { useQueryClient } from '@tanstack/react-query'
 
 const ATTENTION = new Set(['issues_found', 'needs_review', 'failed', 'unavailable', 'unreadable'])
 
@@ -47,7 +48,13 @@ export function ReviewPage() {
   const app = useApplication(id)
   const schema = useFormSchema()
   const submit = useSubmitApplication(id)
+  const qc = useQueryClient()
   const [confirm, setConfirm] = useState(false)
+  const submitError = submit.error instanceof AppError ? submit.error : null
+  // Submitted elsewhere (another tab): drop the stale view so the page reflects the real state.
+  useEffect(() => {
+    if (submitError?.status === 409) void qc.invalidateQueries({ queryKey: applicationKeys.detail(id) })
+  }, [submitError, qc, id])
 
   if (app.isPending || schema.isPending) {
     return (
@@ -68,16 +75,22 @@ export function ReviewPage() {
 
   const view = app.data
   const base = `/app/applications/${id}`
+  // Review is only for an editable application; a submitted or decided one shows its own page.
+  if (!view.can_edit) return <Navigate to={base} replace />
   const withAttention = view.document_slots.filter((s) => s.document?.verification && ATTENTION.has(s.document.verification.status))
-  const submitError = submit.error instanceof AppError ? submit.error : null
+  const stillChecking = view.document_slots.filter(
+    (s) => s.document?.verification && (s.document.verification.status === 'pending' || s.document.verification.status === 'running'),
+  )
   const missing =
     submitError?.status === 422 && Array.isArray(submitError.details?.missing) ? (submitError.details.missing as string[]) : []
 
-  const doSubmit = () =>
+  const doSubmit = () => {
+    if (submit.isPending) return
     submit.mutate(undefined, {
-      onSuccess: () => navigate(`${base}/submitted`),
+      onSuccess: () => navigate(`${base}/submitted`, { replace: true }),
       onSettled: () => setConfirm(false),
     })
+  }
 
   return (
     <>
@@ -86,8 +99,18 @@ export function ReviewPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex flex-col gap-5">
           {submit.isError && !missing.length ? (
-            <Alert tone="error" title="Could not submit">
-              {submitError?.message ?? 'Try again in a moment. Nothing you entered has been lost.'}
+            <Alert tone="error" title={submitError?.status === 409 ? 'Already submitted' : 'Could not submit'}>
+              {submitError?.status === 409
+                ? 'This application was submitted from another tab or device. Nothing was sent twice.'
+                : (submitError?.message ?? 'Try again in a moment. Nothing you entered has been lost.')}
+            </Alert>
+          ) : null}
+          {stillChecking.length ? (
+            <Alert
+              tone="info"
+              title={`${stillChecking.length} document ${stillChecking.length === 1 ? 'check is' : 'checks are'} still running`}
+            >
+              You can wait for the result or submit now. The licensing officer will see the result when it finishes.
             </Alert>
           ) : null}
           {missing.length ? (

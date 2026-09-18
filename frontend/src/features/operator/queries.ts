@@ -10,21 +10,30 @@ export const applicationKeys = {
 }
 
 const ACTIVE_VERIFICATION = new Set(['pending', 'running'])
+/** Stop polling a check that has been pending or running longer than this; the slot then offers Re-run. */
+export const CHECK_STALE_MS = 3 * 60 * 1000
+
+export function isCheckStale(uploadedAt: string, now: number = Date.now()): boolean {
+  return now - new Date(uploadedAt).getTime() > CHECK_STALE_MS
+}
 
 export function useApplications() {
   return useQuery({ queryKey: applicationKeys.all, queryFn: listApplications })
 }
 
-/** Polls every 2 s while any document is still being checked (FR-005), then stops. */
+/** Polls every 2 s while any document is still being checked (FR-005), only in the visible tab, and stops
+ * after CHECK_STALE_MS so a stuck check cannot poll forever. Refetches on focus so another tab's change shows. */
 export function useApplication(id: string) {
   return useQuery({
     queryKey: applicationKeys.detail(id),
     queryFn: () => getApplication(id),
-    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
     refetchInterval: (query) => {
       const view = query.state.data
       if (!view) return false
-      const active = view.document_slots.some((s) => s.document?.verification && ACTIVE_VERIFICATION.has(s.document.verification.status))
+      const active = view.document_slots.some(
+        (s) => s.document?.verification && ACTIVE_VERIFICATION.has(s.document.verification.status) && !isCheckStale(s.document.uploaded_at),
+      )
       return active ? 2000 : false
     },
   })

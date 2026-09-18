@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
 import { buttonClasses } from '@/features/shared/Button'
@@ -11,10 +11,10 @@ const STEPS: [string, string, string][] = [
   [
     'Officer review',
     'A licensing officer reviews your form and documents. You will be notified if changes are needed.',
-    'Typically within 10 working days',
+    'You will see the status change here',
   ],
   ['Site visit', 'If the review is satisfactory, an officer will contact you to arrange a visit to the premises.', 'After review'],
-  ['Outcome', 'You will be notified of the final decision here and by email.', 'After the site visit'],
+  ['Outcome', 'The final decision appears on this page and on your dashboard.', 'After the site visit'],
 ]
 
 export function SubmittedPage() {
@@ -27,6 +27,7 @@ export function SubmittedPage() {
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   const view = app.data
+  if (view.revision_count === 0) return <Navigate to={`/app/applications/${id}`} replace />
   return (
     <div className="mx-auto max-w-3xl pt-4 sm:pt-8">
       <div className="pf-stagger text-center" role="status">
@@ -62,7 +63,7 @@ export function SubmittedPage() {
             </dd>
           </div>
           <div className="px-5 py-4">
-            <dt className="pf-eyebrow mb-1">Submitted</dt>
+            <dt className="pf-eyebrow mb-1">Last updated</dt>
             <dd className="text-[15px] font-medium tabular-nums">{formatDateTime(view.updated_at)}</dd>
           </div>
         </dl>
@@ -97,7 +98,7 @@ export function SubmittedPage() {
               </svg>
             </span>
             <div>
-              <div className="text-[15px] font-semibold">Submitted · Revision 1 recorded</div>
+              <div className="text-[15px] font-semibold">Submitted · Revision {view.revision_count} recorded</div>
               <div className="mt-0.5 text-[13px] leading-[19px] text-text-2">
                 The snapshot cannot be changed. Later revisions are compared against it.
               </div>

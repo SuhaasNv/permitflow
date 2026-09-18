@@ -4,7 +4,9 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import type { Role } from '@/api/auth'
 import { useAuth } from '@/features/auth/AuthContext'
+import { Dialog } from '@/features/shared/Dialog'
 import { Logo } from '@/features/shared/Logo'
+import { hasUnsaved, setUnsaved } from '@/lib/unsaved'
 import { cn } from '@/lib/cn'
 
 interface NavItem {
@@ -90,6 +92,13 @@ export function AppShell() {
     }
   })
 
+  const [confirmSignOut, setConfirmSignOut] = useState(false)
+  const doSignOut = () => {
+    setUnsaved(false)
+    signOut()
+    navigate('/login', { replace: true })
+  }
+
   useEffect(() => {
     try {
       localStorage.setItem(NAV_KEY, collapsed ? '1' : '0')
@@ -150,8 +159,8 @@ export function AppShell() {
             type="button"
             className="h-8 rounded-md px-3 text-[13px] font-semibold text-text-2 transition-colors hover:bg-neutral-soft hover:text-text"
             onClick={() => {
-              signOut()
-              navigate('/login', { replace: true })
+              if (hasUnsaved()) setConfirmSignOut(true)
+              else doSignOut()
             }}
           >
             Sign out
@@ -235,6 +244,17 @@ export function AppShell() {
           </NavLink>
         ))}
       </nav>
+      <Dialog
+        open={confirmSignOut}
+        title="Sign out without saving?"
+        confirmLabel="Sign out"
+        cancelLabel="Stay"
+        danger
+        onConfirm={doSignOut}
+        onCancel={() => setConfirmSignOut(false)}
+      >
+        <p>You have unsaved changes in the section you are editing. Sign out now and they will be lost.</p>
+      </Dialog>
     </div>
   )
 }
