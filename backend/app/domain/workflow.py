@@ -96,7 +96,11 @@ TRANSITIONS: tuple[Transition, ...] = (
         "Request resubmission",
     ),
     Transition(
-        S.UNDER_REVIEW, S.SITE_VISIT_SCHEDULED, Actor.OFFICER, _needs_no_open_feedback, "Mark site visit scheduled"
+        S.UNDER_REVIEW,
+        S.SITE_VISIT_SCHEDULED,
+        Actor.OFFICER,
+        _needs_no_open_feedback,
+        "Mark site visit scheduled",
     ),
     Transition(
         S.PENDING_PRE_SITE_RESUBMISSION,

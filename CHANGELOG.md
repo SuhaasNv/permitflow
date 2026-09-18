@@ -86,6 +86,8 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 
 ## Sprint 3 (in progress, 19 Sep 2026)
 
+- Version chip: the release version (`frontend/package.json`, injected by Vite) shows in the side rail footer and the landing footer; bumping it is part of the release step in BRANCHING.md. First remote CI run after the push caught one ruff line-length slip from the site visit rename; fixed.
+
 - US-006 CI complete: an `e2e` job starts the whole stack inside GitHub Actions (Postgres service, migrations, seed, uvicorn on the mock provider, `vite preview` of the production build) and runs the journey plus the six scenarios, uploading the Playwright report on failure; a `docker` job builds the backend image with the Actions cache. Verified locally with the same recipe (preview build, all seven specs green) and a local image build.
 
 - US-047 Landing hero: red accent on the headline and the document tiles, an ink band with two slowly drifting lights behind the What you need panel (bleeds to the screen edge, panel centred, reduced motion respected), staff sign-in link dropped from the footer. A full red band was tried and rejected as too heavy. Also: site visit actions renamed to "Mark site visit scheduled" with a dialog note that no appointment is booked (UC3 deferred).
