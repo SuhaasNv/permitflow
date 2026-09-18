@@ -146,6 +146,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /officer/applications/{id}/feedback | officer | create feedback (only while `under_review`) |
 | POST | /officer/applications/{id}/feedback/{fid}/resolve | officer | addressed/open → resolved; `{fid}` must belong to `{id}` |
 | POST | /officer/applications/{id}/feedback/{fid}/withdraw | officer | open → withdrawn (only while `under_review`) |
+| POST | /officer/applications/{id}/documents/{doc_id}/verify | officer | re-run the AI check; same rules and audit as the operator re-run; returns the officer view (built, US-022) |
 | GET | /officer/applications/{id}/audit | officer | audit trail |
 | GET | /admin/overview | admin | counts by status, idle applications, today's submissions |
 | GET | /admin/ai-health | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
