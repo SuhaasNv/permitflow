@@ -165,6 +165,8 @@ class OfficerApplicationOut(BaseModel):
     feedback_locked_reason: str | None
     actions: list[ActionOut]
     decision_note: str | None
+    # Operator's reason when they withdrew (US-038).
+    withdrawal_reason: str | None
     version: int
     created_at: datetime
     updated_at: datetime

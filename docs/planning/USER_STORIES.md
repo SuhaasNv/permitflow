@@ -139,6 +139,16 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: MVP · Day 2 · Dependencies: US-011, US-015 · Requirements: SEC-006, UX-002, REL-005 · Source: `docs/reviews/EDGE_CASE_REVIEW.md` items 1 to 16 · Branch `fix/us-033-operator-edge-cases`
 - Definition of Done: DoD checklist + `lib/unsaved.test.ts`, `queries.test.ts`, Chrome check of the sign-out guard and Save and exit.
 
+### US-038 — As an operator, I want to withdraw my submitted application with an optional reason, so that the licensing office stops working on something I no longer need.
+- Acceptance criteria: Withdraw is available to the owner from every post-submission, non-terminal status; drafts are simply left and decided applications cannot be withdrawn (409); optional reason (up to 1000 characters) stored with the application, shown to the officer on the case and to the operator in an outcome panel; Withdrawn is a terminal status labelled Withdrawn for both roles and nothing can be edited, resubmitted or transitioned afterwards; officers are notified in-app; the audit trail records the status change with the operator as actor; officers and admins get 403.
+- Priority: Nice-to-have · Day 3 (added 19 Sep on request) · Dependencies: US-015, US-025 · Requirements: FR-032 · `docs/architecture/STATE_MACHINE.md` · Branch `feat/us-038-withdraw-application`
+- Definition of Done: state machine tests cover the new edges; `tests/integration/test_withdrawal.py`; `ApplicationPage.test.tsx`; browser check on both sides; STATE_MACHINE, DOMAIN_MODEL, ARCHITECTURE, REQUIREMENTS, SCOPE, USE_CASES, SCREEN_INVENTORY, UI_STATES, USER_JOURNEY updated.
+
+### US-040 — As an operator responding to feedback, I want the flagged sections marked with a warning in the form rail and the stepper, so that I can see at a glance where the officer asked for changes.
+- Acceptance criteria: while the application is Pending Pre-Site Resubmission, sections with open released feedback show a warning marker (dot plus label, never colour alone) in the form rail, the stepper and the documents row; untouched sections keep their complete marker but are visibly locked; the marker becomes an addressed marker once the section changed in this round; fits 1440, 820 and 390.
+- Priority: MVP · Day 3 (added 19 Sep from a phone screenshot) · Dependencies: US-017 · Requirements: FR-011, UX-003 · Branch `feat/us-040-flagged-markers`
+- Definition of Done: component test for the rail markers; browser check on the resubmission flow.
+
 ## UC2 — Officer Review & Feedback
 
 ### US-020 — As an officer, I want a review queue of all submitted applications with their internal status, so that I can pick what to review next.
@@ -231,6 +241,11 @@ Not in the assessment brief; added as a product decision (SCOPE.md, S7). Read-on
 - Acceptance criteria: `GET /admin/users` lists users with name, email, role, active flag, created and last-active; `POST /admin/users` creates a user with a role (email unique, 409 on duplicate); `PATCH /admin/users/{id}` changes role and/or deactivates/reactivates; a change that would leave no active admin returns 409; an admin cannot change their own role; every change writes an audit event (`user.created`, `user.role_changed`, `user.deactivated`, `user.reactivated`); deactivated users get 401 on their next request; UI: users table with role filter, Add user drawer, Change role and Deactivate with confirmation; operators and officers receive 403.
 - Priority: Nice-to-have · Day 3 · Dependencies: US-070, US-001 · Requirements: FR-030, SEC-003 · Threat model T19 · Use case UC4-A
 - Definition of Done: DoD checklist + role test + last-admin protection test + audit event test.
+
+### US-039 — As an officer, I want feedback decisions to be safe and clear: resolve only items the operator saw, undo a withdraw or resolve for 10 seconds, and never see a composer on a locked case, so that I do not make mistakes I cannot take back.
+- Acceptance criteria: Mark resolved is offered only for items released to the operator (open after release, or addressed); a draft item that was never sent offers Withdraw only and the API returns 409 for resolving an unreleased item; after Withdraw or Mark resolved a toast offers Undo for 10 seconds, undo restores the previous resolution, is audited (`feedback.restored`) and is refused by the server after the grace window or once the state no longer allows it; the composer closes itself when the case stops being editable and the lock reason is shown instead; item actions sit on their own row on phones.
+- Priority: MVP · Day 3 (added 19 Sep from phone screenshots) · Dependencies: US-023, US-028 · Requirements: FR-018, FR-024, AUD-001 · Branch `feat/us-039-feedback-undo`
+- Definition of Done: backend tests for the release rule and undo (window, audit, authorization); component test for the toast undo; browser check at 390 and 1440.
 
 ## UC3 — On-Site Assessment & Post-Site Clarification (DEFERRED)
 

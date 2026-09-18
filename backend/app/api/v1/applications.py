@@ -16,6 +16,7 @@ from app.schemas.applications import (
     ApplicationSummaryOut,
     RevisionSummaryView,
     UploadOut,
+    WithdrawIn,
 )
 from app.schemas.compare import CompareOut
 from app.services.applications import ApplicationService
@@ -25,6 +26,7 @@ from app.services.operator_view import document_view, operator_view, summary
 from app.services.resubmission import ResubmissionService
 from app.services.submission import SubmissionService
 from app.services.verification import VerificationService, run_verification
+from app.services.withdrawal import WithdrawalService
 
 router = APIRouter(prefix="/applications")
 
@@ -109,6 +111,16 @@ def resubmit_application(
     """Resubmit after feedback: Revision N+1, flagged items that changed become addressed, officers notified.
     422 `no_change` when nothing flagged changed; 409 when the status does not allow it."""
     app = ResubmissionService(db).resubmit(user, application_id)
+    return _view(ApplicationService(db), app)
+
+
+@router.post("/{application_id}/withdraw", response_model=ApplicationOperatorView)
+def withdraw_application(
+    application_id: uuid.UUID, user: OperatorUser, db: DbSession, body: WithdrawIn
+) -> ApplicationOperatorView:
+    """Withdraw a submitted application (US-038): terminal, owner only, optional reason, officers notified.
+    409 for drafts and decided applications."""
+    app = WithdrawalService(db).withdraw(user, application_id, body.reason)
     return _view(ApplicationService(db), app)
 
 

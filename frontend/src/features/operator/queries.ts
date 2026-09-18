@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { createApplication, getApplication, listApplications, resubmitApplication, submitApplication } from '@/api/applications'
+import {
+  createApplication,
+  getApplication,
+  listApplications,
+  resubmitApplication,
+  withdrawApplication,
+  submitApplication,
+} from '@/api/applications'
 import { getFormSchema } from '@/api/formSchema'
 import { updateSection } from '@/api/sections'
 
@@ -80,6 +87,17 @@ export function useResubmitApplication(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => resubmitApplication(id),
+    onSuccess: (view) => {
+      qc.setQueryData(applicationKeys.detail(id), view)
+      void qc.invalidateQueries({ queryKey: applicationKeys.all })
+    },
+  })
+}
+
+export function useWithdrawApplication(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (reason: string | null) => withdrawApplication(id, reason),
     onSuccess: (view) => {
       qc.setQueryData(applicationKeys.detail(id), view)
       void qc.invalidateQueries({ queryKey: applicationKeys.all })

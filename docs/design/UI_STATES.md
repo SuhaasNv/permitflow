@@ -64,6 +64,7 @@ Progress on S-15: "Items addressed n of m"; Resubmit enabled once n ≥ 1.
 | S-00 | button spinner |: | generic "Email or password is incorrect"; 429 "Too many attempts: try again in a minute" | redirect by role |
 | S-10 | strip + table skeleton | no applications | retry |: |
 | S-11 | form skeleton | new draft (all sections "Not started") | save failed (input kept); 403 if not draft ("This application can no longer be edited") | "Draft saved" note; section "Complete" badge |
+| S-11 (application) | sections + completion skeleton |: | withdraw 409 ("A decided application cannot be withdrawn.") as an error toast, dialog closes | withdraw: danger dialog (Cancel focused, reason optional) → toast "Application withdrawn" → neutral outcome panel with the reason; Withdraw panel disappears (US-038) |
 | S-12 | slot skeletons | all four slots empty | upload errors above; poll error → block shows "Could not refresh: retry" | see lifecycle |
 | S-13 | summary skeleton |: | 422 gaps listed and linked; submit disabled until complete | → S-14 |
 | S-15 | status bar + feedback skeleton | no released feedback (read-only view) | 403 non-flagged, 422 no change, 409 conflict | toast "Resubmitted"; status bar updates |

@@ -62,6 +62,7 @@ Rules:
 | auth | users | `authenticate(email, password) -> Token`, `current_user()` |
 | applications | applications | `create`, `get_for(user, id)`, `list_for(user)`, `update_draft(user, id, section, data)`, `transition(officer, id, target, note, expected_version)` |
 | revisions | application_revisions | `submit(operator, id)`, `resubmit(operator, id)`, `list(id)`, `compare(id, from_no, to_no)` |
+| withdrawal | applications, audit_events, notifications | `withdraw(operator, id, reason)` (US-038) |
 | documents | documents | `upload(user, id, type, file)`, `replace`, `download`, `list` |
 | verification | verification_runs | `enqueue(document_id)`, `run_verification(document_id)`, `latest(document_id)`, `rerun` |
 | feedback | feedback | `create(officer, id, target, message, template_key)`, `resolve`, `withdraw`, `list`, `templates()` |
@@ -101,6 +102,19 @@ run_verification(run_id):   # plain sync function; FastAPI runs it in the thread
 Client: GET /applications/{id} polls every 2 s while any document is pending/running.
 ```
 
+### Withdrawal (US-038)
+```
+POST /applications/{id}/withdraw  { reason? }
+  api: auth → operator role → ownership
+  WithdrawalService.withdraw:
+    SELECT application FOR UPDATE
+    domain.workflow.transition(status, withdrawn, OPERATOR) → 409 for draft, decided or already withdrawn
+    status = withdrawn; withdrawal_reason; version += 1
+    audit status.changed (actor = operator, trigger = operator)
+    notify every active officer (title "<ref>: Withdrawn", body carries the reason)
+  commit → 200 operator view (can_withdraw = false, withdrawal_reason)
+```
+
 ### Resubmission
 ```
 POST /applications/{id}/resubmit
@@ -134,6 +148,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | PATCH | /applications/{id}/sections/{key} | operator (own) | update a section of the working copy (checked against editability) |
 | POST | /applications/{id}/submit | operator (own) | draft → application_received |
 | POST | /applications/{id}/resubmit | operator (own) | pending_pre_site_resubmission → pre_site_resubmitted |
+| POST | /applications/{id}/withdraw | operator (own) | any post-submission non-terminal → withdrawn, optional reason, officers notified (built, US-038) |
 | POST | /applications/{id}/documents | operator (own) | upload / replace by type |
 | DELETE | /applications/{id}/documents/{doc_id} | operator (own) | remove a document while in `draft` only |
 | GET | /applications/{id}/documents/{doc_id}/download | owner, officer or admin | file; the document must belong to `{id}` |

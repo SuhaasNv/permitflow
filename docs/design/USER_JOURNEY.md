@@ -26,6 +26,7 @@ Operator applies and submits → officer reviews with AI-assisted document check
 | 14 | Application S-11 | Resubmit, confirms in a dialog that names untouched items | Revision 2 snapshot; items whose target changed become Addressed; `feedback.addressed`, `revision.submitted`, `status.changed` audited; officers notified with "n of m items addressed" | Pre-Site Resubmitted |
 | 15 | History S-16 | Sees every revision, "what changed from Revision 1" (field by field, documents by content), every feedback item by round with its state | Compare endpoint is owner-scoped; Revision 1 is immutable | any |
 | 16 | Bell, Application | Sees Pending Site Visit, then Pending Approval, then Approved or Rejected with the officer's note in an outcome panel | Decision note is served to the operator only with the final outcome; nothing can follow a decision | Pending Site Visit → Pending Approval → Approved / Rejected |
+| any time after step 8 | Application S-11 | Withdraw application (optional reason) when the licence is no longer needed | Terminal Withdrawn status, officers notified, audited with the operator as actor (US-038) | Withdrawn |
 
 ## Licensing officer journey
 

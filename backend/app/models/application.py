@@ -32,6 +32,8 @@ class Application(TimestampMixin, Base):
         nullable=True,
     )
     decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Operator's optional reason when they withdraw (US-038). Shown to officers and to the operator.
+    withdrawal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False

@@ -19,13 +19,13 @@ Scope: the MVP as designed (this document is written before implementation and w
 ### T1 Unauthorized access to another operator's application (IDOR / horizontal escalation) — High
 - **Risk:** Operator B reads or modifies Operator A's application by guessing an id.
 - **Mitigation:** UUID ids; every application-scoped repository call for an operator filters by `operator_id = current_user.id`; not found → 404 (no existence leak). Officer role checked by dependency on officer routers.
-- **Validation:** Integration tests for read/update/submit/document download/revisions/compare as the wrong operator → 404; sub-resource checks: a document or feedback id from application B used under application A's path → 404; `/notifications/{id}/read` for another user's notification → 404.
+- **Validation:** Integration tests for read/update/submit/document download/revisions/compare as the wrong operator → 404; sub-resource checks: a document or feedback id from application B used under application A's path → 404; `/notifications/{id}/read` for another user's notification → 404; `/applications/{id}/withdraw` as another operator → 404 (US-038).
 - **Gap:** none material for MVP.
 
 ### T2 Operator invokes officer-only functionality (vertical escalation) — High
 - **Risk:** Operator changes status, creates feedback, reads audit trail or the queue.
 - **Mitigation:** `require_role(Role.officer)` dependency on officer routers and `require_role(Role.admin)` on admin routers; workflow transition table also encodes the allowed role, so even a mis-mounted route cannot perform an officer transition as an operator or admin. Admin is read-only on applications by construction (no admin route calls a mutating service).
-- **Validation:** Tests: operator → 403 on each officer and admin endpoint; officer → 403 on admin endpoints; admin → 403 on mutating endpoints; workflow unit test rejects operator and admin on officer transitions.
+- **Validation:** Tests: operator → 403 on each officer and admin endpoint; officer → 403 on admin endpoints; admin → 403 on mutating endpoints; workflow unit test rejects operator and admin on officer transitions; officer and admin → 403 on the operator-only withdraw endpoint, and the workflow table gives the `withdrawn` edge to the operator actor only (US-038).
 
 ### T3 Operator sees internal approval stage — High (explicit assessment constraint)
 - **Risk:** "Route to Approval" or internal codes leak to operators.

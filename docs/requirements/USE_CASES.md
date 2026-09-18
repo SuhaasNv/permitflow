@@ -81,6 +81,23 @@ Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC
 
 **Expected outcome:** New revision; prior revision untouched; feedback resolution states updated; officers notified. Repeats for unlimited rounds.
 
+### UC1-D Withdraw an application (US-038, product decision)
+**Actor:** Operator (own applications)
+**Requirements:** FR-032, SEC-002, AUD-001
+
+**Main flow**
+1. Operator opens a submitted application that has not been decided and chooses Withdraw application.
+2. Confirms in a dialog, optionally giving a reason.
+3. The application becomes Withdrawn (terminal); every active officer is notified with the reason; the audit trail records the operator as actor.
+
+**Alternative / error flows**
+| Case | Result |
+|------|--------|
+| Draft | No withdrawal: the draft is simply left (409 from the API) |
+| Approved or Rejected | 409 "A decided application cannot be withdrawn." |
+| Officer or admin calls the endpoint | 403 |
+| Another operator | 404 (ownership) |
+
 ### UC1-C View history and prior feedback
 **Actor:** Operator (own applications)
 **Requirements:** FR-014, SEC-001, SEC-002

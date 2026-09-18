@@ -5,6 +5,7 @@ from app.domain.enums import ApplicationStatus, DocumentType
 from app.domain.form_schema import SECTIONS
 from app.domain.labels import operator_label, tone_for
 from app.domain.officer_actions import next_action
+from app.domain.workflow import can_withdraw
 from app.models import Application, Document, VerificationRun
 from app.schemas.applications import (
     ApplicationOperatorView,
@@ -51,6 +52,7 @@ _EXPLANATIONS: dict[ApplicationStatus, str] = {
     ApplicationStatus.PENDING_APPROVAL: "Your application is with the licensing office for a decision.",
     ApplicationStatus.APPROVED: "Your licence application has been approved.",
     ApplicationStatus.REJECTED: "Your licence application was not approved. See the officer's note.",
+    ApplicationStatus.WITHDRAWN: "You withdrew this application. It will not be reviewed further.",
 }
 
 
@@ -63,6 +65,7 @@ def _needs_operator(status: ApplicationStatus) -> bool:
         not in (
             ApplicationStatus.APPROVED,
             ApplicationStatus.REJECTED,
+            ApplicationStatus.WITHDRAWN,
         )
     )
 
@@ -190,6 +193,8 @@ def operator_view(
             if app.status in (ApplicationStatus.APPROVED, ApplicationStatus.REJECTED)
             else None
         ),
+        can_withdraw=can_withdraw(app.status),
+        withdrawal_reason=app.withdrawal_reason if app.status == ApplicationStatus.WITHDRAWN else None,
         created_at=app.created_at,
         updated_at=app.updated_at,
     )

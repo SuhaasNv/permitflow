@@ -228,6 +228,7 @@ def _assemble(
         feedback_locked_reason=locked_reason,
         actions=actions,
         decision_note=app.decision_note,
+        withdrawal_reason=app.withdrawal_reason,
         version=app.version,
         created_at=app.created_at,
         updated_at=app.updated_at,

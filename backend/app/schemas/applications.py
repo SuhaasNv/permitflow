@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SectionView(BaseModel):
@@ -108,6 +108,10 @@ class ApplicationSummaryOut(BaseModel):
     updated_at: datetime
 
 
+class WithdrawIn(BaseModel):
+    reason: str | None = Field(default=None, max_length=1000)
+
+
 class ApplicationOperatorView(BaseModel):
     id: uuid.UUID
     reference_no: str
@@ -127,6 +131,9 @@ class ApplicationOperatorView(BaseModel):
     revisions: list[RevisionSummaryView] = []
     # Officer's note shown with the final outcome only (Approved or Rejected).
     decision_note: str | None = None
+    # Withdrawal (US-038): allowed after submission and before a decision; reason served once withdrawn.
+    can_withdraw: bool = False
+    withdrawal_reason: str | None = None
     created_at: datetime
     updated_at: datetime
 
