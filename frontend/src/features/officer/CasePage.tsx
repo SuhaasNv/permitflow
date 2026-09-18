@@ -250,6 +250,8 @@ export function OfficerCasePage() {
   if (schema.isError) return <ErrorPanel error={schema.error} onRetry={() => void schema.refetch()} />
 
   const view = app.data
+  // Anything but Verified or still checking: the same set the queue counts as "to check".
+  const unresolvedChecks = view.verification_summary.issues_found + view.verification_summary.needs_review + view.verification_summary.other
   const targets: Target[] = [
     ...view.sections.map((sec) => ({ value: `section:${sec.key}`, label: sec.title, target_type: 'section' as const, key: sec.key })),
     ...view.documents.map((d) => ({
@@ -560,6 +562,14 @@ export function OfficerCasePage() {
             Approving issues the licence certificate at once; the operator can download it from their application page. Use "Preview
             licence" on the case first if you want to check it.
           </p>
+        ) : null}
+        {pending?.target === 'approved' && unresolvedChecks > 0 ? (
+          <Alert
+            tone="warning"
+            title={`${unresolvedChecks} ${unresolvedChecks === 1 ? 'document still has' : 'documents still have'} unresolved check results`}
+          >
+            The checks are advisory and do not block approval. Approving records that you reviewed them.
+          </Alert>
         ) : null}
         {pending?.requires_note || pending?.target === 'approved' ? (
           <TextAreaField

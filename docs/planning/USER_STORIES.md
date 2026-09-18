@@ -253,6 +253,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 
 ### US-031 — As an officer, I want to schedule and complete a site visit, route the case to approval and approve or reject it with a note, so that applications reach a final outcome.
 - Acceptance criteria: transitions follow `STATE_MACHINE.md`; the decision note is stored and shown to the operator on Approved/Rejected; because UC3 is deferred, Site Visit Done may go directly to Pending Approval.
+- Follow-up (19 Sep 2026, run-through): the Approve dialog warns when documents in the current revision still have unresolved check results (issues found, needs review, not checked) and says approving records that the officer reviewed them; the button stays enabled because checks are advisory (AI-005). Decided against a hard gate.
 - Priority: MVP · Day 2 · Dependencies: US-025 · Requirements: FR-027 · Use case UC2-C
 - Definition of Done: DoD checklist + outcome transition tests.
 

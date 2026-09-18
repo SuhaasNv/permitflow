@@ -48,7 +48,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `Tag` | default, changed, editable, readonly | facts, markers |
 | `Alert` | info, warning, error, success, neutral; icon + bold lead | guidance and blocking messages |
 | `Toast` | success (dark), with undo/secondary line | after mutations |
-| `Dialog` | title as question, body, optional note field, footer (Cancel + primary/danger) | transitions, unsaved changes, remove |
+| `Dialog` | title as question, body, optional note field, optional warning alert (Approve: unresolved check results, button stays enabled), footer (Cancel + primary/danger) | transitions, unsaved changes, remove |
 | `Table` | header uppercase, `rowlink` hover, `num` cells nowrap, right-aligned action column; `TableSkeleton`, `TableEmpty` | S-10, S-20, S-25, S-40 |
 | `Timeline` | dot kinds (primary/success/warning/info/neutral), title, description, time | S-10, S-14, S-16, S-25, S-40 |
 | `EmptyState`, `ErrorState`, `Skeleton` | icon, title, description, action | every data view (UX-002) |
