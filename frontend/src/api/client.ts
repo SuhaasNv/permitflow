@@ -3,7 +3,9 @@
  * `{ error: { code, message, details? } }` to an AppError (REL-001).
  */
 
-export const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1'
+// Runtime value first (container, see public/config.js), then the build-time value, then the local default.
+export const API_URL: string =
+  (typeof window !== 'undefined' && window.__PERMITFLOW__?.apiUrl) || import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 export interface ApiErrorBody {
   error: { code: string; message: string; details?: Record<string, unknown> }

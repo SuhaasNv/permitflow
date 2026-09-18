@@ -224,17 +224,57 @@ jobs:
             frontend/test-results
           retention-days: 7
 
-  docker:
-    name: Docker build (backend image)
+  images:
+    name: Images (build, push to GHCR on dev and main)
     runs-on: ubuntu-latest
+    needs: [backend, frontend, ai, e2e]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      OWNER: ${{ github.repository_owner }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Build
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tags
+        id: tags
+        run: |
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          short=${GITHUB_SHA::7}
+          ref=${GITHUB_REF_NAME}
+          echo "backend=ghcr.io/$owner/permitflow-backend:sha-$short,ghcr.io/$owner/permitflow-backend:$ref" >> "$GITHUB_OUTPUT"
+          echo "frontend=ghcr.io/$owner/permitflow-frontend:sha-$short,ghcr.io/$owner/permitflow-frontend:$ref" >> "$GITHUB_OUTPUT"
+      - name: Backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          push: false
-          tags: permitflow-backend:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.tags.outputs.backend }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.tags.outputs.frontend }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+      - name: Summary
+        run: |
+          {
+            echo "## Images"
+            echo '`'"${{ steps.tags.outputs.backend }}"'`'
+            echo
+            echo '`'"${{ steps.tags.outputs.frontend }}"'`'
+            echo
+            echo "Pushed: ${{ github.event_name == 'push' }} (pull requests only build)"
+          } >> "$GITHUB_STEP_SUMMARY"

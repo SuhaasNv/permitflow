@@ -1,0 +1,56 @@
+name: Deploy
+
+# Continuous deployment (US-007). Runs after CI succeeded on dev or main, never on pull requests:
+#   dev  -> Railway environment "development" (services track the :dev image tag)
+#   main -> Railway environment "production"  (services track the :main image tag)
+# Railway pulls the images CI pushed to GHCR; nothing is built here. Rollback: redeploy an earlier
+# sha- tag from the Railway dashboard, or re-run this workflow on the previous commit.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [dev, main]
+
+concurrency:
+  group: deploy-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.event.workflow_run.head_branch }}
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.workflow_run.head_branch == 'main' && 'production' || 'development' }}
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENV: ${{ github.event.workflow_run.head_branch == 'main' && 'production' || 'development' }}
+      BACKEND_URL: ${{ vars.BACKEND_URL }}
+      FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+    steps:
+      - name: Pre-deploy gate (the run being deployed is the head of the branch)
+        run: |
+          test -n "$RAILWAY_TOKEN" || { echo "RAILWAY_TOKEN secret is missing"; exit 1; }
+          test -n "$RAILWAY_PROJECT_ID" || { echo "RAILWAY_PROJECT_ID variable is missing"; exit 1; }
+          test -n "$BACKEND_URL" -a -n "$FRONTEND_URL" || { echo "BACKEND_URL / FRONTEND_URL environment variables are missing"; exit 1; }
+          echo "deploying ${{ github.event.workflow_run.head_sha }} to $RAILWAY_ENV"
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Redeploy backend and frontend from the new images
+        run: |
+          railway redeploy --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service backend --from-source --yes
+          railway redeploy --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service frontend --from-source --yes
+      - name: Post-deploy gate (health of both tiers)
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fsS "$BACKEND_URL/api/v1/health" > /dev/null && curl -fsS "$FRONTEND_URL/healthz" > /dev/null; then
+              echo "both tiers healthy after $i checks"; exit 0
+            fi
+            sleep 10
+          done
+          echo "deployment did not become healthy"; exit 1
+      - name: Post-deploy gate (frontend points at this environment's API)
+        run: |
+          curl -fsS "$FRONTEND_URL/config.js" | tee /tmp/config.js
+          grep -q "$BACKEND_URL" /tmp/config.js
