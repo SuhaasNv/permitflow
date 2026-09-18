@@ -156,7 +156,7 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
   await page.getByRole('button', { name: 'Mark resolved' }).click()
   await expect(page.locator('aside').getByText('Resolved', { exact: true }).first()).toBeVisible()
   for (const [action, confirm] of [
-    ['Schedule site visit', 'Schedule site visit'],
+    ['Mark site visit scheduled', 'Mark scheduled'],
     ['Mark site visit done', 'Mark done'],
     ['Route to approval', 'Route to approval'],
   ] as const) {
