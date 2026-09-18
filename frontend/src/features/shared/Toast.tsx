@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { cn } from '@/lib/cn'
 
-export type ToastTone = 'neutral' | 'success' | 'error' | 'info'
+type ToastTone = 'neutral' | 'success' | 'error' | 'info'
 
 export interface ToastInput {
   title: string

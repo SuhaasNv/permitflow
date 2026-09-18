@@ -5,16 +5,7 @@ from sqlalchemy.orm import Session
 from app.models import AuditEvent, Notification
 from app.models.enums import Role
 from tests.factories import login, make_user
-from tests.integration.test_submit import _complete_draft
-
-
-def _submitted(client: TestClient, db: Session) -> tuple[str, dict[str, str], dict[str, str]]:
-    make_user(db, "op@example.sg", Role.OPERATOR)
-    make_user(db, "off@example.sg", Role.OFFICER)
-    op = login(client, "op@example.sg")
-    app_id = _complete_draft(client, op)
-    assert client.post(f"/api/v1/applications/{app_id}/submit", headers=op).status_code == 200
-    return app_id, op, login(client, "off@example.sg")
+from tests.journeys import submitted as _submitted
 
 
 def test_officer_view_shows_revision_documents_and_actions(client: TestClient, db: Session) -> None:

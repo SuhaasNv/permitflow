@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter
 
 from app.api.deps import CurrentUser, DbSession
-from app.api.v1.schemas import NotificationOut, NotificationsOut
+from app.schemas.notifications import NotificationOut, NotificationsOut
 from app.services.notifications import NotificationService
 
 router = APIRouter(prefix="/notifications")

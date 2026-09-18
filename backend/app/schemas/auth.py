@@ -1,4 +1,4 @@
-"""Shared response schemas."""
+"""Auth schemas: login request, token, user."""
 
 import uuid
 from datetime import datetime
@@ -27,20 +27,3 @@ class TokenOut(BaseModel):
     token_type: str = "bearer"
     expires_at: datetime
     user: UserOut
-
-
-class NotificationOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    application_id: uuid.UUID
-    kind: str
-    title: str
-    body: str
-    read_at: datetime | None
-    created_at: datetime
-
-
-class NotificationsOut(BaseModel):
-    items: list[NotificationOut]
-    unread_count: int

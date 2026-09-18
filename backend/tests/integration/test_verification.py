@@ -1,4 +1,3 @@
-import io
 import uuid
 
 from fastapi.testclient import TestClient
@@ -9,7 +8,8 @@ from app.models import AuditEvent, VerificationRun
 from app.models.enums import Role, VerificationStatus
 from app.services.verification import run_verification
 from tests.factories import login, make_user
-from tests.unit.test_form_schema import VALID_BUSINESS
+from tests.journeys import VALID_BUSINESS
+from tests.journeys import upload as _upload
 
 PROFILE_TXT = (
     "ACRA Business Profile. Entity name: Kopi & Kaya Toast House Pte. Ltd. UEN: 202312345K. Registered 2023. "
@@ -21,17 +21,6 @@ def _draft_with_business(client: TestClient, h: dict[str, str]) -> str:
     app_id = str(client.post("/api/v1/applications", headers=h).json()["id"])
     client.patch(f"/api/v1/applications/{app_id}/sections/business", headers=h, json=VALID_BUSINESS)
     return app_id
-
-
-def _upload(
-    client: TestClient, h: dict[str, str], app_id: str, dtype: str, name: str, data: bytes, mime: str
-):  # type: ignore[no-untyped-def]
-    return client.post(
-        f"/api/v1/applications/{app_id}/documents",
-        headers=h,
-        data={"document_type": dtype},
-        files={"file": (name, io.BytesIO(data), mime)},
-    )
 
 
 def test_upload_runs_verification_in_background(client: TestClient, db: Session) -> None:

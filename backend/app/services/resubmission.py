@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.api.v1.applications_schemas import OperatorFeedbackView, ResubmitReadiness
 from app.core.errors import InvalidTransition, ValidationFailed
 from app.domain.enums import ApplicationStatus, DocumentType, FeedbackResolution, NotificationKind
 from app.domain.form_schema import DOCUMENT_TYPE_LABELS, get_section
@@ -18,6 +17,7 @@ from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
+from app.schemas.applications import OperatorFeedbackView, ResubmitReadiness
 from app.services.feedback import target_label
 from app.services.notifications import NotificationService
 

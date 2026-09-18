@@ -5,15 +5,16 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, Query
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import CurrentUser, DbSession, OperatorUser, require_role
-from app.api.v1.applications_schemas import ApplicationOperatorView, ApplicationSummaryOut, UploadOut
 from app.core.errors import BadRequest
 from app.core.settings import get_settings
 from app.domain.enums import ApplicationStatus, DocumentType
 from app.domain.uploads import too_large_message
 from app.models import Application, User
 from app.models.enums import Role
+from app.schemas.applications import ApplicationOperatorView, ApplicationSummaryOut, UploadOut
+from app.schemas.compare import CompareOut
 from app.services.applications import ApplicationService
-from app.services.compare import CompareOut, CompareService
+from app.services.compare import CompareService
 from app.services.documents import DocumentService, content_disposition
 from app.services.operator_view import document_view, operator_view, summary
 from app.services.resubmission import ResubmissionService

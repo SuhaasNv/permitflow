@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from sqlalchemy import func, select, text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound
@@ -54,14 +54,6 @@ class ApplicationRepository:
             .order_by(Application.updated_at.desc())
         )
         return [(row[0], row[1]) for row in self.db.execute(stmt)]
-
-    def count_for_operator(self, operator_id: uuid.UUID) -> int:
-        return int(
-            self.db.scalar(
-                select(func.count()).select_from(Application).where(Application.operator_id == operator_id)
-            )
-            or 0
-        )
 
     def next_reference_no(self, year: int) -> str:
         n = int(self.db.scalar(text("SELECT nextval('application_reference_seq')")) or 0)

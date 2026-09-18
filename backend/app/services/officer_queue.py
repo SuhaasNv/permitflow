@@ -2,7 +2,6 @@
 
 from sqlalchemy.orm import Session
 
-from app.api.v1.officer_schemas import QueueItemOut, QueueOut
 from app.domain.enums import VerificationStatus
 from app.domain.labels import officer_label, tone_for
 from app.domain.officer_actions import is_decided, next_action
@@ -10,6 +9,7 @@ from app.repositories.applications import ApplicationRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
+from app.schemas.officer import QueueItemOut, QueueOut
 from app.services.operator_view import LICENCE_TITLE
 
 _ATTENTION = {

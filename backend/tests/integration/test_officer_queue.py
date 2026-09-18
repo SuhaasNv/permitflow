@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.enums import Role
 from tests.factories import login, make_user
-from tests.integration.test_submit import _complete_draft
+from tests.journeys import complete_draft as _complete_draft
 
 
 def test_queue_lists_submitted_applications_only(client: TestClient, db: Session) -> None:

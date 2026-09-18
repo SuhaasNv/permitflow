@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from app.models import AuditEvent, Notification
 from app.models.enums import Role
 from tests.factories import login, make_user
-from tests.integration.test_resubmission import _flag_and_request
-from tests.unit.test_form_schema import VALID_PREMISES
+from tests.journeys import VALID_PREMISES
+from tests.journeys import flag_and_request as _flag_and_request
 
 
 def _resubmitted(client: TestClient, db: Session) -> tuple[str, dict[str, str], dict[str, str]]:

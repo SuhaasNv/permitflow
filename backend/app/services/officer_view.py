@@ -5,17 +5,6 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.api.v1.officer_schemas import (
-    ActionOut,
-    ApplicantOut,
-    FeedbackOut,
-    OfficerApplicationOut,
-    OfficerDocumentOut,
-    OfficerSectionOut,
-    OfficerVerificationOut,
-    RevisionOut,
-    VerificationSummaryOut,
-)
 from app.core.errors import NotFound
 from app.domain import completeness as completeness_rules
 from app.domain.enums import ApplicationStatus, DocumentType, FeedbackResolution, VerificationStatus
@@ -28,6 +17,17 @@ from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
 from app.repositories.users import UserRepository
+from app.schemas.officer import (
+    ActionOut,
+    ApplicantOut,
+    FeedbackOut,
+    OfficerApplicationOut,
+    OfficerDocumentOut,
+    OfficerSectionOut,
+    OfficerVerificationOut,
+    RevisionOut,
+    VerificationSummaryOut,
+)
 from app.services.compare import CompareService
 from app.services.feedback import target_label
 from app.services.operator_view import LICENCE_TITLE

@@ -5,7 +5,7 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import { cn } from '@/lib/cn'
 import { formatDateTime, formatRelative } from '@/lib/format'
 
-export function rowAction(app: ApplicationSummary): string {
+function rowAction(app: ApplicationSummary): string {
   if (app.status_label === 'Draft') return 'Continue'
   if (app.needs_operator_action) return 'Respond'
   return 'View'
@@ -21,7 +21,7 @@ export function bucketOf(app: ApplicationSummary): Bucket {
   return 'office'
 }
 
-export const ArrowIcon = (
+const ArrowIcon = (
   <svg
     width="14"
     height="14"

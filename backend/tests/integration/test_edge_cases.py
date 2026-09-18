@@ -16,7 +16,9 @@ from app.models import AuditEvent, Document, VerificationRun
 from app.models.enums import Role
 from app.services.verification import mark_stale_runs_failed
 from tests.factories import DEFAULT_PASSWORD, login, make_user
-from tests.integration.test_documents import PDF, _draft, _upload
+from tests.journeys import PDF
+from tests.journeys import draft as _draft
+from tests.journeys import upload as _upload
 
 
 def test_forwarded_for_is_ignored_from_untrusted_clients(

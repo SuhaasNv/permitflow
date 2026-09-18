@@ -1,5 +1,3 @@
-import io
-
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,36 +5,8 @@ from sqlalchemy.orm import Session
 from app.models import Application, ApplicationRevision, AuditEvent, Notification
 from app.models.enums import ApplicationStatus, Role
 from tests.factories import login, make_user
-from tests.unit.test_form_schema import VALID_BUSINESS, VALID_DECLARATIONS, VALID_OPERATIONS, VALID_PREMISES
-
-_SENTENCE = (
-    "Tenancy agreement between landlord and tenant. Business profile ACRA UEN. Floor plan kitchen. "
-    "Food hygiene certificate. "
-)
-TXT = (_SENTENCE * 3).encode()
-
-
-def _complete_draft(client: TestClient, h: dict[str, str]) -> str:
-    app_id = str(client.post("/api/v1/applications", headers=h).json()["id"])
-    for key, data in [
-        ("business", VALID_BUSINESS),
-        ("premises", VALID_PREMISES),
-        ("operations", VALID_OPERATIONS),
-        ("declarations", VALID_DECLARATIONS),
-    ]:
-        assert (
-            client.patch(f"/api/v1/applications/{app_id}/sections/{key}", headers=h, json=data).status_code
-            == 200
-        )
-    for dtype in ("business_profile", "floor_plan", "tenancy_agreement", "food_hygiene_certificate"):
-        r = client.post(
-            f"/api/v1/applications/{app_id}/documents",
-            headers=h,
-            data={"document_type": dtype},
-            files={"file": (f"{dtype}.txt", io.BytesIO(TXT), "text/plain")},
-        )
-        assert r.status_code == 201
-    return app_id
+from tests.journeys import VALID_BUSINESS
+from tests.journeys import complete_draft as _complete_draft
 
 
 def test_submit_creates_revision_status_audit_and_notifications(client: TestClient, db: Session) -> None:

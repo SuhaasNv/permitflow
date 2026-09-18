@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Request
 
 from app.api.deps import CurrentUser, DbSession
-from app.api.v1.schemas import LoginRequest, TokenOut, UserOut
 from app.core.errors import RateLimited, Unauthorized
 from app.core.rate_limit import FailedLoginLimiter
 from app.core.settings import get_settings
+from app.schemas.auth import LoginRequest, TokenOut, UserOut
 from app.services.auth import AuthService
 
 router = APIRouter(prefix="/auth")

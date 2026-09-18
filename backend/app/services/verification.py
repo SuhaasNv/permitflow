@@ -10,7 +10,7 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, or_, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, NotFound
@@ -26,6 +26,7 @@ from app.domain.verification_rules import (
 )
 from app.infra.ai import ProviderError, ProviderUnavailable
 from app.infra.ai.factory import get_provider
+from app.infra.ai.openai_provider import PROMPT_VERSION
 from app.infra.db import session_factory
 from app.infra.extraction import extract_text
 from app.infra.storage import get_storage
@@ -205,6 +206,8 @@ def _finish(
             "document_id": str(run.document_id),
             "status": status.value,
             "provider": provider,
+            "model": model,
+            "prompt_version": PROMPT_VERSION if provider == "openai" else None,
             "error_reason": error_reason,
         },
     )
@@ -283,10 +286,3 @@ class VerificationService:
         self.db.commit()
         self.db.refresh(run)
         return run
-
-    def pending_runs(self) -> list[uuid.UUID]:
-        return list(
-            self.db.scalars(
-                select(VerificationRun.id).where(VerificationRun.status == VerificationStatus.PENDING)
-            )
-        )
