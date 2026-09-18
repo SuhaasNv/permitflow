@@ -105,6 +105,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: Nice-to-have · Day 3 (from user screenshots, 19 Sep; a full red band was tried and rejected as too heavy) · Dependencies: US-009 · Requirements: FR-031 · Branches `feat/landing-accent`, `fix/landing-red-band`, `feat/us-047-landing-band`
 - Definition of Done: measured at 1024, 1440 and 2000: equal gaps either side of the panel, band reaches the viewport edge, no horizontal overflow.
 
+### US-048 — As a signed-in user, I want to be warned only when my session is about to end, so that the top bar does not raise questions the rest of the time.
+- Acceptance criteria: the top bar shows nothing about the session while more than 30 minutes remain; inside 30 minutes it shows "Session ends in n min", updated every minute, emphasised inside 5 minutes; at expiry the proactive sign-out and the sign-in explanation stay as they were (US-033).
+- Priority: MVP · Day 3 (from the user's walkthrough, 20 Sep) · Dependencies: US-001, US-033 · Requirements: UX-002, SEC-006 · Branch `fix/us-048-session-warning`
+- Definition of Done: `lib/session.test.ts`; browser check at 8 h, 12 min and 3 min remaining.
+
 ## UC1 — Operator Submission & Resubmission
 
 ### US-010 — As an operator, I want to create a new licence application, so that I can start my submission.

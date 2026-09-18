@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router-dom'
 
 import type { Role } from '@/api/auth'
@@ -9,6 +9,7 @@ import { Logo } from '@/features/shared/Logo'
 import { NotificationsBell } from '@/features/shared/NotificationsBell'
 import { hasUnsaved, setUnsaved } from '@/lib/unsaved'
 import { cn } from '@/lib/cn'
+import { sessionWarning } from '@/lib/session'
 
 interface NavItem {
   label: string
@@ -64,13 +65,6 @@ const ROLE_LABEL: Record<Role, string> = {
 
 const NAV_KEY = 'permitflow.nav.collapsed'
 
-function formatExpiry(iso: string): string {
-  const d = new Date(iso)
-  const sameDay = d.toDateString() === new Date().toDateString()
-  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  return sameDay ? `at ${time}` : `tomorrow at ${time}`
-}
-
 function initials(name: string): string {
   return name
     .split(/\s+/)
@@ -94,6 +88,13 @@ export function AppShell() {
   })
 
   const [confirmSignOut, setConfirmSignOut] = useState(false)
+  // Re-evaluate the session warning once a minute; silent until 30 minutes remain (US-048).
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const warning = useMemo(() => (expiresAt ? sessionWarning(expiresAt, now) : { level: 'none' as const }), [expiresAt, now])
   const doSignOut = () => {
     setUnsaved(false)
     signOut()
@@ -118,9 +119,13 @@ export function AppShell() {
       <div className="flex h-7 items-center gap-2 bg-ink px-4 text-xs text-[#aeb6c2] sm:px-6">
         <span className="font-semibold text-white">Secure licensing portal</span>
         <span className="hidden sm:inline">· Food Establishments Unit</span>
-        {expiresAt ? (
-          <span className="ml-auto tabular-nums" title={new Date(expiresAt).toLocaleString()}>
-            Session expires {formatExpiry(expiresAt)}
+        {warning.level !== 'none' && expiresAt ? (
+          <span
+            role="status"
+            className={cn('ml-auto tabular-nums', warning.level === 'urgent' ? 'font-semibold text-white' : 'text-[#e6c8cc]')}
+            title={`Signed in until ${new Date(expiresAt).toLocaleString()}. Sign in again to continue afterwards.`}
+          >
+            {warning.text}
           </span>
         ) : null}
       </div>
