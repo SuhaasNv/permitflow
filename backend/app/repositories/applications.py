@@ -45,6 +45,16 @@ class ApplicationRepository:
         )
         return list(self.db.scalars(stmt))
 
+    def list_submitted(self) -> list[tuple[Application, User]]:
+        """Every non-draft application with its applicant, newest activity first (officer queue)."""
+        stmt = (
+            select(Application, User)
+            .join(User, User.id == Application.operator_id)
+            .where(Application.status != ApplicationStatus.DRAFT)
+            .order_by(Application.updated_at.desc())
+        )
+        return [(row[0], row[1]) for row in self.db.execute(stmt)]
+
     def count_for_operator(self, operator_id: uuid.UUID) -> int:
         return int(
             self.db.scalar(

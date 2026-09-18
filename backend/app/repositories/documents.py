@@ -62,3 +62,24 @@ class DocumentRepository:
     def add_run(self, run: VerificationRun) -> VerificationRun:
         self.db.add(run)
         return run
+
+    def latest_runs_for_applications(
+        self, application_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[VerificationRun]]:
+        """Latest verification run of every current document, grouped by application (officer queue)."""
+        if not application_ids:
+            return {}
+        docs = list(
+            self.db.scalars(
+                select(Document).where(
+                    Document.application_id.in_(application_ids), Document.is_current.is_(True)
+                )
+            )
+        )
+        runs = self.latest_runs([d.id for d in docs])
+        out: dict[uuid.UUID, list[VerificationRun]] = {}
+        for d in docs:
+            run = runs.get(d.id)
+            if run is not None:
+                out.setdefault(d.application_id, []).append(run)
+        return out

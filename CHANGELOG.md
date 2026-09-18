@@ -39,7 +39,11 @@ Also in this sprint, not tied to a story: the public landing page (FR-031), the 
 - What to change tomorrow: keep the officer screens honest from the first commit (no "all caught up" when the list is not built); verify every screen in Claude in Chrome at three widths before calling a story Done; write the Playwright journey early on Day 3 so the Sprint 2 loop is protected.
 - Risk into Sprint 2: 19 stories on the plan. The cut order in `SPRINTS.md` applies; the OpenAI provider may slip to Sprint 3 morning without cutting anything.
 
-### Milestones during the sprint
+## Sprint 2 (in progress, 19 Sep 2026)
+
+- US-020 Review queue: `GET /officer/applications` (officer only; operators and admins get 403) lists every non-draft application with applicant, internal status and officer label, a server-derived next action and whose turn it is (`domain/officer_actions.py`), revision count, open feedback count, document-check attention and checking counts, first submission and last activity, plus turn counts, in four queries. Frontend queue with Needs review / Waiting on operator / Decided / All tabs, 30 s refresh, honest empty states; case route placeholder until US-021.
+
+### Milestones during the sprint (Sprint 1)
 
 - Dashboard and My applications are now different screens: the dashboard groups work cards by who is waiting on whom (Needs your response, Drafts to finish, With the licensing office, Decided) with a documents checklist rail; My applications is the full table with client-side status filter tabs.
 

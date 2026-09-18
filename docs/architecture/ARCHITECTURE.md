@@ -140,7 +140,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /applications/{id}/revisions | owner, officer or admin | list revisions |
 | GET | /applications/{id}/revisions/{n} | owner, officer or admin | snapshot |
 | GET | /applications/{id}/compare?from=n&to=m | owner, officer or admin | field and document diff |
-| GET | /officer/applications | officer | queue (all applications, internal status, counts) |
+| GET | /officer/applications | officer | queue: every non-draft application with applicant, internal status + officer label, server-derived next action and whose turn it is, revision count, open feedback count, document-check attention and checking counts, first submission and last activity; plus turn counts (built, US-020) |
 | GET | /officer/applications/{id} | officer | officer view (internal status, officer label, audit, feedback, verification) |
 | POST | /officer/applications/{id}/transition | officer | `{ target, note?, expected_version }` |
 | POST | /officer/applications/{id}/feedback | officer | create feedback (only while `under_review`) |
