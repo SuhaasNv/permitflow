@@ -57,14 +57,15 @@ class LicenceService:
         current = revisions[-1]
         holder = self.users.get(app.operator_id)
         issued_at = datetime.now(UTC)
+        issued_on = issued_at.astimezone(LOCAL_TZ).date()  # the year in the number is the Singapore year
         sequence = int(self.db.scalar(text("SELECT nextval('licence_no_seq')")) or 0)
         data = build_licence_data(
-            licence_no=licence_number(issued_at.year, sequence),
+            licence_no=licence_number(issued_on.year, sequence),
             reference_no=app.reference_no,
             form_data=current.form_data,
             holder_name=holder.full_name if holder else "",
             approved_by=officer.full_name,
-            issued_on=issued_at.astimezone(LOCAL_TZ).date(),
+            issued_on=issued_on,
         )
         pdf = render_licence_pdf(data)
         key = f"{app.id}/licence-{data.licence_no}.pdf"

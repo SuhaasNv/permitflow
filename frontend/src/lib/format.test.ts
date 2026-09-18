@@ -23,3 +23,10 @@ describe('format', () => {
     expect(greeting(20)).toBe('Good evening')
   })
 })
+
+describe('formatDate with date-only values', () => {
+  it('treats a date-only string as a calendar date, not UTC midnight', () => {
+    expect(formatDate('2026-09-19')).toBe('19 Sep 2026')
+    expect(formatDate('2027-09-18')).toBe('18 Sep 2027')
+  })
+})

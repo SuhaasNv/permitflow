@@ -10,7 +10,10 @@ export function formatDateTime(iso: string): string {
 
 /** "17 Sep 2026" */
 export function formatDate(iso: string): string {
-  const d = new Date(iso)
+  // A date-only value ("2026-09-19") is a calendar date, not an instant: build it in local time so it
+  // does not shift a day west of UTC the way `new Date("2026-09-19")` (parsed as UTC midnight) would.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  const d = dateOnly ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])) : new Date(iso)
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 

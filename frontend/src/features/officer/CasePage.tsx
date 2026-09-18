@@ -65,7 +65,7 @@ const ACTION_COPY: Record<string, ActionCopy> = {
 const ACTION_COPY_BY_LABEL: Record<string, ActionCopy | undefined> = {
   'Return to review': {
     title: 'Return this application to review?',
-    body: 'The status goes back to Under Review so you can add feedback or request a resubmission. The operator is told the review continues.',
+    body: 'The status goes back to Under Review so you can add feedback or request a resubmission. The operator is told the application is under review again.',
     confirm: 'Return to review',
   },
 }
