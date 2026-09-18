@@ -4,6 +4,7 @@ import type { Resolver } from 'react-hook-form'
 import { useForm } from 'react-hook-form'
 
 import { AppError } from '@/api/client'
+import type { OperatorFeedback } from '@/api/applications'
 import type { FieldDef, SectionDef } from '@/api/formSchema'
 import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
@@ -27,6 +28,8 @@ export interface SectionFormProps {
   savedAt?: number | null
   isLast: boolean
   stepLabel?: string
+  feedback?: OperatorFeedback[]
+  lockedReason?: string
   onSave: (payload: Record<string, unknown>, andContinue: boolean) => Promise<void>
   onDirtyChange: (dirty: boolean) => void
 }
@@ -36,7 +39,19 @@ function fieldError(errors: Record<string, { message?: string } | undefined>, ke
 }
 
 export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(function SectionForm(
-  { section, data, editable, saving, savedAt = null, isLast, stepLabel, onSave, onDirtyChange }: SectionFormProps,
+  {
+    section,
+    data,
+    editable,
+    saving,
+    savedAt = null,
+    isLast,
+    stepLabel,
+    feedback = [],
+    lockedReason,
+    onSave,
+    onDirtyChange,
+  }: SectionFormProps,
   ref,
 ) {
   const draftSchema = sectionSchema(section, 'draft')
@@ -219,6 +234,23 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
         ) : null}
       </div>
       <div className="flex flex-col gap-5 px-5 py-6 sm:px-7">
+        {feedback
+          .filter((f) => f.resolution === 'open')
+          .map((f) => (
+            <Alert key={f.id} tone="warning" title="The licensing office asked for a change here">
+              {f.message}
+            </Alert>
+          ))}
+        {feedback.some((f) => f.resolution === 'addressed') ? (
+          <Alert tone="info">
+            <span>You changed this section in your latest revision. The officer will review it.</span>
+          </Alert>
+        ) : null}
+        {!editable && lockedReason ? (
+          <Alert tone="neutral">
+            <span>{lockedReason}</span>
+          </Alert>
+        ) : null}
         {summary.length > 0 ? (
           <div ref={summaryRef} tabIndex={-1} className="outline-none">
             <Alert

@@ -8,14 +8,14 @@ from app.api.deps import CurrentUser, DbSession, OperatorUser, require_role
 from app.api.v1.applications_schemas import ApplicationOperatorView, ApplicationSummaryOut, UploadOut
 from app.core.errors import BadRequest
 from app.core.settings import get_settings
-from app.domain.editability import editable_targets
-from app.domain.enums import DocumentType
+from app.domain.enums import ApplicationStatus, DocumentType
 from app.domain.uploads import too_large_message
 from app.models import Application, User
 from app.models.enums import Role
 from app.services.applications import ApplicationService
 from app.services.documents import DocumentService, content_disposition
 from app.services.operator_view import document_view, operator_view, summary
+from app.services.resubmission import ResubmissionService
 from app.services.submission import SubmissionService
 from app.services.verification import VerificationService, run_verification
 
@@ -34,13 +34,17 @@ def _reject_oversized_body(request: Request) -> None:
 
 
 def _view(service: ApplicationService, app: Application) -> ApplicationOperatorView:
-    sections, doc_types = editable_targets(app.status, set(), set())
+    sections, doc_types = service.editable_for(app)
+    documents = service.documents_with_runs(app)
+    resub = ResubmissionService(service.db)
     return operator_view(
         app,
-        documents=service.documents_with_runs(app),
+        documents=documents,
         editable_sections=sections,
         editable_document_types=doc_types,
         revision_count=service.revision_count(app),
+        feedback=resub.released_feedback(app) if app.status != ApplicationStatus.DRAFT else [],
+        resubmit=resub.readiness(app, [d for d, _ in documents]),
     )
 
 
@@ -72,6 +76,16 @@ def submit_application(
     application_id: uuid.UUID, user: OperatorUser, db: DbSession
 ) -> ApplicationOperatorView:
     app = SubmissionService(db).submit(user, application_id)
+    return _view(ApplicationService(db), app)
+
+
+@router.post("/{application_id}/resubmit", response_model=ApplicationOperatorView)
+def resubmit_application(
+    application_id: uuid.UUID, user: OperatorUser, db: DbSession
+) -> ApplicationOperatorView:
+    """Resubmit after feedback: Revision N+1, flagged items that changed become addressed, officers notified.
+    422 `no_change` when nothing flagged changed; 409 when the status does not allow it."""
+    app = ResubmissionService(db).resubmit(user, application_id)
     return _view(ApplicationService(db), app)
 
 

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { createApplication, getApplication, listApplications, submitApplication } from '@/api/applications'
+import { createApplication, getApplication, listApplications, resubmitApplication, submitApplication } from '@/api/applications'
 import { getFormSchema } from '@/api/formSchema'
 import { updateSection } from '@/api/sections'
 
@@ -69,6 +69,17 @@ export function useSubmitApplication(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => submitApplication(id),
+    onSuccess: (view) => {
+      qc.setQueryData(applicationKeys.detail(id), view)
+      void qc.invalidateQueries({ queryKey: applicationKeys.all })
+    },
+  })
+}
+
+export function useResubmitApplication(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => resubmitApplication(id),
     onSuccess: (view) => {
       qc.setQueryData(applicationKeys.detail(id), view)
       void qc.invalidateQueries({ queryKey: applicationKeys.all })

@@ -6,6 +6,8 @@ from app.api.v1.applications_schemas import (
     CompletenessView,
     DocumentSlotView,
     DocumentView,
+    OperatorFeedbackView,
+    ResubmitReadiness,
     SectionView,
     VerificationView,
 )
@@ -123,6 +125,8 @@ def operator_view(
     editable_sections: set[str] | None = None,
     editable_document_types: set[DocumentType] | None = None,
     revision_count: int = 0,
+    feedback: list[OperatorFeedbackView] | None = None,
+    resubmit: ResubmitReadiness | None = None,
 ) -> ApplicationOperatorView:
     documents = documents or []
     docs_by_type = {d.document_type: (d, r) for d, r in documents}
@@ -176,6 +180,8 @@ def operator_view(
         ),
         revision_count=revision_count,
         needs_operator_action=_needs_operator(app.status),
+        feedback=feedback or [],
+        resubmit=resubmit,
         created_at=app.created_at,
         updated_at=app.updated_at,
     )

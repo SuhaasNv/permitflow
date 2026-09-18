@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import type { DocumentSlotView } from '@/api/applications'
+import type { DocumentSlotView, OperatorFeedback } from '@/api/applications'
 import { AppError } from '@/api/client'
 import { deleteDocument, downloadDocument, rerunVerification, uploadDocument, validateFile } from '@/api/documents'
 import type { UploadResult } from '@/api/documents'
@@ -20,6 +20,8 @@ interface DocumentSlotProps {
   slot: DocumentSlotView
   index: number
   canDelete: boolean
+  feedback?: OperatorFeedback[]
+  lockedReason?: string
   onUploaded: (result: UploadResult) => void
   onDeleted: (view: UploadResult['application']) => void
 }
@@ -57,7 +59,16 @@ const FileIcon = ({ image }: { image: boolean }) => (
 const RERUNNABLE = new Set(['verified', 'issues_found', 'needs_review', 'unreadable', 'failed', 'unavailable'])
 
 /** One required document type: empty drop zone, or the current file with its verification result. */
-export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded, onDeleted }: DocumentSlotProps) {
+export function DocumentSlot({
+  applicationId,
+  slot,
+  index,
+  canDelete,
+  feedback = [],
+  lockedReason,
+  onUploaded,
+  onDeleted,
+}: DocumentSlotProps) {
   const [state, setState] = useState<UploadState>({ phase: 'idle' })
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -140,7 +151,7 @@ export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded
   }
 
   return (
-    <section className="pf-surface overflow-hidden" aria-labelledby={`slot-${slot.type}`}>
+    <section id={`slot-${slot.type}`} className="pf-surface scroll-mt-24 overflow-hidden" aria-labelledby={`slot-title-${slot.type}`}>
       <div className="flex items-center gap-3.5 px-4 py-4 sm:px-5">
         <span
           className={cn(
@@ -153,7 +164,7 @@ export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             <span className="font-mono text-xs text-text-3">0{index + 1}</span>
-            <h3 id={`slot-${slot.type}`} className="text-[15px] font-semibold leading-[22px]">
+            <h3 id={`slot-title-${slot.type}`} className="text-[15px] font-semibold leading-[22px]">
               {slot.label}
             </h3>
           </div>
@@ -180,6 +191,22 @@ export function DocumentSlot({ applicationId, slot, index, canDelete, onUploaded
         )}
       </div>
 
+      {feedback
+        .filter((f) => f.resolution === 'open')
+        .map((f) => (
+          <div key={f.id} className="px-4 pb-4 sm:px-5">
+            <Alert tone="warning" title="The licensing office asked for a new copy">
+              {f.message}
+            </Alert>
+          </div>
+        ))}
+      {!slot.editable && lockedReason ? (
+        <div className="px-4 pb-4 sm:px-5">
+          <Alert tone="neutral">
+            <span>{lockedReason}</span>
+          </Alert>
+        </div>
+      ) : null}
       {state.phase === 'error' ? (
         <div className="px-4 pb-4 sm:px-5">
           <Alert tone="error" title={state.title}>

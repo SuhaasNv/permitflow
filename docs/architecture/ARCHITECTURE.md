@@ -129,7 +129,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /officer/feedback-templates | officer | comment templates from `domain/feedback_templates.py` (key, title, suggested target, message); the officer edits before sending (built, US-024) |
 | GET | /applications | operator | own applications |
 | POST | /applications | operator | create draft |
-| GET | /applications/{id} | operator (own) | operator view: sections, documents + verification, feedback (all rounds), revisions summary, editability |
+| GET | /applications/{id} | operator (own) | operator view: sections, documents + verification, released feedback (all rounds, no author), `resubmit` readiness (changed and untouched flagged targets), editability from open released feedback, `needs_operator_action` (built) |
 | PATCH | /applications/{id}/sections/{key} | operator (own) | update a section of the working copy (checked against editability) |
 | POST | /applications/{id}/submit | operator (own) | draft → application_received |
 | POST | /applications/{id}/resubmit | operator (own) | pending_pre_site_resubmission → pre_site_resubmitted |
