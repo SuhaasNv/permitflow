@@ -84,6 +84,12 @@ A last read-only bug hunt on the day's changes (US-051, Return to review, the ch
 | R10 | Low | Frontend showed licence dates one day early west of UTC (`new Date("2026-09-19")` is UTC midnight) | `formatDate` builds date-only values in local time; test run under `TZ=America/New_York` |
 | R11 | Low | Return-to-review dialog said the operator is told "the review continues"; the notification says a review has started | Dialog copy matches the notification |
 
+Run 3 on the deployed development environment (26 steps, two personas, `docs/uat/UAT_PLAN.md`) added one more:
+
+| # | Severity | Finding | Fix |
+|---|----------|---------|-----|
+| R12 | Low | The verifier's "today's date" line used the container's UTC date; between 00:00 and 08:00 SGT the model reasoned with yesterday's date | Singapore date in the prompt |
+
 The certificate itself was also reworked on the same pass (real brand mark, wrapping values, signature strip pinned at the bottom, two-pass layout), recorded under US-051 in `CHANGELOG.md`.
 
 ## Not changed
