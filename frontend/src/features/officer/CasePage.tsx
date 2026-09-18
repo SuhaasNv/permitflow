@@ -17,6 +17,7 @@ import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDate, formatDateTime, formatRelative } from '@/lib/format'
 import { CheckResult } from './CheckResult'
+import { ComparePanel } from './ComparePanel'
 import { FeedbackPanel } from './FeedbackPanel'
 import type { Target } from './FeedbackPanel'
 import { useOfficerApplication, useRerunCheck, useTransition } from './queries'
@@ -270,6 +271,26 @@ export function OfficerCasePage() {
         </div>
       </div>
 
+      {view.status === 'pre_site_resubmitted' ? (
+        <div className="mb-5">
+          <Alert tone="info" title={`Revision ${view.current_revision_number} resubmitted`}>
+            {view.changed_sections.length} {view.changed_sections.length === 1 ? 'section' : 'sections'} and{' '}
+            {view.changed_document_types.length} {view.changed_document_types.length === 1 ? 'document' : 'documents'} changed. Start the
+            review, check the changes below and mark each feedback item resolved or leave it open for another round.
+          </Alert>
+        </div>
+      ) : null}
+      {view.addressed_unresolved_count > 0 && view.status !== 'pre_site_resubmitted' ? (
+        <div className="mb-5">
+          <Alert
+            tone="warning"
+            title={`${view.addressed_unresolved_count} addressed ${view.addressed_unresolved_count === 1 ? 'item is' : 'items are'} not resolved yet`}
+          >
+            The operator changed these targets. Mark each one resolved, or leave it open and request another resubmission, before scheduling
+            a site visit.
+          </Alert>
+        </div>
+      ) : null}
       {stale ? (
         <div className="mb-5">
           <Alert
@@ -322,6 +343,9 @@ export function OfficerCasePage() {
                       {!section.complete ? <StatusBadge label="Incomplete" tone="warning" /> : null}
                       {openFor('section', def.key).length ? (
                         <StatusBadge label={`${openFor('section', def.key).length} open feedback`} tone="warning" />
+                      ) : null}
+                      {view.changed_sections.includes(def.key) ? (
+                        <StatusBadge label={`Changed in Revision ${view.current_revision_number}`} tone="info" />
                       ) : null}
                     </div>
                     <dl className="grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[220px_minmax(0,1fr)]">
@@ -380,6 +404,9 @@ export function OfficerCasePage() {
                         {openFor('document', d.document_type).length ? (
                           <StatusBadge label={`${openFor('document', d.document_type).length} open feedback`} tone="warning" />
                         ) : null}
+                        {view.changed_document_types.includes(d.document_type) ? (
+                          <StatusBadge label={`Replaced in Revision ${view.current_revision_number}`} tone="info" />
+                        ) : null}
                       </div>
                       <div className="truncate text-[13px] text-text-3">
                         <span className="text-text-2">{d.original_filename}</span> · {formatBytes(d.size_bytes)} · uploaded{' '}
@@ -430,6 +457,8 @@ export function OfficerCasePage() {
             </ol>
           </section>
 
+          <ComparePanel view={view} />
+
           <section className="pf-surface" aria-labelledby="history-title">
             <div className="border-b border-line px-5 py-4 sm:px-7">
               <h2 id="history-title" className="text-[13px] font-semibold uppercase tracking-[0.06em] text-text-3">
@@ -451,7 +480,7 @@ export function OfficerCasePage() {
               ))}
             </ol>
             <p className="border-t border-line px-5 py-3 text-xs text-text-3 sm:px-7">
-              Comparing revisions and the audit trail arrive with US-027 and US-029.{' '}
+              The audit trail arrives with US-029.{' '}
               <Link to="/officer/queue" className="text-text-2">
                 Back to the queue
               </Link>

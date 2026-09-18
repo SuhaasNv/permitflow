@@ -18,6 +18,14 @@ from app.repositories.revisions import RevisionRepository
 
 MAX_MESSAGE = 2000
 
+_RESOLVABLE_STATES = {
+    ApplicationStatus.UNDER_REVIEW,
+    ApplicationStatus.PRE_SITE_RESUBMITTED,
+    ApplicationStatus.SITE_VISIT_SCHEDULED,
+    ApplicationStatus.SITE_VISIT_DONE,
+    ApplicationStatus.PENDING_APPROVAL,
+}
+
 
 class FeedbackService:
     def __init__(self, db: Session) -> None:
@@ -115,6 +123,32 @@ class FeedbackService:
             application_id=app.id,
             actor_id=officer.id,
             event_type="feedback.withdrawn",
+            payload={"feedback_id": str(item.id), "target": target_label(item)},
+        )
+        app.version += 1
+        self.db.commit()
+        self.db.refresh(item)
+        return item
+
+    def resolve(self, officer: User, application_id: uuid.UUID, feedback_id: uuid.UUID) -> Feedback:
+        """open or addressed → resolved, by officer action, while the application is with the officer."""
+        app = self.applications.get_for(officer, application_id, for_update=True)
+        item = self.feedback.get_in_application(app.id, feedback_id)
+        if item is None:
+            raise NotFound("Feedback not found.")
+        if app.status not in _RESOLVABLE_STATES:
+            raise Conflict(
+                "Feedback can be resolved only while the application is with the licensing office."
+            )
+        if item.resolution not in (FeedbackResolution.OPEN, FeedbackResolution.ADDRESSED):
+            raise Conflict("Only open or addressed feedback can be resolved.")
+        item.resolution = FeedbackResolution.RESOLVED
+        item.resolved_by = officer.id
+        item.resolved_at = datetime.now(UTC)
+        self.audit.record(
+            application_id=app.id,
+            actor_id=officer.id,
+            event_type="feedback.resolved",
             payload={"feedback_id": str(item.id), "target": target_label(item)},
         )
         app.version += 1

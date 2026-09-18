@@ -10,7 +10,7 @@ import type { Tone } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { formatDateTime } from '@/lib/format'
-import { useCreateFeedback, useFeedbackTemplates, useWithdrawFeedback } from './queries'
+import { useCreateFeedback, useFeedbackTemplates, useResolveFeedback, useWithdrawFeedback } from './queries'
 
 const RESOLUTION: Record<FeedbackItem['resolution'], { label: string; tone: Tone }> = {
   open: { label: 'Open', tone: 'warning' },
@@ -31,6 +31,10 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
   const templates = useFeedbackTemplates()
   const create = useCreateFeedback(view.id)
   const withdraw = useWithdrawFeedback(view.id)
+  const resolve = useResolveFeedback(view.id)
+  const canResolve = ['under_review', 'pre_site_resubmitted', 'site_visit_scheduled', 'site_visit_done', 'pending_approval'].includes(
+    view.status,
+  )
   const toast = useToast()
   const [composing, setComposing] = useState(false)
   const [target, setTarget] = useState('')
@@ -128,7 +132,14 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                         >
                           {f.target_label}
                         </a>
-                        <StatusBadge label={RESOLUTION[f.resolution].label} tone={RESOLUTION[f.resolution].tone} />
+                        <StatusBadge
+                          label={
+                            f.resolution === 'addressed' && f.addressed_in_revision
+                              ? `Addressed in Revision ${f.addressed_in_revision}`
+                              : RESOLUTION[f.resolution].label
+                          }
+                          tone={RESOLUTION[f.resolution].tone}
+                        />
                         {f.released_to_operator_at ? (
                           <span className="text-[11px] text-text-3">sent to operator</span>
                         ) : f.resolution === 'open' ? (
@@ -140,6 +151,22 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                         <span>
                           {f.author_name} · {formatDateTime(f.created_at)}
                         </span>
+                        {(f.resolution === 'addressed' || f.resolution === 'open') && canResolve ? (
+                          <button
+                            type="button"
+                            className="mr-3 font-semibold text-success hover:underline"
+                            disabled={resolve.isPending}
+                            onClick={() =>
+                              resolve.mutate(f.id, {
+                                onSuccess: () =>
+                                  toast.push({ title: 'Marked resolved', body: `${f.target_label} is resolved.`, tone: 'success' }),
+                                onError: (e) => toast.push({ title: 'Could not resolve', body: e.message, tone: 'error' }),
+                              })
+                            }
+                          >
+                            Mark resolved
+                          </button>
+                        ) : null}
                         {f.resolution === 'open' && view.feedback_editable ? (
                           <button
                             type="button"

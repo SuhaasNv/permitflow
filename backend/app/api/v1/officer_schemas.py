@@ -153,6 +153,11 @@ class OfficerApplicationOut(BaseModel):
     verification_summary: VerificationSummaryOut
     revisions: list[RevisionOut]
     current_revision_number: int
+    previous_revision_number: int | None
+    changed_sections: list[str]
+    changed_document_types: list[str]
+    # Addressed items the officer has not resolved yet (warning before moving on).
+    addressed_unresolved_count: int
     feedback: list[FeedbackOut]
     open_feedback_count: int
     # Feedback can be created or withdrawn only while under review; the reason explains why not.
