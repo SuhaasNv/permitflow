@@ -57,6 +57,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | C3 | Image OCR for document verification (currently images are marked "not extractable") |
 | C4 | Download all documents as a bundle |
 | C6 | Licence certificate issued on approval, officer preview, PDF download · **built 19 Sep (US-051)** on its own branch, merged after review |
+| C7 | The owner's domain for both environments: `permitflow.space` and `api.permitflow.space` (production), `dev.permitflow.space` and `api.dev.permitflow.space` (development), Railway TLS · **planned 19 Sep (US-052)** for the v0.3.0 release |
 | C5 | Operator withdraws a submitted application with an optional reason · **done 19 Sep (US-038)**: new terminal status, officers notified, audited |
 
 ## DEFERRED / MOCKED

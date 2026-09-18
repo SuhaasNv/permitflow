@@ -48,6 +48,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: MVP · Day 3 · Dependencies: US-006 · Requirements: NFR-006 · `docs/operations/OPERATIONS.md`
 - Definition of Done: UAT executed on the deployed URL.
 
+### US-052 — As a reviewer, I want the production deployment reachable on the project's own domain (permitflow.space), so that the demo URL is memorable and looks like a real service.
+- Acceptance criteria: one naming convention per environment on the owner's domain: production `https://permitflow.space` (and `www`) for the frontend and `https://api.permitflow.space` for the API; development `https://dev.permitflow.space` and `https://api.dev.permitflow.space`; all with Railway-managed TLS; per environment `CORS_ORIGINS`, the frontend `API_URL`, the GitHub environment variables (`FRONTEND_URL`, `BACKEND_URL`) and the deploy health gates use the new hosts; the railway.app hosts keep working as fallbacks; `README.md` and `docs/operations/OPERATIONS.md` name the hosts and the DNS records (owner adds them at the registrar).
+- Priority: Nice-to-have · Day 3 (added 19 Sep, domain bought by the owner) · Dependencies: US-007 · Requirements: NFR-006 · Beyond the brief
+- Definition of Done: all four hosts answer their health checks over HTTPS; the next development deploy and the v0.3.0 production deploy pass their gates against them.
+
 ### US-008 — As a reviewer, I want clear documentation of scope, architecture, AI usage, testing and operations, so that every decision is explainable.
 - Acceptance criteria: README (setup, env vars, tests, AI usage, what I would do next), SCOPE.md, ADRs, threat model, test strategy, UAT plan, operations guide, production readiness review, assessment traceability, CHANGELOG.
 - Priority: MVP · Day 3 (continuous) · Dependencies: all

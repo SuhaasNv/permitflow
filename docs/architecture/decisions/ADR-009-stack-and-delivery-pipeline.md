@@ -23,7 +23,7 @@ Stack choice is free per the assessment but must be justified. The stack must ma
 - Cons: the drag-and-drop upload with live status and the diff/compare UI are richer than HTMX comfortably supports in the time; less aligned with the preferred frontend direction.
 
 ## Decision
-Option A. Testing layers: unit (state machine, authorization, diff, AI validation, form schema), integration (API + Postgres lifecycle), one Playwright E2E for the critical journey, an AI evaluation set. CI: `ci.yml` runs frontend lint/typecheck/test/build, backend lint (ruff) / typecheck (mypy) / tests on a Postgres service, Playwright against the built app, and gitleaks. Deployment is a separate `deploy.yml` (manual trigger or on `main` after CI) using the Railway CLI.
+Option A. Testing layers: unit (state machine, authorization, diff, AI validation, form schema), integration (API + Postgres lifecycle), one Playwright E2E for the critical journey, an AI evaluation set. CI: `ci.yml` runs frontend lint/typecheck/test/build, backend lint (ruff) / typecheck (mypy) / tests on a Postgres service, Playwright against the built app, and gitleaks. Deployment is a separate `deploy.yml` using the Railway CLI. As built the pipeline grew to seven jobs and two Railway environments with an approval gate; that shape is recorded in ADR-011.
 
 ## Rationale
 Every choice serves a requirement: Pydantic for validation at both API and AI boundaries, TanStack Query for real-time status, Zod + RHF for inline validation, Playwright for the journey the assessment cares about, Railway for a deploy the reviewer can open.
@@ -32,12 +32,12 @@ Every choice serves a requirement: Pydantic for validation at both API and AI bo
 
 ### Positive
 - Familiar, boring, explainable.
-- Frontend types generated from OpenAPI reduce drift.
+- Frontend types are hand-written in `frontend/src/api/*.ts` next to each client call and checked against the API in vitest and Playwright; the ADR first planned OpenAPI type generation, dropped because the hand-written types stayed small and readable. Drift is caught by the integration and end-to-end suites, not by codegen.
 
 ### Negative / Tradeoffs
 - Two toolchains in CI (slightly longer pipeline).
 - Railway single-region deployment; no blue/green.
 
 ## Validation
-- CI green on the main branch; branch protection requires it.
+- CI green on `dev` and `main`; the E2E job runs the full stack inside the job.
 - README setup verified on a clean clone.

@@ -74,5 +74,8 @@ Two earlier wordings were rejected by the harness before this one landed: a soft
 
 ## Next steps (not in scope)
 
-- Grow the set from the officer's real decisions: every case where an officer overrides a check is a candidate golden case. LangSmith datasets and tracing would make that capture routine; promptfoo would give a threshold gate and a red-team suite for the prompt itself. Both were judged more than this release needs (`docs/reviews/PRODUCTION_READINESS_REVIEW.md`).
+- Grow the set from the officer's real decisions: every case where an officer overrides a check is a candidate golden case. LangSmith or self-hosted Langfuse datasets and tracing would make that capture routine (self-hosted matters because extracted document text should not leave the platform more than it must); promptfoo, driving the real pipeline through a Python provider, would give a threshold gate and an injection red-team suite in CI; Project Moonshot (AI Verify Foundation, `moonshot-cicd`) mapped to IMDA's Starter Kit for Testing LLM-Based Applications would give the Singapore assurance evidence. All were judged more than this release needs (`docs/reviews/PRODUCTION_READINESS_REVIEW.md`).
+- Bias and fairness: no bias evaluation has been run. A first pass would be a Project Moonshot bias benchmark and per-issue-code accuracy split by document language, so that a Chinese-, Malay- or Tamil-language document is not flagged more often than an English one for the same facts.
+- Confidence calibration: reliability diagram and Brier score over the labelled set, replacing the fixed 0.6 threshold.
+- Injection defence: a multilingual classifier (Llama Prompt Guard 2) in front of the model in place of the English-only phrase heuristic; garak or PyRIT for a periodic broader adversarial scan.
 - Score per dimension (type detection, field match, dates, injection) once the set is large enough for a per-dimension number to mean something.

@@ -46,3 +46,8 @@ Snapshots make the two hardest UI requirements (targeted edit and compare) into 
 ## Validation
 - Unit tests for the diff (added/removed/changed, nested, documents add/remove/replace).
 - Integration test: three rounds produce three revisions; revision 1 bytes unchanged; feedback states move open → addressed → resolved as specified; unflagged section edit rejected with 403.
+
+## Amendments (as built)
+- 19 Sep 2026 (US-039): officers may resolve only feedback the operator has seen (released); an unsent item can only be withdrawn. Withdraw and resolve keep `previous_resolution` and can be undone by their author within 15 s (`feedback.restored` audit). Undo never crosses a status change.
+- 19 Sep 2026 (US-049): "Not fixed" reopens an `addressed` item as `open` with the same text, as a draft for the next round (`feedback.reopened` audit). This closes the loop where a replaced document auto-addressed the only open item and the officer could not request another round without retyping.
+- 19 Sep 2026 (US-045 follow-up): re-confirming the declarations while responding counts as a change (`confirmed_at` stamp, reported as "Confirmed on"), so a flagged declarations section is never a dead end.
