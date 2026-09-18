@@ -39,7 +39,7 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `pre_site_resubmitted` | `under_review` | officer | — | Officer clicks Start review |
 | `pre_site_resubmitted` | `rejected` | officer | — (note required) | Officer clicks Reject |
 | `under_review` | `pending_pre_site_resubmission` | officer | `open_feedback_count ≥ 1` | Officer clicks Request resubmission |
-| `under_review` | `site_visit_scheduled` | officer | `open_feedback_count = 0` | Officer clicks Schedule site visit |
+| `under_review` | `site_visit_scheduled` | officer | `open_feedback_count = 0` | Officer clicks Mark site visit scheduled (status only: no appointment is booked, UC3 deferred) |
 | `under_review` | `rejected` | officer | — (note required) | Officer clicks Reject |
 | `pending_pre_site_resubmission` | `rejected` | officer | — (note required) | Officer clicks Reject (abandoned or unsalvageable application; prevents stuck cases) |
 | `pending_pre_site_resubmission` | `pre_site_resubmitted` | operator (owner) | `has_changes_to_flagged_targets` | Operator clicks Resubmit |

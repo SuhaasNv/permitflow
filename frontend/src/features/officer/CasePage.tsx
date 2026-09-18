@@ -35,9 +35,9 @@ const ACTION_COPY: Record<string, { title: string; body: string; confirm: string
     confirm: 'Request resubmission',
   },
   site_visit_scheduled: {
-    title: 'Schedule a site visit?',
-    body: 'The operator is told an officer will contact them to arrange a visit.',
-    confirm: 'Schedule site visit',
+    title: 'Mark the site visit as scheduled?',
+    body: 'Status only: no appointment is booked here. The operator is told an officer will contact them to arrange the visit.',
+    confirm: 'Mark scheduled',
   },
   site_visit_done: {
     title: 'Mark the site visit as done?',

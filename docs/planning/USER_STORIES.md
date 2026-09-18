@@ -207,7 +207,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: DoD checklist + template endpoint test.
 
 ### US-025 — As an officer, I want to set the application status through allowed transitions and have the operator notified automatically, so that the case moves forward without manual follow-up.
-- Acceptance criteria: only allowed targets for the current state are offered; Request resubmission requires at least one open feedback item and releases the round's feedback to the operator; Schedule site visit requires no `open` items; Reject requires a note and is available from every non-terminal post-submission state; invalid transitions return 409 and stale `expected_version` returns 409; the operator receives an in-app notification carrying the operator label; email delivery is mocked (logged).
+- Acceptance criteria: only allowed targets for the current state are offered; Request resubmission requires at least one open feedback item and releases the round's feedback to the operator; Mark site visit scheduled requires no `open` items; Reject requires a note and is available from every non-terminal post-submission state; invalid transitions return 409 and stale `expected_version` returns 409; the operator receives an in-app notification carrying the operator label; email delivery is mocked (logged).
 - Priority: MVP (notification delivery: Mocked) · Day 2 · Dependencies: US-023 · Requirements: FR-019, FR-020, SEC-004, REL-007, AUD-002 · ADR-003 · Use case UC2-A
 - Definition of Done: DoD checklist + transition and notification tests.
 

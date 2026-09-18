@@ -61,7 +61,7 @@ test('two resubmission rounds: fix, resubmit, compare, resolve, again, then appr
   await confirmDialog(page, 'Start review')
   await page.getByRole('button', { name: 'Mark resolved' }).click()
   for (const [action, confirm] of [
-    ['Schedule site visit', 'Schedule site visit'],
+    ['Mark site visit scheduled', 'Mark scheduled'],
     ['Mark site visit done', 'Mark done'],
     ['Route to approval', 'Route to approval'],
   ] as const) {
