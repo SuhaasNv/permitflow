@@ -211,9 +211,15 @@ export function AppShell() {
             ))}
           </div>
           <div
-            className={cn('sticky bottom-0 mt-auto border-t border-line bg-surface p-4 text-xs leading-[18px] text-text-3', collapsed && 'hidden')}
+            className={cn(
+              'sticky bottom-0 mt-auto border-t border-line bg-surface p-4 text-xs leading-[18px] text-text-3',
+              collapsed && 'hidden',
+            )}
           >
-            <div className="font-medium text-text-2">PermitFlow</div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-text-2">PermitFlow</span>
+              <span className="rounded border border-line px-1.5 font-mono text-[10px] leading-4 text-text-3">v{__APP_VERSION__}</span>
+            </div>
             <div>Fictional assessment product</div>
           </div>
         </nav>

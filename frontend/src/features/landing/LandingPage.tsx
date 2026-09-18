@@ -299,6 +299,7 @@ export function LandingPage() {
       <footer className="mt-auto">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-5 py-8 text-[13px] text-text-3 sm:flex-row sm:items-center sm:px-10">
           <span>© 2026 PermitFlow</span>
+          <span className="rounded border border-line px-1.5 font-mono text-[11px] leading-[18px]">v{__APP_VERSION__}</span>
           <span className="hidden sm:inline">·</span>
           <span>A fictional licensing service built for an engineering assessment. Not a government service.</span>
         </div>
