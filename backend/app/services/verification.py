@@ -10,7 +10,7 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, NotFound
@@ -49,16 +49,20 @@ TERMINAL = {
 def run_verification(run_id: uuid.UUID) -> None:
     settings = get_settings()
     with session_factory()() as db:
-        run = db.get(VerificationRun, run_id)
-        if run is None or run.status != VerificationStatus.PENDING:
-            return
-        doc = db.get(Document, run.document_id)
-        app = db.get(Application, doc.application_id) if doc else None
-        if doc is None or app is None:
-            return
-        run.status = VerificationStatus.RUNNING
-        run.started_at = datetime.now(UTC)
+        # Atomic claim: only one worker can move a run from pending to running.
+        claimed = db.execute(
+            update(VerificationRun)
+            .where(VerificationRun.id == run_id, VerificationRun.status == VerificationStatus.PENDING)
+            .values(status=VerificationStatus.RUNNING, started_at=datetime.now(UTC))
+        )
         db.commit()
+        if int(getattr(claimed, "rowcount", 0) or 0) != 1:
+            return
+        run = db.get(VerificationRun, run_id)
+        doc = db.get(Document, run.document_id) if run else None
+        app = db.get(Application, doc.application_id) if doc else None
+        if run is None or doc is None or app is None:
+            return
         started = time.perf_counter()
 
         try:
@@ -160,7 +164,17 @@ def run_verification(run_id: uuid.UUID) -> None:
 
 
 def _reason(exc: Exception) -> str:
-    return (type(exc).__name__ + ": " + str(exc))[:64]
+    """Fixed vocabulary stored on the run and served to clients; the exception detail goes to the log only."""
+    logger.warning(
+        "verification_error", extra={"extra_fields": {"error": f"{type(exc).__name__}: {exc}"[:500]}}
+    )
+    if isinstance(exc, ProviderUnavailable):
+        return "provider_unavailable"
+    if isinstance(exc, ProviderError):
+        return "provider_error"
+    if isinstance(exc, (OSError, FileNotFoundError)):
+        return "storage_error"
+    return "internal_error"
 
 
 def _finish(
@@ -211,13 +225,26 @@ def _finish(
 
 
 def mark_stale_runs_failed(grace_seconds: int = 60) -> int:
-    """On startup, runs still `running` longer than timeout + grace were interrupted by a restart."""
+    """On startup, runs still `running` (or never started) longer than timeout + grace were interrupted by a
+    restart. Both become `failed: interrupted` so re-run is possible and the queue does not show them as
+    checking forever."""
     settings = get_settings()
     cutoff = datetime.now(UTC) - timedelta(seconds=settings.ai_timeout_seconds * 2 + grace_seconds)
     with session_factory()() as db:
         result = db.execute(
             update(VerificationRun)
-            .where(VerificationRun.status == VerificationStatus.RUNNING, VerificationRun.started_at < cutoff)
+            .where(
+                or_(
+                    and_(
+                        VerificationRun.status == VerificationStatus.RUNNING,
+                        VerificationRun.started_at < cutoff,
+                    ),
+                    and_(
+                        VerificationRun.status == VerificationStatus.PENDING,
+                        VerificationRun.created_at < cutoff,
+                    ),
+                )
+            )
             .values(
                 status=VerificationStatus.FAILED, error_reason="interrupted", finished_at=datetime.now(UTC)
             )
@@ -237,7 +264,8 @@ class VerificationService:
         """Owner or officer may re-run once the latest run is terminal (AI-009, SCOPE S2)."""
         if user.role not in (Role.OPERATOR, Role.OFFICER):
             raise NotFound("Document not found.")
-        app = self.applications.get_for(user, application_id)
+        # Row lock so two concurrent re-run requests cannot both insert a pending run.
+        app = self.applications.get_for(user, application_id, for_update=True)
         doc = self.documents.get_in_application(app.id, document_id)
         if doc is None or not doc.is_current:
             raise NotFound("Document not found.")
@@ -246,6 +274,12 @@ class VerificationService:
             raise Conflict("A check is already in progress for this document.")
         run = VerificationRun(document_id=doc.id, status=VerificationStatus.PENDING, provider="none")
         self.documents.add_run(run)
+        self.audit.record(
+            application_id=app.id,
+            actor_id=user.id,
+            event_type="verification.requested",
+            payload={"document_id": str(doc.id), "document_type": doc.document_type.value},
+        )
         self.db.commit()
         self.db.refresh(run)
         return run

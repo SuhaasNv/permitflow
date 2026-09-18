@@ -10,7 +10,7 @@ from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.domain.editability import editable_targets
 from app.domain.form_schema import get_section, validate_section
 from app.models import Application, Document, User, VerificationRun
-from app.models.enums import ApplicationStatus, LicenceType
+from app.models.enums import ApplicationStatus, DocumentType, LicenceType
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
@@ -71,9 +71,18 @@ class ApplicationService:
         if errors:
             raise ValidationFailed("Some fields need attention.", details={"fields": errors})
         draft = dict(app.draft_data)
+        previous = draft.get(key) or {}
+        changed = sorted(k for k in set(previous) | set(data) if previous.get(k) != data.get(k))
         draft[key] = data
         app.draft_data = draft
         app.version += 1
+        # Field names only, never values: the officer can see who changed what, the audit stays free of PII.
+        self.audit.record(
+            application_id=app.id,
+            actor_id=operator.id,
+            event_type="section.updated",
+            payload={"section": key, "fields": changed},
+        )
         self.db.commit()
         self.db.refresh(app)
         return app
@@ -82,6 +91,15 @@ class ApplicationService:
         docs = self.documents.current_for(app.id)
         runs = self.documents.latest_runs([d.id for d in docs])
         return [(d, runs.get(d.id)) for d in docs]
+
+    def list_stats(
+        self, apps: list[Application]
+    ) -> tuple[dict[uuid.UUID, set[DocumentType]], dict[uuid.UUID, int]]:
+        """Present document types and revision counts for a list, in two queries instead of three per row."""
+        ids = [a.id for a in apps]
+        present = self.documents.present_types_for(ids)
+        revisions = {k: v[0] for k, v in self.revisions.stats_for(ids).items()}
+        return present, revisions
 
     def revision_count(self, app: Application) -> int:
         return self.revisions.count_for(app.id)

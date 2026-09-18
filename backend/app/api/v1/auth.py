@@ -16,10 +16,16 @@ login_limiter = FailedLoginLimiter(
 
 
 def _client_key(request: Request) -> str:
+    """Rate-limit key: the socket address, or X-Forwarded-For only when the socket is a trusted proxy.
+
+    Honouring the header from any client would let an attacker pick a fresh bucket per request (T4).
+    """
+    host = request.client.host if request.client else "unknown"
+    trusted = {p.strip() for p in _settings.trusted_proxies.split(",") if p.strip()}
     forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
+    if forwarded and host in trusted:
         return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    return host
 
 
 @router.post("/login", response_model=TokenOut)
@@ -32,7 +38,7 @@ def login(payload: LoginRequest, request: Request, db: DbSession) -> TokenOut:
     except Unauthorized:
         login_limiter.record_failure(key)
         raise
-    login_limiter.reset(key)
+    # No reset on success: a valid account must not be able to clear the failure window for its IP.
     return TokenOut(
         access_token=token.access_token,
         expires_at=token.expires_at,

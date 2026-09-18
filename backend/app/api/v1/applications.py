@@ -1,21 +1,36 @@
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, Body, File, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import CurrentUser, DbSession, OperatorUser
+from app.api.deps import CurrentUser, DbSession, OperatorUser, require_role
 from app.api.v1.applications_schemas import ApplicationOperatorView, ApplicationSummaryOut, UploadOut
+from app.core.errors import BadRequest
+from app.core.settings import get_settings
 from app.domain.editability import editable_targets
 from app.domain.enums import DocumentType
-from app.models import Application
+from app.domain.uploads import too_large_message
+from app.models import Application, User
+from app.models.enums import Role
 from app.services.applications import ApplicationService
-from app.services.documents import DocumentService
+from app.services.documents import DocumentService, content_disposition
 from app.services.operator_view import document_view, operator_view, summary
 from app.services.submission import SubmissionService
 from app.services.verification import VerificationService, run_verification
 
 router = APIRouter(prefix="/applications")
+
+# Multipart framing plus the document_type field; anything beyond the file itself.
+_MULTIPART_OVERHEAD = 16 * 1024
+
+
+def _reject_oversized_body(request: Request) -> None:
+    """Refuse an upload from its Content-Length before Starlette buffers the multipart body (T7)."""
+    limit = get_settings().upload_max_bytes
+    raw = request.headers.get("content-length")
+    if raw and raw.isdigit() and int(raw) > limit + _MULTIPART_OVERHEAD:
+        raise BadRequest(too_large_message(limit), details={"reason": "too_large"})
 
 
 def _view(service: ApplicationService, app: Application) -> ApplicationOperatorView:
@@ -32,13 +47,11 @@ def _view(service: ApplicationService, app: Application) -> ApplicationOperatorV
 @router.get("", response_model=list[ApplicationSummaryOut])
 def list_applications(user: OperatorUser, db: DbSession) -> list[ApplicationSummaryOut]:
     service = ApplicationService(db)
+    apps = service.list_for(user)
+    present, revisions = service.list_stats(apps)
     return [
-        summary(
-            a,
-            present_types={d.document_type for d, _ in service.documents_with_runs(a)},
-            revision_count=service.revision_count(a),
-        )
-        for a in service.list_for(user)
+        summary(a, present_types=present.get(a.id, set()), revision_count=revisions.get(a.id, 0))
+        for a in apps
     ]
 
 
@@ -74,7 +87,12 @@ def update_section(
     return _view(service, service.update_section(user, application_id, key, data))
 
 
-@router.post("/{application_id}/documents", response_model=UploadOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{application_id}/documents",
+    response_model=UploadOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(_reject_oversized_body)],
+)
 def upload_document(
     application_id: uuid.UUID,
     user: OperatorUser,
@@ -106,15 +124,17 @@ def delete_document(
 
 @router.get("/{application_id}/documents/{document_id}/download")
 def download_document(
-    application_id: uuid.UUID, document_id: uuid.UUID, user: CurrentUser, db: DbSession
+    application_id: uuid.UUID,
+    document_id: uuid.UUID,
+    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER))],
+    db: DbSession,
 ) -> StreamingResponse:
     doc, chunks = DocumentService(db).open_for_download(user, application_id, document_id)
-    safe_name = doc.original_filename.replace('"', "")
     return StreamingResponse(
         chunks,
         media_type=doc.content_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{safe_name}"',
+            "Content-Disposition": content_disposition(doc.original_filename),
             "Content-Length": str(doc.size_bytes),
         },
     )

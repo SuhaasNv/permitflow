@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     upload_max_bytes: int = 10 * 1024 * 1024
 
     login_rate_limit_per_minute: int = 10
+    # Comma-separated proxy IPs whose X-Forwarded-For is trusted. Empty: use the socket address.
+    trusted_proxies: str = ""
 
     ai_provider: Literal["mock", "openai"] = "mock"
     openai_api_key: str = ""
