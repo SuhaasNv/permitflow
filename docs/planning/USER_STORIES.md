@@ -80,6 +80,21 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: MVP · Day 3 (hotfix, added 19 Sep from iPhone 12 Pro screenshots) · Dependencies: US-021 · Requirements: UX-001 · Branch `fix/us-037-phone-layout`
 - Definition of Done: Playwright measurement of `scrollWidth` on every route at 390; scroll position check after navigation.
 
+### US-042 — As an engineer, I want one Playwright scenario per workflow (apply with AI checks, reaches the officer, officer flags, two resubmission rounds, withdraw, rejection), each asserting the audit trail, so that every path is proven separately and recorded.
+- Acceptance criteria: six independent specs under `frontend/e2e/scenarios`; every spec ends by opening the audit trail as the officer and asserting the expected event sequence; each spec creates its own application and is re-runnable; traces kept on failure; listed in `docs/testing/TEST_STRATEGY.md`.
+- Priority: MVP · Day 3 (requested 19 Sep) · Dependencies: US-005, US-038 · Requirements: all · Branch `feat/us-042-scenario-suite`
+- Definition of Done: all six green locally against the mock provider; README and TEST_STRATEGY updated.
+
+### US-043 — As a user on any screen size, I want the layout audit findings fixed (tables at 820 and 1280, audit trail columns, sticky review rail, stepper labels, tap targets), so that no screen is unreadable or unreachable at a common width.
+- Acceptance criteria: every High and Medium item in `docs/reviews/LAYOUT_AUDIT.md` fixed and re-measured at the width it was found; Low items fixed where cheap, the rest marked open in the audit doc; no regression at 390, 820, 1024, 1280 and 1440.
+- Priority: MVP · Day 3 (from the layout audit, 19 Sep) · Dependencies: US-037 · Requirements: UX-001 · Branch `fix/us-043-layout-audit`
+- Definition of Done: audit doc status column updated; as-built screenshots refreshed for the changed screens.
+
+### US-044 — As an operator on a busy server, I want an unexpected server error to reach my browser as a proper error with a request id, so that I am not told the server is unreachable when it is not.
+- Acceptance criteria: unhandled exceptions are answered inside the CORS layer so the browser receives the JSON error envelope and request id; engine pool sized for the expected concurrency and documented; pool exhaustion surfaces as a clear 503 rather than a 30 s hang; a test injects an exception and asserts the envelope plus the CORS header for an allowed origin.
+- Priority: MVP · Day 3 (from the layout audit backend observation, 19 Sep) · Dependencies: US-000 · Requirements: REL-001, NFR-004 · Branch `fix/us-044-error-cors-pool`
+- Definition of Done: test green; `docs/operations/OPERATIONS.md` and `docs/security/THREAT_MODEL.md` (availability) updated.
+
 ## UC1 — Operator Submission & Resubmission
 
 ### US-010 — As an operator, I want to create a new licence application, so that I can start my submission.

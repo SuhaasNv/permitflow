@@ -67,6 +67,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
 | `operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |
 | `reviews/EDGE_CASE_REVIEW.md` | written (Sprint 2) | Three devil's-advocate reviews: every finding, its fix or its plan |
+| `reviews/LAYOUT_AUDIT.md` | written (19 Sep) | Layout audit at 390, 820, 1024, 1280 and 1440; findings tracked as US-043 and US-044 |
 | `reviews/PRODUCTION_READINESS_REVIEW.md` | to be written (Day 3) | Honest gap list with severity |
 | `reviews/ASSESSMENT_TRACEABILITY.md` | to be written (Day 3) | Brief requirement → implementation → test → evidence |
 | `reviews/FINAL_REVIEW.md` | to be written (Day 3) | What we built, tradeoffs, what AI got wrong |

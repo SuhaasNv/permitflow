@@ -114,6 +114,9 @@ Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done;
 | US-039 | Feedback decisions: resolve only released items, 10 s undo, composer lock | MVP (added 19 Sep) |
 | US-040 | Flagged-section markers in the form rail and stepper | MVP (added 19 Sep) |
 | US-041 | Respond-to-feedback flow: walk flagged items, lead to Resubmit | MVP (added 19 Sep) |
+| US-042 | Playwright scenario suite: one spec per workflow, audit asserted | MVP (added 19 Sep) |
+| US-043 | Layout audit fixes (`docs/reviews/LAYOUT_AUDIT.md`) | MVP (added 19 Sep) |
+| US-044 | Unhandled errors inside CORS; engine pool sizing | MVP (added 19 Sep) |
 | US-070–073 | Admin oversight dashboard | Nice-to-have (only after US-005/006/007 are Done) |
 
 **Exit criteria:** Sprint DoD + UAT plan executed on the deployed URL + production readiness review + assessment traceability + final review written honestly.
