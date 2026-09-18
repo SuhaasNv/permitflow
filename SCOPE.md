@@ -41,9 +41,9 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | # | Feature | Simplification |
 |---|---------|----------------|
 | S1 | Officer queue filtering by status | Client-side filter over a single list endpoint; the queue itself is M8 |
-| S2 | Re-run AI verification action for a document | Same code path as upload; the live status itself is M4 |
+| S2 | Re-run AI verification action for a document · **done in Sprint 1 (operator) and Sprint 2 (officer)** | Same code path as upload; the live status itself is M4 |
 | S3 | Operator can delete a document while in draft | Simple DELETE; without it a wrong upload is fixed by replacing the type |
-| S4 | Compare any two revisions (not only current vs previous) | Same diff function; only the selector changes |
+| S4 | Compare any two revisions (not only current vs previous) · **done in Sprint 2** | Same diff function; only the selector changes |
 | S5 | AI evaluation dataset + runner script | Six fixtures, manual run documented |
 | S6 | Structured request logging with request id | Middleware only, no log shipping |
 | S7 | Admin persona: seeded admin account, `/admin/*` router, an operations dashboard (counts by status, idle applications, AI verification health, cross-application audit feed, read-only application view) and **user management** (create user, change role, deactivate/reactivate; every change audited; the last active admin cannot be demoted or deactivated). **Beyond the brief** — added because a regulator operating the platform needs oversight and account control; the assessment names only Operator and Officer. The `admin` role value exists in the enum from Day 1 (cheap); everything else in this row is built only after the MUST list is Done, so cutting it removes a router and two pages, not a concept. | Overview page first; user management second (US-073); no password reset or self-registration |

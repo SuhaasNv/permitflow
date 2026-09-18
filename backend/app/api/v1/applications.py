@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import CurrentUser, DbSession, OperatorUser, require_role
@@ -13,6 +13,7 @@ from app.domain.uploads import too_large_message
 from app.models import Application, User
 from app.models.enums import Role
 from app.services.applications import ApplicationService
+from app.services.compare import CompareOut, CompareService
 from app.services.documents import DocumentService, content_disposition
 from app.services.operator_view import document_view, operator_view, summary
 from app.services.resubmission import ResubmissionService
@@ -77,6 +78,18 @@ def submit_application(
 ) -> ApplicationOperatorView:
     app = SubmissionService(db).submit(user, application_id)
     return _view(ApplicationService(db), app)
+
+
+@router.get("/{application_id}/compare", response_model=CompareOut)
+def compare_revisions(
+    application_id: uuid.UUID,
+    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER))],
+    db: DbSession,
+    from_revision: Annotated[int, Query(alias="from", ge=1)],
+    to_revision: Annotated[int, Query(alias="to", ge=1)],
+) -> CompareOut:
+    """Field-level and document-level diff between two revisions (FR-022). Owner or officer."""
+    return CompareService(db).compare(user, application_id, from_revision, to_revision)
 
 
 @router.post("/{application_id}/resubmit", response_model=ApplicationOperatorView)

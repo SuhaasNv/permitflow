@@ -2,11 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import type { FeedbackInput } from '@/api/officer'
 import {
+  compareRevisions,
   createFeedback,
   getFeedbackTemplates,
   getOfficerApplication,
   getQueue,
   rerunOfficerCheck,
+  resolveFeedback,
   transitionApplication,
   withdrawFeedback,
 } from '@/api/officer'
@@ -72,6 +74,26 @@ export function useWithdrawFeedback(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (feedbackId: string) => withdrawFeedback(id, feedbackId),
+    onSuccess: (view) => {
+      qc.setQueryData(officerKeys.case(id), view)
+      void qc.invalidateQueries({ queryKey: officerKeys.queue })
+    },
+  })
+}
+
+export function useCompare(id: string, from: number | null, to: number | null) {
+  return useQuery({
+    queryKey: ['officer', 'compare', id, from, to],
+    queryFn: () => compareRevisions(id, from ?? 1, to ?? 1),
+    enabled: from !== null && to !== null && from !== to,
+    staleTime: Infinity,
+  })
+}
+
+export function useResolveFeedback(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (feedbackId: string) => resolveFeedback(id, feedbackId),
     onSuccess: (view) => {
       qc.setQueryData(officerKeys.case(id), view)
       void qc.invalidateQueries({ queryKey: officerKeys.queue })

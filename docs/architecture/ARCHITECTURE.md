@@ -139,12 +139,12 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /applications/{id}/documents/{doc_id}/verify | owner or officer | re-run verification (only when the latest run is terminal); 202 |
 | GET | /applications/{id}/revisions | owner, officer or admin | list revisions |
 | GET | /applications/{id}/revisions/{n} | owner, officer or admin | snapshot |
-| GET | /applications/{id}/compare?from=n&to=m | owner, officer or admin | field and document diff |
+| GET | /applications/{id}/compare?from=n&to=m | owner or officer (admin with US-072) | field-level form diff and document add/remove/replace from `domain/diff.py`; 404 for unknown revisions (built, US-027) |
 | GET | /officer/applications | officer | queue: every non-draft application with applicant, internal status + officer label, server-derived next action and whose turn it is, revision count, open feedback count, document-check attention and checking counts, first submission and last activity; plus turn counts (built, US-020) |
 | GET | /officer/applications/{id} | officer | case view: current revision's sections, current documents with full verification detail (confidence, evidence, model), revision history, available transitions with guard reasons, `version` (built, US-021; feedback and audit lists join with US-023 and US-029) |
 | POST | /officer/applications/{id}/transition | officer | `{ target, note?, expected_version }`: row lock, version check (409 `version_conflict`), `domain/workflow.transition` (409 `invalid_transition` with `allowed`), `status.changed` audit with actor, operator notification in the same transaction (built, US-021; on `→ pending_pre_site_resubmission` every open item gets `released_to_operator_at` and `feedback.released` is audited, built with US-023) |
 | POST | /officer/applications/{id}/feedback | officer | create feedback tied to a section key or document type, optional template key; 422 per-field errors; 409 unless `under_review`; audit `feedback.created`; returns the officer view (built, US-023) |
-| POST | /officer/applications/{id}/feedback/{fid}/resolve | officer | addressed/open → resolved; `{fid}` must belong to `{id}` |
+| POST | /officer/applications/{id}/feedback/{fid}/resolve | officer | open or addressed → resolved while the case is with the officer; audit `feedback.resolved`; `{fid}` must belong to `{id}` (built, US-028) |
 | POST | /officer/applications/{id}/feedback/{fid}/withdraw | officer | open → withdrawn; 409 unless `under_review` and open; `{fid}` must belong to `{id}`; audit `feedback.withdrawn` (built, US-023) |
 | POST | /officer/applications/{id}/documents/{doc_id}/verify | officer | re-run the AI check; same rules and audit as the operator re-run; returns the officer view (built, US-022) |
 | GET | /officer/applications/{id}/audit | officer | audit trail |

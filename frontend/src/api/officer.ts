@@ -144,6 +144,10 @@ export interface OfficerApplication {
   verification_summary: VerificationSummary
   revisions: Revision[]
   current_revision_number: number
+  previous_revision_number: number | null
+  changed_sections: string[]
+  changed_document_types: string[]
+  addressed_unresolved_count: number
   feedback: FeedbackItem[]
   open_feedback_count: number
   feedback_editable: boolean
@@ -184,4 +188,35 @@ export function createFeedback(id: string, body: FeedbackInput): Promise<Officer
 
 export function withdrawFeedback(id: string, feedbackId: string): Promise<OfficerApplication> {
   return request<OfficerApplication>(`/officer/applications/${id}/feedback/${feedbackId}/withdraw`, { method: 'POST' })
+}
+
+export interface FieldChange {
+  key: string
+  label: string
+  old: unknown
+  new: unknown
+}
+
+export interface Compare {
+  application_id: string
+  from_revision: number
+  to_revision: number
+  sections: { key: string; title: string; changed: boolean; fields: FieldChange[] }[]
+  documents: {
+    type: string
+    label: string
+    change: 'unchanged' | 'added' | 'removed' | 'replaced'
+    old: { id: string; filename: string } | null
+    new: { id: string; filename: string } | null
+  }[]
+  changed_section_count: number
+  changed_document_count: number
+}
+
+export function compareRevisions(id: string, from: number, to: number): Promise<Compare> {
+  return request<Compare>(`/applications/${id}/compare?from=${from}&to=${to}`)
+}
+
+export function resolveFeedback(id: string, feedbackId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/feedback/${feedbackId}/resolve`, { method: 'POST' })
 }

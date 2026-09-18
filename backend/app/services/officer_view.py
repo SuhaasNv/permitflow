@@ -18,7 +18,7 @@ from app.api.v1.officer_schemas import (
 )
 from app.core.errors import NotFound
 from app.domain import completeness as completeness_rules
-from app.domain.enums import ApplicationStatus, FeedbackResolution, VerificationStatus
+from app.domain.enums import ApplicationStatus, DocumentType, FeedbackResolution, VerificationStatus
 from app.domain.form_schema import SECTIONS
 from app.domain.labels import officer_label, tone_for
 from app.domain.workflow import Actor, TransitionContext, available_actions
@@ -28,6 +28,7 @@ from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
 from app.repositories.users import UserRepository
+from app.services.compare import CompareService
 from app.services.feedback import target_label
 from app.services.operator_view import LICENCE_TITLE
 
@@ -85,7 +86,19 @@ class OfficerViewService:
             if a.requires_note and not a.enabled:
                 a.enabled = True
                 a.reason = None
-        return _assemble(app, current, revisions, docs, runs, applicant, actions, feedback, self.users)
+        changed_sections, changed_docs, previous_no = CompareService(self.db).changed_since_previous(app)
+        return _assemble(
+            app,
+            current,
+            revisions,
+            docs,
+            runs,
+            applicant,
+            actions,
+            feedback,
+            self.users,
+            changed=(changed_sections, changed_docs, previous_no),
+        )
 
 
 def _assemble(
@@ -98,6 +111,7 @@ def _assemble(
     actions: list[ActionOut],
     feedback: list[Feedback],
     users: UserRepository,
+    changed: tuple[set[str], set[DocumentType], int | None] = (set(), set(), None),
 ) -> OfficerApplicationOut:
     form = current.form_data if current else app.draft_data
     comp = completeness_rules.compute(form, {d.document_type for d in docs})
@@ -204,6 +218,10 @@ def _assemble(
             for r in revisions
         ],
         current_revision_number=current.revision_number if current else 0,
+        previous_revision_number=changed[2],
+        changed_sections=sorted(changed[0]),
+        changed_document_types=sorted(t.value for t in changed[1]),
+        addressed_unresolved_count=sum(1 for f in feedback if f.resolution == FeedbackResolution.ADDRESSED),
         feedback=feedback_out,
         open_feedback_count=sum(1 for f in feedback if f.resolution == FeedbackResolution.OPEN),
         feedback_editable=editable,

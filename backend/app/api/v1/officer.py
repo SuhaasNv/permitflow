@@ -111,3 +111,14 @@ def withdraw_feedback(
     """Withdraw an open item; only while Under Review (409 otherwise)."""
     FeedbackService(db).withdraw(user, application_id, feedback_id)
     return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
+    "/applications/{application_id}/feedback/{feedback_id}/resolve", response_model=OfficerApplicationOut
+)
+def resolve_feedback(
+    application_id: uuid.UUID, feedback_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """Mark an open or addressed item resolved (FR-024). Audited; 409 outside the officer's states."""
+    FeedbackService(db).resolve(user, application_id, feedback_id)
+    return OfficerViewService(db).get(user, application_id)
