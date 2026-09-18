@@ -107,8 +107,13 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 
 ### US-048 — As a signed-in user, I want to be warned only when my session is about to end, so that the top bar does not raise questions the rest of the time.
 - Acceptance criteria: the top bar shows nothing about the session while more than 30 minutes remain; inside 30 minutes it shows "Session ends in n min", updated every minute, emphasised inside 5 minutes; at expiry the proactive sign-out and the sign-in explanation stay as they were (US-033).
-- Priority: MVP · Day 3 (from the user's walkthrough, 20 Sep) · Dependencies: US-001, US-033 · Requirements: UX-002, SEC-006 · Branch `fix/us-048-session-warning`
+- Priority: MVP · Day 3 (from the user's walkthrough, 19 Sep) · Dependencies: US-001, US-033 · Requirements: UX-002, SEC-006 · Branch `fix/us-048-session-warning`
 - Definition of Done: `lib/session.test.ts`; browser check at 8 h, 12 min and 3 min remaining.
+
+### US-050 — As the team, I want the findings of three independent bug-hunting reviews (backend rules, frontend interaction, seams) fixed and recorded, so that the release ships without the defects a reviewer would find first.
+- Acceptance criteria: every High and Medium finding in `docs/reviews/BUG_HUNT_REVIEW.md` fixed with a regression test where one can capture it; Low findings fixed or explicitly kept with the reason; all suites green afterwards.
+- Priority: MVP · Day 3 (requested 19 Sep) · Dependencies: everything shipped before it · Requirements: all · Branch `fix/us-050-bug-hunt`
+- Definition of Done: review doc written; backend, vitest and the seven Playwright specs green.
 
 ## UC1 — Operator Submission & Resubmission
 
@@ -289,7 +294,7 @@ Not in the assessment brief; added as a product decision (SCOPE.md, S7). Read-on
 
 ### US-049 — As an officer reviewing a resubmission, I want to mark an addressed item as not fixed so it reopens with the same text, so that I can request the next round without retyping the feedback.
 - Acceptance criteria: Not fixed on an addressed item (only while Under Review) sets it back to Open with the same message and target, takes it out of the operator's view until the next round is requested (freeze rule kept), is audited as `feedback.reopened` and counts as open so Request resubmission is available; Undo for 10 s like withdraw and resolve; the operator then sees the item as Needs your change again with the same text and history keeps both rounds.
-- Priority: MVP · Day 3 (from the user's walkthrough, 20 Sep: a replaced document flips the item to Addressed, leaving nothing open to send) · Dependencies: US-028, US-039 · Requirements: FR-024 · Branch `feat/us-049-reopen-feedback`
+- Priority: MVP · Day 3 (from the user's walkthrough, 19 Sep: a replaced document flips the item to Addressed, leaving nothing open to send) · Dependencies: US-028, US-039 · Requirements: FR-024 · Branch `feat/us-049-reopen-feedback`
 - Definition of Done: `tests/integration/test_feedback_reopen.py`; scenario 04 extended with a not-fixed round; STATE_MACHINE, ARCHITECTURE, USER_JOURNEY updated.
 
 ## UC3 — On-Site Assessment & Post-Site Clarification (DEFERRED)

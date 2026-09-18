@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import type { ApplicationSummary } from '@/api/applications'
 import { useAuth } from '@/features/auth/AuthContext'
+import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
 import { EmptyPanel, ErrorPanel, Skeleton } from '@/features/shared/states'
 import { cn } from '@/lib/cn'
@@ -158,7 +159,17 @@ export function OperatorDashboardPage() {
       </div>
       {create.isError ? (
         <div className="mb-4">
-          <ErrorPanel error={create.error} onRetry={() => create.reset()} />
+          <Alert
+            tone="error"
+            title="Could not start a new application"
+            action={
+              <Button size="sm" variant="secondary" onClick={() => create.reset()}>
+                Dismiss
+              </Button>
+            }
+          >
+            {create.error.message} Press New application to try again.
+          </Alert>
         </div>
       ) : null}
       {apps.isPending ? (

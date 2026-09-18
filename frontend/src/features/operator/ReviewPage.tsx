@@ -68,7 +68,7 @@ export function ReviewPage() {
   }
   if (app.isError) {
     if (app.error instanceof AppError && app.error.status === 404)
-      return <NotFoundPanel backTo="/app/dashboard" backLabel="Back to my applications" />
+      return <NotFoundPanel backTo="/app/applications" backLabel="Back to my applications" />
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   if (schema.isError) return <ErrorPanel error={schema.error} onRetry={() => void schema.refetch()} />
@@ -78,7 +78,8 @@ export function ReviewPage() {
   // Review is only for an editable application; a submitted or decided one shows its own page.
   // Locked applications go back to their page, except right after this page's own submit succeeded:
   // the mutation's data lands before its navigation to the confirmation page.
-  if (!view.can_edit && !submit.isSuccess && !submit.isPending) return <Navigate to={base} replace />
+  // Locked applications and resubmissions (Resubmit lives on the application page) go back to their page.
+  if ((!view.can_edit || view.resubmit) && !submit.isSuccess && !submit.isPending) return <Navigate to={base} replace />
   const withAttention = view.document_slots.filter((s) => s.document?.verification && ATTENTION.has(s.document.verification.status))
   const stillChecking = view.document_slots.filter(
     (s) => s.document?.verification && (s.document.verification.status === 'pending' || s.document.verification.status === 'running'),

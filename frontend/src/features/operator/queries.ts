@@ -21,8 +21,8 @@ const ACTIVE_VERIFICATION = new Set(['pending', 'running'])
 /** Stop polling a check that has been pending or running longer than this; the slot then offers Re-run. */
 export const CHECK_STALE_MS = 3 * 60 * 1000
 
-export function isCheckStale(uploadedAt: string, now: number = Date.now()): boolean {
-  return now - new Date(uploadedAt).getTime() > CHECK_STALE_MS
+export function isCheckStale(requestedAt: string, now: number = Date.now()): boolean {
+  return now - new Date(requestedAt).getTime() > CHECK_STALE_MS
 }
 
 export function useApplications() {
@@ -40,7 +40,10 @@ export function useApplication(id: string) {
       const view = query.state.data
       if (!view) return false
       const active = view.document_slots.some(
-        (s) => s.document?.verification && ACTIVE_VERIFICATION.has(s.document.verification.status) && !isCheckStale(s.document.uploaded_at),
+        (s) =>
+          s.document?.verification &&
+          ACTIVE_VERIFICATION.has(s.document.verification.status) &&
+          !isCheckStale(s.document.verification.requested_at),
       )
       return active ? 2000 : false
     },

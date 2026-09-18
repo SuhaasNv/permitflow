@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
@@ -12,7 +13,7 @@ import { cn } from '@/lib/cn'
 import { ApplicationHeader } from './ApplicationHeader'
 import { CompletionCard } from './CompletionCard'
 import { FeedbackNotice, targetHref } from './FeedbackNotice'
-import { useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
+import { applicationKeys, useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
 
 const ArrowIcon = (
   <svg
@@ -37,7 +38,17 @@ export function ApplicationPage() {
   const resubmit = useResubmitApplication(id)
   const navigate = useNavigate()
   const toast = useToast()
+  const queryClient = useQueryClient()
   const [confirm, setConfirm] = useState(false)
+  /** A 409 means the application moved under us (the officer decided, another tab acted): reload, never show the raw reason. */
+  const explainConflict = (e: Error, title: string) => {
+    if (e instanceof AppError && e.status === 409) {
+      toast.push({ title, body: 'This application changed since you opened it. Showing the latest.', tone: 'error' })
+      void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(id) })
+      return
+    }
+    toast.push({ title, body: e.message, tone: 'error' })
+  }
   const withdraw = useWithdrawApplication(id)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [reason, setReason] = useState('')
@@ -56,7 +67,7 @@ export function ApplicationPage() {
   }
   if (app.isError) {
     if (app.error instanceof AppError && app.error.status === 404) {
-      return <NotFoundPanel backTo="/app/dashboard" backLabel="Back to my applications" />
+      return <NotFoundPanel backTo="/app/applications" backLabel="Back to my applications" />
     }
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
@@ -65,7 +76,9 @@ export function ApplicationPage() {
   const docsDone = view.completeness.documents_present === view.completeness.documents_total
   const responding = view.resubmit !== null
   const firstOpen = view.feedback.find((f) => f.resolution === 'open')
-  const openCount = view.feedback.filter((f) => f.resolution === 'open').length
+  // Readiness counts flagged targets (sections and document types), never feedback items.
+  const changedTargets = view.resubmit ? view.resubmit.changed_sections.length + view.resubmit.changed_document_types.length : 0
+  const flaggedTargets = view.resubmit ? changedTargets + view.resubmit.untouched_targets.length : 0
   const doResubmit = () => {
     if (resubmit.isPending) return
     resubmit.mutate(undefined, {
@@ -76,7 +89,7 @@ export function ApplicationPage() {
       },
       onError: (e) => {
         setConfirm(false)
-        toast.push({ title: 'Could not resubmit', body: e.message, tone: 'error' })
+        explainConflict(e, 'Could not resubmit')
       },
     })
   }
@@ -105,7 +118,7 @@ export function ApplicationPage() {
       },
       onError: (e) => {
         setWithdrawOpen(false)
-        toast.push({ title: 'Could not withdraw', body: e.message, tone: 'error' })
+        explainConflict(e, 'Could not withdraw')
       },
     })
   }
@@ -182,7 +195,7 @@ export function ApplicationPage() {
             tone={view.resubmit.can_resubmit ? 'success' : 'warning'}
             title={
               view.resubmit.can_resubmit
-                ? `Ready to resubmit: ${[...view.resubmit.changed_sections, ...view.resubmit.changed_document_types].length} of ${openCount} flagged ${openCount === 1 ? 'item' : 'items'} changed.`
+                ? `Ready to resubmit: ${changedTargets} of ${flaggedTargets} flagged ${flaggedTargets === 1 ? 'item' : 'items'} changed.`
                 : 'Nothing has changed yet.'
             }
           >

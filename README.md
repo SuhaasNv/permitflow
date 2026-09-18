@@ -2,7 +2,7 @@
 
 A regulatory licensing platform: business operators apply for a Food Establishment Licence, licensing officers review, give contextual feedback and request targeted resubmissions, and every uploaded document is checked by an advisory AI verifier. Built as a 3-day engineering assessment.
 
-Status: Sprint 2 in progress (19 Sep 2026). Shipped so far: operator application, checked uploads and submission (Sprint 1); officer queue, case review with AI evidence, contextual feedback and templates, status transitions with notifications, operator resubmission of flagged parts only, revision compare and feedback resolution (Sprint 2). Details in `CHANGELOG.md`; scope in `SCOPE.md`; documentation index in `docs/README.md`. What exists today is listed in `CHANGELOG.md`; scope is in `SCOPE.md`; documentation index in `docs/README.md`.
+Status: Sprint 3 in progress (19 Sep 2026). Shipped: the operator application with checked uploads and submission (Sprint 1); the officer review loop with contextual feedback, resubmission of flagged parts only, revision compare and feedback resolution, notifications, audit trail and the live OpenAI provider (Sprint 2); withdrawal, draft deletion, feedback undo and reopen, the Playwright journey and scenario suite, the AI evaluation harness, CI with images to GHCR and Railway deployment (Sprint 3 so far). What exists today is listed in `CHANGELOG.md`; scope is in `SCOPE.md`; documentation index in `docs/README.md`.
 
 ## Run locally
 
@@ -76,7 +76,7 @@ Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway 
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every push and pull request to `main` and `dev`, five jobs:
+`.github/workflows/ci.yml` runs on every push and pull request to `main` and `dev`, seven jobs:
 
 | Job | What it does |
 |-----|--------------|
@@ -96,6 +96,6 @@ The E2E job waits for the backend and frontend suites, so a broken unit test nev
 
 Every uploaded document is checked in the background against the application form (`backend/app/services/verification.py`): text is extracted (PDF and TXT; images are stored but reported as unreadable), sent to a provider behind the `VerificationProvider` interface, and the structured result is validated and post-processed by deterministic rules before it is stored. `AI_PROVIDER=mock` (default) uses a deterministic provider with no network; `AI_PROVIDER=openai` uses the OpenAI API with `OPENAI_API_KEY` and `OPENAI_MODEL` (default `gpt-4.1-mini`). Results are advisory: they never change an application's status, and the operator sees a plain-language outcome while the officer also sees confidence, evidence and the model used. Design and prompt contract: `docs/ai/AI_VERIFICATION_DESIGN.md`.
 
-**CI for the AI.** The `ai` job in `ci.yml` audits the configuration (pinned wire schema, prompt version, default model, provider wiring), runs the provider contract tests, then runs fourteen golden cases (the demo PDFs, edge cases and two prompt-injection styles) through the real pipeline with the mock provider and fails below 100 %; the verdict is written to the run summary. The same set is run by hand against OpenAI whenever the prompt or model changes and the result is recorded with the date in `docs/ai/AI_EVALUATION.md` (14 of 14 on 20 Sep 2026). A dependency audit job (pip-audit, npm audit on production dependencies) reports without blocking.
+**CI for the AI.** The `ai` job in `ci.yml` audits the configuration (pinned wire schema, prompt version, default model, provider wiring), runs the provider contract tests, then runs fourteen golden cases (the demo PDFs, edge cases and two prompt-injection styles) through the real pipeline with the mock provider and fails below 100 %; the verdict is written to the run summary. The same set is run by hand against OpenAI whenever the prompt or model changes and the result is recorded with the date in `docs/ai/AI_EVALUATION.md` (14 of 14 on 19 Sep 2026). A dependency audit job (pip-audit, npm audit on production dependencies) reports without blocking.
 
 Sections on AI usage and "what I would do next" are added as the corresponding stories land (see `docs/planning/SPRINTS.md`).

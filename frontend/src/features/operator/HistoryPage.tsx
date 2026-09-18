@@ -34,7 +34,7 @@ export function HistoryPage() {
   }
   if (app.isError) {
     if (app.error instanceof AppError && app.error.status === 404)
-      return <NotFoundPanel backTo="/app/dashboard" backLabel="Back to my applications" />
+      return <NotFoundPanel backTo="/app/applications" backLabel="Back to my applications" />
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   if (schema.isError) return <ErrorPanel error={schema.error} onRetry={() => void schema.refetch()} />

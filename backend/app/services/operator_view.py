@@ -108,6 +108,7 @@ def document_view(
             issues=[{k: v for k, v in i.items() if k != "evidence"} for i in run.issues],
             missing_information=list(run.missing_information),
             error_reason=run.error_reason,
+            requested_at=run.created_at,
             finished_at=run.finished_at,
         )
     return DocumentView(

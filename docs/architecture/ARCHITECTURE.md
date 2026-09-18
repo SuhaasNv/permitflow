@@ -154,10 +154,8 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /applications/{id}/withdraw | operator (own) | any post-submission non-terminal → withdrawn, optional reason, officers notified (built, US-038) |
 | POST | /applications/{id}/documents | operator (own) | upload / replace by type |
 | DELETE | /applications/{id}/documents/{doc_id} | operator (own) | remove a document while in `draft` only |
-| GET | /applications/{id}/documents/{doc_id}/download | owner, officer or admin | file; the document must belong to `{id}` |
+| GET | /applications/{id}/documents/{doc_id}/download | owner or officer (admin until US-072: 403) | file; the document must belong to `{id}` |
 | POST | /applications/{id}/documents/{doc_id}/verify | owner or officer | re-run verification (only when the latest run is terminal); 202 |
-| GET | /applications/{id}/revisions | owner, officer or admin | list revisions |
-| GET | /applications/{id}/revisions/{n} | owner, officer or admin | snapshot |
 | GET | /applications/{id}/compare?from=n&to=m | owner or officer (admin with US-072) | field-level form diff and document add/remove/replace from `domain/diff.py`; 404 for unknown revisions (built, US-027) |
 | GET | /officer/applications | officer | queue: every non-draft application with applicant, internal status + officer label, server-derived next action and whose turn it is, revision count, open feedback count, document-check attention and checking counts, first submission and last activity; plus turn counts (built, US-020) |
 | GET | /officer/applications/{id} | officer | case view: current revision's sections, current documents with full verification detail (confidence, evidence, model), revision history, available transitions with guard reasons, `version` (built, US-021; feedback and audit lists join with US-023 and US-029) |
@@ -167,13 +165,13 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /officer/applications/{id}/feedback/{fid}/withdraw | officer | open → withdrawn; 409 unless `under_review` and open; `{fid}` must belong to `{id}`; audit `feedback.withdrawn` (built, US-023) |
 | POST | /officer/applications/{id}/documents/{doc_id}/verify | officer | re-run the AI check; same rules and audit as the operator re-run; returns the officer view (built, US-022) |
 | GET | /officer/applications/{id}/audit | officer | append-only audit trail with actor name and role, plain-language summary (`domain/audit_labels.py`) and payload, chronological (built, US-029) |
-| GET | /admin/overview | admin | counts by status, idle applications, today's submissions |
-| GET | /admin/ai-health | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
-| GET | /admin/audit-feed | admin | latest 50 audit events across applications |
-| GET | /admin/users | admin | user directory |
-| POST | /admin/users | admin | create user `{full_name, email, role}`; audit `user.created` |
-| PATCH | /admin/users/{id} | admin | change `role` and/or `is_active`; audit `user.role_changed` / `user.deactivated` / `user.reactivated`; 409 when it would remove the last active admin |
-| GET | /admin/applications/{id} | admin | officer view, read-only (mutations 403) |
+| GET | /admin/overview (planned, US-070) | admin | counts by status, idle applications, today's submissions |
+| GET | /admin/ai-health (planned, US-070) | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
+| GET | /admin/audit-feed (planned, US-071) | admin | latest 50 audit events across applications |
+| GET | /admin/users (planned, US-073) | admin | user directory |
+| POST | /admin/users (planned, US-073) | admin | create user `{full_name, email, role}`; audit `user.created` |
+| PATCH | /admin/users/{id} (planned, US-073) | admin | change `role` and/or `is_active`; audit `user.role_changed` / `user.deactivated` / `user.reactivated`; 409 when it would remove the last active admin |
+| GET | /admin/applications/{id} (planned, US-072) | admin | officer view, read-only (mutations 403) |
 | GET | /notifications | any | own notifications (newest first, 50) plus `unread_count` (built, US-025) |
 | POST | /notifications/{id}/read | any | mark read; another user's id is 404 (built, US-025) |
 | POST | /notifications/read-all | any | mark every own notification read (built, US-025) |
@@ -185,7 +183,7 @@ All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail":
 
 ```
 frontend/src
-  api/            generated OpenAPI types + thin fetch client (auth header, error mapping)
+  api/            hand-written types mirroring app/schemas + thin fetch client (auth header, error mapping)
   app/            router, providers (QueryClient, Auth), layout shell
   features/
     auth/         login page, useAuth
@@ -224,4 +222,4 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 ## Deployment
 
 - Local: `docker compose up db` (PostgreSQL only; the API and the frontend run natively with `uvicorn` and `vite`) or `docker compose --profile full up` to also run the API container. A local database is kept because the test suite truncates tables between tests and because a reviewer must be able to run the system from a clean clone without any hosted credentials (NFR-001).
-- Railway, two environments: `development` deploys from the `dev` branch and `production` from `main` (see `docs/operations/BRANCHING.md`). Each has its own PostgreSQL and its own variables. Per environment: `backend` service from `backend/Dockerfile` with a volume at `/data/uploads`, `frontend` static service built from `frontend/` with `VITE_API_URL`. See `docs/operations/OPERATIONS.md`.
+- Railway, two environments (`development` from `dev`, `production` from `main`), each with its own Postgres, uploads volume, secrets and domains; both tiers run as GHCR images built once in CI (frontend: nginx with the API URL injected at start), deployed by `deploy.yml` behind health gates and, for production, a reviewer approval. Shape, secrets, seeding and rollback: `docs/operations/OPERATIONS.md`.

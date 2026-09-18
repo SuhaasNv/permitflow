@@ -33,7 +33,7 @@ test('operator applies, every AI check lands, submission is recorded', async ({ 
   await fillSection(page, OPERATIONS)
   await page.locator('[name="information_accurate"]').check()
   await page.locator('[name="consent_to_inspection"]').check()
-  await page.getByRole('button', { name: /Save and review/ }).click()
+  await page.getByRole('button', { name: /Save and continue/ }).click()
   await expect(page).toHaveURL(/\/documents$/)
 
   for (const slot of DOCUMENT_TYPES) await uploadTxt(page, slot, `${slot}.txt`)

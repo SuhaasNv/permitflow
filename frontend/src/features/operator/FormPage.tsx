@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 
@@ -13,7 +14,7 @@ import { guardUnload, setUnsaved } from '@/lib/unsaved'
 import { ApplicationHeader } from './ApplicationHeader'
 import { SectionForm } from './SectionForm'
 import type { SectionFormHandle } from './SectionForm'
-import { useApplication, useFormSchema, useUpdateSection } from './queries'
+import { applicationKeys, useApplication, useFormSchema, useUpdateSection } from './queries'
 import { nextRespondTarget } from './respond'
 
 export function FormPage() {
@@ -22,6 +23,7 @@ export function FormPage() {
   const app = useApplication(id)
   const schema = useFormSchema()
   const update = useUpdateSection(id)
+  const queryClient = useQueryClient()
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [exiting, setExiting] = useState(false)
   const formRef = useRef<SectionFormHandle>(null)
@@ -56,7 +58,7 @@ export function FormPage() {
   }
   if (app.isError) {
     if (app.error instanceof AppError && app.error.status === 404)
-      return <NotFoundPanel backTo="/app/dashboard" backLabel="Back to my applications" />
+      return <NotFoundPanel backTo="/app/applications" backLabel="Back to my applications" />
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   if (schema.isError) return <ErrorPanel error={schema.error} onRetry={() => void schema.refetch()} />
@@ -66,12 +68,15 @@ export function FormPage() {
   const activeKey =
     sectionKey && sections.some((s) => s.key === sectionKey)
       ? sectionKey
-      : (view.sections.find((s) => !s.complete)?.key ?? sections[0]?.key ?? '')
+      : (view.sections.find((s) => s.editable && !s.complete)?.key ??
+        view.sections.find((s) => s.editable)?.key ??
+        view.sections.find((s) => !s.complete)?.key ??
+        sections[0]?.key ??
+        '')
   const activeIndex = sections.findIndex((s) => s.key === activeKey)
   const section = sections[activeIndex]
   const state = view.sections.find((s) => s.key === activeKey)
-  if (!section || !state) return <NotFoundPanel backTo="/app/dashboard" backLabel="Back to my applications" />
-  const isLast = activeIndex === sections.length - 1
+  if (!section || !state) return <NotFoundPanel backTo="/app/applications" backLabel="Back to my applications" />
   const base = `/app/applications/${id}`
   // Responding to feedback: only flagged targets are editable; "continue" walks them and ends at Resubmit.
   const responding = view.resubmit !== null
@@ -123,7 +128,15 @@ export function FormPage() {
   ]
 
   const save = async (payload: Record<string, unknown>, andContinue: boolean) => {
-    await update.mutateAsync({ key: section.key, data: payload })
+    try {
+      await update.mutateAsync({ key: section.key, data: payload })
+    } catch (error) {
+      // 403 or 409: the application moved under us (officer decided, round closed). Refetch so the form locks itself.
+      if (error instanceof AppError && (error.status === 403 || error.status === 409)) {
+        void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(id) })
+      }
+      throw error
+    }
     dirtyRef.current = false
     setUnsaved(false)
     setSavedAt(Date.now())
@@ -303,7 +316,6 @@ export function FormPage() {
             editable={state.editable}
             saving={update.isPending}
             savedAt={savedAt}
-            isLast={isLast}
             continueLabel={
               nextTarget
                 ? nextTarget.kind === 'section'

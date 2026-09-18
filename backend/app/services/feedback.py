@@ -239,6 +239,10 @@ def restorable(item: Feedback, status: ApplicationStatus, officer_id: uuid.UUID,
     if item.resolution == FeedbackResolution.WITHDRAWN:
         return status == ApplicationStatus.UNDER_REVIEW
     if item.resolution == FeedbackResolution.RESOLVED:
+        # Undoing a resolve that would put an item back to open is only safe while the review is open:
+        # the site visit guard ("no open feedback") must not be bypassed after the fact.
+        if item.previous_resolution == FeedbackResolution.OPEN:
+            return status == ApplicationStatus.UNDER_REVIEW
         return status in _RESOLVABLE_STATES
     reopened = item.resolution == FeedbackResolution.OPEN
     if reopened and item.previous_resolution == FeedbackResolution.ADDRESSED:

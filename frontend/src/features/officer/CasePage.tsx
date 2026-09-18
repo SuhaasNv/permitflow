@@ -313,7 +313,14 @@ export function OfficerCasePage() {
             tone="warning"
             title="This application changed since you opened it"
             action={
-              <Button variant="secondary" size="sm" onClick={() => void app.refetch()}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  transition.reset()
+                  void app.refetch()
+                }}
+              >
                 Reload
               </Button>
             }
@@ -473,7 +480,7 @@ export function OfficerCasePage() {
             </ol>
           </section>
 
-          <ComparePanel view={view} />
+          <ComparePanel key={view.current_revision_number} view={view} />
 
           <section className="pf-surface" aria-labelledby="history-title">
             <div className="border-b border-line px-5 py-4 sm:px-7">
@@ -517,6 +524,7 @@ export function OfficerCasePage() {
         onConfirm={confirm}
         onCancel={() => {
           setPending(null)
+          setNote('')
           setNoteError(null)
         }}
       >

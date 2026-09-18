@@ -53,7 +53,15 @@ def _error_response(request: Request, status: int, code: str, message: str) -> J
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="PermitFlow API", version="0.1.0", lifespan=lifespan, docs_url="/api/docs")
+    # Interactive docs stay available outside production (THREAT_MODEL: no public schema in production).
+    expose_docs = settings.app_env != "production"
+    app = FastAPI(
+        title="PermitFlow API",
+        version="0.3.0",
+        lifespan=lifespan,
+        docs_url="/api/docs" if expose_docs else None,
+        openapi_url="/api/openapi.json" if expose_docs else None,
+    )
 
     # Added first, so it sits inside CORS: an unhandled error or an exhausted pool is answered with the
     # standard error body and the CORS headers, instead of a bare 500 the browser cannot read (US-044).
@@ -99,9 +107,13 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+        errors = exc.errors()
+        # A malformed id in the path (a mistyped or truncated link) is a missing resource to the user.
+        if errors and all(e.get("loc", [None])[0] == "path" for e in errors):
+            return _error_response(request, 404, "not_found", "Not found.")
         fields = [
             {"loc": [str(p) for p in e.get("loc", [])], "msg": e.get("msg", ""), "type": e.get("type", "")}
-            for e in exc.errors()
+            for e in errors
         ]
         body = {
             "error": {

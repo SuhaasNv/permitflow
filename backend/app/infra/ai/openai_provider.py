@@ -107,9 +107,25 @@ class OpenAIProvider:
             raise ProviderError("empty response")
         try:
             wire = WireResult.model_validate_json(content)
-            return VerificationResult.model_validate(wire.model_dump())
+            return VerificationResult.model_validate(_bounded(wire.model_dump()))
         except Exception as exc:
             raise ProviderError(f"schema validation failed: {exc}") from exc
+
+
+def _bounded(data: dict[str, Any]) -> dict[str, Any]:
+    """The strict wire schema cannot carry length caps; trim a verbose answer to the domain limits instead of
+    failing the run (the officer would see "check failed" for a perfectly readable result)."""
+    data["summary"] = str(data.get("summary") or "")[:2000] or "No summary."
+    issues = []
+    for issue in list(data.get("issues") or [])[:20]:
+        issue = dict(issue)
+        issue["message"] = str(issue.get("message") or "")[:500] or "Issue reported."
+        if issue.get("evidence") is not None:
+            issue["evidence"] = str(issue["evidence"])[:300]
+        issues.append(issue)
+    data["issues"] = issues
+    data["missing_information"] = [str(m)[:200] for m in list(data.get("missing_information") or [])[:20]]
+    return data
 
 
 def _strictify(schema: dict[str, Any]) -> None:

@@ -32,11 +32,16 @@ export function NotificationsBell({ role }: { role: Role }) {
 
   useEffect(() => {
     if (!open) return
+    const close = () => {
+      setOpen(false)
+      // Return focus to the bell so keyboard users are not dropped on the page body.
+      ref.current?.querySelector<HTMLButtonElement>('button')?.focus()
+    }
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) close()
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') close()
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)

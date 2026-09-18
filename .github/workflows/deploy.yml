@@ -52,9 +52,29 @@ jobs:
         run: |
           railway redeploy --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service backend --from-source --yes
           railway redeploy --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service frontend --from-source --yes
+      - name: Wait for the NEW deployments to succeed (redeploy returns before the rollout)
+        run: |
+          # The health URLs keep answering from the old containers during the rollout, so the gate must
+          # first wait for Railway to report the new deployment of each service as SUCCESS.
+          wait_for() {
+            service="$1"
+            for i in $(seq 1 60); do
+              json=$(railway deployment list --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service "$service" --limit 1 --json)
+              status=$(echo "$json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[0]["status"] if d else "NONE")')
+              echo "$service: $status"
+              case "$status" in
+                SUCCESS) return 0 ;;
+                FAILED|CRASHED|REMOVED) echo "$service deployment ended in $status"; return 1 ;;
+              esac
+              sleep 10
+            done
+            echo "$service did not reach SUCCESS in time"; return 1
+          }
+          wait_for backend
+          wait_for frontend
       - name: Post-deploy gate (health of both tiers)
         run: |
-          for i in $(seq 1 40); do
+          for i in $(seq 1 30); do
             if curl -fsS "$BACKEND_URL/api/v1/health" > /dev/null && curl -fsS "$FRONTEND_URL/healthz" > /dev/null; then
               echo "both tiers healthy after $i checks"; exit 0
             fi
