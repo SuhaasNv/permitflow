@@ -43,3 +43,8 @@ The state table is the most scrutinised business rule in the brief. Making it a 
 - Parametrised tests: every allowed transition succeeds for its role; every other combination raises `InvalidTransition`.
 - Label test asserts the twelve-row mapping for both roles.
 - Integration test asserts an operator cannot trigger an officer-only transition via the API (403) and an officer cannot skip states (409).
+
+## Amendments (as built)
+- 19 Sep 2026 (US-038): a fourteenth state `withdrawn`, terminal, reachable by the operator (owner) from every post-submission non-terminal state with an optional reason. First transition with `Actor.OPERATOR` outside submit and resubmit; officers are notified; the operator is the audit actor.
+- 19 Sep 2026 (US-031 follow-up): `pending_approval → under_review` ("Return to review", officer) so an officer who notices something at the decision step can add feedback or request a resubmission instead of rejecting. No new state.
+- The unit test now iterates 14 states × 14 targets × 3 actors (588 cases) plus guards; the label test covers the withdrawn row for both roles.
