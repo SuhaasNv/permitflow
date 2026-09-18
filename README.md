@@ -72,7 +72,7 @@ docs/      requirements, architecture, ADRs, design system and prototype, planni
 
 `main` is production, `dev` is integration, work happens on `feat/*` branches: `docs/operations/BRANCHING.md`.
 
-Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway pulls them. Push to `dev` deploys the `development` environment, push to `main` deploys `production`, each with its own database, uploads volume and secrets, gated on health after deploy. Development: https://frontend-development-afe2.up.railway.app. Details, secrets, seeding and rollback: `docs/operations/OPERATIONS.md`.
+Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway pulls them. Push to `dev` deploys the `development` environment automatically; push to `main` prepares a `production` deployment that waits for the owner's approval in GitHub Actions before Railway is touched. Each environment has its own database, uploads volume and secrets, and every deployment is gated on health afterwards. Either can be redeployed by hand from the Deploy workflow. Development: https://frontend-development-afe2.up.railway.app. Details, secrets, seeding and rollback: `docs/operations/OPERATIONS.md`.
 
 ## CI
 
