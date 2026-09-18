@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
-import { downloadDocument } from '@/api/documents'
+import { downloadDocument, downloadLicence } from '@/api/documents'
 import type { OfficerAction, OfficerApplication } from '@/api/officer'
 import { useFormSchema } from '@/features/operator/queries'
 import { displayValue } from '@/features/operator/SectionSummary'
 import { Alert } from '@/features/shared/Alert'
-import { Button } from '@/features/shared/Button'
+import { Button, buttonClasses } from '@/features/shared/Button'
 import { TextAreaField } from '@/features/shared/Controls'
 import { Dialog } from '@/features/shared/Dialog'
 import { Breadcrumb } from '@/features/shared/Breadcrumb'
@@ -94,6 +94,7 @@ function ReviewRail({
   onAction: (action: OfficerAction) => void
   busy: boolean
 }) {
+  const toast = useToast()
   const s = view.verification_summary
   const primary = view.actions.find((a) => a.enabled && !a.requires_note)
   const rest = view.actions.filter((a) => a !== primary)
@@ -112,6 +113,26 @@ function ReviewRail({
                 : 'Every status change is recorded with your name in the audit trail.'}
           </p>
         </div>
+        {view.licence ? (
+          <div className="mx-5 mb-5 mt-4 rounded-md border border-success-line bg-success-soft/50 px-4 py-3 text-sm">
+            <div className="font-semibold">Licence {view.licence.licence_no}</div>
+            <div className="mt-0.5 text-[13px] text-text-2">
+              Valid {formatDate(view.licence.valid_from)} to {formatDate(view.licence.valid_to)} · code {view.licence.verification_code}
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={() =>
+                void downloadLicence(view.id, view.licence?.licence_no ?? 'licence').catch((e: unknown) =>
+                  toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                )
+              }
+            >
+              Download licence (PDF)
+            </Button>
+          </div>
+        ) : null}
         {view.actions.length > 0 ? (
           <div className="flex flex-col gap-2 px-5 pb-5 pt-4">
             {primary ? (
@@ -130,6 +151,11 @@ function ReviewRail({
                 {a.label}
               </Button>
             ))}
+            {view.status === 'pending_approval' ? (
+              <Link to={`/officer/applications/${view.id}/licence-preview`} className={buttonClasses('ghost')}>
+                Preview licence
+              </Link>
+            ) : null}
             {rest.some((a) => !a.enabled && a.reason) ? (
               <ul className="mt-1 flex flex-col gap-1 text-xs leading-[17px] text-text-3">
                 {rest
@@ -529,6 +555,12 @@ export function OfficerCasePage() {
         }}
       >
         <p>{copy?.body}</p>
+        {pending?.target === 'approved' ? (
+          <p className="text-text-3">
+            Approving issues the licence certificate at once; the operator can download it from their application page. Use "Preview
+            licence" on the case first if you want to check it.
+          </p>
+        ) : null}
         {pending?.requires_note || pending?.target === 'approved' ? (
           <TextAreaField
             label={pending.requires_note ? 'Note to the operator' : 'Note to the operator'}

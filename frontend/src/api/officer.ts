@@ -157,6 +157,7 @@ export interface OfficerApplication {
   actions: OfficerAction[]
   decision_note: string | null
   withdrawal_reason: string | null
+  licence: import('./applications').LicenceView | null
   version: number
   created_at: string
   updated_at: string

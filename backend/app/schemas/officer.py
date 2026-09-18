@@ -7,6 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.applications import LicenceView
+
 
 class QueueItemOut(BaseModel):
     id: uuid.UUID
@@ -169,6 +171,7 @@ class OfficerApplicationOut(BaseModel):
     decision_note: str | None
     # Operator's reason when they withdrew (US-038).
     withdrawal_reason: str | None
+    licence: LicenceView | None = None
     version: int
     created_at: datetime
     updated_at: datetime

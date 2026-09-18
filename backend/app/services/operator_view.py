@@ -13,6 +13,7 @@ from app.schemas.applications import (
     CompletenessView,
     DocumentSlotView,
     DocumentView,
+    LicenceView,
     OperatorFeedbackView,
     ResubmitReadiness,
     RevisionSummaryView,
@@ -133,6 +134,7 @@ def operator_view(
     feedback: list[OperatorFeedbackView] | None = None,
     resubmit: ResubmitReadiness | None = None,
     revisions: list[RevisionSummaryView] | None = None,
+    licence: LicenceView | None = None,
 ) -> ApplicationOperatorView:
     documents = documents or []
     docs_by_type = {d.document_type: (d, r) for d, r in documents}
@@ -197,6 +199,7 @@ def operator_view(
         can_withdraw=can_withdraw(app.status),
         can_delete=app.status == ApplicationStatus.DRAFT,
         withdrawal_reason=app.withdrawal_reason if app.status == ApplicationStatus.WITHDRAWN else None,
+        licence=licence,
         created_at=app.created_at,
         updated_at=app.updated_at,
     )

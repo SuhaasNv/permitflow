@@ -53,7 +53,7 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `pending_post_site_resubmission` | `post_site_clarification_resubmitted` | operator (owner) | — | UC3 (deferred) |
 | `post_site_clarification_resubmitted` | `awaiting_post_site_clarification` | officer | — | UC3 (deferred) |
 | `post_site_clarification_resubmitted` | `pending_approval` | officer | — | UC3 (deferred) |
-| `pending_approval` | `approved` | officer | — (note optional) | Officer clicks Approve |
+| `pending_approval` | `approved` | officer | — (note optional) | Officer clicks Approve; side effect: the licence certificate is issued in the same transaction (`licence.issued`, US-051) |
 | `pending_approval` | `rejected` | officer | — (note required) | Officer clicks Reject |
 | any post-submission, non-terminal state | `withdrawn` | operator (owner) | — (reason optional) | Operator clicks Withdraw application (US-038); `POST /applications/{id}/withdraw` |
 

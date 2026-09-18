@@ -164,6 +164,10 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
     await page.locator('dialog[open]').getByRole('button', { name: confirm }).click()
     await page.waitForTimeout(300)
   }
+  await page.getByRole('link', { name: 'Preview licence' }).click()
+  await expect(page.getByRole('heading', { name: 'Licence preview' })).toBeVisible()
+  await expect(page.locator('object[type="application/pdf"]')).toBeVisible()
+  await page.getByRole('link', { name: 'Back to the case' }).click()
   await page.getByRole('button', { name: 'Approve' }).click()
   await page
     .locator('dialog[open]')
@@ -171,7 +175,12 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
     .fill('Premises meet the requirements.')
   await page.locator('dialog[open]').getByRole('button', { name: 'Approve' }).click()
   await expect(page.locator('main span[data-tone]').first()).toHaveText('Approved')
+  await expect(page.locator('aside')).toContainText(/Licence FEL-\d{4}-\d{6}/)
+  const officerDownload = page.waitForEvent('download')
+  await page.locator('aside').getByRole('button', { name: 'Download licence (PDF)' }).click()
+  expect((await officerDownload).suggestedFilename()).toMatch(/^FEL-\d{4}-\d{6}\.pdf$/)
   await page.locator('section:has(#audit-title)').getByRole('button', { name: 'Show' }).click()
+  await expect(page.getByText(/Licence FEL-\d{4}-\d{6} issued/)).toBeVisible()
   await expect(page.getByText('Status: Route to Approval → Approved')).toBeVisible()
   await signOut(page)
 
@@ -180,4 +189,7 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
   await page.goto(appUrl)
   await expect(page.getByText('Your licence application was approved')).toBeVisible()
   await expect(page.getByText('Premises meet the requirements.')).toBeVisible()
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download licence (PDF)' }).click()
+  expect((await download).suggestedFilename()).toMatch(/^FEL-\d{4}-\d{6}\.pdf$/)
 })

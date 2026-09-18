@@ -297,6 +297,11 @@ Not in the assessment brief; added as a product decision (SCOPE.md, S7). Read-on
 - Priority: MVP · Day 3 (from the user's walkthrough, 19 Sep: a replaced document flips the item to Addressed, leaving nothing open to send) · Dependencies: US-028, US-039 · Requirements: FR-024 · Branch `feat/us-049-reopen-feedback`
 - Definition of Done: `tests/integration/test_feedback_reopen.py`; scenario 04 extended with a not-fixed round; STATE_MACHINE, ARCHITECTURE, USER_JOURNEY updated.
 
+### US-051 — As an operator whose application is approved, I want to download my licence certificate as a PDF, and as an officer I want to preview it before approving, so that the approval ends in a document the business can show.
+- Acceptance criteria: on Approve the backend renders a PDF certificate (fictional issuing unit, licence number `FEL-<year>-<n>`, business, UEN, premises, holder, valid one year in Singapore calendar dates, approving officer, decision date, application reference, verification code) inside the approval transaction, stores it under a server key on the uploads volume, records it in `licences` and audits `licence.issued`; the operator's approval notification names the licence; officers get a watermarked preview page while the application awaits a decision (nothing stored) and Download licence on the case after approval; the operator gets Download licence (PDF) in the outcome panel; owner or officer only, admin 403, 404 before approval; rejection issues nothing.
+- Priority: Nice-to-have · Day 3 (requested 19 Sep, beyond the brief) · Dependencies: US-031 · Requirements: FR-035 · Branch `feat/us-051-licence-certificate` (kept unmerged until reviewed)
+- Definition of Done: `tests/unit/test_licence_render.py`, `tests/integration/test_licence.py`; the Playwright journey covers preview and both downloads; STATE_MACHINE side effect, DOMAIN_MODEL, ARCHITECTURE, USER_JOURNEY, SCREEN_INVENTORY, SCOPE updated.
+
 ## UC3 — On-Site Assessment & Post-Site Clarification (DEFERRED)
 
 Deferred per `SCOPE.md`. The post-site states and transitions exist and are unit-tested in the state machine; the checklist data model and screens are not built.

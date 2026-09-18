@@ -15,6 +15,7 @@ from app.models import Application, User
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.feedback import FeedbackRepository
+from app.services.licence import LicenceService
 from app.services.notifications import NotificationService
 
 
@@ -74,6 +75,10 @@ class WorkflowService:
                 )
         if note is not None and resolved in (ApplicationStatus.APPROVED, ApplicationStatus.REJECTED):
             app.decision_note = note
+        licence_no: str | None = None
+        if resolved == ApplicationStatus.APPROVED:
+            # The certificate is part of the approval: same transaction, audited, or neither happens (US-051).
+            licence_no = LicenceService(self.db).issue(app, officer).licence_no
         app.version += 1
         self.audit.record(
             application_id=app.id,
@@ -91,7 +96,7 @@ class WorkflowService:
             app,
             NotificationKind.STATUS_CHANGED,
             f"{app.reference_no}: {operator_label(resolved)}",
-            _operator_body(resolved, note),
+            _operator_body(resolved, note, licence_no),
         )
         self.db.commit()
         self.notifications.flush_sent()
@@ -99,7 +104,7 @@ class WorkflowService:
         return app
 
 
-def _operator_body(status: ApplicationStatus, note: str | None) -> str:
+def _operator_body(status: ApplicationStatus, note: str | None, licence_no: str | None = None) -> str:
     if status == ApplicationStatus.UNDER_REVIEW:
         return "A licensing officer has started reviewing your application. Nothing is needed from you."
     if status == ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION:
@@ -107,7 +112,10 @@ def _operator_body(status: ApplicationStatus, note: str | None) -> str:
     if status == ApplicationStatus.SITE_VISIT_SCHEDULED:
         return "An officer will contact you to arrange a visit to the premises."
     if status == ApplicationStatus.APPROVED:
-        return "Your licence application has been approved." + (f" Officer's note: {note}" if note else "")
+        text = "Your licence application has been approved."
+        if licence_no:
+            text += f" Licence {licence_no} is ready to download from the application page."
+        return text + (f" Officer's note: {note}" if note else "")
     if status == ApplicationStatus.REJECTED:
         return "Your licence application was not approved." + (f" Officer's note: {note}" if note else "")
     return f"Your application is now {operator_label(status)}."

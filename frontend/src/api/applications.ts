@@ -67,6 +67,14 @@ export interface ResubmitReadiness {
   reason: string | null
 }
 
+export interface LicenceView {
+  licence_no: string
+  issued_at: string
+  valid_from: string
+  valid_to: string
+  verification_code: string
+}
+
 export interface ApplicationView {
   id: string
   reference_no: string
@@ -91,6 +99,8 @@ export interface ApplicationView {
   can_delete: boolean
   /** The operator's own reason, served once withdrawn. */
   withdrawal_reason: string | null
+  /** Issued on approval (US-051). */
+  licence: LicenceView | null
   created_at: string
   updated_at: string
 }
