@@ -185,12 +185,12 @@ function ReviewRail({
           <span className="text-xs text-text-3">AI-assisted</span>
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 px-5 pb-4 text-[13px]">
-          <Stat label="Analysed" value={s.total} />
+          <Stat label="Documents" value={s.total} />
           <Stat label="Verified" value={s.verified} tone="success" />
           <Stat label="Issues found" value={s.issues_found} tone="warning" />
           <Stat label="Need your review" value={s.needs_review} tone="warning" />
           {s.checking > 0 ? <Stat label="Still checking" value={s.checking} tone="info" /> : null}
-          {s.other > 0 ? <Stat label="Unreadable or failed" value={s.other} /> : null}
+          {s.other > 0 ? <Stat label="Not checked" value={s.other} tone="warning" /> : null}
         </dl>
         <p className="border-t border-line px-5 py-3 text-xs leading-[18px] text-text-3">
           Checks compare each document with the submitted form. They are advisory: the decision is yours.

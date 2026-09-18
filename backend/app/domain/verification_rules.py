@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.enums import IssueCode, VerificationStatus
 
@@ -30,6 +30,16 @@ class VerificationResult(BaseModel):
     summary: str = Field(min_length=1, max_length=2000)
     issues: list[Issue] = Field(default_factory=list, max_length=20)
     missing_information: list[str] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def _status_matches_issues(self) -> "VerificationResult":
+        """The status and the issue list must agree, whatever the model said: issues present means
+        issues_found; issues_found with nothing listed is a verified document."""
+        if self.status == "verified" and self.issues:
+            self.status = "issues_found"
+        elif self.status == "issues_found" and not self.issues:
+            self.status = "verified"
+        return self
 
 
 @dataclass(frozen=True)

@@ -65,6 +65,14 @@ A full operator and officer journey in Chrome with `docs/demo/documents` (clean 
 | R1 | High | Operator outcome panel, and with it the licence download, rendered only when the officer left a decision note; an approval without a note hid the licence | Panel renders whenever a note or a licence exists; note line optional; unit test |
 | R2 | Low | Feedback group heading read "Round N · Revision N" (the same number twice), so a reopened item looked stale once the application moved on | Both sides say "Raised against Revision N" |
 
+A follow-up read-only audit of the Document checks card (same day) confirmed the counters are per document, by the latest run only, and correct for the reading that prompted it (four documents, four `issues_found`). Three small items fixed on `fix/us-050-document-checks`, with a mixed-case test that asserts the card's buckets and the queue's "to check" count from the same facts:
+
+| # | Severity | Finding | Fix |
+|---|----------|---------|-----|
+| R3 | Medium | Queue and card disagreed: `unreadable` read "Clear" in the queue while the operator was told an officer would look at it; `failed` read "to check" in the queue but neutral on the card | Queue attention set includes `unreadable`; the card's remainder row is "Not checked" in warning tone |
+| R4 | Low | "Analysed" counted documents still checking or never checked | Label is "Documents" |
+| R5 | Low | Provider could answer `verified` with issues listed, or `issues_found` with none; mock never does, OpenAI could | Domain model settles status from the issue list (validator + unit test) |
+
 The certificate itself was also reworked on the same pass (real brand mark, wrapping values, signature strip pinned at the bottom, two-pass layout), recorded under US-051 in `CHANGELOG.md`.
 
 ## Not changed
