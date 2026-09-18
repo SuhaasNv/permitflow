@@ -34,6 +34,8 @@ class Settings(BaseSettings):
 
     login_rate_limit_per_minute: int = 10
     # Comma-separated proxy IPs whose X-Forwarded-For is trusted. Empty: use the socket address.
+    # Comma-separated proxy addresses whose X-Forwarded-For is trusted, or "*" on a platform whose edge
+    # proxy is the only thing that can reach the container (Railway, most PaaS).
     trusted_proxies: str = ""
 
     ai_provider: Literal["mock", "openai"] = "mock"
@@ -49,7 +51,11 @@ class Settings(BaseSettings):
 
     @property
     def effective_database_url(self) -> str:
-        return self.test_database_url if self.app_env == "test" else self.database_url
+        url = self.test_database_url if self.app_env == "test" else self.database_url
+        # Managed databases hand out plain postgresql:// URLs; SQLAlchemy needs the driver named.
+        if url.startswith("postgresql://"):
+            url = "postgresql+psycopg://" + url[len("postgresql://") :]
+        return url
 
     def validate_for_startup(self) -> None:
         """Refuse to start without a real JWT secret outside the test environment (SEC-006)."""

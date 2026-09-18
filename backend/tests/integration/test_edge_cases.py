@@ -44,6 +44,37 @@ def test_forwarded_for_is_ignored_from_untrusted_clients(
     limiter.clear()
 
 
+def test_forwarded_for_is_honoured_behind_a_wildcard_trusted_proxy(
+    client: TestClient, db: Session, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    """TRUSTED_PROXIES=* (a PaaS edge proxy is the only peer): each forwarded client gets its own bucket."""
+    make_user(db, "op@example.sg", Role.OPERATOR)
+    limiter = auth_module.login_limiter
+    monkeypatch.setattr(limiter, "limit", 2)
+    monkeypatch.setattr(auth_module._settings, "trusted_proxies", "*")
+    limiter.clear()
+    for _ in range(2):
+        r = client.post(
+            "/api/v1/auth/login",
+            json={"email": "op@example.sg", "password": "bad"},
+            headers={"X-Forwarded-For": "203.0.113.5, 10.0.0.1"},
+        )
+        assert r.status_code == 401
+    blocked = client.post(
+        "/api/v1/auth/login",
+        json={"email": "op@example.sg", "password": DEFAULT_PASSWORD},
+        headers={"X-Forwarded-For": "203.0.113.5, 10.0.0.1"},
+    )
+    assert blocked.status_code == 429
+    other = client.post(
+        "/api/v1/auth/login",
+        json={"email": "op@example.sg", "password": DEFAULT_PASSWORD},
+        headers={"X-Forwarded-For": "203.0.113.6, 10.0.0.1"},
+    )
+    assert other.status_code == 200, "another client behind the same proxy is not blocked"
+    limiter.clear()
+
+
 def test_successful_login_does_not_reset_failure_window(client: TestClient, db: Session, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     make_user(db, "victim@example.sg", Role.OPERATOR)
     make_user(db, "mine@example.sg", Role.OPERATOR)

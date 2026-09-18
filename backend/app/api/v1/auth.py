@@ -23,7 +23,7 @@ def _client_key(request: Request) -> str:
     host = request.client.host if request.client else "unknown"
     trusted = {p.strip() for p in _settings.trusted_proxies.split(",") if p.strip()}
     forwarded = request.headers.get("x-forwarded-for")
-    if forwarded and host in trusted:
+    if forwarded and (host in trusted or "*" in trusted):
         return forwarded.split(",")[0].strip()
     return host
 
