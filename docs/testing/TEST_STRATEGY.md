@@ -54,12 +54,13 @@ The E2E test signs in with the seeded `operator@permitflow.example.sg` and `offi
 
 | Gap | Reason | Plan |
 |-----|--------|------|
-| Playwright in CI | The workflow runs backend and frontend suites but does not yet start the stack for the E2E | US-006 (Day 3): a job with a Postgres service, backend on the mock provider, Vite, then `npm run e2e` |
 | Visual regression | No screenshot comparison; layouts are verified by hand at 1440, 820 and 390 per story and captured in `../design/screens/as-built/` | Deferred; a Playwright screenshot assertion per screen would be the next step |
 | Live AI in CI | Costs money and is non-deterministic | Evaluation set run by hand and recorded (US-004) |
 | Load and soak | Out of scope for the assessment | Noted in `../reviews/PRODUCTION_READINESS_REVIEW.md` |
 | Accessibility audit | Manual checks only (labels, focus order, `aria-live` on status) | `axe` run per screen would be the next step |
 
 ## Definition of Done link
+
+Playwright runs in CI (US-006): the `e2e` job starts Postgres, the migrated and seeded backend on the mock provider, and a production build served by `vite preview`, then runs every spec; the report is uploaded on failure.
 
 A story is not Done until its tests exist and are green at every layer it touches (`../planning/DEFINITION_OF_DONE.md`, "Tests"). Every endpoint added in Sprint 2 shipped with an authorization test in the same commit.

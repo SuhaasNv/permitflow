@@ -72,8 +72,22 @@ docs/      requirements, architecture, ADRs, design system and prototype, planni
 
 `main` is production, `dev` is integration, work happens on `feat/*` branches: `docs/operations/BRANCHING.md`. Two Railway environments are planned: `development` from `dev` and `production` from `main`.
 
+## CI
+
+`.github/workflows/ci.yml` runs on every push and pull request to `main` and `dev`, five jobs:
+
+| Job | What it does |
+|-----|--------------|
+| Backend | `uv sync`, ruff (lint and format), mypy strict, pytest against a Postgres 16 service |
+| Frontend | `npm ci`, oxlint, tsc, vitest, vite build |
+| E2E | Starts Postgres, migrates and seeds, serves the backend on :8000 with the mock provider, builds the frontend and serves it with `vite preview` on :3000, then runs the Playwright journey and the six scenario specs; server logs and the Playwright report are attached when it fails |
+| Secret scan | gitleaks over the full history |
+| Docker build | Builds `backend/Dockerfile` with the GitHub Actions cache (no push) |
+
+The E2E job waits for the backend and frontend suites, so a broken unit test never spends the browser minutes.
+
 ## AI verification
 
 Every uploaded document is checked in the background against the application form (`backend/app/services/verification.py`): text is extracted (PDF and TXT; images are stored but reported as unreadable), sent to a provider behind the `VerificationProvider` interface, and the structured result is validated and post-processed by deterministic rules before it is stored. `AI_PROVIDER=mock` (default) uses a deterministic provider with no network; `AI_PROVIDER=openai` uses the OpenAI API with `OPENAI_API_KEY` and `OPENAI_MODEL` (default `gpt-4.1-mini`). Results are advisory: they never change an application's status, and the operator sees a plain-language outcome while the officer also sees confidence, evidence and the model used. Design and prompt contract: `docs/ai/AI_VERIFICATION_DESIGN.md`.
 
-Sections on CI/CD, deployment, AI usage and "what I would do next" are added as the corresponding stories land (see `docs/planning/SPRINTS.md`).
+Sections on deployment, AI usage and "what I would do next" are added as the corresponding stories land (see `docs/planning/SPRINTS.md`).
