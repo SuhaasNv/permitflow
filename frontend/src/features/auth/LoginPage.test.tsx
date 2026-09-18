@@ -68,4 +68,17 @@ describe('LoginPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     expect(await screen.findByText('Email or password is incorrect.')).toBeInTheDocument()
   })
+
+  it('shows and hides the password without submitting (US-046)', async () => {
+    const login = vi.spyOn(authApi, 'login')
+    renderLogin()
+    const password = screen.getByLabelText(/^Password/)
+    expect(password).toHaveAttribute('type', 'password')
+    await userEvent.type(password, 'secret')
+    await userEvent.click(screen.getByRole('button', { name: 'Show password' }))
+    expect(password).toHaveAttribute('type', 'text')
+    await userEvent.click(screen.getByRole('button', { name: 'Hide password' }))
+    expect(password).toHaveAttribute('type', 'password')
+    expect(login).not.toHaveBeenCalled()
+  })
 })

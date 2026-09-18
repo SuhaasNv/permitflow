@@ -94,7 +94,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
           className={inputClasses(Boolean(error), rest.readOnly)}
           {...rest}
         />
-        {trailing ? <span className="pointer-events-none absolute right-3 top-2.5 text-text-3">{trailing}</span> : null}
+        {trailing ? <span className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center text-text-3">{trailing}</span> : null}
       </div>
       <FieldMessage id={inputId} error={error} help={help} />
     </div>
