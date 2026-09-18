@@ -100,6 +100,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: Nice-to-have · Day 3 (requested 19 Sep) · Dependencies: US-001 · Requirements: UX-002 · Branch `feat/us-046-password-toggle`
 - Definition of Done: `LoginPage.test.tsx` updated; browser check at 390 and 1440.
 
+### US-047 — As a visitor, I want the landing hero to feel alive and branded (accent on the headline, tinted document tiles, an ink band with drifting light behind the What you need panel), so that the first impression is polished rather than flat.
+- Acceptance criteria: brand red on "Apply once." and on the four document tiles, PDF chips stay quiet; the band behind the panel bleeds to the right edge of the screen at desktop widths, uses the ink tone with two soft lights drifting slowly and stops under `prefers-reduced-motion`; the panel is centred inside the band at every desktop width and flows under the copy below `lg`; the footer no longer links to staff sign-in.
+- Priority: Nice-to-have · Day 3 (from user screenshots, 19 Sep; a full red band was tried and rejected as too heavy) · Dependencies: US-009 · Requirements: FR-031 · Branches `feat/landing-accent`, `fix/landing-red-band`, `feat/us-047-landing-band`
+- Definition of Done: measured at 1024, 1440 and 2000: equal gaps either side of the panel, band reaches the viewport edge, no horizontal overflow.
+
 ## UC1 — Operator Submission & Resubmission
 
 ### US-010 — As an operator, I want to create a new licence application, so that I can start my submission.

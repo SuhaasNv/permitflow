@@ -134,14 +134,7 @@ export function LandingPage() {
 
       {/* Hero: full width, two columns, editorial display type; the document panel sits on a tinted backdrop. */}
       <section className="relative overflow-hidden border-b border-line">
-        <div
-          className="pf-band pointer-events-none absolute inset-y-0 right-0 hidden w-[42%] overflow-hidden bg-ink lg:block"
-          aria-hidden="true"
-        >
-          <span className="pf-band-glow pf-band-glow-a" />
-          <span className="pf-band-glow pf-band-glow-b" />
-        </div>
-        <div className="relative mx-auto grid max-w-[1440px] gap-12 px-5 pb-16 pt-14 sm:px-10 lg:grid-cols-[58%_minmax(0,1fr)] lg:gap-20 lg:pb-24 lg:pt-20">
+        <div className="mx-auto grid max-w-[1440px] gap-12 px-5 pb-16 pt-14 sm:px-10 lg:grid-cols-[58%_minmax(0,1fr)] lg:gap-20 lg:pb-24 lg:pt-20">
           <div className="pf-stagger">
             <div className="pf-eyebrow mb-5 text-primary">Food Establishment Licence · Singapore</div>
             <h1 className="font-display max-w-[16ch] text-[44px] leading-[1.02] tracking-[-0.015em] sm:text-[60px] lg:text-[72px]">
@@ -174,8 +167,15 @@ export function LandingPage() {
               </div>
             </dl>
           </div>
-          <div id="need" className="pf-enter lg:self-center" style={{ animationDelay: '160ms' }}>
-            <div className="pf-surface overflow-hidden shadow-[var(--shadow-2)] lg:shadow-[0_24px_60px_-20px_rgba(0,0,0,0.55)]">
+          {/* At lg the panel sits centred inside the ink band, which bleeds to the right edge; below lg it flows under the copy. */}
+          <div
+            id="need"
+            className="pf-enter lg:absolute lg:inset-y-0 lg:right-0 lg:flex lg:w-[42%] lg:items-center lg:justify-center lg:overflow-hidden lg:bg-ink lg:px-10"
+            style={{ animationDelay: '160ms' }}
+          >
+            <span className="pf-band-glow pf-band-glow-a hidden lg:block" aria-hidden="true" />
+            <span className="pf-band-glow pf-band-glow-b hidden lg:block" aria-hidden="true" />
+            <div className="pf-surface relative w-full overflow-hidden shadow-[var(--shadow-2)] lg:max-w-[540px] lg:shadow-[0_24px_60px_-20px_rgba(0,0,0,0.55)]">
               <div className="flex items-center justify-between border-b border-line bg-surface-2 px-5 py-3.5">
                 <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-text-2">What you need</h2>
                 <span className="font-mono text-xs text-text-3">4 documents</span>
