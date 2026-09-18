@@ -17,6 +17,7 @@ export type Bucket = 'waiting' | 'draft' | 'office' | 'decided'
 export function bucketOf(app: ApplicationSummary): Bucket {
   if (app.needs_operator_action) return 'waiting'
   if (app.status_label === 'Draft') return 'draft'
+  if (app.status_label === 'Withdrawn') return 'decided'
   if (app.status_tone === 'success' || app.status_tone === 'error') return 'decided'
   return 'office'
 }

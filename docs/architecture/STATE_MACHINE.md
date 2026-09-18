@@ -1,6 +1,6 @@
 # PermitFlow — Application State Machine
 
-To be implemented in `backend/app/domain/workflow.py` (ADR-003). The transition table below is the specification; unit tests in `backend/tests/unit/test_workflow.py` will iterate over every combination.
+Implemented in `backend/app/domain/workflow.py` (ADR-003). The transition table below is the specification; unit tests in `backend/tests/unit/test_workflow.py` will iterate over every combination.
 
 ## States and role-specific labels
 
@@ -57,7 +57,7 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `pending_approval` | `rejected` | officer | — (note required) | Officer clicks Reject |
 | any post-submission, non-terminal state | `withdrawn` | operator (owner) | — (reason optional) | Operator clicks Withdraw application (US-038); `POST /applications/{id}/withdraw` |
 
-Everything not listed is invalid and returns HTTP 409 `invalid_transition` with `allowed_targets` for the caller's role. Role mismatches on a listed transition return 403. The `admin` role has no transitions: it is read-only on applications.
+Everything not listed is invalid and returns HTTP 409 `invalid_transition` with `details.allowed` for the caller's role. Role mismatches on a listed transition also return 409 (`details.kind = "forbidden"`): the transition table encodes the actor, and the role-gated routers already answered 403 before a wrong role could reach it. The `admin` role has no transitions: it is read-only on applications.
 
 Terminal states: `approved`, `rejected`, `withdrawn`.
 

@@ -33,7 +33,7 @@ The form data the documents are checked against is the seeded demo application (
 
 ### Mock provider (hermetic, runs in CI on every push, `ci.yml` job "AI verification")
 
-Run on 20 Sep 2026: **12 of 12 counted cases pass**. Two cases are marked `mock_gap` in `cases.json` and are reported but not counted, because the mock's heuristics are deliberately simple:
+Run on 19 Sep 2026: **12 of 12 counted cases pass**. Two cases are marked `mock_gap` in `cases.json` and are reported but not counted, because the mock's heuristics are deliberately simple:
 
 | Case | Mock says | Why |
 |------|-----------|-----|
@@ -42,7 +42,7 @@ Run on 20 Sep 2026: **12 of 12 counted cases pass**. Two cases are marked `mock_
 
 Building this harness improved the mock: it now reads long-form dates ("3 January 2025") after an expiry phrase, so the expired certificate is caught, and a tenancy agreement with no date at all now raises `missing_field` instead of only listing missing information.
 
-### OpenAI `gpt-4.1-mini`, prompt version 2026-09-19.2 (run by hand, 20 Sep 2026)
+### OpenAI `gpt-4.1-mini`, prompt version 2026-09-19.2 (run by hand, 19 Sep 2026)
 
 **14 of 14 pass.** Latency 1.2 s to 2.9 s per document; the empty document never reaches the model.
 

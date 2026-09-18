@@ -44,7 +44,7 @@ const business: SectionDef = {
 describe('SectionForm', () => {
   it('blocks "Save and continue" with a summary when required fields are empty', async () => {
     const onSave = vi.fn()
-    render(<SectionForm section={business} data={{}} editable saving={false} isLast={false} onSave={onSave} onDirtyChange={() => {}} />)
+    render(<SectionForm section={business} data={{}} editable saving={false} onSave={onSave} onDirtyChange={() => {}} />)
     await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }))
     expect(await screen.findByText(/2 fields need attention/)).toBeInTheDocument()
     expect(onSave).not.toHaveBeenCalled()
@@ -52,7 +52,7 @@ describe('SectionForm', () => {
 
   it('"Save section" saves a partial draft but rejects bad formats', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined)
-    render(<SectionForm section={business} data={{}} editable saving={false} isLast={false} onSave={onSave} onDirtyChange={() => {}} />)
+    render(<SectionForm section={business} data={{}} editable saving={false} onSave={onSave} onDirtyChange={() => {}} />)
     await userEvent.type(screen.getByLabelText(/UEN/), 'abc')
     await userEvent.click(screen.getByRole('button', { name: 'Save section' }))
     expect(await screen.findByText('Enter a valid UEN.')).toBeInTheDocument()

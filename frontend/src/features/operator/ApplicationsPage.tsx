@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import type { ApplicationSummary } from '@/api/applications'
+import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
 import { PageHeader } from '@/features/shared/PageHeader'
 import { SearchBox } from '@/features/shared/SearchBox'
@@ -67,7 +68,17 @@ export function ApplicationsPage() {
       />
       {create.isError ? (
         <div className="mb-4">
-          <ErrorPanel error={create.error} onRetry={() => create.reset()} />
+          <Alert
+            tone="error"
+            title="Could not start a new application"
+            action={
+              <Button size="sm" variant="secondary" onClick={() => create.reset()}>
+                Dismiss
+              </Button>
+            }
+          >
+            {create.error.message} Press New application to try again.
+          </Alert>
         </div>
       ) : null}
       {apps.isPending ? (

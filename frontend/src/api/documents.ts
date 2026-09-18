@@ -12,6 +12,8 @@ export interface VerificationView {
   }[]
   missing_information: string[]
   error_reason: string | null
+  /** When this run was requested (upload or re-run): staleness is measured from here. */
+  requested_at: string
   finished_at: string | null
 }
 

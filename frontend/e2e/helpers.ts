@@ -49,7 +49,7 @@ export async function signOut(page: Page) {
 export async function fillSection(page: Page, values: Record<string, string>, selects: Record<string, string> = {}) {
   for (const [name, value] of Object.entries(values)) await page.locator(`[name="${name}"]`).fill(value)
   for (const [name, value] of Object.entries(selects)) await page.locator(`select[name="${name}"]`).selectOption(value)
-  await page.getByRole('button', { name: /Save and (continue|review|go to)/ }).click()
+  await page.getByRole('button', { name: /Save and (continue|go to)/ }).click()
 }
 
 export async function uploadTxt(page: Page, slot: string, filename: string, text: string = TXT) {

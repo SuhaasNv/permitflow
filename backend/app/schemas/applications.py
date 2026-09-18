@@ -25,6 +25,8 @@ class VerificationView(BaseModel):
     issues: list[dict[str, Any]]
     missing_information: list[str]
     error_reason: str | None
+    # When this run was requested (upload or re-run): the client measures "taking too long" from here.
+    requested_at: datetime
     finished_at: datetime | None
 
 

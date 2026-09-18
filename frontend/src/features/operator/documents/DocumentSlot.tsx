@@ -115,6 +115,8 @@ export function DocumentSlot({
         message: error instanceof AppError ? error.message : 'Try again in a moment.',
       })
     } finally {
+      // The dialog closes either way; a failure shows in the slot's own error state.
+      setConfirmDelete(false)
       setBusy(false)
     }
   }
@@ -138,7 +140,7 @@ export function DocumentSlot({
   }
 
   const live = doc?.verification?.status === 'running' || doc?.verification?.status === 'pending'
-  const stale = Boolean(doc && live && isCheckStale(doc.uploaded_at))
+  const stale = Boolean(doc?.verification && live && isCheckStale(doc.verification.requested_at))
   const canRerun = Boolean(doc?.verification && slot.editable && (RERUNNABLE.has(doc.verification.status) || stale))
 
   const download = async () => {

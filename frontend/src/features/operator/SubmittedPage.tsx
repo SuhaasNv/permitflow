@@ -23,7 +23,7 @@ export function SubmittedPage() {
   if (app.isPending) return <Skeleton className="mx-auto h-72 max-w-3xl" />
   if (app.isError) {
     if (app.error instanceof AppError && app.error.status === 404)
-      return <NotFoundPanel backTo="/app/dashboard" backLabel="Back to my applications" />
+      return <NotFoundPanel backTo="/app/applications" backLabel="Back to my applications" />
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   const view = app.data

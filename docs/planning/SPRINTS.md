@@ -96,7 +96,7 @@ Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done;
 
 **Cut order if behind:** follow `DELIVERY_PLAN.md` §Cut order — any-two-revision compare → static Zod schemas → queue filter / re-run / draft delete → notification bell → templates UI (endpoint stays). MUST stories (US-024 templates, US-031 outcome transitions) are never cut; their UI becomes plainer. The OpenAI provider may slip to Sprint 3 morning (mock stays default) without cutting anything.
 
-## Sprint 3 — 20 September 2026 — "Ship it honestly"
+## Sprint 3 — 19 September 2026 — "Ship it honestly"
 
 **Goal:** deployed, tested, documented, reviewed. Admin epic only if the core is stable by midday.
 
@@ -120,8 +120,8 @@ Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done;
 | US-045 | Delete draft | MVP (added 19 Sep) |
 | US-046 | Password show/hide; leaner sign-in copy | Nice-to-have (added 19 Sep) |
 | US-047 | Landing hero band and accent | Nice-to-have (added 19 Sep) |
-| US-048 | Session warning only in the last 30 minutes | MVP (added 20 Sep) |
-| US-049 | Not fixed: reopen an addressed item for the next round | MVP (added 20 Sep) |
+| US-048 | Session warning only in the last 30 minutes | MVP (added 19 Sep) |
+| US-049 | Not fixed: reopen an addressed item for the next round | MVP (added 19 Sep) |
 | US-070–073 | Admin oversight dashboard | Nice-to-have (only after US-005/006/007 are Done) |
 
 **Exit criteria:** Sprint DoD + UAT plan executed on the deployed URL + production readiness review + assessment traceability + final review written honestly.

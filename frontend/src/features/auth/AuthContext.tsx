@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 import { AppError, setTokenProvider, setUnauthorizedHandler } from '@/api/client'
@@ -64,10 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUploadTokenProvider(() => session?.token ?? null)
   }, [session])
 
+  // Every cached query belongs to the account that fetched it: drop the cache with the session.
+  const queryClient = useQueryClient()
   const signOut = useCallback(() => {
     setSession(null)
     writeStored(null)
-  }, [])
+    queryClient.clear()
+  }, [queryClient])
 
   // A 401 from any request ends the session in one place; the sign-in page explains and keeps the return path.
   useEffect(() => {
@@ -77,9 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null
       })
       writeStored(null)
+      queryClient.clear()
     })
     return () => setUnauthorizedHandler(() => undefined)
-  }, [])
+  }, [queryClient])
 
   // Sign out proactively when the token expires, so the user is never left with a dead session.
   useEffect(() => {

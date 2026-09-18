@@ -20,12 +20,18 @@ export function Dialog({ open, title, children, confirmLabel, cancelLabel = 'Can
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const bodyId = useId()
+  // Focus is set after showModal(): React's autoFocus runs at mount, while the dialog is still closed.
+  // Destructive dialogs start on Cancel, the others on the primary action.
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    if (open && !el.open) el.showModal()
+    if (open && !el.open) {
+      el.showModal()
+      const target = el.querySelector<HTMLButtonElement>(danger ? '[data-dialog-cancel]' : '[data-dialog-confirm]')
+      target?.focus()
+    }
     if (!open && el.open) el.close()
-  }, [open])
+  }, [open, danger])
   return (
     <dialog
       ref={ref}
@@ -46,10 +52,10 @@ export function Dialog({ open, title, children, confirmLabel, cancelLabel = 'Can
         {children}
       </div>
       <div className="flex justify-end gap-2 border-t border-line bg-surface-2 px-6 py-3.5">
-        <Button variant="ghost" onClick={onCancel} disabled={busy} autoFocus={danger}>
+        <Button variant="ghost" onClick={onCancel} disabled={busy} data-dialog-cancel>
           {cancelLabel}
         </Button>
-        <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy} autoFocus={!danger}>
+        <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy} data-dialog-confirm>
           {confirmLabel}
         </Button>
       </div>

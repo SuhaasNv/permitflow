@@ -24,7 +24,7 @@ async function signOut(page: Page) {
 async function fillSection(page: Page, values: Record<string, string>, selects: Record<string, string> = {}) {
   for (const [name, value] of Object.entries(values)) await page.locator(`[name="${name}"]`).fill(value)
   for (const [name, value] of Object.entries(selects)) await page.locator(`select[name="${name}"]`).selectOption(value)
-  await page.getByRole('button', { name: /Save and (continue|review)/ }).click()
+  await page.getByRole('button', { name: /Save and continue/ }).click()
 }
 
 async function upload(page: Page, slot: string, filename: string) {
@@ -76,7 +76,7 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
   await expect(page).toHaveURL(/\/form\/declarations$/)
   await page.locator('[name="information_accurate"]').check()
   await page.locator('[name="consent_to_inspection"]').check()
-  await page.getByRole('button', { name: /Save and review/ }).click()
+  await page.getByRole('button', { name: /Save and continue/ }).click()
   await expect(page).toHaveURL(/\/documents$/)
 
   // ---- Operator: upload four documents; the mock check runs in the background and lands without a reload ----

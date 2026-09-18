@@ -65,12 +65,13 @@ class WorkflowService:
                 if item.released_to_operator_at is None:
                     item.released_to_operator_at = now
                     released.append(str(item.id))
-            self.audit.record(
-                application_id=app.id,
-                actor_id=officer.id,
-                event_type="feedback.released",
-                payload={"feedback_ids": released},
-            )
+            if released:
+                self.audit.record(
+                    application_id=app.id,
+                    actor_id=officer.id,
+                    event_type="feedback.released",
+                    payload={"feedback_ids": released},
+                )
         if note is not None and resolved in (ApplicationStatus.APPROVED, ApplicationStatus.REJECTED):
             app.decision_note = note
         app.version += 1

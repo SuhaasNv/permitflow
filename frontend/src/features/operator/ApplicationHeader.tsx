@@ -24,7 +24,7 @@ function businessName(view: ApplicationView): string | null {
 /** Consistent application header: reference eyebrow, business name as title, licence, status with explanation, meta line. */
 export function ApplicationHeader({ view, crumb, actions, aside }: ApplicationHeaderProps) {
   const name = businessName(view)
-  const crumbs: Crumb[] = [{ label: 'My applications', to: '/app/dashboard' }]
+  const crumbs: Crumb[] = [{ label: 'My applications', to: '/app/applications' }]
   if (crumb) {
     crumbs.push({ label: view.reference_no, to: `/app/applications/${view.id}` }, { label: crumb })
   } else {
