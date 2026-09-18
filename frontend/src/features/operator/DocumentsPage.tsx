@@ -61,7 +61,7 @@ export function DocumentsPage() {
                 Back to form
               </Link>
               <Link to={view.resubmit ? base : `${base}/review`} className={buttonClasses('primary')}>
-                {view.resubmit ? 'Back to application' : 'Review and submit'}
+                {view.resubmit ? (view.resubmit.can_resubmit ? 'Go to resubmit' : 'Back to application') : 'Review and submit'}
               </Link>
             </>
           ) : undefined

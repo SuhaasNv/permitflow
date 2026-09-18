@@ -149,6 +149,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: MVP · Day 3 (added 19 Sep from a phone screenshot) · Dependencies: US-017 · Requirements: FR-011, UX-003 · Branch `feat/us-040-flagged-markers`
 - Definition of Done: component test for the rail markers; browser check on the resubmission flow.
 
+### US-041 — As an operator responding to feedback, I want the form to walk me through only the flagged items and lead me straight to Resubmit, so that I always know what is left and how to send my changes back.
+- Acceptance criteria: while Pending Pre-Site Resubmission, Save and continue moves to the next flagged section, then the documents page if a document was flagged, then the application page where Resubmit lives (locked sections are never a destination); the form shows a readiness banner ("Responding to feedback: n flagged items" / "Ready to resubmit: n of m changed") with a link back; locked sections are non-navigable in the rail and stepper; the application page shows a readiness alert above the feedback notice and each changed item reads "Changed, ready to resubmit"; the documents page primary reads Go to resubmit once ready.
+- Priority: MVP · Day 3 (added 19 Sep: Save and continue landed on a locked section, no clear path to Resubmit) · Dependencies: US-018 · Requirements: FR-011, UX-003 · Branch `feat/us-041-respond-flow` (also delivers US-040)
+- Definition of Done: `respond.test.ts` for the next-target rule; browser check of the respond flow at 1440 and 390 on a scratch application.
+
 ## UC2 — Officer Review & Feedback
 
 ### US-020 — As an officer, I want a review queue of all submitted applications with their internal status, so that I can pick what to review next.

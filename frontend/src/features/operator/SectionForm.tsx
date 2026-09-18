@@ -27,6 +27,8 @@ export interface SectionFormProps {
   saving: boolean
   savedAt?: number | null
   isLast: boolean
+  /** Overrides the primary button label (responding to feedback walks flagged targets, not the next section). */
+  continueLabel?: string
   stepLabel?: string
   feedback?: OperatorFeedback[]
   lockedReason?: string
@@ -46,6 +48,7 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
     saving,
     savedAt = null,
     isLast,
+    continueLabel,
     stepLabel,
     feedback = [],
     lockedReason,
@@ -295,7 +298,7 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
             Save section
           </Button>
           <Button type="submit" loading={saving}>
-            {isLast ? 'Save and review' : 'Save and continue'}
+            {continueLabel ?? (isLast ? 'Save and review' : 'Save and continue')}
           </Button>
         </div>
       ) : null}
