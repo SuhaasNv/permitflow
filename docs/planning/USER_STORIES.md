@@ -44,7 +44,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: branch protection requires the workflow; green on `main`.
 
 ### US-007 — As a reviewer, I want the application deployed with seeded accounts, so that I can try it without local setup.
-- Acceptance criteria: Railway backend (Docker, volume for uploads), managed Postgres and static frontend; migrations and seed run on deploy; `/health` green; deployment separate from CI.
+- Acceptance criteria: two images built once in CI and pushed to GHCR (backend; frontend nginx with the API URL injected at start); Railway `development` and `production` environments, each with its own Postgres, uploads volume, secrets and domains, deployed from `dev` and `main` by `deploy.yml` with pre and post-deploy gates; migrations run on container start; seed run once per environment by hand; `/health` and `/healthz` green.
 - Priority: MVP · Day 3 · Dependencies: US-006 · Requirements: NFR-006 · `docs/operations/OPERATIONS.md`
 - Definition of Done: UAT executed on the deployed URL.
 
