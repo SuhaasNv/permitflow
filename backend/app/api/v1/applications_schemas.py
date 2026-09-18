@@ -53,6 +53,30 @@ class UploadOut(BaseModel):
     unchanged: bool
 
 
+class OperatorFeedbackView(BaseModel):
+    """Released feedback only. No author name or internal fields: the operator sees the licensing office."""
+
+    id: uuid.UUID
+    target_type: str
+    section_key: str | None
+    document_type: str | None
+    target_label: str
+    message: str
+    resolution: str
+    round: int
+    released_at: datetime
+    addressed_in_revision: int | None
+
+
+class ResubmitReadiness(BaseModel):
+    can_resubmit: bool
+    changed_sections: list[str]
+    changed_document_types: list[str]
+    # Open targets the operator has not changed yet.
+    untouched_targets: list[str]
+    reason: str | None
+
+
 class CompletenessView(BaseModel):
     percent: int
     is_complete: bool
@@ -93,6 +117,8 @@ class ApplicationOperatorView(BaseModel):
     completeness: CompletenessView
     revision_count: int
     needs_operator_action: bool
+    feedback: list[OperatorFeedbackView] = []
+    resubmit: ResubmitReadiness | None = None
     created_at: datetime
     updated_at: datetime
 

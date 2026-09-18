@@ -201,6 +201,10 @@ export function FormPage() {
             savedAt={savedAt}
             isLast={isLast}
             stepLabel={`Section ${activeIndex + 1} of ${sections.length}`}
+            feedback={view.feedback.filter((f) => f.section_key === section.key)}
+            lockedReason={
+              !state.editable && view.resubmit ? 'The licensing officer did not ask for changes here. It is kept as submitted.' : undefined
+            }
             onSave={save}
             onDirtyChange={onDirtyChange}
           />

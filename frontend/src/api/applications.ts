@@ -46,6 +46,27 @@ export interface Completeness {
   missing: string[]
 }
 
+export interface OperatorFeedback {
+  id: string
+  target_type: 'section' | 'document'
+  section_key: string | null
+  document_type: string | null
+  target_label: string
+  message: string
+  resolution: 'open' | 'addressed' | 'resolved'
+  round: number
+  released_at: string
+  addressed_in_revision: number | null
+}
+
+export interface ResubmitReadiness {
+  can_resubmit: boolean
+  changed_sections: string[]
+  changed_document_types: string[]
+  untouched_targets: string[]
+  reason: string | null
+}
+
 export interface ApplicationView {
   id: string
   reference_no: string
@@ -60,6 +81,8 @@ export interface ApplicationView {
   completeness: Completeness
   revision_count: number
   needs_operator_action: boolean
+  feedback: OperatorFeedback[]
+  resubmit: ResubmitReadiness | null
   created_at: string
   updated_at: string
 }
@@ -78,4 +101,8 @@ export function getApplication(id: string): Promise<ApplicationView> {
 
 export function submitApplication(id: string): Promise<ApplicationView> {
   return request<ApplicationView>(`/applications/${id}/submit`, { method: 'POST' })
+}
+
+export function resubmitApplication(id: string): Promise<ApplicationView> {
+  return request<ApplicationView>(`/applications/${id}/resubmit`, { method: 'POST' })
 }

@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import BadRequest, Forbidden, NotFound
 from app.core.settings import get_settings
-from app.domain.editability import editable_targets
 from app.domain.enums import ApplicationStatus, DocumentType, VerificationStatus
 from app.domain.uploads import (
     UploadRejected,
@@ -25,6 +24,7 @@ from app.models import Application, Document, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
+from app.services.applications import ApplicationService
 
 CHUNK = 64 * 1024
 
@@ -61,8 +61,10 @@ class DocumentService:
             raise BadRequest(exc.message, details={"reason": exc.reason}) from exc
 
         app = self.applications.get_for(operator, application_id, for_update=True)
-        _, editable_types = editable_targets(app.status, set(), set())  # open feedback wired in US-018
+        _, editable_types = ApplicationService(self.db).editable_for(app)
         if document_type not in editable_types:
+            if app.status == ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION:
+                raise Forbidden("The licensing officer did not ask for a new copy of this document.")
             raise Forbidden("This document is not open for changes.")
 
         # Stream to storage with a hard size cap; hash while streaming; check magic bytes on the first chunk.

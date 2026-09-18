@@ -14,6 +14,7 @@ from app.models.enums import ApplicationStatus, DocumentType, LicenceType
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
+from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
 
 
@@ -24,6 +25,7 @@ class ApplicationService:
         self.audit = AuditRepository(db)
         self.documents = DocumentRepository(db)
         self.revisions = RevisionRepository(db)
+        self.feedback = FeedbackRepository(db)
 
     def create(self, operator: User) -> Application:
         """One transaction: application row + `application.created` audit event (AUD-005)."""
@@ -64,8 +66,10 @@ class ApplicationService:
         if get_section(key) is None:
             raise NotFound("Section not found.")
         app = self.applications.get_for(operator, application_id, for_update=True)
-        sections, _ = editable_targets(app.status, set(), set())  # open feedback wired in US-018
+        sections, _ = self.editable_for(app)
         if key not in sections:
+            if app.status == ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION:
+                raise Forbidden("The licensing officer did not ask for changes to this section.")
             raise Forbidden("This section is not open for changes.")
         errors = validate_section(key, data, allow_missing=app.status == ApplicationStatus.DRAFT)
         if errors:
@@ -86,6 +90,23 @@ class ApplicationService:
         self.db.commit()
         self.db.refresh(app)
         return app
+
+    def open_feedback_targets(self, app: Application) -> tuple[set[str], set[DocumentType]]:
+        """Section keys and document types with open, released feedback (what the operator may edit)."""
+        sections: set[str] = set()
+        doc_types: set[DocumentType] = set()
+        for item in self.feedback.open_for(app.id):
+            if item.released_to_operator_at is None:
+                continue
+            if item.section_key:
+                sections.add(item.section_key)
+            if item.document_type is not None:
+                doc_types.add(item.document_type)
+        return sections, doc_types
+
+    def editable_for(self, app: Application) -> tuple[set[str], set[DocumentType]]:
+        sections, doc_types = self.open_feedback_targets(app)
+        return editable_targets(app.status, sections, doc_types)
 
     def documents_with_runs(self, app: Application) -> list[tuple[Document, VerificationRun | None]]:
         docs = self.documents.current_for(app.id)

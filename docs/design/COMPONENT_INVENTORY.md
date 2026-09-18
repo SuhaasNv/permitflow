@@ -36,6 +36,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `CheckResult` | officer-facing verification: outcome, confidence, model, time, issues with code, field and evidence quote, missing information, fixed-vocabulary error reasons | S-21 |
 | `ReviewRail` (in `OfficerCasePage`) | server-driven action buttons (primary + secondary, disabled with reason), document-check counts, feedback placeholder | S-21 |
 | `FeedbackPanel` | items grouped by round with resolution badge and sent/draft state, anchor link to the target, Withdraw; composer (template select fills target and message, target select, textarea) with per-field 422 errors; locked reason when not under review | S-21 |
+| `FeedbackNotice` | operator-facing feedback: open items first with target, resolution (Needs your change / Changed, awaiting review / Resolved), round, message and a link to the target; compact mode folds earlier items | S-15, S-13 |
 | `Reveal` | scroll reveal (IntersectionObserver, once, delay for staggering; reveals immediately without the API) | landing sections |
 | `PageSkeleton`, `Skeleton` | shimmer placeholders in the shape of the final layout | every loading state |
 | `Badge` | neutral/info/warning/success/error/primary; dot | counts, upload state |

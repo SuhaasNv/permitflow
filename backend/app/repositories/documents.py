@@ -33,6 +33,11 @@ class DocumentRepository:
             select(Document).where(Document.id == document_id, Document.application_id == application_id)
         )
 
+    def get_many(self, ids: list[uuid.UUID]) -> list[Document]:
+        if not ids:
+            return []
+        return list(self.db.scalars(select(Document).where(Document.id.in_(ids))))
+
     def latest_run(self, document_id: uuid.UUID) -> VerificationRun | None:
         stmt = (
             select(VerificationRun)
