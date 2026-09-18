@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     ai_provider: Literal["mock", "openai"] = "mock"
     openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
+    openai_model: str = "gpt-4.1-mini"
     ai_timeout_seconds: int = 30
     ai_confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     ai_max_text_chars: int = 20_000

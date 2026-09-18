@@ -61,7 +61,7 @@ Response: structured output (JSON schema) matching the **wire model**:
 }
 ```
 
-The wire model contains only enums and required fields (OpenAI strict schemas reject numeric bounds and regex). The **domain model** re-validates the same shape with `0 ≤ confidence ≤ 1`, `extra="forbid"`, evidence length ≤ 300 characters and at most 20 issues.
+The wire model contains only enums and required fields (OpenAI strict schemas reject numeric bounds and regex). The enums are real `enum` constraints in the JSON schema: the first live run on 19 Sep 2026 used plain strings and the model invented `status: rejected`, `severity: error` and `code: address_mismatch`, which the domain model then rejected as a `failed` run. Pinning the vocabulary in the schema and listing it in the system prompt removed every such failure. The user message also states today's date, because a model has no clock and without it an expired certificate was reported as verified. The **domain model** re-validates the same shape with `0 ≤ confidence ≤ 1`, `extra="forbid"`, evidence length ≤ 300 characters and at most 20 issues.
 
 ## Mock provider
 
@@ -80,12 +80,12 @@ The mock is intentionally simple; it exists so the whole product works without a
 |----------|---------|---------|
 | `AI_PROVIDER` | `mock` | `openai` or `mock` |
 | `OPENAI_API_KEY` | — | required when `AI_PROVIDER=openai` |
-| `OPENAI_MODEL` | `gpt-4o-mini` | model name; chosen for cost and structured-output support |
+| `OPENAI_MODEL` | `gpt-4.1-mini` | model name; measured on 19 Sep 2026 against `gpt-4o-mini` and `gpt-5-mini` on the same verification prompt: 1.8 s / 124 tokens vs 3.3 s / 150 and 7.6 s / 621 (reasoning tokens); all three answered correctly, so the fastest structured-output model wins |
 | `AI_TIMEOUT_SECONDS` | `30` | per call |
 | `AI_CONFIDENCE_THRESHOLD` | `0.6` | below this, `verified` becomes `needs_review` |
 | `AI_MAX_TEXT_CHARS` | `20000` | extraction cap |
 
-Estimated cost per verification with `gpt-4o-mini`: well under one cent for a 20 000-character document (input-dominated); demo traffic on the developer's key.
+Estimated cost per verification with `gpt-4.1-mini`: well under one cent for a 20 000-character document (input-dominated); demo traffic on the developer's key.
 
 ## Failure handling summary
 
@@ -97,6 +97,17 @@ Estimated cost per verification with `gpt-4o-mini`: well under one cent for a 20
 | Image or empty PDF | `unreadable`, reason | "Could not read this document" |
 | Injection phrases detected | `needs_review` + issue | "Needs officer review" with the flagged phrase |
 | Process restart mid-run | stale `running` → `failed`, reason `interrupted` (only runs older than timeout + grace) | re-run available |
+
+## Live run record (19 Sep 2026, `gpt-4.1-mini`, prompt 2026-09-19.2)
+
+| Case | Outcome | Confidence | Issues | Latency |
+|------|---------|------------|--------|---------|
+| Valid ACRA profile matching the form | verified | 1.00 | none | 3.2 s |
+| Tenancy text uploaded as a floor plan, with an injection sentence | issues_found | 0.90 | wrong_document_type (high), field_mismatch (high); the deterministic heuristic adds possible_prompt_injection and the run lands on needs_review | 2.6 s |
+| Certificate valid until 3 Jan 2025 | issues_found | 0.95 | expired_document (high, evidence "Valid until 3 Jan 2025."), field_mismatch (medium) | 2 s |
+| Certificate valid until 2029 | verified | 0.95 | none | 1.5 s |
+| Tenancy for #01-21 against a form saying #01-12 | issues_found | 0.90 | field_mismatch (medium), missing_field (high) | 2.4 s |
+| Same expired certificate uploaded through the API | issues_found | stored with provider `openai`, model `gpt-4.1-mini` | expired_document | about 4 s end to end |
 
 ## Evaluation (Day 3, `docs/ai/AI_EVALUATION.md`)
 
