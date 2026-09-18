@@ -194,6 +194,7 @@ def operator_view(
             else None
         ),
         can_withdraw=can_withdraw(app.status),
+        can_delete=app.status == ApplicationStatus.DRAFT,
         withdrawal_reason=app.withdrawal_reason if app.status == ApplicationStatus.WITHDRAWN else None,
         created_at=app.created_at,
         updated_at=app.updated_at,

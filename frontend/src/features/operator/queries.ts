@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
   createApplication,
+  deleteDraft,
   getApplication,
   listApplications,
   resubmitApplication,
@@ -102,5 +103,15 @@ export function useWithdrawApplication(id: string) {
       qc.setQueryData(applicationKeys.detail(id), view)
       void qc.invalidateQueries({ queryKey: applicationKeys.all })
     },
+  })
+}
+
+export function useDeleteDraft(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => deleteDraft(id),
+    // The detail query is left alone: the page navigates away and the cache entry is garbage-collected.
+    // Removing it here would make the still-mounted page refetch a row that is gone (404).
+    onSuccess: () => void qc.invalidateQueries({ queryKey: applicationKeys.all }),
   })
 }

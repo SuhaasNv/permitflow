@@ -12,7 +12,7 @@ import { cn } from '@/lib/cn'
 import { ApplicationHeader } from './ApplicationHeader'
 import { CompletionCard } from './CompletionCard'
 import { FeedbackNotice, targetHref } from './FeedbackNotice'
-import { useApplication, useResubmitApplication, useWithdrawApplication } from './queries'
+import { useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
 
 const ArrowIcon = (
   <svg
@@ -41,6 +41,8 @@ export function ApplicationPage() {
   const withdraw = useWithdrawApplication(id)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [reason, setReason] = useState('')
+  const remove = useDeleteDraft(id)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   if (app.isPending) {
     return (
@@ -80,6 +82,20 @@ export function ApplicationPage() {
   }
 
   const withdrawn = view.withdrawal_reason !== null || view.status_label === 'Withdrawn'
+  const untouched = view.completeness.percent === 0 && view.completeness.documents_present === 0
+  const doDelete = () => {
+    if (remove.isPending) return
+    remove.mutate(undefined, {
+      onSuccess: () => {
+        toast.push({ title: untouched ? 'Draft discarded' : 'Draft deleted', body: `${view.reference_no} is gone.`, tone: 'success' })
+        navigate('/app/applications', { replace: true })
+      },
+      onError: (e) => {
+        setDeleteOpen(false)
+        toast.push({ title: 'Could not delete', body: e.message, tone: 'error' })
+      },
+    })
+  }
   const doWithdraw = () => {
     if (withdraw.isPending) return
     withdraw.mutate(reason.trim() || null, {
@@ -274,6 +290,21 @@ export function ApplicationPage() {
         </section>
         <div className="flex flex-col gap-6">
           <CompletionCard view={view} />
+          {view.can_delete ? (
+            <section className="pf-surface px-5 py-4" aria-labelledby="delete-title">
+              <h2 id="delete-title" className="text-[15px] font-semibold">
+                {untouched ? 'Started by mistake?' : 'No longer need this draft?'}
+              </h2>
+              <p className="mt-1 text-[13px] leading-[19px] text-text-2">
+                {untouched
+                  ? 'Nothing has been entered yet. Discarding removes this draft and its reference number.'
+                  : 'Deleting removes the draft, everything entered and every uploaded file. Nothing was sent to the licensing office.'}
+              </p>
+              <Button variant="danger" size="sm" className="mt-3" onClick={() => setDeleteOpen(true)}>
+                {untouched ? 'Discard draft' : 'Delete draft'}
+              </Button>
+            </section>
+          ) : null}
           {view.can_withdraw ? (
             <section className="pf-surface px-5 py-4" aria-labelledby="withdraw-title">
               <h2 id="withdraw-title" className="text-[15px] font-semibold">
@@ -289,6 +320,20 @@ export function ApplicationPage() {
           ) : null}
         </div>
       </div>
+      <Dialog
+        open={deleteOpen}
+        title={untouched ? 'Discard this draft?' : 'Delete this draft?'}
+        confirmLabel={untouched ? 'Discard draft' : 'Delete draft'}
+        danger
+        busy={remove.isPending}
+        onConfirm={doDelete}
+        onCancel={() => setDeleteOpen(false)}
+      >
+        <p>
+          <b>{view.reference_no}</b> is removed for good, including{' '}
+          {view.completeness.documents_present > 0 ? 'the uploaded files' : 'anything entered'}. This cannot be undone.
+        </p>
+      </Dialog>
       <Dialog
         open={withdrawOpen}
         title="Withdraw this application?"

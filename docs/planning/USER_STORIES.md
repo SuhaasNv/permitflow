@@ -95,6 +95,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: MVP · Day 3 (from the layout audit backend observation, 19 Sep) · Dependencies: US-000 · Requirements: REL-001, NFR-004 · Branch `fix/us-044-error-cors-pool`
 - Definition of Done: test green; `docs/operations/OPERATIONS.md` and `docs/security/THREAT_MODEL.md` (availability) updated.
 
+### US-046 — As a user signing in, I want to show or hide my password and a sign-in page without unnecessary text, so that I can type it right without distraction.
+- Acceptance criteria: an eye toggle inside the password field (accessible name Show password / Hide password), keyboard reachable, never submits the form; the helper text about the 10-attempt pause and shared sign-in is removed (the limiter still applies and the 429 message still explains it).
+- Priority: Nice-to-have · Day 3 (requested 19 Sep) · Dependencies: US-001 · Requirements: UX-002 · Branch `feat/us-046-password-toggle`
+- Definition of Done: `LoginPage.test.tsx` updated; browser check at 390 and 1440.
+
 ## UC1 — Operator Submission & Resubmission
 
 ### US-010 — As an operator, I want to create a new licence application, so that I can start my submission.
@@ -168,6 +173,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Acceptance criteria: while Pending Pre-Site Resubmission, Save and continue moves to the next flagged section, then the documents page if a document was flagged, then the application page where Resubmit lives (locked sections are never a destination); the form shows a readiness banner ("Responding to feedback: n flagged items" / "Ready to resubmit: n of m changed") with a link back; locked sections are non-navigable in the rail and stepper; the application page shows a readiness alert above the feedback notice and each changed item reads "Changed, ready to resubmit"; the documents page primary reads Go to resubmit once ready.
 - Priority: MVP · Day 3 (added 19 Sep: Save and continue landed on a locked section, no clear path to Resubmit) · Dependencies: US-018 · Requirements: FR-011, UX-003 · Branch `feat/us-041-respond-flow` (also delivers US-040)
 - Definition of Done: `respond.test.ts` for the next-target rule; browser check of the respond flow at 1440 and 390 on a scratch application.
+
+### US-045 — As an operator, I want to delete a draft I no longer need, so that abandoned drafts do not clutter my list.
+- Acceptance criteria: a draft can be deleted by its owner from the application page (Discard draft when nothing was entered, Delete draft otherwise) after a confirmation that names the reference; `DELETE /applications/{id}` removes the application, its sections, documents (files on disk), verification runs and audit events; submitted applications answer 409 (withdraw instead), other operators 404, officers and admins 403. A draft was never part of the licensing record, so nothing is kept (SCOPE assumption 14).
+- Priority: MVP · Day 3 (requested 19 Sep: drafts are created the moment New application is pressed) · Dependencies: US-010 · Requirements: FR-034 · Branch `feat/us-045-delete-draft`
+- Definition of Done: `tests/integration/test_draft_deletion.py`; `ApplicationPage.test.tsx`; browser check; docs updated. Same branch fixes the Declarations resubmission dead end: re-confirming stamps `confirmed_at`, which the diff reports as "Confirmed on".
 
 ## UC2 — Officer Review & Feedback
 

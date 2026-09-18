@@ -86,6 +86,8 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 
 ## Sprint 3 (in progress, 19 Sep 2026)
 
+- US-045 Delete draft: `DELETE /applications/{id}` removes a never-submitted draft with its files, runs and audit events (409 once submitted, ownership enforced); the application page offers Discard draft (nothing entered) or Delete draft behind a danger dialog. Same branch fixes the Declarations dead end on resubmission: re-confirming stamps `confirmed_at`, which the diff reports as "Confirmed on", so feedback on Declarations can be answered.
+
 - US-039 Feedback decisions made safe: Mark resolved is offered only for items the operator has seen (409 for an unsent draft, which can only be withdrawn); Withdraw and Mark resolved toasts carry Undo for 10 s backed by `POST .../feedback/{fid}/restore` (own decision, 15 s server window, state still valid, audited as `feedback.restored`, migration 0004 `previous_resolution`); the composer closes itself when the case locks; item actions sit on their own row on phones. Toast component gains an action slot.
 
 - US-040 and US-041 Respond-to-feedback flow recalibrated: Save and continue walks only the flagged targets (next flagged section, then documents if flagged, then the application page where Resubmit lives), locked sections show a lock in the rail and the stepper and cannot be opened from them, flagged sections read Flagged / Changed, the form carries a readiness banner, the application page shows "Ready to resubmit: n of m changed" above the feedback notice and each changed item reads "Changed, ready to resubmit". Reported from a phone screenshot where every section showed a green dot and Save and continue landed on a locked section.

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.domain.enums import DocumentType
-from app.domain.form_schema import DOCUMENT_TYPE_LABELS, REQUIRED_DOCUMENT_TYPES, SECTIONS
+from app.domain.form_schema import DOCUMENT_TYPE_LABELS, REQUIRED_DOCUMENT_TYPES, SECTIONS, STAMPED_FIELDS
 
 
 @dataclass(frozen=True)
@@ -41,15 +41,16 @@ class DocumentDiff:
 
 
 def diff_forms(previous: dict[str, Any], current: dict[str, Any]) -> list[SectionDiff]:
-    """Compare every schema field; sections not in the schema are ignored."""
+    """Compare every schema field (plus the stamped extras); sections not in the schema are ignored."""
     out: list[SectionDiff] = []
     for section in SECTIONS:
         before = previous.get(section.key) or {}
         after = current.get(section.key) or {}
+        pairs = [(f.key, f.label) for f in section.fields] + list(STAMPED_FIELDS.get(section.key, ()))
         fields = [
-            FieldChange(key=f.key, label=f.label, old=before.get(f.key), new=after.get(f.key))
-            for f in section.fields
-            if before.get(f.key) != after.get(f.key)
+            FieldChange(key=key, label=label, old=before.get(key), new=after.get(key))
+            for key, label in pairs
+            if before.get(key) != after.get(key)
         ]
         out.append(SectionDiff(key=section.key, title=section.title, changed=bool(fields), fields=fields))
     return out
