@@ -95,7 +95,9 @@ async function main() {
           displayHeaderFooter: true,
           headerTemplate: '<span></span>',
           footerTemplate: footerTemplate(doc.label),
-          margin: { top: '14mm', right: '14mm', bottom: '16mm', left: '14mm' },
+          margin: doc.landscape
+            ? { top: '10mm', right: '12mm', bottom: '13mm', left: '12mm' }
+            : { top: '14mm', right: '14mm', bottom: '16mm', left: '14mm' },
         });
         await page.close();
         console.log(`${setName}/${doc.name}.pdf`);
