@@ -50,6 +50,10 @@ JSON lines on stdout: one `request` line per request with `request_id`, method, 
 
 `cd backend && uv run alembic upgrade head`. New migration: `uv run alembic revision --autogenerate -m "<what>"`, then review the file. The container image runs `alembic upgrade head` on start.
 
+## CI (US-006)
+
+`.github/workflows/ci.yml`: backend (ruff, mypy, pytest on a Postgres service), frontend (lint, typecheck, vitest, build), E2E (the full stack started inside the job: Postgres service, `alembic upgrade head`, `scripts/seed.py`, uvicorn on :8000 with `AI_PROVIDER=mock` and a CI-only `JWT_SECRET`, `vite preview` on :3000, then `npm run e2e`), gitleaks, and a Docker build of the backend image. The E2E job needs the two test suites first. On failure it prints the last 200 lines of both server logs and uploads `playwright-report` and `test-results` as an artifact for seven days. Nothing in CI deploys: deployment is Railway's job (below).
+
 ## Deployment (planned, US-007)
 
 Two Railway environments: `development` (deploys from `dev`) and `production` (deploys from `main`), each with its own PostgreSQL and its own variables. Backend from `backend/Dockerfile` with a volume at `/data/uploads`; frontend as a static site built with `VITE_API_URL` pointing at that environment's API.
