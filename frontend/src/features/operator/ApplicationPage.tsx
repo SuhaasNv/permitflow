@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
+import { Alert } from '@/features/shared/Alert'
 import { Button, buttonClasses } from '@/features/shared/Button'
 import { TextAreaField } from '@/features/shared/Controls'
 import { Dialog } from '@/features/shared/Dialog'
@@ -62,6 +63,7 @@ export function ApplicationPage() {
   const docsDone = view.completeness.documents_present === view.completeness.documents_total
   const responding = view.resubmit !== null
   const firstOpen = view.feedback.find((f) => f.resolution === 'open')
+  const openCount = view.feedback.filter((f) => f.resolution === 'open').length
   const doResubmit = () => {
     if (resubmit.isPending) return
     resubmit.mutate(undefined, {
@@ -158,17 +160,28 @@ export function ApplicationPage() {
           <p className="mt-2 text-[13px] text-text-3">This decision is final. The full record stays available under History.</p>
         </section>
       ) : null}
+      {responding && view.resubmit ? (
+        <div className="mb-6">
+          <Alert
+            tone={view.resubmit.can_resubmit ? 'success' : 'warning'}
+            title={
+              view.resubmit.can_resubmit
+                ? `Ready to resubmit: ${[...view.resubmit.changed_sections, ...view.resubmit.changed_document_types].length} of ${openCount} flagged ${openCount === 1 ? 'item' : 'items'} changed.`
+                : 'Nothing has changed yet.'
+            }
+          >
+            {view.resubmit.can_resubmit
+              ? view.resubmit.untouched_targets.length
+                ? `Not changed yet: ${view.resubmit.untouched_targets.join(', ')}. You can resubmit now or keep editing.`
+                : 'Every flagged item has been changed. Press Resubmit to send your changes back to the licensing office.'
+              : view.resubmit.reason}
+          </Alert>
+        </div>
+      ) : null}
       {view.feedback.length > 0 ? (
         <div className="mb-6">
           <FeedbackNotice view={view} />
         </div>
-      ) : null}
-      {responding && view.resubmit ? (
-        <p className="mb-5 text-[13px] text-text-2">
-          {view.resubmit.can_resubmit
-            ? `Changed: ${[...view.resubmit.changed_sections, ...view.resubmit.changed_document_types].length} of ${view.feedback.filter((f) => f.resolution === 'open').length} flagged ${view.feedback.filter((f) => f.resolution === 'open').length === 1 ? 'item' : 'items'}. You can resubmit now or keep editing.`
-            : view.resubmit.reason}
-        </p>
       ) : null}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section className="pf-surface overflow-hidden" aria-labelledby="sections-title">
