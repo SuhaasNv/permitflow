@@ -60,12 +60,24 @@ jobs:
   ai:
     name: AI verification (config audit, golden set, adversarial)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: permitflow
+          POSTGRES_PASSWORD: permitflow
+          POSTGRES_DB: permitflow_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U permitflow -d permitflow_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
     defaults:
       run:
         working-directory: backend
     env:
       APP_ENV: test
       AI_PROVIDER: mock
+      TEST_DATABASE_URL: postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow_test
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
