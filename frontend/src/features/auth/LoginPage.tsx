@@ -67,7 +67,7 @@ export function LoginPage() {
         </div>
         <div className="pf-enter my-auto w-full max-w-[400px] py-12">
           <h1 className="font-display text-[40px] leading-[1.05] tracking-[-0.01em]">Sign in</h1>
-          <p className="mb-8 mt-3 text-[15px] leading-[22px] text-text-2">Use the email address and password you registered with.</p>
+          <p className="mb-8 mt-3 text-[15px] leading-[22px] text-text-2">Sign in with the account the licensing office issued you (the demo accounts are listed in the README).</p>
           <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
             {endedReason && !serverError ? (
               <Alert tone="info">

@@ -1,6 +1,6 @@
 # PermitFlow: Use Cases
 
-Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC1 Operator Submission & Resubmission**, **UC2 Officer Review & Feedback**, **UC3 On-Site Assessment (deferred)** and **E4 Admin Oversight & Monitoring**. Each use case has an ID `UCn-X` used in `USER_STORIES.md`, the use case diagrams and the sequence diagrams (`docs/03-architecture/diagrams/`). Requirement IDs refer to `REQUIREMENTS.md`.
+Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC1 Operator Submission & Resubmission**, **UC2 Officer Review & Feedback**, **UC3 On-Site Assessment (deferred)** and **E4 Admin Oversight & Monitoring**. Each use case has an ID `UCn-X` used in `USER_STORIES.md`. Requirement IDs refer to `REQUIREMENTS.md`.
 
 ## Personas
 

@@ -1,6 +1,6 @@
 # PermitFlow: Threat Model
 
-Scope: the MVP as designed (this document is written before implementation and will be re-checked against the code in the production readiness review). Each threat lists the risk, the control planned for the MVP, how it will be validated, and the production gap where one exists. Severity is High / Medium / Low for this product (regulatory data, three roles, small user base).
+Scope: the MVP as designed (written before implementation on 17 Sep 2026, re-checked against the code at each sprint close and in the reviews of 19 and 20 Sep; amendments are dated in place). Each threat lists the risk, the control planned for the MVP, how it is validated, and the production gap where one exists. Severity is High / Medium / Low for this product (regulatory data, three roles, small user base).
 
 ## Assets
 - Application form data and uploaded documents (business and personal data).

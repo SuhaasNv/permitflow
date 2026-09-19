@@ -108,7 +108,7 @@ Scope status per requirement is tracked in `SCOPE.md` and, at the end, in `docs/
 | UX-004 | Feedback on the operator view is anchored: clicking a feedback item scrolls to and highlights its section or document. |
 | UX-005 | Status is shown as a labelled badge using the role-specific label. |
 | UX-006 | Officer diff view uses side-by-side or inline field comparison with changed fields visually marked. |
-| UX-007 | Layouts work at 375 px, 768 px and 1280 px widths without horizontal scroll. |
+| UX-007 | Layouts work at 390 px, 1024 px and 1280 px widths without horizontal scroll (the design phase moved the checkpoints from 375/768 to the phone and tablet widths in `docs/04-design/`). |
 | UX-008 | Interactive elements are keyboard reachable and have visible focus; colour is never the only signal. |
 
 ## 7. Reliability and error-handling requirements
