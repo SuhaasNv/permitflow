@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/planning/USER_STORIES.md`.
 
+## Debrief material (19 Sep 2026, after v0.3.0)
+
+- `debrief/`: the pitch deck (11 slides) and the technical deck (15 slides) as PowerPoint with handout PDFs and slide PNGs, the launch video (70.7 s) and the narrated walkthrough (4 min 36 s) with subtitles and posters (videos in Git LFS), and the plans they were built from. Diagrams (solution architecture, deployment, CI/CD) added under `docs/architecture/diagrams/views/` and embedded in `ARCHITECTURE.md`, `OPERATIONS.md` and the README; the launch poster heads the README. No product code changed.
+
 ## Sprint 1, 18 Sep 2026: "An operator can submit"
 
 Sprint goal met: an operator signs in, creates an application, completes four validated sections, uploads four documents that are checked by the mock provider with live status, sees a server-computed progress indicator and submits; the submission becomes an immutable Revision 1 with audit events and officer notifications. Demonstrated end to end in Chrome at 1440, 820 and 390.
