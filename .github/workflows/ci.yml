@@ -108,7 +108,17 @@ jobs:
         working-directory: frontend
         run: |
           npm ci --ignore-scripts
-          npm audit --omit=dev --audit-level=high 2>&1 | tee /tmp/npm-audit.txt
+          # A vulnerability fails the job. A registry outage (npm's audit endpoint answering 503 during
+          # maintenance) is retried three times and then fails too: the job never passes on "could not check".
+          for attempt in 1 2 3; do
+            if npm audit --omit=dev --audit-level=high 2>&1 | tee /tmp/npm-audit.txt; then exit 0; fi
+            if grep -q "audit endpoint returned an error" /tmp/npm-audit.txt; then
+              echo "npm audit endpoint unavailable (attempt $attempt of 3), retrying in 60 s"; sleep 60
+            else
+              exit 1
+            fi
+          done
+          echo "npm audit endpoint unavailable after three attempts; treating as a failed check"; exit 1
       - name: Summary
         if: always()
         run: |

@@ -2,7 +2,7 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
-## Review fixes (20 Sep 2026, after the four-persona assessment)
+## Review fixes (20 Sep 2026, after the four-persona assessment, US-074)
 
 - Operator refusals no longer carry internal status codes: `domain/operator_errors.py` words a refused submit, resubmit or withdraw with the operator's own label and no `allowed` list; `tests/integration/test_operator_refusals.py` walks the three paths and asserts no internal code or officer-only label in the body (FR-026).
 - The layering test now catches `from app.models import ...` in the API layer (it had a trailing-dot hole) and states the one allowance: `User` and `Application` may be named in annotations; the API never queries or mutates them.

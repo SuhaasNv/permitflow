@@ -53,7 +53,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Planning
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-073 (US-059 is the debrief material), 1:1 with Notion |
+| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-074 (US-059 the debrief material, US-074 the post-release review), 1:1 with Notion |
 | `05-planning/SPRINTS.md` | written | Three one-day sprints, sprint DoD, close ritual, cut order |
 | `05-planning/KANBAN.md` | written | Flow, WIP limits, story-to-day mapping |
 | `05-planning/notion/*.png` | written (19 Sep) | The Notion board after the release: the workspace page, the Epics table, the Stories table |

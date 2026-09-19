@@ -138,6 +138,12 @@ Three layers, one solved, two planned.
 
 **Data (planned, readiness rows 13 and 14).** Today: Railway's managed Postgres backups (point-in-time restore from the dashboard), no backup of the uploads volume, no restore drill. Before real users: a nightly `pg_dump` and a copy of the uploads volume to object storage (30 days), one restore drill into a scratch environment, and a staging environment cloned from production data so a migration is rehearsed before it reaches production. Order: backups and the drill first, staging second.
 
+**Configuration.** A wrong variable (a CORS origin, a quota, a model name) is rolled back by setting the previous value in Railway (Variables) and redeploying; Railway keeps the variable history per service, so the previous value is visible there. The values that matter are listed in the Secrets and variables table above; nothing is derived at build time except the frontend's `API_URL`, which is read at container start.
+
+**AI prompt.** The verifier's prompt is versioned in code (`PROMPT_VERSION` in `openai_provider.py`, stamped on every run and trace). A bad prompt is rolled back like any code change: previous pin, deploy job. Runs made under the bad version stay in the database with their version, so they can be listed and re-run (the re-run button, or a script over `verification_runs` where `prompt_version = ...`).
+
+**Secrets.** Rotation, not rollback: a new `JWT_SECRET` signs every user out (8 hour tokens, accepted); `OPENAI_API_KEY` and `LANGSMITH_API_KEY` are replaced in Railway and, for the evaluation workflow, in the GitHub repository secret, then the service restarts. The OpenAI key is due for rotation after the assessment; the LangSmith key expires on its own after three months.
+
 **A rollout that never became healthy** needs no rollback: Railway keeps the old containers serving until the new ones pass `/api/v1/health` and `/healthz`, and the deploy job goes red.
 
 ### Verified
