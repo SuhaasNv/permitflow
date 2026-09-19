@@ -1,14 +1,11 @@
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, Query, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import CurrentUser, DbSession, OperatorUser, require_role
-from app.core.errors import BadRequest
-from app.core.settings import get_settings
+from app.api.deps import DbSession, OperatorUser, require_role
 from app.domain.enums import ApplicationStatus, DocumentType
-from app.domain.uploads import too_large_message
 from app.models import Application, User
 from app.models.enums import Role
 from app.schemas.applications import (
@@ -31,17 +28,6 @@ from app.services.verification import VerificationService, run_verification
 from app.services.withdrawal import WithdrawalService
 
 router = APIRouter(prefix="/applications")
-
-# Multipart framing plus the document_type field; anything beyond the file itself.
-_MULTIPART_OVERHEAD = 16 * 1024
-
-
-def _reject_oversized_body(request: Request) -> None:
-    """Refuse an upload from its Content-Length before Starlette buffers the multipart body (T7)."""
-    limit = get_settings().upload_max_bytes
-    raw = request.headers.get("content-length")
-    if raw and raw.isdigit() and int(raw) > limit + _MULTIPART_OVERHEAD:
-        raise BadRequest(too_large_message(limit), details={"reason": "too_large"})
 
 
 def _view(service: ApplicationService, app: Application) -> ApplicationOperatorView:
@@ -164,7 +150,6 @@ def update_section(
     "/{application_id}/documents",
     response_model=UploadOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(_reject_oversized_body)],
 )
 def upload_document(
     application_id: uuid.UUID,
@@ -221,10 +206,11 @@ def download_document(
 def rerun_verification(
     application_id: uuid.UUID,
     document_id: uuid.UUID,
-    user: CurrentUser,
+    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER))],
     db: DbSession,
     background: BackgroundTasks,
 ) -> UploadOut:
+    """Re-run the check on a current document (SCOPE S2). Owner or officer; 409 while one is running."""
     run = VerificationService(db).rerun(user, application_id, document_id)
     background.add_task(run_verification, run.id)
     service = ApplicationService(db)

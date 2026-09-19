@@ -80,6 +80,7 @@ const view: OfficerApplication = {
         missing_information: [],
         error_reason: null,
         provider: 'mock',
+        requested_at: '2026-09-18T01:40:00Z',
         model: 'mock-1',
         finished_at: '2026-09-18T01:40:10Z',
       },

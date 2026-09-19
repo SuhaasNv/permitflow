@@ -21,7 +21,8 @@ export function SubmittedPage() {
   const { id = '' } = useParams()
   const app = useApplication(id)
   if (app.isPending) return <Skeleton className="mx-auto h-72 max-w-3xl" />
-  if (app.isError) {
+  // A failed background refetch keeps the cached view (and any unsaved work); only a first load can fail the page.
+  if (app.isError && app.data === undefined) {
     if (app.error instanceof AppError && app.error.status === 404)
       return <NotFoundPanel backTo="/app/applications" backLabel="Back to my applications" />
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />

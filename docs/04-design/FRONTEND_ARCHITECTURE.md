@@ -4,7 +4,7 @@ Rewritten on 20 September 2026 from the tree in `frontend/src`. The design-phase
 
 ## Stack
 
-React 19, TypeScript strict (no `any`), Vite, Tailwind v4, TanStack Query, React Hook Form with Zod, React Router. Tests: vitest with Testing Library (153 tests in 32 files, coverage thresholds in `vite.config.ts`), Playwright (the journey, six scenarios, an axe accessibility gate over 23 screen states). Linting: oxlint.
+React 19, TypeScript strict (no `any`), Vite, Tailwind v4, TanStack Query, React Hook Form with Zod, React Router. Tests: vitest with Testing Library (158 tests in 33 files, coverage thresholds in `vite.config.ts`), Playwright (the journey, six scenarios, an axe accessibility gate over 23 screen states). Linting: oxlint.
 
 ## Tree
 
@@ -35,14 +35,14 @@ src/
 ## Data flow
 
 - Server state lives in TanStack Query. Query keys are per resource (`['operator','application',id]`, `['officer','case',id]`, `['officer','audit',id]`, `['officer','queue']`, `['form-schema']`). Mutations write the returned view into the case or application key and invalidate the lists and the audit trail that the change affects (`officer/queries.ts` `afterCaseChange`).
-- Polling: the operator application and the officer case refetch every 2 s while any document check is `pending` or `running`, only while the tab is visible, and stop after a check is older than three minutes (`isCheckStale`). The queue refetches every 30 s; the notifications bell every 30 s.
+- Polling: the operator application and the officer case refetch every 2 s while any document check is `pending` or `running`, only while the tab is visible, and stop after a check is older than three minutes (`isCheckStale`, shared by both roles; the operator slot wakes itself when the window closes so it can offer Re-run without a navigation). The queue refetches every 30 s; the notifications bell every 30 s.
 - Forms: React Hook Form with a Zod resolver built at runtime from the server's form schema (`lib/zodFromSchema.ts`), so the client validates the same rules the server enforces; server 422 details are mapped back onto fields.
 - Labels and status: every status label, tone and available action comes from the API for the caller's role. Operator components never receive an internal status code; officer components render the officer label and the server-derived `available_actions` with their disabled reasons.
 - Verification display: the operator sees the server's run status (`pending`, `running`, then a terminal state), the summary and the issues; nothing about the check is simulated on the client.
 
 ## Errors and states
 
-`api/client.ts` turns every non-2xx into `AppError { code, message, details, requestId }` and maps a failed fetch to a network error. Query errors render `ErrorPanel` with the request id and a retry; mutation errors render an inline `Alert` and keep the user's input; 429 shows the server message; unknown routes render `NotFoundPanel`. Loading uses skeletons. There is no React error boundary for render crashes (recorded in the readiness review).
+`api/client.ts` turns every non-2xx into `AppError { code, message, details, requestId }` and maps a failed fetch to a network error. A query that fails on its first load renders `ErrorPanel` with the request id and a retry, while a failed background refetch keeps the cached view and any unsaved input (a poll that meets a 429 must not wipe the form); mutation errors render an inline `Alert` and keep the user's input; 429 shows the server message; unknown routes render `NotFoundPanel`. Loading uses skeletons. There is no React error boundary for render crashes (recorded in the readiness review).
 
 ## Security on the client
 

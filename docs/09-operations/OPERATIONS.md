@@ -25,7 +25,7 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `AI_RUNS_PER_USER_PER_DAY` | `60` | backend | Verification runs per applicant over a rolling day; beyond it a run is stored `unavailable` (`daily_limit_reached`) and nothing is sent to the model. 0 disables. |
 | `AI_RUNS_PER_DAY` | `1000` | backend | The platform-wide ceiling on model calls per rolling day: the cost brake. 0 disables. |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_TIMEOUT_SECONDS` | 10 / 20 / 5 | backend | SQLAlchemy pool per process; when every connection is busy for longer than the timeout the request is answered 503 `unavailable` (US-044). Size for the number of uvicorn workers times concurrent requests |
-| `TRUSTED_PROXIES` | empty | backend | Comma-separated proxy IPs whose `X-Forwarded-For` is trusted for the login rate limit, or `*` when the platform edge proxy is the only peer (Railway) |
+| `TRUSTED_PROXIES` | empty | backend | Comma-separated proxy IPs whose `X-Forwarded-For` is trusted for every per-client limiter, or `*` when the platform edge proxy is the only peer (Railway) |
 | `TEST_LIVE_AI` | unset | tests | Set to `1` to let the pytest suite call the live OpenAI provider; otherwise tests force `AI_PROVIDER=mock` regardless of `.env`. |
 | `AI_PROVIDER` | `mock` | backend | `mock` or `openai`. |
 | `OPENAI_API_KEY` | empty | backend | Required when `AI_PROVIDER=openai`. |

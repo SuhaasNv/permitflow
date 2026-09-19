@@ -16,7 +16,11 @@ def test_health_503_when_database_down(client: TestClient, monkeypatch) -> None:
     monkeypatch.setattr(health_module, "database_is_reachable", lambda: False)
     r = client.get("/api/v1/health")
     assert r.status_code == 503
-    assert r.json() == {"status": "degraded", "database": "unreachable"}
+    assert r.json() == {
+        "status": "degraded",
+        "database": "unreachable",
+        "error": {"code": "unavailable", "message": "The database is unreachable."},
+    }
 
 
 def test_unknown_route_uses_error_shape(client: TestClient) -> None:

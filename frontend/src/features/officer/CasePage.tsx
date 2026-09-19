@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { AppError } from '@/api/client'
 import { downloadDocument, downloadLicence } from '@/api/documents'
 import type { OfficerAction, OfficerApplication } from '@/api/officer'
-import { useFormSchema } from '@/features/operator/queries'
+import { isCheckStale, useFormSchema } from '@/features/operator/queries'
 import { displayValue } from '@/features/operator/SectionSummary'
 import { Alert } from '@/features/shared/Alert'
 import { Button, buttonClasses } from '@/features/shared/Button'
@@ -258,7 +258,8 @@ export function OfficerCasePage() {
       </PageSkeleton>
     )
   }
-  if (app.isError) {
+  // A failed background refetch keeps the cached view (and any unsaved work); only a first load can fail the page.
+  if (app.isError && app.data === undefined) {
     if (app.error instanceof AppError && app.error.status === 404)
       return <NotFoundPanel backTo="/officer/queue" backLabel="Back to the queue" />
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
@@ -301,7 +302,10 @@ export function OfficerCasePage() {
     )
   }
 
-  const copy = pending ? (ACTION_COPY_BY_LABEL[pending.label] ?? ACTION_COPY[pending.target]) : null
+  const copy = pending
+    ? (ACTION_COPY_BY_LABEL[pending.label] ??
+      ACTION_COPY[pending.target] ?? { title: `${pending.label}?`, body: '', confirm: pending.label })
+    : null
 
   return (
     <>
@@ -495,7 +499,8 @@ export function OfficerCasePage() {
                   {d.verification ? (
                     <div className="mt-4 rounded-md border border-line bg-surface-2 px-4 py-3.5">
                       <CheckResult verification={d.verification} />
-                      {d.verification.status !== 'pending' && d.verification.status !== 'running' ? (
+                      {(d.verification.status !== 'pending' && d.verification.status !== 'running') ||
+                      isCheckStale(d.verification.requested_at) ? (
                         <div className="mt-3 flex justify-end border-t border-line pt-2.5">
                           <Button
                             variant="ghost"

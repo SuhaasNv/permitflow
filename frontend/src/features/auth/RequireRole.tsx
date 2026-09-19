@@ -16,7 +16,7 @@ export function RequireRole({ roles }: { roles: Role[] }) {
       </div>
     )
   }
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />
   if (!roles.includes(user.role)) return <NotAvailableForRole />
   return <Outlet />
 }

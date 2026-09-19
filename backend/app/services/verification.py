@@ -66,6 +66,10 @@ def run_verification(run_id: uuid.UUID) -> None:
         app = db.get(Application, doc.application_id) if doc else None
         if run is None or doc is None or app is None:
             return
+        # End the read transaction here: the session keeps the loaded rows (expire_on_commit=False) but
+        # returns its pooled connection while the file is read and the model is called, so a burst of slow
+        # checks cannot park every connection and starve the API. `_finish` opens a new one to write.
+        db.commit()
         started = time.perf_counter()
 
         try:

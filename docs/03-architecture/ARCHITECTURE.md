@@ -38,8 +38,8 @@ Rules:
 | verification | verification_runs | `enqueue(document_id)`, `run_verification(document_id)`, `latest(document_id)`, `rerun` |
 | feedback | feedback | `create(officer, id, target, message, template_key)`, `resolve`, `withdraw`, `list`, `templates()` |
 | notifications | notifications | `notify(user_ids, kind, application, ...)`, `list(user)`, `mark_read` |
-| audit | audit_events | `record(application_id, actor, event_type, payload)`, `list(application_id)`, `feed(limit)` |
-| admin | none (reads other modules' tables through their repositories; writes users through the auth module's service) | `overview()`, `ai_health()`, `audit_feed()`, `users()`, `create_user()`, `update_user(role, is_active)` |
+| audit | audit_events | `record(application_id, actor, event_type, payload)`, `list(application_id)`, `purge_draft(application_id)` |
+| admin (planned, v0.4.0, US-070 to US-073) | none (would read other modules' tables through their repositories; writes users through the auth module's service) | `overview()`, `ai_health()`, `audit_feed()`, `users()`, `update_user(role, is_active)`: not built; only the role value and `AdminUser` in `api/deps.py` exist |
 
 Cross-module writes go through services, never across repositories.
 
@@ -139,15 +139,15 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /officer/applications/{id}/documents/{doc_id}/verify | officer | re-run the AI check; same rules and audit as the operator re-run; returns the officer view (built, US-022) |
 | GET | /officer/applications/{id}/audit | officer | append-only audit trail with actor name and role, plain-language summary (`domain/audit_labels.py`) and payload, chronological (built, US-029) |
 | GET | /admin/overview (planned, US-070) | admin | counts by status, idle applications, today's submissions |
-| GET | /admin/ai-health (planned, US-070) | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
-| GET | /admin/audit-feed (planned, US-071) | admin | latest 50 audit events across applications |
+| GET | /admin/ai-health (planned, US-071) | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
+| GET | /admin/audit-feed (planned, US-072) | admin | latest 50 audit events across applications |
 | GET | /admin/users (planned, US-073) | admin | user directory |
 | PATCH | /admin/users/{id} (planned, US-073) | admin | change `role` and/or `is_active`; audit `user.role_changed` / `user.deactivated` / `user.reactivated`; 409 when it would remove the last active admin |
 | GET | /admin/applications/{id} (planned, US-072) | admin | officer view, read-only (mutations 403) |
 | GET | /notifications | any | own notifications (newest first, 50) plus `unread_count` (built, US-025) |
 | POST | /notifications/{id}/read | any | mark read; another user's id is 404 (built, US-025) |
 | POST | /notifications/read-all | any | mark every own notification read (built, US-025) |
-| GET | /health | public | `{status, database}`; 503 when the database ping fails; provider details are not exposed publicly (admin sees them in `/admin/ai-health`) |
+| GET | /health | public | `{status, database}`; 503 when the database ping fails, with the standard `error` object beside the status fields; provider details are not exposed publicly (the planned admin AI-health endpoint, US-071, would report them) |
 
 All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail": …}` bodies for 401/403/422 are replaced by explicit exception handlers so every error uses the standard shape (REL-001).
 
@@ -170,12 +170,12 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 
 - API: a global exception handler maps domain exceptions (`NotFound`, `Forbidden`, `InvalidTransition`, `ValidationFailed`, `VersionConflict`) to the standard error body; unexpected exceptions → 500 with a request id and no stack trace.
 - Verification task: catches everything, records failure, never propagates.
-- Frontend: query errors rendered by `ErrorPanel` with the request id and Retry; mutation errors shown inline as an `Alert` and preserve input; 429 shows the server message and queries never retry a 4xx; an unknown route renders `NotFoundPanel`. There is no React error boundary for render crashes (recorded as a gap in the US-058 review).
+- Frontend: a query that fails on first load is rendered by `ErrorPanel` with the request id and Retry, while a failed background refetch keeps the cached view (and any unsaved form input) until the next poll succeeds; mutation errors shown inline as an `Alert` and preserve input; 429 shows the server message and queries never retry a 4xx; an unknown route renders `NotFoundPanel`. There is no React error boundary for render crashes (recorded as a gap in the US-058 review).
 
 ## Authorization boundaries
 
 - Authentication: `get_current_user` dependency (JWT → User row; rejects unknown users and `is_active = false`).
-- Role: `require_role(...)` on officer routers (`officer`) and admin routers (`admin`); admin is read-only on applications.
+- Role: `require_role(...)` on the officer router and on the routes an owner shares with an officer (compare, download, licence, re-run); `AdminUser` in `api/deps.py` is reserved for the admin router (US-070, not built); an admin gets 403 from officer routes and 404 from operator routes.
 - Ownership: `ApplicationRepository.get_for(user, id)` applies `operator_id` filter for operators; raises `NotFound`.
 - Editability: `domain.editability.editable_targets(status, open_feedback)` used by section update and document upload.
 - Transition role and guards: `domain.workflow`.
@@ -185,7 +185,7 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 
 - Request logging middleware: request id, method, path, status, duration, user id; request id echoed in `X-Request-ID`.
 - Verification logs: run id, provider, model, latency, outcome, `raw_output_valid`.
-- `/health`: database ping (503 on failure). AI provider configuration is reported on the admin AI-health endpoint, not publicly.
+- `/health`: database ping (503 on failure). AI provider configuration is never reported publicly; the planned admin AI-health endpoint (US-071) would carry it.
 
 ## Deployment
 

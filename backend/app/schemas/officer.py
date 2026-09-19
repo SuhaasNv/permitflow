@@ -63,6 +63,7 @@ class OfficerVerificationOut(BaseModel):
     error_reason: str | None
     provider: str
     model: str | None
+    requested_at: datetime
     finished_at: datetime | None
 
 
@@ -74,7 +75,8 @@ class OfficerDocumentOut(BaseModel):
     content_type: str
     size_bytes: int
     uploaded_at: datetime
-    # True when this document was uploaded after the current revision was submitted (not part of it yet).
+    # True when this document is part of the current submitted revision; False for a file the operator
+    # uploaded since (a replacement during resubmission that has not been resubmitted yet).
     in_current_revision: bool
     verification: OfficerVerificationOut | None
 
@@ -179,6 +181,7 @@ class OfficerApplicationOut(BaseModel):
 
 class TransitionIn(BaseModel):
     target: str
+    # Stored as the decision note for `approved` and `rejected` (required for reject); ignored otherwise.
     note: str | None = Field(default=None, max_length=2000)
     expected_version: int
 

@@ -11,6 +11,7 @@ from app.core.errors import InvalidTransition, ValidationFailed, VersionConflict
 from app.domain.enums import ApplicationStatus, NotificationKind
 from app.domain.labels import operator_label
 from app.domain.workflow import Actor, TransitionContext, TransitionError, transition
+from app.infra.storage import get_storage
 from app.models import Application, User
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
@@ -73,12 +74,16 @@ class WorkflowService:
                     event_type="feedback.released",
                     payload={"feedback_ids": released},
                 )
-        if note is not None and resolved in (ApplicationStatus.APPROVED, ApplicationStatus.REJECTED):
+        # A note is stored only with a decision and ignored for other targets (TransitionIn says so).
+        note = note if resolved in (ApplicationStatus.APPROVED, ApplicationStatus.REJECTED) else None
+        if note is not None:
             app.decision_note = note
         licence_no: str | None = None
+        licence_key: str | None = None
         if resolved == ApplicationStatus.APPROVED:
             # The certificate is part of the approval: same transaction, audited, or neither happens (US-051).
-            licence_no = LicenceService(self.db).issue(app, officer).licence_no
+            licence = LicenceService(self.db).issue(app, officer)
+            licence_no, licence_key = licence.licence_no, licence.stored_key
         app.version += 1
         self.audit.record(
             application_id=app.id,
@@ -98,7 +103,13 @@ class WorkflowService:
             f"{app.reference_no}: {operator_label(resolved)}",
             _operator_body(resolved, note, licence_no),
         )
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception:
+            # The PDF was written before the commit; without the row it would be an orphan on the volume.
+            if licence_key is not None:
+                get_storage().delete(licence_key)
+            raise
         self.notifications.flush_sent()
         self.db.refresh(app)
         return app
