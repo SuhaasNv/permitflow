@@ -21,6 +21,12 @@ env:
   APP_ENV: test
   AI_PROVIDER: mock
 
+# `shell: bash` gives `-o pipefail`, so `pytest | tee` and `python | tee` cannot hide a failure. Before this
+# fix the Contracts stage reported "pass" while every test had errored at setup.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   model-approval:
     name: Model approval
@@ -28,6 +34,7 @@ jobs:
     defaults:
       run:
         working-directory: backend
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -55,25 +62,53 @@ jobs:
           assert not s.langsmith_api_key, "tracing key must not be set in CI"
           print("model approval ok: model", s.openai_model, "prompt", PROMPT_VERSION)
           PY
-          echo "| 1. Model approval | pass | gpt-4.1-mini, prompt $(uv run python -c 'from app.infra.ai.openai_provider import PROMPT_VERSION; print(PROMPT_VERSION)') |" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### 1. Model approval"
+            echo
+            echo "pass: model gpt-4.1-mini, prompt $(uv run python -c 'from app.infra.ai.openai_provider import PROMPT_VERSION; print(PROMPT_VERSION)')"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   contracts:
     name: Contracts
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: permitflow
+          POSTGRES_PASSWORD: permitflow
+          POSTGRES_DB: permitflow_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U permitflow -d permitflow_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow_test
     defaults:
       run:
         working-directory: backend
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
       - run: uv sync --frozen
-      - run: |
+      - name: Provider, rules, extraction and tracing tests
+        run: |
           uv run pytest tests/unit/test_verification_rules.py tests/unit/test_openai_wire.py \
             tests/unit/test_openai_provider_paths.py tests/unit/test_mock_provider.py \
-            tests/unit/test_extraction.py tests/unit/test_tracing.py -q | tee /tmp/contracts.txt
-          echo "| 2. Contracts | pass | $(tail -n 1 /tmp/contracts.txt) |" >> "$GITHUB_STEP_SUMMARY"
+            tests/unit/test_extraction.py tests/unit/test_tracing.py tests/unit/test_rate_limit.py -q \
+            | tee /tmp/contracts.txt
+          grep -Eq "^[0-9]+ passed" /tmp/contracts.txt || { echo "::error::no tests ran"; exit 1; }
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### 2. Contracts"
+            echo
+            echo "$(tail -n 1 /tmp/contracts.txt 2>/dev/null || echo 'no result')"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   golden-set:
     name: Golden set
@@ -81,6 +116,7 @@ jobs:
     defaults:
       run:
         working-directory: backend
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -95,9 +131,11 @@ jobs:
             uv run python - <<'PY'
           import json
           r = json.load(open("/tmp/ai-eval.json"))
-          print(f"| 3. Golden set | {'pass' if r['pass_rate'] == 1 else 'FAIL'} | {r['passed']}/{r['counted']} counted, prompt {r['prompt_version']} |")
+          print("### 3. Golden set")
           print()
-          print("<details><summary>Golden set, per case</summary>")
+          print(f"{'pass' if r['pass_rate'] == 1 else 'FAIL'}: {r['passed']}/{r['counted']} counted cases, prompt {r['prompt_version']}")
+          print()
+          print("<details><summary>Per case</summary>")
           print()
           print("| case | group | expected | actual | result |")
           print("|---|---|---|---|---|")
@@ -120,6 +158,7 @@ jobs:
     defaults:
       run:
         working-directory: backend
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -134,7 +173,9 @@ jobs:
           import json
           r = json.load(open("/tmp/adv.json"))
           mark = "pass" if r["pass_rate"] == 1 else "FAIL"
-          print(f"| 4. Adversarial | {mark} | {r['passed']}/{r['counted']} injection cases land on needs_review |")
+          print("### 4. Adversarial")
+          print()
+          print(f"{mark}: {r['passed']}/{r['counted']} injection cases land on needs_review")
           PY
 
   fairness:
@@ -143,6 +184,7 @@ jobs:
     defaults:
       run:
         working-directory: backend
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -158,7 +200,9 @@ jobs:
           import json
           r = json.load(open("/tmp/fairness.json"))
           ok = r["differing"] == 0
-          print(f"| 5. Fairness | {'pass' if ok else 'FAIL'} | {r['runs'] - r['differing']}/{r['runs']} name-swapped runs match their baseline |")
+          print("### 5. Fairness")
+          print()
+          print(f"{'pass' if ok else 'FAIL'}: {r['runs'] - r['differing']}/{r['runs']} name-swapped runs match their baseline")
           if not ok:
               print()
               print("| scenario | contact | status | codes |")

@@ -18,7 +18,7 @@ The AI reads a supporting document and says whether it matches the application f
 **AI gate** (`.github/workflows/ai-gate.yml`, called by `ci.yml` on every push and pull request, mock provider, free, deterministic). Six stages, each a job named in the run summary:
 
 1. Model approval: the model is the pinned `gpt-4.1-mini`, the confidence threshold is sane, the text cap has not grown, the prompt says the model does not make decisions, every enum on the wire is closed, the domain model forbids unknown fields, tests use the mock, no tracing key in CI.
-2. Contracts: unit tests for the rules, the wire schema, the provider's failure paths (timeout, refusal, malformed answer), the mock, extraction and tracing.
+2. Contracts: unit tests for the rules, the wire schema, the provider's failure paths (timeout, refusal, malformed answer), the mock, extraction, tracing and the rate limiter. (Found on 19 Sep after the first runs: this stage had reported "pass" while every test errored at setup, because the job had no database and the exit code was hidden behind a pipe. Fixed the same day: a Postgres service, `pipefail`, and a guard that fails the stage unless pytest reports passes.)
 3. Golden set: 14 cases, blocking at 100 % of the 12 counted (two documented mock gaps are reported, not counted).
 4. Adversarial: the two injection cases must land on `needs_review` with `possible_prompt_injection`.
 5. Fairness: 21 name-swapped runs must match their baseline.
