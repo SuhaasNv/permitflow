@@ -41,6 +41,10 @@ jobs:
       APP_ENV: test
       AI_PROVIDER: openai
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # Optional (US-055): when set, the run is also recorded as a LangSmith experiment on the golden dataset.
+      LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+      LANGSMITH_ENDPOINT: ${{ vars.LANGSMITH_ENDPOINT || 'https://api.smith.langchain.com' }}
+      LANGSMITH_PROJECT: permitflow-eval
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -55,7 +59,9 @@ jobs:
           fi
       - name: Golden set and adversarial cases through the real pipeline (OpenAI, blocking)
         run: |
-          uv run python -m evals.run --provider openai --json /tmp/ai-eval-live.json \
+          FLAGS=""
+          if [ -n "$LANGSMITH_API_KEY" ]; then FLAGS="--langsmith"; fi
+          uv run python -m evals.run --provider openai --json /tmp/ai-eval-live.json $FLAGS \
             --fail-under "${{ github.event.inputs.fail_under || '1.0' }}" | tee /tmp/ai-eval-live.txt
       - name: Publish the verdict
         if: always()

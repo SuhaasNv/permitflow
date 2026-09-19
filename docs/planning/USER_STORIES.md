@@ -63,6 +63,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: Nice-to-have · Day 3 (added 19 Sep, after the coverage story) · Dependencies: US-004 · Requirements: AI-008 · Branch `feat/us-054-ai-eval-workflow`
 - Definition of Done: the workflow is green on the first manual run after the owner sets the secret; the mock job in `ci.yml` unchanged and green.
 
+### US-055 — As an officer or reviewer, I want every AI check traced (prompt version, model, tokens, latency, raw answer) and every evaluation run kept as an experiment, so that a wrong check can be explained from its trace and a prompt change has a history.
+- Acceptance criteria: LangSmith tracing behind `LANGSMITH_API_KEY` (off without it, no behaviour change); one parent run per check carrying the verification run id, application id, document id, document type and prompt version, the OpenAI call as a child run; inputs hidden by default (`LANGSMITH_HIDE_INPUTS`), endpoint per region (`LANGSMITH_ENDPOINT`), project per environment; tracing lives in `infra/ai/tracing.py`, never in `domain`, and a tracing failure cannot fail a check; `evals.run --langsmith` records a run as an experiment on the golden dataset; `ai-eval.yml` uses it when the secret exists; threat model T21; ADR-006 amended; env documented in `.env.example`, README, OPERATIONS.
+- Priority: Nice-to-have · Day 3 (added 19 Sep, after US-054) · Dependencies: US-002, US-054 · Requirements: AI-007, AI-008, AI-009 · Branch `feat/us-055-langsmith-tracing` · Beyond the brief
+- Definition of Done: unit tests green; a trace of a live check visible in the owner's LangSmith project (development); documented.
+
 ### US-008 — As a reviewer, I want clear documentation of scope, architecture, AI usage, testing and operations, so that every decision is explainable.
 - Acceptance criteria: README (setup, env vars, tests, AI usage, what I would do next), SCOPE.md, ADRs, threat model, test strategy, UAT plan, operations guide, production readiness review, assessment traceability, CHANGELOG.
 - Priority: MVP · Day 3 (continuous) · Dependencies: all
