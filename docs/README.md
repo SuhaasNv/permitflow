@@ -21,7 +21,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `architecture/permitflow-architecture.drawio` / `.png` | written | Overall architecture diagram |
 | `architecture/diagrams/uc1-use-case`, `uc2-use-case`, `e4-admin-use-case` (`.drawio` / `.png`) | written | UML use case diagrams per epic |
 | `architecture/diagrams/sequences/*.mmd` / `.png` | written | Sequence diagrams UC1-A, UC1-B, UC2-A, UC2-B (Mermaid) |
-| `architecture/diagrams/views/*.png` | written (19 Sep) | Solution architecture, deployment and CI/CD views used in the technical deck; generated from prompts written against the code and rated before use (`AI_USAGE.md`, Debrief material) |
+| `architecture/diagrams/views/*.png` | written (19 Sep) | Solution architecture, branching, deployment and CI/CD views used in the technical deck; generated from prompts written against the code and rated before use (`AI_USAGE.md`, Debrief material) |
 
 ## Design (UI/UX phase, 17–18 Sep 2026)
 | Document | Status | Purpose |
@@ -58,6 +58,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `planning/USER_STORIES.md` | written | Stories US-000 … US-073, 1:1 with Notion |
 | `planning/SPRINTS.md` | written | Three one-day sprints, sprint DoD, close ritual, cut order |
 | `planning/KANBAN.md` | written | Flow, WIP limits, story-to-day mapping |
+| `planning/notion/*.png` | written (19 Sep) | The Notion board after the release: the workspace page, the Epics table, the Stories table |
 | `planning/DELIVERY_PLAN.md` | written | Day-by-day plan, cut order, risks |
 | `planning/DEFINITION_OF_DONE.md` | written | Story-level DoD |
 
