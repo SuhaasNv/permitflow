@@ -156,17 +156,13 @@ All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail":
 ```
 frontend/src
   api/            hand-written types mirroring app/schemas + thin fetch client (auth header, error mapping)
-  app/            router, providers (QueryClient, Auth), layout shell
-  features/
-    auth/         login page, useAuth
-    operator/     dashboard, application form (sections, uploads, progress), application detail, resubmission
-    officer/      queue, review page (sections, documents, AI results, feedback panel, transition actions), compare view, audit
-    admin/        OverviewPage placeholder only; the admin screens (US-070 to US-073) are v0.4.0
-    landing/      public landing page
-    shared/       StatusBadge, FeedbackList, DocumentCard, RevisionCompare, EmptyState, ErrorState, Skeleton
-  lib/            zod-from-schema builder, formatting, constants
-  styles/         tailwind base, design tokens
+  app/            router, providers (QueryClient, Auth), AppShell
+  features/       auth, landing, legal, operator, officer, admin (placeholder only, v0.4.0), shared
+  lib/            zodFromSchema, format, search, session, unsaved, cn
+  styles/         index.css (tokens, Tailwind theme), fonts.css
 ```
+
+The tree file by file, the data flow, polling, forms, errors and the known gaps: `docs/04-design/FRONTEND_ARCHITECTURE.md` (rewritten from the tree on 20 Sep 2026).
 
 State: server state in TanStack Query (query keys per resource; invalidation after mutations; polling while verifying). Auth in a small context. Forms via React Hook Form with Zod resolvers built from `/form-schema`.
 

@@ -13,7 +13,7 @@ const STEPS: [string, string, string][] = [
     'A licensing officer reviews your form and documents. You will be notified if changes are needed.',
     'You will see the status change here',
   ],
-  ['Site visit', 'If the review is satisfactory, an officer will contact you to arrange a visit to the premises.', 'After review'],
+  ['Site visit', 'If the review is satisfactory, the officer marks a site visit in this system; booking the visit itself happens outside it for now.', 'After review'],
   ['Outcome', 'The final decision appears on this page and on your dashboard.', 'After the site visit'],
 ]
 

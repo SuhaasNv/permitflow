@@ -8,7 +8,7 @@ https://github.com/user-attachments/assets/942739f7-e2bd-4360-b525-ecf960a7e796
 
 *Launch video, 70 seconds. The full-resolution file, the narrated walkthrough (4 min 36 s) and the technical video (4 min) are in `docs/13-debrief/video/`.*
 
-A regulatory licensing platform built for a 3-day full-stack assessment. Business operators apply for a Food Establishment Licence through a guided form with checked uploads; licensing officers review the submission, leave feedback tied to a specific section or document, and request a resubmission in which only the flagged parts reopen; every status change, feedback round and decision is audited; approval issues a licence certificate the business can download. An advisory AI verifier reads each uploaded document and compares it with the form before anyone submits; it never decides anything.
+A regulatory licensing platform built for a 3-day full-stack assessment. Business operators (the business owner, or an agent applying on the business's behalf) apply for a Food Establishment Licence, the assumed domain, through a guided form with checked uploads; licensing officers review the submission, leave feedback tied to a specific section or document, and request a resubmission in which only the flagged parts reopen; every status change, feedback round and decision is audited; approval issues a licence certificate the business can download. An advisory AI verifier reads each uploaded document and compares it with the form before anyone submits; it never decides anything.
 
 **Try it:** production, v0.3.0: https://permitflow.space (one example application waiting in the officer's queue). Development environment: https://dev.permitflow.space (platform host as a fallback: https://frontend-development-afe2.up.railway.app). Demo accounts below. Local setup takes about ten minutes (below).
 
@@ -24,10 +24,12 @@ Contents: Run locally · Demo accounts · Security · Tests and checks · Enviro
 
 ## Run locally
 
-Requirements: Docker (for PostgreSQL), Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 24.
+Requirements: Docker (for PostgreSQL), Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 24. Git LFS only if you want the videos and the prototype PDF under `docs/` (they arrive as pointer files without it).
 
 ```bash
-cp .env.example .env            # defaults work for local development
+cp .env.example .env
+# The app refuses to start with the placeholder secret; set any 16+ random characters (macOS/Linux):
+sed -i.bak "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" .env && rm .env.bak
 docker compose up -d db          # PostgreSQL 16 on localhost:5432 (+ permitflow_test database)
 
 cd backend
@@ -40,6 +42,8 @@ cd ../frontend
 npm install
 npm run dev                            # http://localhost:3000
 ```
+
+Local quotas: an operator may hold 20 open drafts and run 60 AI checks a day, and the mock provider counts too, so a day of manual testing plus a few end-to-end runs reaches them. For local work set `MAX_DRAFTS_PER_USER=0` and `AI_RUNS_PER_USER_PER_DAY=0` in `.env` (0 disables). Reading order for the code: `README.md`, `SCOPE.md`, `docs/03-architecture/ARCHITECTURE.md`, `docs/03-architecture/STATE_MACHINE.md`, `docs/07-ai/AI_ASSURANCE.md`.
 
 ## Demo accounts
 
@@ -83,7 +87,7 @@ Layers and what each protects: `docs/08-testing/TEST_STRATEGY.md`.
 
 ## Environment variables
 
-See `.env.example`; every runtime variable is documented there and in `docs/09-operations/OPERATIONS.md` (`SEED_PASSWORD` is read by the seed script only). `JWT_SECRET` is required outside `APP_ENV=test`. The frontend needs no `.env` locally: it defaults to `http://localhost:8000/api/v1`.
+See `.env.example`; every runtime variable is documented there and in `docs/09-operations/OPERATIONS.md` (`SEED_PASSWORD` is read by the seed script only). `JWT_SECRET` is required in every environment, tests included (the suite signs with a random secret per run); the frontend reads the API URL from `VITE_API_URL` in `frontend/.env` and defaults to http://localhost:8000. The frontend needs no `.env` locally: it defaults to `http://localhost:8000/api/v1`.
 
 ## Project layout
 
