@@ -37,9 +37,6 @@ uploads/
 *.xlsx
 !docs/debrief/**/*.pptx
 
-# Large design exports stay out of git (link to the canvas instead)
-docs/extra-images/*.pdf
-
 # Runtime data, partial uploads, coverage and generated prototype output
 data/
 *.part
