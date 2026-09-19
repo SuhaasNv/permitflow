@@ -2,6 +2,8 @@
 
 Two long-lived branches, short-lived work branches, merges only through the chain below. No direct commits to `main`.
 
+![Branching: main with release tags, dev as integration, one work branch per story merged with --no-ff, hotfix and optional release paths](../architecture/diagrams/views/branching.png)
+
 ```
 main  ── production. Only receives merges from dev (release) or hotfix/*. Tagged on every release.
   └── dev  ── integration. Always buildable; CI must be green. Receives merges from feat/*, fix/*, chore/*, docs/*.

@@ -2,6 +2,14 @@
 
 Three calendar days, one engineer with AI assistance. We run **three one-day sprints**. A one-day sprint is the shortest cycle that still has a real goal, a review and a close; anything shorter turns into task-switching. The Notion `Sprint Day` field is the sprint (Day 1 = Sprint 1, and so on). Stories move `Not started → In progress → Done` on the Notion board as they are picked up and finished; a sprint is closed only when the close ritual below has run.
 
+The board as it stands after the v0.3.0 release (19 September 2026):
+
+![Notion board: PermitFlow, Xtremax Assessment, with the Epics and Stories databases](notion/board.png)
+
+![Epics: E0 Foundation, UC1, UC2 in scope, UC3 deferred, E4 admin](notion/epics.png)
+
+![Stories: US-000 onwards, each linked to its epic, one to one with USER_STORIES.md](notion/stories.png)
+
 ## Cadence
 
 | Event | When | Duration | Output |
