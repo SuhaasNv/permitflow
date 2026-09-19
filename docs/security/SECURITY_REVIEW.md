@@ -39,6 +39,6 @@ Reviewed by an engineer against the code, with the tools named in each row. It i
 
 ## Verification record
 
-- Backend: 747 tests green on a real PostgreSQL, including the 8 new abuse tests; `ruff`, `mypy --strict`, `bandit` clean; `pip-audit` clean.
+- Backend: 748 tests green on a real PostgreSQL, including the 8 new abuse tests; `ruff`, `mypy --strict`, `bandit` clean; `pip-audit` clean.
 - Frontend: the image built locally; `curl -I` shows the rendered headers with the right API origin; the built bundle driven by Playwright under the exact CSP through landing, sign-in, new application, document upload with a check, and the applications list, with zero CSP violations and zero console errors; the licence preview's `<object data="blob:">` confirmed allowed by `object-src blob:`.
 - gitleaks over the full history: no leaks.
