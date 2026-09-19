@@ -31,20 +31,20 @@ uploads/
 .vscode/
 *.log
 
-# Assessment brief and other office docs never enter the repo (the decks under docs/debrief/ are the exception)
+# Assessment brief and other office docs never enter the repo (the decks under docs/13-debrief/ are the exception)
 *.docx
 *.pptx
 *.xlsx
-!docs/debrief/**/*.pptx
+!docs/13-debrief/**/*.pptx
 
 # Runtime data, partial uploads, coverage and generated prototype output
 data/
 *.part
 coverage/
 playwright/.cache/
-docs/design/prototype-src/project/
-docs/design/prototype-src/static/
-docs/design/prototype-src/shots/
+docs/04-design/prototype-src/project/
+docs/04-design/prototype-src/static/
+docs/04-design/prototype-src/shots/
 
 # Personal study notes (not part of the deliverable)
 notes/

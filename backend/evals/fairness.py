@@ -36,7 +36,7 @@ from app.infra.extraction import extract_text
 from evals.run import _provider
 
 HERE = Path(__file__).resolve().parent
-DEMO = HERE / "../../docs/demo/documents/clean"
+DEMO = HERE / "../../docs/12-demo/documents/clean"
 
 BASELINE = ("Kopi & Kaya Toast House Pte. Ltd.", "Tan Wei Ling")
 BASELINE_EMAIL = "weiling.tan@kopikaya.sg"

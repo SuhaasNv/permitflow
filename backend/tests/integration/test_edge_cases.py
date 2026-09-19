@@ -1,4 +1,4 @@
-"""Regression tests from the Sprint 2 edge-case review (docs/reviews/EDGE_CASE_REVIEW.md)."""
+"""Regression tests from the Sprint 2 edge-case review (docs/11-reviews/EDGE_CASE_REVIEW.md)."""
 
 import uuid
 from datetime import UTC, datetime, timedelta

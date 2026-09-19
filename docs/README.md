@@ -6,85 +6,85 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | Document | Status | Purpose |
 |----------|--------|---------|
 | `../SCOPE.md` | written | What is built, deferred, mocked; assumptions; stack summary |
-| `discovery/PROBLEM.md` | written | Problem, personas, pain points, success criteria |
-| `requirements/REQUIREMENTS.md` | written | FR / NFR / SEC / AI / AUD / UX / REL requirements with IDs |
-| `requirements/USE_CASES.md` | written | Use cases UC0-A … UC4-A grouped by Notion epic |
+| `01-discovery/PROBLEM.md` | written | Problem, personas, pain points, success criteria |
+| `02-requirements/REQUIREMENTS.md` | written | FR / NFR / SEC / AI / AUD / UX / REL requirements with IDs |
+| `02-requirements/USE_CASES.md` | written | Use cases UC0-A … UC4-A grouped by Notion epic |
 
 ## Architecture
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `architecture/SOLUTIONING.md` | written | Options and choices for every significant engineering problem |
-| `architecture/ARCHITECTURE.md` | written | Layers, modules, API surface, request flows, boundaries |
-| `architecture/DOMAIN_MODEL.md` | written | Entities, verification vocabulary, issue codes, invariants |
-| `architecture/STATE_MACHINE.md` | written | 12 states + draft + withdrawn, labels, transitions (incl. Return to review), guards, feedback rules |
-| `architecture/decisions/README.md` + `ADR-001` to `ADR-012` | written (index with "chose X over Y because Z" per ADR; 003, 006, 007, 009, 011 amended as built; 010, 011 and 012 added 19 Sep) | Architecture decision records |
-| `architecture/permitflow-architecture.drawio` / `.png` | written | Overall architecture diagram |
-| `architecture/diagrams/uc1-use-case`, `uc2-use-case`, `e4-admin-use-case` (`.drawio` / `.png`) | written | UML use case diagrams per epic |
-| `architecture/diagrams/sequences/*.mmd` / `.png` | written | Sequence diagrams UC1-A, UC1-B, UC2-A, UC2-B (Mermaid) |
-| `architecture/diagrams/views/*.png` | written (19 Sep) | Solution architecture, branching, deployment and CI/CD views used in the technical deck; generated from prompts written against the code and rated before use (`AI_USAGE.md`, Debrief material) |
+| `03-architecture/SOLUTIONING.md` | written | Options and choices for every significant engineering problem |
+| `03-architecture/ARCHITECTURE.md` | written | Layers, modules, API surface, request flows, boundaries |
+| `03-architecture/DOMAIN_MODEL.md` | written | Entities, verification vocabulary, issue codes, invariants |
+| `03-architecture/STATE_MACHINE.md` | written | 12 states + draft + withdrawn, labels, transitions (incl. Return to review), guards, feedback rules |
+| `03-architecture/decisions/README.md` + `ADR-001` to `ADR-012` | written (index with "chose X over Y because Z" per ADR; 003, 006, 007, 009, 011 amended as built; 010, 011 and 012 added 19 Sep) | Architecture decision records |
+| `03-architecture/permitflow-architecture.drawio` / `.png` | written | Overall architecture diagram |
+| `03-architecture/diagrams/uc1-use-case`, `uc2-use-case`, `e4-admin-use-case` (`.drawio` / `.png`) | written | UML use case diagrams per epic |
+| `03-architecture/diagrams/sequences/*.mmd` / `.png` | written | Sequence diagrams UC1-A, UC1-B, UC2-A, UC2-B (Mermaid) |
+| `03-architecture/diagrams/views/*.png` | written (19 Sep) | Solution architecture, branching, deployment and CI/CD views used in the technical deck; generated from prompts written against the code and rated before use (`AI_USAGE.md`, Debrief material) |
 
 ## Design (UI/UX phase, 17–18 Sep 2026)
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `design/README.md` | written | Index + link to the clickable prototype (23 artboards) |
-| `design/UI_DESIGN.md` | written | Direction, personality, what is avoided, motion, accessibility, assumptions |
-| `design/DESIGN_SYSTEM.md` | written | Tokens, type scale, status / verification / feedback vocabularies as rendered |
-| `design/UI_FLOW.md` | written | Information architecture; operator and officer flows mapped to states and endpoints |
-| `design/USER_JOURNEY.md` | written (Sprint 2) | The journey as built, step by step for the operator and the officer, with what the system does at each step |
-| `design/SCREEN_INVENTORY.md` | written | Every screen with ID, persona, requirements, actions, states, responsive notes, priority |
-| `design/COMPONENT_INVENTORY.md` | written | Reusable components and where they are used |
-| `design/UI_STATES.md` | written | Loading / empty / error / permission states; upload → verification and feedback lifecycles |
-| `design/FRONTEND_ARCHITECTURE.md` | written | Folder layout, routing, query keys, forms, uploads, responsive breakpoints, motion, a11y |
-| `design/UI_REQUIREMENTS_TRACEABILITY.md` | written | Use case / requirement / story → screen |
-| `design/brand/` | written | Logo mark (SVG), monochrome mark, horizontal lockup, usage notes |
-| `design/prototype/permitflow-prototype-v3-23-artboards.pdf` | written (18 Sep) | Static export of the clickable prototype, one artboard per page (design system, operator journey, resubmission, officer journey, admin concept, phone screens); Git LFS |
-| `design/screens/` | written | Rendered PNG of every prototype artboard; `screens/as-built/` holds captures of the shipped screens at the Sprint 1 close |
+| `04-design/README.md` | written | Index + link to the clickable prototype (23 artboards) |
+| `04-design/UI_DESIGN.md` | written | Direction, personality, what is avoided, motion, accessibility, assumptions |
+| `04-design/DESIGN_SYSTEM.md` | written | Tokens, type scale, status / verification / feedback vocabularies as rendered |
+| `04-design/UI_FLOW.md` | written | Information architecture; operator and officer flows mapped to states and endpoints |
+| `04-design/USER_JOURNEY.md` | written (Sprint 2) | The journey as built, step by step for the operator and the officer, with what the system does at each step |
+| `04-design/SCREEN_INVENTORY.md` | written | Every screen with ID, persona, requirements, actions, states, responsive notes, priority |
+| `04-design/COMPONENT_INVENTORY.md` | written | Reusable components and where they are used |
+| `04-design/UI_STATES.md` | written | Loading / empty / error / permission states; upload → verification and feedback lifecycles |
+| `04-design/FRONTEND_ARCHITECTURE.md` | written | Folder layout, routing, query keys, forms, uploads, responsive breakpoints, motion, a11y |
+| `04-design/UI_REQUIREMENTS_TRACEABILITY.md` | written | Use case / requirement / story → screen |
+| `04-design/brand/` | written | Logo mark (SVG), monochrome mark, horizontal lockup, usage notes |
+| `04-design/prototype/permitflow-prototype-v3-23-artboards.pdf` | written (18 Sep) | Static export of the clickable prototype, one artboard per page (design system, operator journey, resubmission, officer journey, admin concept, phone screens); Git LFS |
+| `04-design/screens/` | written | Rendered PNG of every prototype artboard; `screens/as-built/` holds captures of the shipped screens at the Sprint 1 close |
 
 ## Security
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `security/THREAT_MODEL.md` | written | Threats T1 to T22, planned controls, validation, production gaps |
+| `06-security/THREAT_MODEL.md` | written | Threats T1 to T22, planned controls, validation, production gaps |
 
 ## AI
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `ai/AI_VERIFICATION_DESIGN.md` | written | Pipeline, prompt contract, output schema, rules, failure handling |
-| `ai/AI_EVALUATION.md` | written (19 Sep) | Evaluation set and results against mock and OpenAI |
-| `ai/AI_ASSURANCE.md` | written (19 Sep) | One page: the four layers, the AI gate and the live evaluation, fairness, tools chosen and not |
+| `07-ai/AI_VERIFICATION_DESIGN.md` | written | Pipeline, prompt contract, output schema, rules, failure handling |
+| `07-ai/AI_EVALUATION.md` | written (19 Sep) | Evaluation set and results against mock and OpenAI |
+| `07-ai/AI_ASSURANCE.md` | written (19 Sep) | One page: the four layers, the AI gate and the live evaluation, fairness, tools chosen and not |
 | `../AI_USAGE.md` | written (19 Sep) | How AI tools were used: tools and models, the workflow they worked inside, the standing instructions, the prompts grouped by the decision they carry, verification, what was discarded |
 
 ## Planning
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `planning/USER_STORIES.md` | written | Stories US-000 … US-073, 1:1 with Notion |
-| `planning/SPRINTS.md` | written | Three one-day sprints, sprint DoD, close ritual, cut order |
-| `planning/KANBAN.md` | written | Flow, WIP limits, story-to-day mapping |
-| `planning/notion/*.png` | written (19 Sep) | The Notion board after the release: the workspace page, the Epics table, the Stories table |
-| `planning/DELIVERY_PLAN.md` | written | Day-by-day plan, cut order, risks |
-| `planning/DEFINITION_OF_DONE.md` | written | Story-level DoD |
+| `05-planning/USER_STORIES.md` | written | Stories US-000 … US-073, 1:1 with Notion |
+| `05-planning/SPRINTS.md` | written | Three one-day sprints, sprint DoD, close ritual, cut order |
+| `05-planning/KANBAN.md` | written | Flow, WIP limits, story-to-day mapping |
+| `05-planning/notion/*.png` | written (19 Sep) | The Notion board after the release: the workspace page, the Epics table, the Stories table |
+| `05-planning/DELIVERY_PLAN.md` | written | Day-by-day plan, cut order, risks |
+| `05-planning/DEFINITION_OF_DONE.md` | written | Story-level DoD |
 
 ## Quality, operations, reviews (produced during implementation)
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `testing/TEST_STRATEGY.md` | written (19 Sep) | Layers, what each layer protects, how to run |
-| `uat/UAT_PLAN.md` | written (19 Sep) | Twelve acceptance scenarios, environments and accounts, the record of every run (local, development, CI, production after v0.3.0) |
-| `operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
-| `operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |
-| `reviews/EDGE_CASE_REVIEW.md` | written (Sprint 2) | Three devil's-advocate reviews: every finding, its fix or its plan |
-| `reviews/BUG_HUNT_REVIEW.md` | written (19 Sep) | Three parallel bug hunts (backend, frontend, seams): 45 findings, what was fixed and what was kept; run-through findings R1 to R5 |
-| `reviews/LAYOUT_AUDIT.md` | written (19 Sep) | Layout audit at 390, 820, 1024, 1280 and 1440; findings tracked as US-043 and US-044 |
-| `reviews/PRODUCTION_READINESS_REVIEW.md` | written (19 Sep) | Twenty gaps with severity, what is in place, what production would need; go/no-go |
-| `reviews/ASSESSMENT_TRACEABILITY.md` | written (19 Sep) | The brief decoded; every deliverable and acceptance criterion → implementation → test → evidence |
-| `reviews/FINAL_REVIEW.md` | written (19 Sep) | What was built, the decisions to defend, trade-offs, what the AI got wrong, what to show in the debrief |
-| `reviews/ISSUES_AND_MITIGATIONS.md` | written (19 Sep) | Every issue found across the reviews and run-throughs, its risk, mitigation and evidence; what was kept as a decision |
-| `security/SECURITY_REVIEW.md` | written (19 Sep) | The owner's hardening checklist and four abuse scenarios, before and after US-058, with tests and what production adds |
-| `demo/documents/README.md` and `demo/documents/with_issues/NOTES.md` | written | The three generated document sets (clean, with planted issues, second business), how to regenerate them, the planted values |
-| `design/prototype-src/README.md` | written | How the clickable prototype was generated |
-| `reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` | written (19 Sep) | The owner's legal, privacy and accessibility checklist answered item by item with evidence; laws considered; risks flagged; contrast computation (US-057) |
+| `08-testing/TEST_STRATEGY.md` | written (19 Sep) | Layers, what each layer protects, how to run |
+| `10-uat/UAT_PLAN.md` | written (19 Sep) | Twelve acceptance scenarios, environments and accounts, the record of every run (local, development, CI, production after v0.3.0) |
+| `09-operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
+| `09-operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |
+| `11-reviews/EDGE_CASE_REVIEW.md` | written (Sprint 2) | Three devil's-advocate reviews: every finding, its fix or its plan |
+| `11-reviews/BUG_HUNT_REVIEW.md` | written (19 Sep) | Three parallel bug hunts (backend, frontend, seams): 45 findings, what was fixed and what was kept; run-through findings R1 to R5 |
+| `11-reviews/LAYOUT_AUDIT.md` | written (19 Sep) | Layout audit at 390, 820, 1024, 1280 and 1440; findings tracked as US-043 and US-044 |
+| `11-reviews/PRODUCTION_READINESS_REVIEW.md` | written (19 Sep) | Twenty gaps with severity, what is in place, what production would need; go/no-go |
+| `11-reviews/ASSESSMENT_TRACEABILITY.md` | written (19 Sep) | The brief decoded; every deliverable and acceptance criterion → implementation → test → evidence |
+| `11-reviews/FINAL_REVIEW.md` | written (19 Sep) | What was built, the decisions to defend, trade-offs, what the AI got wrong, what to show in the debrief |
+| `11-reviews/ISSUES_AND_MITIGATIONS.md` | written (19 Sep) | Every issue found across the reviews and run-throughs, its risk, mitigation and evidence; what was kept as a decision |
+| `06-security/SECURITY_REVIEW.md` | written (19 Sep) | The owner's hardening checklist and four abuse scenarios, before and after US-058, with tests and what production adds |
+| `12-demo/documents/README.md` and `12-demo/documents/with_issues/NOTES.md` | written | The three generated document sets (clean, with planted issues, second business), how to regenerate them, the planted values |
+| `04-design/prototype-src/README.md` | written | How the clickable prototype was generated |
+| `11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` | written (19 Sep) | The owner's legal, privacy and accessibility checklist answered item by item with evidence; laws considered; risks flagged; contrast computation (US-057) |
 | `../CHANGELOG.md` | written (Sprints 1 to 3 closed; v0.3.0 released 19 Sep) | Milestones, sprint closes with Shipped / Slipped / Retro |
 | `../README.md` | written | What it is, stack and why, hosts, setup, demo accounts, security, tests, CI, deployment, AI verification, AI Usage, What I would do next |
-| `debrief/README.md` | written (19 Sep) | The pitch deck and the technical deck (pptx and handout PDF), the launch video and the narrated walkthrough (videos in Git LFS) |
+| `13-debrief/README.md` | written (19 Sep) | The pitch deck and the technical deck (pptx and handout PDF), the launch video and the narrated walkthrough (videos in Git LFS) |
 
 ## Review history
-- 18 Sep 2026: UI/UX design phase: two independent design-critique passes on the prototype (pass 1 scored 6.6/10 with 11 rendering bugs and 15 fixes; all applied; pass 2 results recorded in `design/UI_DESIGN.md`). Scope changes from the phase: public landing page (M1, FR-031), admin user management (S7, FR-030, US-073, T19), upload validation and hash-based duplicate detection made explicit (M3, SEC-005).
+- 18 Sep 2026: UI/UX design phase: two independent design-critique passes on the prototype (pass 1 scored 6.6/10 with 11 rendering bugs and 15 fixes; all applied; pass 2 results recorded in `04-design/UI_DESIGN.md`). Scope changes from the phase: public landing page (M1, FR-031), admin user management (S7, FR-030, US-073, T19), upload validation and hash-based duplicate detection made explicit (M3, SEC-005).
 - 17 Sep 2026: Solutioning documents reviewed by a stringent solution-architect pass (six blocking findings: feedback withdraw deadlock, document target semantics, undefined verification vocabulary, background-task session lifetime, assessment brief in git history, incomplete concurrency design). All six were fixed in the documents before implementation; the significant findings (priority conflicts, SQLite fallback, admin cuttability, notification kinds, stuck-application exits, structured-output constraints, error shape, sub-resource IDOR, third-party data transfer, rate limiter definition, diff by hash, cut order) were also applied.
