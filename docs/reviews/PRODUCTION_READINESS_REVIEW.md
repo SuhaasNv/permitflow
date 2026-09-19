@@ -28,7 +28,7 @@ The shipped system is a complete, tested vertical slice of use cases 1 and 2 wit
 | 16 | Supply chain | pip-audit and npm audit non-blocking; no SAST | Low | gitleaks blocking; pinned dependencies (`uv.lock`, `package-lock.json`) | Blocking audits once the baseline is clean, Semgrep (PR-blocking) and CodeQL on `main`, Trivy on the GHCR images with an SBOM |
 | 17 | Certificate | Base-14 fonts (Latin only); no digital signature; no public verification page | Low | Hash recorded, verification code printed, owner-or-officer download (T20) | CJK-capable font, PAdES signature, verify-by-code endpoint |
 | 18 | Product | One licence type, fixed form schema; no officer assignment | Low, by design | Form schema shared between server and client | Configurable schemas, assignment and workload routing |
-| 19 | Accessibility | Keyboard and screen-reader paths checked by hand on the main screens; no automated a11y suite | Low | Semantic markup, labels, focus management in dialogs, reduced-motion support | axe in Playwright, an audit against WCAG 2.2 AA |
+| 19 | Accessibility | axe-core gate (WCAG 2.2 AA plus best practice) over 22 screen states in CI, contrast recomputed for every token, skip links, keyboard tests (US-057); no assistive-technology session yet | Low | Semantic markup and landmarks, labels, native dialogs, reduced-motion support, the gate | A VoiceOver or NVDA pass over the two journeys; `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` |
 | 20 | Load | No load or soak testing | Low | Pool sizing configured (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`) | k6 or Locust runs against staging before go-live |
 
 ## What is ready

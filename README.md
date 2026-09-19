@@ -42,7 +42,9 @@ Sign in at http://localhost:3000/login. Each role lands in its own workspace; a 
 
 ## Security
 
-Argon2 password hashes; JWT access tokens (8 h) with the role claim, re-checked against the user row on every request; failed-login rate limit 10 per minute per IP (429, proxy-aware); generic 401 for wrong email or password; security headers and CORS allowlist; the app refuses to start without `JWT_SECRET` outside the test environment. Authorization is server-side on every route (role dependency per router, ownership as 404, sub-resource checks) and every endpoint has an authorization test. Uploads: allowlist (PDF, PNG, JPG, TXT), 10 MB, magic-byte check, server-generated keys, served only through authorised endpoints. Threats and controls: `docs/security/THREAT_MODEL.md` (T1 to T20).
+Argon2 password hashes; JWT access tokens (8 h) with the role claim, re-checked against the user row on every request; failed-login rate limit 10 per minute per IP (429, proxy-aware); generic 401 for wrong email or password; security headers and CORS allowlist; the app refuses to start without `JWT_SECRET` outside the test environment. Authorization is server-side on every route (role dependency per router, ownership as 404, sub-resource checks) and every endpoint has an authorization test. Uploads: allowlist (PDF, PNG, JPG, TXT), 10 MB, magic-byte check, server-generated keys, served only through authorised endpoints. Threats and controls: `docs/security/THREAT_MODEL.md` (T1 to T22).
+
+**Privacy, legal and accessibility** (US-057): `/privacy`, `/terms` and `/cookies` pages written from the code (no cookies, no analytics, no third-party scripts, fonts self-hosted; transfers to OpenAI, LangSmith and Railway disclosed; demonstration-only notices on sign-in and uploads); an axe-core gate in Playwright (WCAG 2.2 AA plus best practice) over 22 screen states at desktop and phone width, run in CI; every text token recomputed against every surface for contrast. The owner's checklist, item by item with evidence and the laws considered: `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.
 
 ## Tests and checks
 
@@ -92,7 +94,7 @@ Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway 
 |-----|--------------|
 | Backend | `uv sync`, ruff (lint and format), mypy strict, pytest with coverage against a Postgres 16 service (fails under 80 %) |
 | Frontend | `npm ci`, oxlint, tsc, vitest with coverage thresholds (80 % statements and lines), vite build |
-| End to end | Starts Postgres, migrates and seeds, serves the backend on :8000 with the mock provider, builds the frontend and serves it with `vite preview` on :3000, then runs the Playwright journey and the six scenario specs; server logs and the Playwright report are attached when it fails |
+| End to end (includes the accessibility gate) | Starts Postgres, migrates and seeds, serves the backend on :8000 with the mock provider, builds the frontend and serves it with `vite preview` on :3000, then runs the Playwright journey and the six scenario specs; server logs and the Playwright report are attached when it fails |
 | Secret scan | gitleaks over the full history |
 | AI gate | Its own workflow (`ai-gate.yml`, US-056) called from CI: six stages on the mock provider, each a job named in the summary: model approval (pinned model, closed enums, strict schemas, prompt version), contracts, the 14-case golden set (blocking at 100 % of the counted cases), adversarial (injection cases must land on `needs_review`), fairness (21 name-swapped runs must match their baseline), verdict |
 | Dependency audit | pip-audit and npm audit (production dependencies), reported in the run summary, non-blocking |

@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import { AppShell } from './AppShell'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { LandingPage } from '@/features/landing/LandingPage'
+import { PolicyPage } from '@/features/legal/PolicyPage'
 import { RequireRole } from '@/features/auth/RequireRole'
 import { AdminOverviewPage } from '@/features/admin/OverviewPage'
 import { OfficerQueuePage } from '@/features/officer/QueuePage'
@@ -21,6 +22,9 @@ import { NotFoundPanel } from '@/features/shared/states'
 export const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
   { path: '/login', element: <LoginPage /> },
+  { path: '/privacy', element: <PolicyPage /> },
+  { path: '/terms', element: <PolicyPage /> },
+  { path: '/cookies', element: <PolicyPage /> },
   {
     element: <RequireRole roles={['operator']} />,
     children: [

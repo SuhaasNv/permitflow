@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import { NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router-dom'
 
 import type { Role } from '@/api/auth'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -116,7 +116,10 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-      <div className="flex h-7 items-center gap-2 bg-ink px-4 text-xs text-[#aeb6c2] sm:px-6">
+      <a href="#main" className="pf-skip-link">
+        Skip to content
+      </a>
+      <div role="region" aria-label="Portal notice" className="flex h-7 items-center gap-2 bg-ink px-4 text-xs text-[#aeb6c2] sm:px-6">
         <span className="font-semibold text-white">Secure licensing portal</span>
         <span className="hidden sm:inline">· Food Establishments Unit</span>
         {warning.level !== 'none' && expiresAt ? (
@@ -226,9 +229,17 @@ export function AppShell() {
               <span className="rounded border border-line px-1.5 font-mono text-[10px] leading-4 text-text-3">v{__APP_VERSION__}</span>
             </div>
             <div>Fictional assessment product</div>
+            <nav aria-label="Policies" className="mt-1 flex gap-3">
+              <Link to="/privacy" className="text-text-3 no-underline hover:text-text">
+                Privacy
+              </Link>
+              <Link to="/terms" className="text-text-3 no-underline hover:text-text">
+                Terms
+              </Link>
+            </nav>
           </div>
         </nav>
-        <main className="min-w-0 flex-1 pb-24 md:pb-0">
+        <main id="main" tabIndex={-1} className="min-w-0 flex-1 pb-24 outline-none md:pb-0">
           <div key={pageKey} className="pf-enter mx-auto w-full max-w-[1360px] px-4 py-6 sm:px-8 sm:py-8 lg:px-10">
             <Outlet />
           </div>

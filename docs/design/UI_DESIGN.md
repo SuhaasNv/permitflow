@@ -39,7 +39,7 @@ Status badge colour groups follow the state machine: neutral = draft; info = sta
 
 ## Typography
 
-Public Sans (Google Fonts) for everything; IBM Plex Mono for references, UENs and audit event types. Scale in `DESIGN_SYSTEM.md`. Body is 15/22: deliberately larger than typical SaaS because forms and officer comments are read carefully. Table headers are 12 px uppercase with letter-spacing; metadata 12 px in text-3. Numerals are tabular everywhere counts and dates appear.
+Public Sans (self-hosted since US-057, OFL) for everything; IBM Plex Mono for references, UENs and audit event types. Scale in `DESIGN_SYSTEM.md`. Body is 15/22: deliberately larger than typical SaaS because forms and officer comments are read carefully. Table headers are 12 px uppercase with letter-spacing; metadata 12 px in text-3. Numerals are tabular everywhere counts and dates appear.
 
 ## Composition rules
 

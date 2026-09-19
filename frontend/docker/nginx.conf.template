@@ -28,6 +28,12 @@ server {
         add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
+    # Self-hosted fonts (US-057): unhashed file names, versioned by release; a day of caching is plenty.
+    location /fonts/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=86400";
+    }
+
     # Single-page app: every route falls back to index.html.
     location / {
         try_files $uri $uri/ /index.html;

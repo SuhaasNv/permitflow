@@ -138,6 +138,10 @@ export function DocumentsPage() {
               PDF, PNG, JPG or TXT, up to 10 MB each. PDF is recommended: it is the only format the check can read. Re-uploading an
               identical file is detected and does not count as a change.
             </p>
+            <p className="mt-3 text-text-3">
+              This is a demonstration: upload only the fictional sample documents, never real identity or business records. Text from PDF
+              and TXT uploads is sent to the check provider (<Link to="/privacy">privacy policy</Link>).
+            </p>
           </div>
         </aside>
       </div>

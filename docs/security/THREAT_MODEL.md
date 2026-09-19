@@ -131,5 +131,11 @@ Scope: the MVP as designed (this document is written before implementation and w
 - **Validation:** `tests/unit/test_tracing.py` (no key means no client and no network; the provider's inputs to the trace contain the text length and never the text; hidden inputs passed to the client).
 - **Gap:** Evidence quotes are still document excerpts; a production deployment would set `hide_outputs` with a redaction callable, or self-host Langfuse so nothing leaves the platform, and sign a DPA with LangChain (offered, per their regions FAQ).
 
+### T22 Real personal data entered into a public demonstration — Medium
+- **Risk:** The demonstration credentials are published in the README. Anyone can sign in, type real business or personal details, and upload a real identity document or certificate; with the live provider on, the extracted text then travels to OpenAI and a record of the check to LangSmith (T18, T21), and the data stays until the environment is reset (no retention schedule, SEC-012 not implemented).
+- **Mitigation:** Notices on the sign-in page and the documents page ("demonstration only; use the fictional sample documents, never real personal data") linking the privacy policy; the privacy policy states the transfers, the regions, the retention and the rights in plain language; uploads limited to four types and 10 MB; images are stored but never read; no analytics or third-party scripts, and fonts served from our origin, so the browser talks only to our API (US-057).
+- **Validation:** `frontend/src/features/legal/PolicyPage.test.tsx` (the policy states the facts the code guarantees); the notices are on the screens covered by `e2e/a11y.spec.ts`.
+- **Gap:** A scheduled reset of the development database and volume; NRIC-pattern redaction in extracted text before storage and before the model call (PDPC NRIC advisory guidelines); SEC-012 retention; for a real deployment, regional providers or contractual transfer terms (PDPA s. 26). Full review: `../reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.
+
 ## Production gaps summary
 Antivirus scanning, httpOnly cookie sessions, edge rate limiting and WAF, tamper-evident audit storage, encryption and retention policies, per-user quotas, SSO/MFA. All listed with recommendations in `docs/reviews/PRODUCTION_READINESS_REVIEW.md`.
