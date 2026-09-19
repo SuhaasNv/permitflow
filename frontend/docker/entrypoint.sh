@@ -6,5 +6,9 @@ set -eu
 export PORT
 escaped=$(printf '%s' "$API_URL" | sed 's/[\\"]/\\&/g')
 printf 'window.__PERMITFLOW__ = { apiUrl: "%s" };\n' "$escaped" > /usr/share/nginx/html/config.js
+# The CSP admits one API origin: the scheme and host of API_URL (US-058).
+API_ORIGIN=$(printf '%s' "$API_URL" | sed -E 's#^(https?://[^/]+).*#\1#')
+export API_ORIGIN
+envsubst '${API_ORIGIN}' < /etc/nginx/templates/security-headers.conf.template > /etc/nginx/snippets/security-headers.conf
 envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf
 exec nginx -g 'daemon off;'

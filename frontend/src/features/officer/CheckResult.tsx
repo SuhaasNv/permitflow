@@ -33,6 +33,7 @@ const REASON: Record<string, string> = {
   storage_error: 'The stored file could not be read.',
   internal_error: 'An internal error stopped the check.',
   interrupted: 'The check was interrupted by a restart.',
+  daily_limit_reached: 'The daily limit on automatic checks was reached; review this document by hand or re-run it tomorrow.',
 }
 
 function Icon({ kind }: { kind: Kind }) {

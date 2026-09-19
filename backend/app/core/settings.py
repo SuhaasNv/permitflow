@@ -33,6 +33,15 @@ class Settings(BaseSettings):
     upload_max_bytes: int = 10 * 1024 * 1024
 
     login_rate_limit_per_minute: int = 10
+    # Request limits per client IP, sliding minute (US-058): every request, and sign-in attempts of any
+    # outcome. 0 disables. Single process; the production step is Redis or an edge limit.
+    rate_limit_per_minute: int = 240
+    login_attempts_per_minute: int = 20
+    # Quotas kept in the database, so they hold across restarts and workers (US-058): open drafts per
+    # operator, verification runs per applicant per day, and per platform per day (the cost ceiling).
+    max_drafts_per_user: int = 20
+    ai_runs_per_user_per_day: int = 60
+    ai_runs_per_day: int = 1000
     # Comma-separated proxy IPs whose X-Forwarded-For is trusted. Empty: use the socket address.
     # Comma-separated proxy addresses whose X-Forwarded-For is trusted, or "*" on a platform whose edge
     # proxy is the only thing that can reach the container (Railway, most PaaS).

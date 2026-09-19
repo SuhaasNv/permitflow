@@ -204,7 +204,8 @@ class FeedbackService:
         if not restorable(item, app.status, officer.id, datetime.now(UTC)):
             raise Conflict("This decision can no longer be undone.")
         previous = item.previous_resolution
-        assert previous is not None  # guaranteed by restorable()
+        if previous is None:  # pragma: no cover - restorable() guarantees it
+            raise Conflict("This decision can no longer be undone.")
         undone = item.resolution
         item.resolution = previous
         item.previous_resolution = None

@@ -11,7 +11,8 @@ FROM nginx:1.27-alpine
 RUN apk add --no-cache curl
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
-COPY docker/security-headers.conf /etc/nginx/snippets/security-headers.conf
+COPY docker/security-headers.conf.template /etc/nginx/templates/security-headers.conf.template
+RUN mkdir -p /etc/nginx/snippets
 COPY docker/entrypoint.sh /entrypoint.sh
 ENV PORT=8080
 EXPOSE 8080
