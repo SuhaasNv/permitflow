@@ -37,6 +37,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `design/FRONTEND_ARCHITECTURE.md` | written | Folder layout, routing, query keys, forms, uploads, responsive breakpoints, motion, a11y |
 | `design/UI_REQUIREMENTS_TRACEABILITY.md` | written | Use case / requirement / story → screen |
 | `design/brand/` | written | Logo mark (SVG), monochrome mark, horizontal lockup, usage notes |
+| `design/prototype/permitflow-prototype-v3-23-artboards.pdf` | written (18 Sep) | Static export of the clickable prototype, one artboard per page (design system, operator journey, resubmission, officer journey, admin concept, phone screens); Git LFS |
 | `design/screens/` | written | Rendered PNG of every prototype artboard; `screens/as-built/` holds captures of the shipped screens at the Sprint 1 close |
 
 ## Security
