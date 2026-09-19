@@ -115,9 +115,9 @@ Scope: the MVP as designed (this document is written before implementation and w
 - **Validation:** Unit test on the prompt builder asserting the payload contains only the allowed fields and respects the cap.
 - **Gap:** A regulator would require a data-processing agreement, a provider with zero data retention (or a regional/private deployment), redaction of personal identifiers before sending, and a retention policy for `extracted_text` (SEC-012 proposes deletion 90 days after a terminal state). None of these are implemented in the MVP.
 
-### T19 Admin role misuse (Medium)
-- **Risk:** The admin sees all applications and all users, and can create users, change roles and deactivate accounts (privilege escalation: an admin makes an operator an officer; lock-out: the only admin is deactivated).
-- **Mitigation:** Admin is read-only on applications by construction (no admin route calls an application-mutating service; those endpoints reject the admin role with 403). User management is the only admin write path: every create / role change / deactivate / reactivate is an audit event with actor and time; the service refuses any change that would leave zero active admins; an admin cannot change their own role; role changes take effect on the user's next request (JWT role claim is re-checked against the row on every request); admin reads are audited only at the request-log level.
+### T19 Admin role misuse (Medium, planned: the admin epic is v0.4.0)
+- **Risk:** Once built (US-070 to US-073), the admin sees all applications and all users and can change roles and deactivate accounts (privilege escalation: an admin makes an operator an officer; lock-out: the only admin is deactivated).
+- **Mitigation, as built today:** the `admin` role exists in the enum and in `require_role`; no admin router is mounted, so an admin account can sign in and reach `/admin/overview` (a placeholder) and nothing else; every application-mutating endpoint rejects the role with 403 (tested). **Design for v0.4.0:** admin read-only on applications by construction; user management as the only admin write path, each change an audit event with actor and before/after values, the last active admin cannot be demoted or deactivated (one transaction, admin rows locked), no self-role change.
 - **Gap:** Production would require MFA for admin accounts, a second admin's approval for role changes to `admin`, and per-view audit of admin access to individual applications.
 
 ### T20 Licence certificate forged, leaked or issued twice (Medium)

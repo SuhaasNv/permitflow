@@ -142,7 +142,6 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /admin/ai-health (planned, US-070) | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
 | GET | /admin/audit-feed (planned, US-071) | admin | latest 50 audit events across applications |
 | GET | /admin/users (planned, US-073) | admin | user directory |
-| POST | /admin/users (planned, US-073) | admin | create user `{full_name, email, role}`; audit `user.created` |
 | PATCH | /admin/users/{id} (planned, US-073) | admin | change `role` and/or `is_active`; audit `user.role_changed` / `user.deactivated` / `user.reactivated`; 409 when it would remove the last active admin |
 | GET | /admin/applications/{id} (planned, US-072) | admin | officer view, read-only (mutations 403) |
 | GET | /notifications | any | own notifications (newest first, 50) plus `unread_count` (built, US-025) |

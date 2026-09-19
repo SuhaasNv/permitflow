@@ -1,14 +1,17 @@
 # AI gate (US-056): everything that must be true about the AI verification before a change merges.
 #
 # Six stages, each its own job so a failure names the stage. All run on the mock provider: free,
-# deterministic, no key. The same checks against the real model live in ai-eval.yml (nightly, manual,
-# and on AI changes). ci.yml calls this workflow, so it blocks the images and the deploy like any job.
+# deterministic, no key. What that proves: the pipeline (extraction, schema, rules, quotas, tracing)
+# and the harness are wired and unchanged; it does not measure the model. The model itself is measured
+# by ai-eval.yml against OpenAI (nightly, manual, and on pushes that touch the AI path), which is the
+# check to read for "is the verifier any good". ci.yml calls this workflow, so it blocks the images
+# and the deploy like any job.
 #
 #   1. model approval   pinned model, closed enums, strict schemas, prompt version, provider wiring
 #   2. contracts        provider, rules, extraction and tracing unit tests
 #   3. golden set       14 cases through the real pipeline, blocking at 100 % of the counted cases
 #   4. adversarial      the injection cases must land on needs_review with possible_prompt_injection
-#   5. fairness         21 name-swapped runs must match their baseline (status and codes)
+#   5. fairness         18 name-swapped runs must match their 3 baselines (21 rows; status and codes)
 #   6. verdict          one summary line per stage in the run summary
 
 name: AI gate
@@ -24,6 +27,9 @@ env:
 
 # `shell: bash` gives `-o pipefail`, so `pytest | tee` and `python | tee` cannot hide a failure. Before this
 # fix the Contracts stage reported "pass" while every test had errored at setup.
+permissions:
+  contents: read
+
 defaults:
   run:
     shell: bash
@@ -112,7 +118,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   golden-set:
-    name: Golden set
+    name: Golden set (pipeline on the mock)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -154,7 +160,7 @@ jobs:
           path: /tmp/ai-eval.json
 
   adversarial:
-    name: Adversarial
+    name: Adversarial (rules on the mock)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -180,7 +186,7 @@ jobs:
           PY
 
   fairness:
-    name: Fairness
+    name: Fairness (harness on the mock)
     runs-on: ubuntu-latest
     defaults:
       run:

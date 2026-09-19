@@ -38,7 +38,7 @@ Three independent read-only reviews, run in parallel by agents with different br
 | F15 | Low | Compare panel kept the old pair after a resubmission arrived live | Panel keyed on the current revision |
 | F16 | Low | Review page reachable by URL during a resubmission; breadcrumb went to the dashboard | Redirects to the application; breadcrumb and Not found links go to My applications |
 
-## Seams (1 High, 8 Medium, 12 Low)
+## Seams (1 High, 6 Medium, 6 Low)
 
 | # | Severity | Finding | Fix |
 |---|----------|---------|-----|

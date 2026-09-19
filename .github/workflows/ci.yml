@@ -3,8 +3,13 @@ name: CI
 on:
   push:
     branches: [main, dev]
+    tags: ['v*']
   pull_request:
     branches: [main, dev]
+
+# Least privilege by default; the images job raises `packages` on its own.
+permissions:
+  contents: read
 
 # `shell: bash` gives `-o pipefail`: a failing command behind `| tee` fails the step.
 defaults:
@@ -227,12 +232,17 @@ jobs:
           ref=$(echo "$GITHUB_REF_NAME" | tr '/' '-')
           backend="ghcr.io/$owner/permitflow-backend:sha-$short,ghcr.io/$owner/permitflow-backend:$ref"
           frontend="ghcr.io/$owner/permitflow-frontend:sha-$short,ghcr.io/$owner/permitflow-frontend:$ref"
-          # A push to main is a release: the images also carry the version from frontend/package.json
-          # (v0.3.0), the same string as the git tag, so a rollback can name a release, not a commit.
-          if [ "$GITHUB_REF_NAME" = "main" ]; then
+          # A release image tag (v0.3.0) is written only by a run for that git tag, never by a branch push,
+          # so `:v0.3.0` always means the commit the tag points at and cannot be overwritten by later
+          # merges to main. The tag must equal the version in frontend/package.json (the app shows it).
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             version=$(python3 -c 'import json; print(json.load(open("frontend/package.json"))["version"])')
-            backend="$backend,ghcr.io/$owner/permitflow-backend:v$version"
-            frontend="$frontend,ghcr.io/$owner/permitflow-frontend:v$version"
+            if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+              echo "tag $GITHUB_REF_NAME does not match frontend/package.json version $version" >&2
+              exit 1
+            fi
+            backend="ghcr.io/$owner/permitflow-backend:sha-$short,ghcr.io/$owner/permitflow-backend:$GITHUB_REF_NAME"
+            frontend="ghcr.io/$owner/permitflow-frontend:sha-$short,ghcr.io/$owner/permitflow-frontend:$GITHUB_REF_NAME"
           fi
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "frontend=$frontend" >> "$GITHUB_OUTPUT"

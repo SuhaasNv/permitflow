@@ -1,4 +1,4 @@
-# Edge-case review (Sprint 2, 19 Sep 2026)
+# Edge-case review (Sprint 2, 18 Sep 2026)
 
 Three independent devil's-advocate reviews were run against the Sprint 1 code: the operator journey (frontend), the backend and workflow, and the product and UX gaps against the requirements. Each returned up to 20 findings ranked by impact. This file records every finding, what was done about it and where, so a reviewer can see the near-misses as well as the fixes. Items marked "later" carry the sprint in which they are planned or the reason they are deferred.
 

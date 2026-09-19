@@ -1,6 +1,6 @@
 # PermitFlow: Documentation Index
 
-Status legend: **written** (solutioning phase, before code) · **to be written** (produced during or after implementation). Documents written before code describe the intended design; the production readiness review on Day 3 re-checks each against the actual code.
+Status legend: **written** (solutioning phase, before code) · **to be written** (produced during or after implementation). Documents written before code describe the intended design; where the built system differs, the document was updated in the same change or the difference is recorded in the readiness review.
 
 ## Product and requirements
 | Document | Status | Purpose |
@@ -31,7 +31,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `04-design/SCREEN_INVENTORY.md` | written | Every screen with ID, persona, requirements, actions, states, responsive notes, priority |
 | `04-design/COMPONENT_INVENTORY.md` | written | Reusable components and where they are used |
 | `04-design/UI_STATES.md` | written | Loading / empty / error / permission states; upload → verification and feedback lifecycles |
-| `04-design/FRONTEND_ARCHITECTURE.md` | written | Folder layout, routing, query keys, forms, uploads, responsive breakpoints, motion, a11y |
+| `04-design/FRONTEND_ARCHITECTURE.md` | rewritten as built (20 Sep) | Tree, data flow, query keys and polling, forms, errors, client security, accessibility, known gaps |
 | `04-design/UI_REQUIREMENTS_TRACEABILITY.md` | written | Use case / requirement / story → screen |
 | `04-design/brand/` | written | Logo mark (SVG), monochrome mark, horizontal lockup, usage notes |
 | `04-design/prototype/permitflow-prototype-v3-23-artboards.pdf` | written (18 Sep) | Static export of the clickable prototype, one artboard per page (design system, operator journey, resubmission, officer journey, admin concept, phone screens); Git LFS |
