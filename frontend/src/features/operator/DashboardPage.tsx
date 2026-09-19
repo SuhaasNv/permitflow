@@ -256,7 +256,7 @@ function WhatYouNeed() {
         ))}
       </ol>
       <p className="border-t border-line px-5 py-3 text-xs leading-[18px] text-text-3">
-        PDF is recommended: it is the only format the automatic check can read. Up to 10 MB each.
+        PDF is recommended: the automatic check reads PDF and TXT, not images. Up to 10 MB each.
       </p>
     </section>
   )

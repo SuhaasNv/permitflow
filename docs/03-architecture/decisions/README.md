@@ -1,12 +1,12 @@
 # Architecture decision records
 
-Eleven decisions, each in the same shape: context, the options considered with their trade-offs, the decision, why, the consequences, how it is validated, and amendments dated as the code changed. Read them in three groups.
+Twelve decisions, each in the same shape: context, the options considered with their trade-offs, the decision, why, the consequences, how it is validated, and amendments dated as the code changed. Read them in three groups.
 
 ## How to read
 
 - **The shape** (001 to 003): what the system is made of.
 - **The rules** (004 to 008): the behaviours that make the brief's guarantees true.
-- **The delivery** (009 to 011): stack, pipeline, and the one feature that is a record in its own right.
+- **The delivery** (009 to 012): stack, pipeline, and the one feature that is a record in its own right.
 
 Each line below is the decision in one breath: chose X over Y because Z.
 

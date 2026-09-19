@@ -17,7 +17,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 |---|---------|----------------|
 | M1 | Public landing page, email/password login, roles operator and officer with seeded accounts and role-specific home screens; the `admin` role value exists but its account and screens are S7 | roles (implied) |
 | M2 | Operator: create application, sectioned form with validation, save draft | UC1 form entry |
-| M3 | Operator: drag-and-drop document upload with document type; validation by extension + MIME allowlist (PDF, PNG, JPG, JPEG, TXT), magic bytes and 10 MB cap; `sha256` per file so an identical re-upload is detected as no change; PDF recommended (only machine-readable format) | UC1 uploads |
+| M3 | Operator: drag-and-drop document upload with document type; validation by extension + MIME allowlist (PDF, PNG, JPG, JPEG, TXT), magic bytes and 10 MB cap; `sha256` per file so an identical re-upload is detected as no change; PDF recommended (the check reads PDF and TXT; images are stored for the officer, not read) | UC1 uploads |
 | M4 | Per-document AI verification with live status (pending → running → result), structured issues, graceful "unavailable" | UC1 real-time AI status; UC2 AI results visible |
 | M5 | Progress indicator (sections + required documents) | UC1 |
 | M6 | Submit → Revision 1 → `application_received` | UC1 |

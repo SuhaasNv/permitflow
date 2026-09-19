@@ -204,7 +204,7 @@ export function LandingPage() {
                   ))}
                 </ol>
                 <p className="border-t border-line bg-surface-2 px-5 py-3 text-[12px] leading-[18px] text-text-3">
-                  PDF, PNG, JPG or TXT, up to 10 MB each. PDF is recommended: it is the only format the automatic check can read.
+                  PDF, PNG, JPG or TXT, up to 10 MB each. PDF is recommended: the automatic check reads PDF and TXT, not images.
                 </p>
               </div>
             </div>

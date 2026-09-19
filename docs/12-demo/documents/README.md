@@ -1,6 +1,6 @@
 # Demo documents
 
-Fictional, text-based PDFs for demonstrating PermitFlow uploads and the AI verification step. They match the seeded demo application for **Kopi & Kaya Toast House Pte. Ltd.** (UEN 202355555E, 10 Jalan Besar #01-12, Singapore 208787), so the AI check can cross-reference every field.
+Fictional, text-based PDFs for demonstrating PermitFlow uploads and the AI verification step. They match the demo business used in the walkthroughs and the evaluation set, **Kopi & Kaya Toast House Pte. Ltd.** (the seed creates the two accounts only; type the form values from the table below) (UEN 202355555E, 10 Jalan Besar #01-12, Singapore 208787), so the AI check can cross-reference every field.
 
 All four are real PDFs with selectable text (rendered from HTML by Chromium, not scanned images), A4, each under 250 KB.
 
@@ -66,6 +66,23 @@ Every document is fictional and says so in its footer and body: "Fictional docum
 | with_issues | Issues found (UEN mismatch) | Verified | Issues found (address mismatch) | Issues found (expired) |
 
 Quirk worth knowing before a demo: on the expired certificate the model also reported the "fictional document" disclaimer as possible prompt injection text. It is a false positive of the model, not of the platform's own injection heuristic, and it shows the "advisory only" stance well: the officer decides.
+
+## Kopi & Kaya (clean and with_issues sets): form values
+
+The values the `clean/` documents agree with, and that `backend/evals/cases.json` uses; the `with_issues/` set plants a different UEN, a different unit number and an expired certificate against these same values.
+
+| Section | Field | Value |
+|---|---|---|
+| Business | Business name | Kopi & Kaya Toast House Pte. Ltd. |
+| Business | UEN | 202355555E |
+| Business | Entity type | Private limited |
+| Business | Contact | Tan Wei Ling, weiling.tan@kopikaya.sg, +65 9123 4567 |
+| Premises | Address | 10 Jalan Besar #01-12, Singapore 208787 |
+| Premises | Floor area, type | 48 sqm, shophouse |
+| Premises | Tenancy expiry | 2027-10-31 |
+| Operations | Cuisine | Kaya toast, soft-boiled eggs, kopi and teh. |
+| Operations | Seating, hours, handlers | 24, Mon-Sun 7am-9pm, 4 |
+| Declarations | Both boxes | ticked |
 
 ## Second business: form values
 

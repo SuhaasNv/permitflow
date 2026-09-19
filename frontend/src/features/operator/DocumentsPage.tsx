@@ -135,7 +135,7 @@ export function DocumentsPage() {
               licensing officer reviews every application and sees the same findings.
             </p>
             <p className="mt-3 text-text-3">
-              PDF, PNG, JPG or TXT, up to 10 MB each. PDF is recommended: it is the only format the check can read. Re-uploading an
+              PDF, PNG, JPG or TXT, up to 10 MB each. PDF is recommended: the automatic check reads PDF and TXT, not images. Re-uploading an
               identical file is detected and does not count as a change.
             </p>
             <p className="mt-3 text-text-3">
