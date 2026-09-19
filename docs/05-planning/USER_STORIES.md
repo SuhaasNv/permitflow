@@ -9,7 +9,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 ## E0 — Foundation, AI Pipeline & Delivery
 
 ### US-000 — As an engineer, I want a runnable backend, frontend and database skeleton, so that every feature builds on a working base.
-- Acceptance criteria: `docker compose up` starts Postgres; `alembic upgrade head` creates the schema; `GET /api/v1/health` returns 200 with database status and 503 when the database is down; every error (including FastAPI's own 401/403/422) uses `{ "error": { "code", "message", "details"? } }` via explicit exception handlers; security headers and CORS allowlist are set; the app refuses to start without `JWT_SECRET` outside the test environment; the frontend dev server renders the app shell; CI skeleton runs lint and type checks.
+- Acceptance criteria: `docker compose up` starts Postgres; `alembic upgrade head` creates the schema; `GET /api/v1/health` returns 200 with database status and 503 when the database is down; every error (including FastAPI's own 401/403/422) uses `{ "error": { "code", "message", "details"? } }` via explicit exception handlers; security headers and CORS allowlist are set; the app refuses to start without a real `JWT_SECRET` in every environment (no fallback secret in the code); the frontend dev server renders the app shell; CI skeleton runs lint and type checks.
 - Priority: MVP · Day 1 · Dependencies: none · Requirements: NFR-001, NFR-005, REL-006
 - Definition of Done: DoD checklist + a clean clone runs with the README steps.
 

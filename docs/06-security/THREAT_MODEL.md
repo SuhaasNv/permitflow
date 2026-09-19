@@ -67,8 +67,8 @@ Scope: the MVP as designed (this document is written before implementation and w
 
 ### T9 Audit log tampering (Medium)
 - **Risk:** Events deleted or edited to hide actions.
-- **Mitigation:** No update/delete code paths; repository exposes only `append` and `list`; events written in the same transaction as the change.
-- **Validation:** Static check in tests (no `delete`/`update` on `AuditEvent`); sequence test.
+- **Mitigation:** No update path; the only delete path is the draft purge in `AuditRepository.purge_draft` (a draft was never submitted, so it is not part of the licensing record, US-045); events written in the same transaction as the change.
+- **Validation:** `tests/unit/test_layering.py` walks every module and fails on any `update()` or `delete()` that touches `AuditEvent` outside that one repository method; sequence test in `test_audit_trail.py`.
 - **Gap:** a database administrator can still edit rows; production would add hash chaining or export to WORM storage.
 
 ### T10 SQL injection (Low)

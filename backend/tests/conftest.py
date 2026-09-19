@@ -3,12 +3,15 @@ created by the Alembic migrations (so a fresh database is exercised on every run
 table is truncated between tests."""
 
 import os
+import secrets
 import subprocess
 import sys
 from collections.abc import Iterator
 from pathlib import Path
 
 os.environ["APP_ENV"] = "test"
+# No fallback secret exists in the code (SEC-006); the suite signs with a random one per run.
+os.environ.setdefault("JWT_SECRET", secrets.token_urlsafe(32))
 os.environ.setdefault("UPLOAD_DIR", "./data/test-uploads")
 # Tests never call a paid provider, whatever the developer's .env says (the live check is a manual step,
 # recorded in docs/07-ai/AI_VERIFICATION_DESIGN.md). Set TEST_LIVE_AI=1 to run the suite against OpenAI.

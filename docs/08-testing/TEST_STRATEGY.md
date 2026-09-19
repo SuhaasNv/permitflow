@@ -23,7 +23,7 @@ What each layer of tests protects, where it lives and how to run it. Written at 
 | Static | both | ruff, ruff format, mypy strict; oxlint, tsc strict, vite build | | Types and style. `any` is not used anywhere in the frontend; mypy runs in strict mode |
 | Secrets | repo | gitleaks (CI) | | No credentials committed |
 
-Backend total on 19 Sep 2026 (after US-058): 748 tests. Sprint 2 close was 620.
+Backend total on 20 Sep 2026 (after the review fixes): 752 test cases from 163 test functions; the state-machine sweep in `test_workflow.py` alone contributes 588 parametrised cases, so the count of distinct tests is the smaller number. Sprint 3 close was 748, Sprint 2 close 620.
 
 ## Coverage (US-053)
 

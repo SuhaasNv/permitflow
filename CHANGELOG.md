@@ -2,6 +2,14 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Review fixes (20 Sep 2026, after the four-persona assessment)
+
+- Operator refusals no longer carry internal status codes: `domain/operator_errors.py` words a refused submit, resubmit or withdraw with the operator's own label and no `allowed` list; `tests/integration/test_operator_refusals.py` walks the three paths and asserts no internal code or officer-only label in the body (FR-026).
+- The layering test now catches `from app.models import ...` in the API layer (it had a trailing-dot hole) and states the one allowance: `User` and `Application` may be named in annotations; the API never queries or mutates them.
+- The audit table's only delete path is `AuditRepository.purge_draft` (draft deletion, US-045); a static test fails on any `update()` or `delete()` touching `AuditEvent` elsewhere. Docstrings, T9 and ADR-008's index line now say so instead of "no delete path".
+- No fallback JWT secret: `security.py` refuses an empty or short secret in every environment, `validate_for_startup` refuses the `.env.example` placeholder, the test suite signs with a random secret per run (SEC-006).
+- Backend: 752 test cases from 163 functions (the state-machine sweep is 588 of the cases).
+
 ## Debrief material (19 Sep 2026, after v0.3.0, US-059)
 
 - `docs/13-debrief/`: the pitch deck (11 slides) and the technical deck (18 slides) as PowerPoint with handout PDFs, the launch video (70.7 s) with its poster, the narrated walkthrough (4 min 36 s) and the technical video (4 min, with a chapter on how the product and the films were built), videos in Git LFS. Diagrams (solution architecture, deployment, CI/CD) added under `docs/03-architecture/diagrams/views/` and embedded in `ARCHITECTURE.md`, `OPERATIONS.md` and the README; the launch poster heads the README. No product code changed.
