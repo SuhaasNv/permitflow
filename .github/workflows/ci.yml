@@ -68,74 +68,9 @@ jobs:
       - run: npm run build
 
   ai:
-    name: AI verification (config audit, golden set, adversarial)
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: permitflow
-          POSTGRES_PASSWORD: permitflow
-          POSTGRES_DB: permitflow_test
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U permitflow -d permitflow_test"
-          --health-interval 5s --health-timeout 3s --health-retries 10
-    defaults:
-      run:
-        working-directory: backend
-    env:
-      APP_ENV: test
-      AI_PROVIDER: mock
-      TEST_DATABASE_URL: postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow_test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-      - run: uv sync --frozen
-      - name: Configuration audit (provider wiring, pinned wire schema, prompt version, default model)
-        run: |
-          uv run python - <<'PY'
-          from app.core.settings import Settings
-          from app.infra.ai.factory import get_provider
-          from app.infra.ai.openai_provider import PROMPT_VERSION, SYSTEM_PROMPT, WireResult
-          from app.domain.verification_rules import VerificationResult
-          s = Settings()
-          assert s.openai_model == "gpt-4.1-mini", s.openai_model
-          assert 0 < s.ai_confidence_threshold < 1
-          assert PROMPT_VERSION and SYSTEM_PROMPT
-          assert set(WireResult.model_json_schema()["properties"]["status"]["enum"]) == {"verified", "issues_found", "unreadable"}
-          assert VerificationResult.model_config.get("extra") == "forbid"
-          assert get_provider().name == "mock"
-          print("configuration audit ok: model", s.openai_model, "prompt", PROMPT_VERSION)
-          PY
-      - name: Provider contract and rules (unit)
-        run: uv run pytest tests/unit/test_verification_rules.py tests/unit/test_openai_wire.py tests/unit/test_mock_provider.py tests/unit/test_extraction.py -q
-      - name: Golden set and adversarial cases through the real pipeline (mock provider, blocking)
-        run: uv run python -m evals.run --provider mock --json /tmp/ai-eval.json --fail-under 1.0
-      - name: Publish the verdict
-        if: always()
-        run: |
-          {
-            echo "## AI verification evaluation"
-            uv run python - <<'PY'
-          import json
-          r = json.load(open("/tmp/ai-eval.json"))
-          print(f"provider **{r['provider']}**, pass rate **{r['pass_rate']:.0%}** ({r['passed']}/{r['counted']} counted)")
-          print()
-          print("| case | group | expected | actual | result |")
-          print("|---|---|---|---|---|")
-          for o in r["outcomes"]:
-              mark = "pass" if o["passed"] else ("known mock gap" if not o["counted"] else "FAIL")
-              print(f"| {o['id']} | {o['group']} | {o['expected']} | {o['actual']} | {mark} |")
-          PY
-          } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ai-evaluation
-          path: /tmp/ai-eval.json
+    name: AI gate
+    # The AI checks are their own workflow (US-056): six stages, each named in the run summary.
+    uses: ./.github/workflows/ai-gate.yml
 
   audit:
     name: Dependency audit (pip-audit, npm audit; reported, not blocking)

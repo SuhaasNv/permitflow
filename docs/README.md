@@ -48,6 +48,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 |----------|--------|---------|
 | `ai/AI_VERIFICATION_DESIGN.md` | written | Pipeline, prompt contract, output schema, rules, failure handling |
 | `ai/AI_EVALUATION.md` | written (19 Sep) | Evaluation set and results against mock and OpenAI |
+| `ai/AI_ASSURANCE.md` | written (19 Sep) | One page: the four layers, the AI gate and the live evaluation, fairness, tools chosen and not |
 | `../AI_USAGE.md` | written (19 Sep) | How AI tools were used: tools and models, the workflow they worked inside, the standing instructions, verbatim prompts, verification, what was discarded |
 
 ## Planning

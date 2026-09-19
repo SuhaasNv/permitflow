@@ -169,6 +169,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--provider", choices=["mock", "openai"], default="mock")
     parser.add_argument("--json", type=Path, help="write the outcomes as JSON")
+    parser.add_argument("--group", help="run only the cases in this group (clean, issues, edge, adversarial)")
     parser.add_argument(
         "--fail-under", type=float, default=None, help="exit 1 when the pass rate is below this"
     )
@@ -180,6 +181,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     spec = json.loads((HERE / "cases.json").read_text())
+    if args.group:
+        spec["cases"] = [c for c in spec["cases"] if c["group"] == args.group]
+        if not spec["cases"]:
+            raise SystemExit(f"no cases in group {args.group!r}")
     provider = _provider(args.provider)
     if args.langsmith:
         outcomes = _run_as_experiment(spec, provider)

@@ -3,7 +3,7 @@
 # ci.yml already gates every push with the golden set on the mock provider: that proves the
 # pipeline (extraction, injection heuristic, wire schema, post-processing) and the prompt plumbing.
 # This workflow proves the model: the same 14 cases through OpenAI, temperature 0, prompt version
-# stamped in the result, blocking at 14/14. It runs nightly, by hand, and whenever the AI module or
+# stamped in the result, blocking at 14/14, then the fairness check (21 name-swapped runs, US-056). It runs nightly, by hand, and whenever the AI module or
 # the golden set changes on dev or main. Never on pull requests from forks: it needs the API key.
 
 name: AI evaluation (live)
@@ -63,6 +63,8 @@ jobs:
           if [ -n "$LANGSMITH_API_KEY" ]; then FLAGS="--langsmith"; fi
           uv run python -m evals.run --provider openai --json /tmp/ai-eval-live.json $FLAGS \
             --fail-under "${{ github.event.inputs.fail_under || '1.0' }}" | tee /tmp/ai-eval-live.txt
+      - name: Fairness against the live model (name-swap invariance, blocking)
+        run: uv run python -m evals.fairness --provider openai --fail --json /tmp/fairness-live.json | tee /tmp/fairness-live.txt
       - name: Publish the verdict
         if: always()
         run: |
@@ -84,6 +86,17 @@ jobs:
             else
               echo "No result file: the run failed before the harness reported."
             fi
+            if [ -f /tmp/fairness-live.json ]; then
+              uv run python - <<'PY'
+          import json
+          r = json.load(open("/tmp/fairness-live.json"))
+          print()
+          print(f"Fairness: **{r['runs'] - r['differing']}/{r['runs']}** name-swapped runs match their baseline")
+          for row in r["rows"]:
+              if not row["same_as_baseline"]:
+                  print(f"- DIFFERS: {row['scenario']}, {row['contact_name']}: {row['status']} {', '.join(row['codes'])}")
+          PY
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
@@ -92,4 +105,6 @@ jobs:
           path: |
             /tmp/ai-eval-live.json
             /tmp/ai-eval-live.txt
+            /tmp/fairness-live.json
+            /tmp/fairness-live.txt
           retention-days: 90
