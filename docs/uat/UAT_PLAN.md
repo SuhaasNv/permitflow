@@ -6,9 +6,9 @@ Acceptance scenarios for PermitFlow, run by a person in a browser against a depl
 
 | | Development | Production |
 |---|---|---|
-| URL | https://dev.permitflow.space (Railway host https://frontend-development-afe2.up.railway.app) | https://permitflow.space (from v0.3.0) |
+| URL | https://dev.permitflow.space (Railway host https://frontend-development-afe2.up.railway.app) | https://permitflow.space (live since v0.3.0, 19 Sep 2026) |
 | AI provider | OpenAI `gpt-4.1-mini` | same |
-| Accounts | operator@permitflow.example.sg, officer@permitflow.example.sg (password: `SEED_PASSWORD`) | same, seeded once |
+| Accounts | operator@permitflow.example.sg (Tan Wei Ling), officer@permitflow.example.sg (Rahim bin Abdullah); password `PermitFlow!2026` (the `SEED_PASSWORD` default, public by design for the demonstration) | same, seeded once on 19 Sep 2026 |
 | Documents | `docs/demo/documents/clean/*.pdf` (all match the form) and `with_issues/*.pdf` (UEN off by one, unit transposed, expired certificate) | same |
 
 ## Scenarios

@@ -31,14 +31,14 @@ npm run dev                            # http://localhost:3000
 
 ## Demo accounts
 
-`scripts/seed.py` creates two accounts (idempotent). Password for both: the value of `SEED_PASSWORD`, default `PermitFlow!2026`.
+`scripts/seed.py` creates two accounts (idempotent). The same two accounts exist in every environment, seeded once each; the password is the value of `SEED_PASSWORD` at seed time, which is the default `PermitFlow!2026` everywhere, including production, because this is a demonstration whose credentials are meant to be shared (the privacy policy and the sign-in page say so, and say not to enter real personal data).
 
-| Role | Email |
-|------|-------|
-| Operator | operator@permitflow.example.sg |
-| Licensing officer | officer@permitflow.example.sg |
+| Role | Email | Password | Where |
+|------|-------|----------|-------|
+| Operator (Tan Wei Ling) | operator@permitflow.example.sg | `PermitFlow!2026` | https://permitflow.space/login, https://dev.permitflow.space/login, http://localhost:3000/login |
+| Licensing officer (Rahim bin Abdullah) | officer@permitflow.example.sg | `PermitFlow!2026` | same |
 
-Sign in at http://localhost:3000/login. Each role lands in its own workspace; a URL for another role shows "Not available for your role" and the API answers 403.
+There is no admin account yet: the admin epic is deferred to v0.4.0 and `scripts/seed.py` seeds only these two. There is no self-registration or password reset by design (`SCOPE.md`, DEFERRED table: "User registration, password reset, MFA, SSO", omitted because identity is not what the assessment evaluates). Each role lands in its own workspace; a URL for another role shows "Not available for your role" and the API answers 403. Sign-in attempts are limited to 20 a minute per client and 10 failed attempts a minute per client; expect a 429 for a minute if a shared demonstration session trips it.
 
 ## Security
 
