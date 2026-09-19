@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 
 import { cn } from '@/lib/cn'
 
-/** Brand mark (docs/design/brand) + wordmark. The wordmark is never coloured red. */
+/** Brand mark (docs/04-design/brand) + wordmark. The wordmark is never coloured red. */
 export function Logo({ inverted = false, className }: { inverted?: boolean; className?: string }) {
   const { pathname } = useLocation()
   return (

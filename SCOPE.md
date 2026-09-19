@@ -58,7 +58,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | C4 | Download all documents as a bundle |
 | C6 | Licence certificate issued on approval, officer preview, PDF download · **built 19 Sep (US-051)** on its own branch, merged after review |
 | C7 | The owner's domain for both environments: `permitflow.space` and `api.permitflow.space` (production), `dev.permitflow.space` and `api.dev.permitflow.space` (development), Railway TLS · **done 19 Sep (US-052)**: development live on the domain, production live since v0.3.0 (19 Sep) |
-| C8 | Legal, privacy and accessibility review: policy pages, demonstration notices, self-hosted fonts, axe gate in CI, contrast fix · **done 19 Sep (US-057)**, `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` |
+| C8 | Legal, privacy and accessibility review: policy pages, demonstration notices, self-hosted fonts, axe gate in CI, contrast fix · **done 19 Sep (US-057)**, `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` |
 | C5 | Operator withdraws a submitted application with an optional reason · **done 19 Sep (US-038)**: new terminal status, officers notified, audited |
 
 ## DEFERRED / MOCKED
@@ -76,7 +76,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | Rate limiting, WAF, DDoS protection | **Simplified** (in-process sliding-window limiter on every request and on sign-in attempts; database quotas on drafts and on verification runs per applicant and per platform per day, US-058) | Infra-level concern for the distributed case. | Edge rate limiting, the same windows in Redis, WAF rules. |
 | Officer assignment / workload routing | **Omitted** | Not in the acceptance criteria. | Assignment model, queue ownership, reassignment audit. |
 | Virus scanning of uploads | **Omitted** (type/size allowlist and magic-byte check only) | Requires ClamAV or a vendor. | Scan on upload, quarantine state. |
-| Session token in `sessionStorage`, no retention or deletion schedule, providers in the US region (OpenAI, LangSmith), a CSP that still allows inline styles, one replica per environment, migrations on container start | **Simplified** (each accepted for a demonstration, each disclosed) | Recorded with severity in `docs/reviews/PRODUCTION_READINESS_REVIEW.md` rows 3, 4, 8, 12, 13 and in the threat model (T14, T18, T21). | httpOnly cookie sessions; a retention policy (SEC-012); in-region providers; CSP nonces; two replicas; migrations as a release step |
+| Session token in `sessionStorage`, no retention or deletion schedule, providers in the US region (OpenAI, LangSmith), a CSP that still allows inline styles, one replica per environment, migrations on container start | **Simplified** (each accepted for a demonstration, each disclosed) | Recorded with severity in `docs/11-reviews/PRODUCTION_READINESS_REVIEW.md` rows 3, 4, 8, 12, 13 and in the threat model (T14, T18, T21). | httpOnly cookie sessions; a retention policy (SEC-012); in-region providers; CSP nonces; two replicas; migrations as a release step |
 | Non-Latin text on the licence certificate | **Limitation** (the PDF uses the base-14 fonts, so Chinese, Tamil or other non-Latin business names print as boxes; Latin accents are fine) | A CJK-capable TrueType font is an asset and licence decision, not a code change. | Register a Noto Sans font in the renderer and cover it in the render test. |
 
 ## Assumptions (where the assessment is ambiguous)
@@ -101,7 +101,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 
 ## Design phase (17–18 Sep 2026)
 
-A UI/UX design phase was run between solutioning and implementation: design direction, design system, clickable prototype (23 artboards) and design documentation in `docs/design/`. It changed no MUST item; it added the public landing page to M1, expanded S7 with user management, and fixed the upload validation wording in M3.
+A UI/UX design phase was run between solutioning and implementation: design direction, design system, clickable prototype (23 artboards) and design documentation in `docs/04-design/`. It changed no MUST item; it added the public landing page to M1, expanded S7 with user management, and fixed the upload validation wording in M3.
 
 ## Sprint 1 check (18 Sep 2026)
 
@@ -117,4 +117,4 @@ Re-read at the Sprint 3 close and the v0.3.0 release: every MUST (M1 to M20) is 
 
 ## What "done" means for this MVP
 
-A reviewer can clone the repo, follow the README, log in as an operator and an officer, and complete two full rounds of submission → review → resubmission → comparison, with AI verification running (or explicitly unavailable), all covered by passing CI. See `docs/planning/DEFINITION_OF_DONE.md`.
+A reviewer can clone the repo, follow the README, log in as an operator and an officer, and complete two full rounds of submission → review → resubmission → comparison, with AI verification running (or explicitly unavailable), all covered by passing CI. See `docs/05-planning/DEFINITION_OF_DONE.md`.

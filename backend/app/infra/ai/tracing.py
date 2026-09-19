@@ -8,7 +8,7 @@ Inputs (the extracted document text and the form section) are hidden by default:
 documents, and LangSmith is a hosted service (the organisation's region, US, EU or APAC in Sydney, is fixed
 at sign-up; `LANGSMITH_ENDPOINT` must match it). `LANGSMITH_HIDE_INPUTS=false` reveals them, meant for the
 development environment only. Outputs stay visible: status, codes, confidence, summary and the evidence
-quotes, which are excerpts of at most 300 characters (`docs/security/THREAT_MODEL.md`, T21).
+quotes, which are excerpts of at most 300 characters (`docs/06-security/THREAT_MODEL.md`, T21).
 
 Tracing never changes a verification result and never raises into the provider: a LangSmith outage is
 logged by the SDK and the check completes as if tracing were off."""
