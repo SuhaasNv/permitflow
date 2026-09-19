@@ -18,9 +18,6 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `03-architecture/DOMAIN_MODEL.md` | written | Entities, verification vocabulary, issue codes, invariants |
 | `03-architecture/STATE_MACHINE.md` | written | 12 states + draft + withdrawn, labels, transitions (incl. Return to review), guards, feedback rules |
 | `03-architecture/decisions/README.md` + `ADR-001` to `ADR-012` | written (index with "chose X over Y because Z" per ADR; 003, 006, 007, 009, 011 amended as built; 010, 011 and 012 added 19 Sep) | Architecture decision records |
-| `03-architecture/permitflow-architecture.drawio` / `.png` | written | Overall architecture diagram |
-| `03-architecture/diagrams/uc1-use-case`, `uc2-use-case`, `e4-admin-use-case` (`.drawio` / `.png`) | written | UML use case diagrams per epic |
-| `03-architecture/diagrams/sequences/*.mmd` / `.png` | written | Sequence diagrams UC1-A, UC1-B, UC2-A, UC2-B (Mermaid) |
 | `03-architecture/diagrams/views/*.png` | written (19 Sep) | Solution architecture, branching, deployment and CI/CD views used in the technical deck; generated from prompts written against the code and rated before use (`AI_USAGE.md`, Debrief material) |
 
 ## Design (UI/UX phase, 17–18 Sep 2026)

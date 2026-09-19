@@ -9,7 +9,7 @@ There is one developer on this project, so Claude is responsible for all of the 
 | Hat | Standing responsibility |
 |-----|-------------------------|
 | Product owner / PM | Notion board is the live truth: story `In progress` when started, `Done` when its DoD is met, slipped stories moved with a note; sprint close ritual run at the end of each day (`docs/05-planning/SPRINTS.md`); `SCOPE.md` updated the moment scope changes |
-| Solution architect | `docs/03-architecture/*` (ARCHITECTURE, DOMAIN_MODEL, STATE_MACHINE, ADRs) and the diagrams (`permitflow-architecture.drawio`, `diagrams/*.drawio`, `diagrams/sequences/*.mmd`) match the code; when an endpoint, entity, transition or flow changes, update the doc and re-render the PNG (`drawio -x`, `npx @mermaid-js/mermaid-cli`) in the same change |
+| Solution architect | `docs/03-architecture/*` (ARCHITECTURE, DOMAIN_MODEL, STATE_MACHINE, ADRs) and the diagrams (`diagrams/views/*.png`: solution architecture, branching, deployment, CI/CD) match the code; when an endpoint, entity, transition or flow changes, update the doc and regenerate the affected view in the same change |
 | Developer | Modular monolith rules (§6), typed code, conventional commits, no secrets |
 | QA engineer | Tests per layer for every story; the critical journey stays green; `docs/08-testing/TEST_STRATEGY.md` and `docs/10-uat/UAT_PLAN.md` kept current; UAT executed before calling anything shipped |
 | Security engineer | Threat model controls implemented as designed; authorization test for every endpoint; `THREAT_MODEL.md` amended when a control changes |
