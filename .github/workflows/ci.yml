@@ -36,7 +36,12 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy
-      - run: uv run pytest
+      - run: uv run pytest --cov=app --cov-report=term --cov-report=xml --cov-fail-under=80
+      - name: Coverage summary
+        if: always()
+        run: |
+          echo '### Backend coverage' >> "$GITHUB_STEP_SUMMARY"
+          uv run coverage report --format=total 2>/dev/null | sed 's/^/Total: /; s/$/ %/' >> "$GITHUB_STEP_SUMMARY" || true
 
   frontend:
     name: Frontend (lint, typecheck, test, build)
@@ -54,7 +59,12 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
+      - name: Coverage summary
+        if: always()
+        run: |
+          echo '### Frontend coverage (all source files counted)' >> "$GITHUB_STEP_SUMMARY"
+          npx vitest run --coverage --coverage.reporter=text-summary 2>/dev/null | grep -E 'Statements|Branches|Functions|Lines' >> "$GITHUB_STEP_SUMMARY" || true
       - run: npm run build
 
   ai:

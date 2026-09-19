@@ -49,7 +49,11 @@ Argon2 password hashes; JWT access tokens (8 h) with the role claim, re-checked 
 ```bash
 cd backend && uv run pytest && uv run ruff check . && uv run mypy
 cd frontend && npm test && npm run lint && npm run typecheck && npm run build
+cd backend && uv run pytest --cov=app        # coverage, fails under 80 %
+cd frontend && npm run test:coverage         # coverage with every source file counted, thresholds in vite.config.ts
 ```
+
+736 backend tests (640 unit, 96 integration on a real Postgres), 146 frontend tests, seven Playwright specs. Coverage on 19 Sep 2026: backend 96 % statements, frontend 80.5 % statements and 83.7 % lines, both measured over every source file and enforced in CI (`docs/testing/TEST_STRATEGY.md`, US-053).
 
 Backend tests run against the real `permitflow_test` database: the Alembic migrations are applied from scratch at the start of the session and every table is truncated between tests. The AI provider is forced to `mock` in tests unless `TEST_LIVE_AI=1`.
 
@@ -86,8 +90,8 @@ Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway 
 
 | Job | What it does |
 |-----|--------------|
-| Backend | `uv sync`, ruff (lint and format), mypy strict, pytest against a Postgres 16 service |
-| Frontend | `npm ci`, oxlint, tsc, vitest, vite build |
+| Backend | `uv sync`, ruff (lint and format), mypy strict, pytest with coverage against a Postgres 16 service (fails under 80 %) |
+| Frontend | `npm ci`, oxlint, tsc, vitest with coverage thresholds (80 % statements and lines), vite build |
 | E2E | Starts Postgres, migrates and seeds, serves the backend on :8000 with the mock provider, builds the frontend and serves it with `vite preview` on :3000, then runs the Playwright journey and the six scenario specs; server logs and the Playwright report are attached when it fails |
 | Secret scan | gitleaks over the full history |
 | AI verification | Configuration audit, provider contract tests, the golden set through the real pipeline on the mock provider (blocking at 100 %), verdict in the run summary and as an artifact |

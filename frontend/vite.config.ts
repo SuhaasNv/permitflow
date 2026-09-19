@@ -21,5 +21,15 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     css: false,
+    coverage: {
+      provider: 'v8',
+      // Every source file counts, tested or not, so the number cannot be flattered by leaving files out.
+      all: true,
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/main.tsx'],
+      reporter: ['text-summary', 'text', 'lcov'],
+      // Industry floor (US-053). Statements and lines are the numbers that matter; branches follow.
+      thresholds: { statements: 80, lines: 80, functions: 75, branches: 65 },
+    },
   },
 })
