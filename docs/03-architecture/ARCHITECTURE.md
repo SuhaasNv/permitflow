@@ -6,40 +6,6 @@ A modular monolith (ADR-001): one FastAPI backend, one React frontend, one Postg
 
 ![Solution architecture: users, the web application and the API with its modules, PostgreSQL and file storage, OpenAI and LangSmith](diagrams/views/solution-architecture.png)
 
-The same picture as text, kept in step with the code:
-
-```
-┌────────────────────────────────────────────────────────────────────┐
-│ Browser (React 19 + TypeScript strict, Vite, Tailwind v4)          │
-│  pages/ ─▶ features/ (hooks: TanStack Query) ─▶ api/ (typed client)│
-│  Auth context (JWT in memory + sessionStorage)                     │
-└──────────────┬─────────────────────────────────────────────────────┘
-               │ HTTPS JSON (Bearer token), multipart for uploads
-┌──────────────▼─────────────────────────────────────────────────────┐
-│ FastAPI backend (backend/app)                                      │
-│                                                                    │
-│  api/            routers, request/response schemas, dependencies   │
-│    │  (auth, role, ownership resolved here)                        │
-│  services/       use cases: ApplicationService, SubmissionService, │
-│    │             FeedbackService, DocumentService, VerificationSvc │
-│    │             : the only layer that mutates and writes audit    │
-│  domain/         pure logic: workflow (state machine), form_schema,│
-│    │             diff, labels, feedback resolution rules           │
-│  repositories/   SQLAlchemy queries; ownership filters             │
-│  models/         SQLAlchemy ORM models                             │
-│  infra/          db session, storage (FileStorage), notifier,      │
-│                  ai providers (OpenAI, Mock)  , logging, settings │
-│                                                                    │
-│  Background task: verification.run_verification(document_id)      │
-└───────┬───────────────────────────┬─────────────────┬──────────────┘
-        │                           │                 │
-┌───────▼────────┐        ┌─────────▼───────┐  ┌──────▼─────────────┐
-│ PostgreSQL     │        │ File storage    │  │ LLM provider       │
-│ (JSON snapshots│        │ (local disk /   │  │ (OpenAI API,       │
-│  + relational) │        │  Railway volume)│  │  replaceable)      │
-└────────────────┘        └─────────────────┘  └────────────────────┘
-```
-
 ## Backend layering and dependency direction
 
 ```
