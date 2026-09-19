@@ -77,9 +77,9 @@ Two kinds. The standing instructions lived in the two `CLAUDE.md` files and appl
 
 - "Test each workflow separately, one Playwright spec per workflow, each ending on the audit trail." (US-042)
 - "Deploy a review agent for orientation and layouts at every width." (`docs/11-reviews/LAYOUT_AUDIT.md`)
-- "Deploy three bug-hunt agents with separate briefs: backend rules, frontend interaction, the seams between them. Reproduce before reporting." (US-050, 45 findings, 43 fixed, 2 kept as decisions)
+- "Deploy three bug-hunt agents with separate briefs: backend rules, frontend interaction, the seams between them. Reproduce before reporting." (US-050, 39 findings, 36 fixed, 3 kept as decisions)
 - "Do a run-through in the browser with the real demo documents, as each persona, and take notes on every step." (three run-throughs; the first found two defects the tests had missed, the third was the Sprint 3 acceptance on the deployed environment)
-- "Review the application, its output and the standards we follow against the brief, independently and without allowances, and report what can be improved." (`docs/11-reviews/PRODUCTION_READINESS_REVIEW.md`; it scored documentation 5/10, which produced the README sections and this file)
+- "Review the application, its output and the standards we follow against the brief, independently and without allowances, and report what can be improved." (its report was not kept as a file; it scored documentation 5/10, and its findings became the README sections, `docs/11-reviews/PRODUCTION_READINESS_REVIEW.md` and this file)
 - "Check Notion, every user story and every document against each other and against the code; everything must be consistent." (the consistency pass before the release: dates against `git log`, API table against the routers, state table against `workflow.py`)
 - "Record every issue found and its mitigation." (`docs/11-reviews/ISSUES_AND_MITIGATIONS.md`)
 - "Raise unit and integration coverage of the business logic to about 80 percent, measured with every source file counted, testing behaviour rather than buttons, and enforce it in CI." (US-053: frontend 47 to 80.6 percent statements, backend 96 percent, thresholds in both jobs)

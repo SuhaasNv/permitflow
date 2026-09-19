@@ -9,6 +9,10 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 - The audit table's only delete path is `AuditRepository.purge_draft` (draft deletion, US-045); a static test fails on any `update()` or `delete()` touching `AuditEvent` elsewhere. Docstrings, T9 and ADR-008's index line now say so instead of "no delete path".
 - No fallback JWT secret: `security.py` refuses an empty or short secret in every environment, `validate_for_startup` refuses the `.env.example` placeholder, the test suite signs with a random secret per run (SEC-006).
 - Backend: 752 test cases from 163 functions (the state-machine sweep is 588 of the cases).
+- Delivery: release image tags are written only by a git-tag CI run and must match `frontend/package.json`; production is pinned to the release image `sha-38df991` instead of the moving `:main` tag; the deploy job waits for a deployment id that differs from the one live before the redeploy; every workflow declares `permissions: contents: read`; the dispatch input of the live evaluation reaches the shell through `env`. `main` is protected on GitHub (pull request from `dev`, seven required checks, owner included); `dev` is protected against force pushes and deletion.
+- Frontend: the audit trail is refetched after every officer action (it kept the old events until a remount); the check-in-progress display shows the two server states (queued, running) instead of a simulated four-step animation; `docs/04-design/FRONTEND_ARCHITECTURE.md` rewritten from the tree (the design-phase version described React 18, generated types and folders that never existed).
+- AI assurance wording: the gate's mock stages are named for what they prove (pipeline, rules, harness); the README says the live evaluation is the check that measures the model; fairness counted as 18 swaps against 3 baselines.
+- Documents recounted against their sources: bug hunt 39 findings (36 fixed, 3 kept), edge-case review 47 (31 fixed, 16 deferred) and dated 18 Sep, 507 transition cases at Sprint 1, 19 as-built captures, `M4` for the provider, the backend package version 0.3.0; threat T19 marked as the planned admin design; readiness rows 21 (PostgreSQL 16 locally versus 18 on Railway) and 22 (frontend findings) added; self-describing adjectives removed.
 
 ## Debrief material (19 Sep 2026, after v0.3.0, US-059)
 
@@ -26,7 +30,7 @@ Numbers at close: backend 578 tests (ruff, mypy strict, pytest on Postgres), fro
 |-------|---------|
 | US-000 Project skeleton | Done |
 | US-001 Login per persona | Done |
-| US-030 Role-specific status labels + state machine | Done (528 parametrised transition tests) |
+| US-030 Role-specific status labels + state machine | Done (507 parametrised transition tests at the time; 588 since `withdrawn` was added) |
 | US-010 Create application | Done |
 | US-011 Sectioned form with validation | Done |
 | US-012 Drag-and-drop document upload | Done (allowlist, magic bytes, 10 MB, sha256 no-change) |
@@ -80,10 +84,10 @@ Numbers at close: backend 620 tests (ruff, mypy strict, pytest on Postgres), fro
 | US-013 Live verification status polish | Done |
 | US-002 OpenAI provider | Done (`gpt-4.1-mini`) |
 | US-003 Injection heuristic + malformed output | Done |
-| US-033 Operator edge cases (added 19 Sep) | Done |
-| US-034 Backend edge cases (added 19 Sep) | Done |
+| US-033 Operator edge cases (added 18 Sep) | Done |
+| US-034 Backend edge cases (added 18 Sep) | Done |
 
-Also in this sprint, not tied to a story: the tidy pass (layering, schemas package, dead code), `docs/04-design/USER_JOURNEY.md`, `docs/11-reviews/EDGE_CASE_REVIEW.md`, SCOPE assumption 10 (who the operator is), 20 as-built captures in `docs/04-design/screens/as-built/`.
+Also in this sprint, not tied to a story: the tidy pass (layering, schemas package, dead code), `docs/04-design/USER_JOURNEY.md`, `docs/11-reviews/EDGE_CASE_REVIEW.md`, SCOPE assumption 10 (who the operator is), 19 as-built captures in `docs/04-design/screens/as-built/`.
 
 ### Slipped
 
@@ -92,7 +96,7 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 ### Retro
 
 - What slowed us: the first live OpenAI call exposed two prompt and schema defects at once (invented enum values, no date), and the full test run against the live key took four minutes. Lesson: pin the wire schema and force the mock in tests before the first live run, not after.
-- What went well: every officer and operator screen was verified in the browser at three widths before its story moved to Done; three independent edge-case reviews found 40 items and all the "now" ones shipped as two stories with tests, without breaking the loop (full suites and a browser smoke after the tidy pass).
+- What went well: every officer and operator screen was verified in the browser at three widths before its story moved to Done; three independent edge-case reviews found 47 items (31 fixed in the sprint, 16 deferred with a plan) and all the "now" ones shipped as two stories with tests, without breaking the loop (full suites and a browser smoke after the tidy pass).
 - What to change tomorrow: write the Playwright journey first thing so the loop is protected while the Day 3 documents are written; keep the admin epic strictly after the MUSTs (tests, CI, deployment, documents).
 - Risk into Sprint 3: Railway deployment needs the user's account; everything else is in our hands.
 
@@ -118,7 +122,7 @@ Numbers at close: backend 748 tests (ruff, mypy strict, pytest on Postgres, 96 %
 | US-043 Layout audit, US-044 Errors inside CORS | Done |
 | US-046 to US-048 Sign-in, landing hero, session warning | Done |
 | US-049 Not fixed reopens an item | Done |
-| US-050 Bug hunt | Done (45 findings, 43 fixed, 2 kept as decisions) |
+| US-050 Bug hunt | Done (39 findings, 36 fixed, 3 kept as decisions) |
 | US-051 Licence certificate | Done (beyond the brief) |
 | US-052 Custom domain | Done (development live; production with the release) |
 | US-053 Coverage thresholds | Done (frontend 47 to 80.6 %) |
@@ -159,7 +163,7 @@ Numbers at close: backend 748 tests (ruff, mypy strict, pytest on Postgres, 96 %
 
 - US-051 Licence certificate: approval renders a PDF certificate with reportlab inside the same transaction (`licences` table, migration 0005, `licence.issued` audit, licence number in the operator's notification); officers get a watermarked in-app preview while the application awaits a decision and a download after; operators download it from the outcome panel. Owner or officer only. Certificate layout reworked after a browser run-through with the demo documents: brand mark drawn as paths, ruled particulars that wrap long values, business names wrapped to two lines, numbered conditions, signature strip pinned to the bottom with the verification code repeated, spare height shared across the gaps (measured in a dry run). The same run-through found two defects (R1, R2 in `docs/11-reviews/BUG_HUNT_REVIEW.md`): the operator's licence download was hidden when the approval carried no note, and feedback groups were headed "Round N · Revision N"; both fixed. A read-only audit of the Document checks card followed (R3 to R5): the queue now treats an unreadable document as "to check", the card's remainder row reads "Not checked" and "Analysed" became "Documents", and the domain model settles a provider answer whose status contradicts its issue list. A second run-through (with the planted-issue set) rejected an application at Pending Approval because a document still had an unresolved check; the Approve dialog now warns about unresolved check results while staying enabled (US-031 follow-up). The scope discussion then added Return to review (Pending Approval back to Under Review, `fix/us-031-return-to-review`): one transition row, dialog copy, integration test, `STATE_MACHINE.md`. Prompt 2026-09-19.3 (`fix/us-050-prompt-disclaimer`): the demo documents' "fictional" footer is no longer reported as a possible injection; eval harness 14/14 twice, record in `docs/07-ai/AI_EVALUATION.md`. A final read-only bug hunt (R6 to R11) found six Low items (licence year at the Singapore New Year, PDF determinism, unbreakable long values, non-Latin fonts, date-only strings west of UTC, dialog copy); all fixed or documented on `fix/us-050-last-day-bugs`.
 
-- US-050 Bug hunt: three parallel read-only reviews found 45 items (`docs/11-reviews/BUG_HUNT_REVIEW.md`); 43 fixed. Highlights: re-run results never landed for older documents (staleness now per run), raw internal status shown after a 409 (now reloads), previous account's cache surviving sign-out, Withdrawn filed under the wrong group, undo bypassing the site-visit guard, a restart leaving checks stuck forever, operators re-running checks after submission, and a deploy gate that tested the old container (now waits for the new rollout, plus Railway health checks).
+- US-050 Bug hunt: three parallel read-only reviews found 39 items (`docs/11-reviews/BUG_HUNT_REVIEW.md`); 36 fixed, 3 kept as decisions. Highlights: re-run results never landed for older documents (staleness now per run), raw internal status shown after a 409 (now reloads), previous account's cache surviving sign-out, Withdrawn filed under the wrong group, undo bypassing the site-visit guard, a restart leaving checks stuck forever, operators re-running checks after submission, and a deploy gate that tested the old container (now waits for the new rollout, plus Railway health checks).
 
 - US-049 Not fixed: an addressed item can be reopened by the officer with the same text (`POST .../feedback/{fid}/reopen`, audited, undo for 10 s); it becomes a draft until the next round is requested, so the officer no longer retypes feedback when the operator's change did not settle it. Scenario 04 now runs a not-fixed round.
 

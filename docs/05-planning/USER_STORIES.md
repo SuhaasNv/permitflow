@@ -41,7 +41,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 ### US-006 — As an engineer, I want a CI pipeline that lints, type-checks, tests, builds and scans for secrets, so that broken or unsafe code is never considered done.
 - Acceptance criteria: GitHub Actions workflow runs frontend lint/typecheck/test/build, backend ruff/mypy/pytest on a Postgres service, Playwright E2E, gitleaks and a Docker build; required on pull requests.
 - Priority: MVP · Day 1 (skeleton), Day 3 (complete) · Dependencies: US-000 · Requirements: NFR-004, NFR-005
-- Definition of Done: branch protection requires the workflow; green on `main`.
+- Definition of Done: branch protection requires the workflow (in place since 20 Sep 2026: `main` takes pull requests only, seven required checks); green on `main`.
 
 ### US-007 — As a reviewer, I want the application deployed with seeded accounts, so that I can try it without local setup.
 - Acceptance criteria: two images built once in CI and pushed to GHCR (backend; frontend nginx with the API URL injected at start); Railway `development` and `production` environments, each with its own Postgres, uploads volume, secrets and domains, deployed from `dev` and `main` by `deploy.yml` with pre and post-deploy gates; migrations run on container start; seed run once per environment by hand; `/health` and `/healthz` green.

@@ -41,7 +41,7 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 
 ## Seeding
 
-`cd backend && uv run python scripts/seed.py` creates the demo operator (`operator@permitflow.example.sg`) and officer (`officer@permitflow.example.sg`) if they do not exist. `SEED_PASSWORD` sets their password (default `PermitFlow!2026`); set it to something else in any shared environment.
+`cd backend && uv run python scripts/seed.py` creates the demo operator (`operator@permitflow.example.sg`) and officer (`officer@permitflow.example.sg`) if they do not exist. `SEED_PASSWORD` sets their password (default `PermitFlow!2026`). The public demonstration keeps that password on purpose (README, privacy policy); any deployment that is not a demonstration must set its own value and reset it on a schedule.
 
 ## Uploads
 
@@ -76,7 +76,7 @@ One Railway project (`permitflow`), two environments that share nothing:
 | | development | production |
 |---|---|---|
 | Deploys from | `dev` | `main` (release tags `v0.<sprint>.0`) |
-| Images | `ghcr.io/suhaasnv/permitflow-backend:dev`, `...-frontend:dev` | `:main` |
+| Images | `ghcr.io/suhaasnv/permitflow-backend:dev`, `...-frontend:dev` (moving tags, every merge) | pinned `sha-<release commit>` (`sha-38df991` for v0.3.0); the `:v0.3.0` tag names the same image |
 | Frontend | https://dev.permitflow.space (US-052; Railway host https://frontend-development-afe2.up.railway.app) | https://permitflow.space (also `www`; Railway host https://frontend-production-2d8b.up.railway.app) |
 | API | https://api.dev.permitflow.space/api/v1 (US-052; Railway host https://backend-development-4e04.up.railway.app/api/v1) | https://api.permitflow.space/api/v1 (Railway host https://backend-production-19cd.up.railway.app/api/v1) |
 | State (19 Sep 2026) | live: deployed on every merge to `dev`, seeded | live since v0.3.0 (19 Sep, 17:00 SGT): images `ghcr.io/suhaasnv/permitflow-{backend,frontend}:main` attached, first deployment committed from the Railway staging area, then the approved `deploy.yml` run redeployed with the health gates; seeded once; production UAT recorded in `docs/10-uat/UAT_PLAN.md`; reset after the UAT and left with one example application (Serangoon Spice House, Application Received) |
@@ -84,15 +84,15 @@ One Railway project (`permitflow`), two environments that share nothing:
 | Uploads | volume `uploads` at `/data/uploads` | own volume at `/data/uploads` |
 | AI | `AI_PROVIDER=openai`, `gpt-4.1-mini` | same |
 
-Two images, built once in CI and pulled by Railway (Railway never builds): `backend/Dockerfile` (uvicorn, runs `alembic upgrade head` on start) and `frontend/Dockerfile` (Vite build served by nginx; the API URL is written into `config.js` at container start from `API_URL`, so one image serves both environments). Images are public packages on GHCR, tagged `sha-<commit>` and with the branch name; a push to `main` also tags them with the release version from `frontend/package.json` (`v0.3.0`), the same string as the git tag.
+Two images, built once in CI and pulled by Railway (Railway never builds): `backend/Dockerfile` (uvicorn, runs `alembic upgrade head` on start) and `frontend/Dockerfile` (Vite build served by nginx; the API URL is written into `config.js` at container start from `API_URL`, so one image serves both environments). Images are public packages on GHCR, tagged `sha-<commit>` and with the branch name on every branch push. A release tag (`:v0.3.0`) is written only by the CI run for that git tag (`on: push: tags: v*`), and that run refuses a tag that does not match `frontend/package.json`; so a release image is immutable and a later merge to `main` cannot overwrite it (this was not the case before 20 Sep 2026: `v<version>` was written on every `main` push, and the `:v0.3.0` tag did get rewritten with documentation-only commits; the running production containers were and are the `sha-38df991` build).
 
 ### Continuous deployment, one push at a time
 
 1. Push to `dev` (or `main`). `ci.yml` runs: backend, frontend, AI verification, gitleaks, dependency audit, then the E2E job against a stack started in the runner.
-2. Green → the `images` job builds both images and pushes them to GHCR (`:dev` or `:main`, plus `sha-<commit>`, plus `v<version>` on `main`). Pull requests build but never push.
+2. Green → the `images` job builds both images and pushes them to GHCR (`:dev` or `:main`, plus `sha-<commit>`). Pull requests build but never push. A `v*` tag push runs CI again and writes the `:v0.x.0` tags.
 3. `deploy.yml` runs when CI completed successfully on that branch. Using the environment's `RAILWAY_TOKEN` it calls `railway redeploy --from-source` for `backend` and `frontend` in the matching Railway environment, which pulls the new images.
-4. The job then waits until Railway reports the NEW deployment of each service as SUCCESS (a redeploy call returns before the rollout, and the old containers keep answering meanwhile); Railway's own health checks (`/api/v1/health`, `/healthz`) gate the rollout too.
-5. Production only: the job pauses at the GitHub `production` environment until a required reviewer (the repository owner) approves it in the Actions run. Development needs no approval. Known limit, found at the v0.3.0 release: a `workflow_run`-triggered job executes on the repository's default branch (`dev`), and the production environment's branch policy admits only `main`, so an automatic production job would be rejected before its first step. The workflow therefore listens for CI on `dev` only and production is deployed by hand: `gh workflow run deploy.yml --ref main -f environment=production` after CI is green on `main`; the approval gate still applies. (Making `main` the default branch would restore the automatic path; not done, because `dev` is where pull requests land.) Either environment can also be redeployed from its current images by hand with "Run workflow" on the Deploy workflow (choose the environment), for example after a platform incident.
+4. The job records the deployment id that is live before the redeploy and then waits until Railway reports a deployment with a different id as SUCCESS (a redeploy call returns before the rollout, and the old containers keep answering meanwhile; accepting the first SUCCESS in the list would pass on the previous rollout, which the job did until 20 Sep 2026); Railway's own health checks (`/api/v1/health`, `/healthz`) gate the rollout too.
+5. Production: the production services do not track a branch tag; each is pinned to the release image `sha-<commit>` in Railway. A release is: merge the `dev` pull request into `main`, tag `v0.x.0`, wait for the tag's CI run, set both production services to `sha-<release commit>` (Railway dashboard, service Settings, Source), then run the deploy job by hand: `gh workflow run deploy.yml --ref main -f environment=production`. The job pauses at the GitHub `production` environment until a required reviewer (the repository owner) approves it in the Actions run. Development needs no approval. Known limit, found at the v0.3.0 release: a `workflow_run`-triggered job executes on the repository's default branch (`dev`), and the production environment's branch policy admits only `main`, so an automatic production job would be rejected before its first step. The workflow therefore listens for CI on `dev` only and production is deployed by hand: `gh workflow run deploy.yml --ref main -f environment=production` after CI is green on `main`; the approval gate still applies. (Making `main` the default branch would restore the automatic path; not done, because `dev` is where pull requests land.) Either environment can also be redeployed from its current images by hand with "Run workflow" on the Deploy workflow (choose the environment), for example after a platform incident.
 6. Post-deploy gates: `/api/v1/health` and `/healthz` must answer 200 within about seven minutes, and the frontend's `config.js` must name that environment's API. A failed gate marks the deployment red; the previous containers keep serving until the new ones are healthy (Railway's default).
 
 The GitHub `production` environment only accepts deployments from `main`. Development and production cannot affect each other: separate databases, volumes, secrets, URLs, and a project token scoped to one environment each.
@@ -128,7 +128,7 @@ In Railway, per environment: frontend service → Settings → Networking → Cu
 
 ### Rollback
 
-Every image carries a `sha-<commit>` tag and every release a `v<version>` tag. Point the service at the previous tag in the Railway dashboard and redeploy. (Re-running `deploy.yml` does not roll back: it pulls whatever the branch tag points at now.) Migrations are forward-only; a rollback that needs a schema change is a new migration.
+Every image carries a `sha-<commit>` tag and every release a `v<version>` tag, and production is pinned to a `sha-` tag, so a rollback is: set the two production services back to the previous release's `sha-` tag in the Railway dashboard and run the deploy job (approval and health gates apply). Development tracks `:dev` and rolls back by pointing at a `sha-` tag the same way. Migrations are forward-only; a rollback that needs a schema change is a new migration.
 
 ### Verified
 

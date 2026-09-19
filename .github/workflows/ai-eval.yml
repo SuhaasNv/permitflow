@@ -3,7 +3,7 @@
 # ci.yml already gates every push with the golden set on the mock provider: that proves the
 # pipeline (extraction, injection heuristic, wire schema, post-processing) and the prompt plumbing.
 # This workflow proves the model: the same 14 cases through OpenAI, temperature 0, prompt version
-# stamped in the result, blocking at 14/14, then the fairness check (21 name-swapped runs, US-056). It runs nightly, by hand, and whenever the AI module or
+# stamped in the result, blocking at 14/14, then the fairness check (18 name-swapped runs against 3 baselines, US-056). It runs nightly, by hand, and whenever the AI module or
 # the golden set changes on dev or main. Never on pull requests from forks: it needs the API key.
 
 name: AI evaluation (live)
@@ -30,6 +30,9 @@ concurrency:
   cancel-in-progress: false
 
 # `shell: bash` gives `-o pipefail`: a failing command behind `| tee` fails the step.
+permissions:
+  contents: read
+
 defaults:
   run:
     shell: bash
@@ -64,11 +67,14 @@ jobs:
             exit 1
           fi
       - name: Golden set and adversarial cases through the real pipeline (OpenAI, blocking)
+        env:
+          # An input reaches the shell through the environment, never by interpolation into the command.
+          FAIL_UNDER: ${{ github.event.inputs.fail_under || '1.0' }}
         run: |
           FLAGS=""
           if [ -n "$LANGSMITH_API_KEY" ]; then FLAGS="--langsmith"; fi
           uv run python -m evals.run --provider openai --json /tmp/ai-eval-live.json $FLAGS \
-            --fail-under "${{ github.event.inputs.fail_under || '1.0' }}" | tee /tmp/ai-eval-live.txt
+            --fail-under "$FAIL_UNDER" | tee /tmp/ai-eval-live.txt
       - name: Fairness against the live model (name-swap invariance, blocking)
         run: uv run python -m evals.fairness --provider openai --fail --json /tmp/fairness-live.json | tee /tmp/fairness-live.txt
       - name: Publish the verdict

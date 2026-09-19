@@ -30,12 +30,12 @@ hotfix/<issue>  ── branched from main, merged into main AND dev.
 ## Rules
 
 1. One story per `feat/*` branch. The branch name carries the story ID so the commit history maps to Notion and `USER_STORIES.md`.
-2. Merge into `dev` with `--no-ff` so each story is one visible merge commit; the branch is deleted after merge.
-3. Commits are conventional: `feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`; subject 50 characters or fewer; body explains why when not obvious. No tool attribution.
-4. `dev` must pass CI (lint, type check, tests, build, secret scan) before it is merged to `main`.
-5. A release is a `--no-ff` merge of `dev` into `main`, tagged `v0.<sprint>.0` (Sprint 1 → `v0.1.0`). Bump `frontend/package.json` `version` to the same number before tagging: it is injected at build time, shown in the app shell and landing footer, and used by CI to tag the release images (`v0.3.0`). Railway never builds: CI pushes images on `dev` (deploys `development`) and `main` (deploys `production`, behind an approval), see `OPERATIONS.md`.
+2. Merge into `dev` with `--no-ff` so each story is one visible merge commit; the local branch may be deleted after merge, the remote copy is kept so the history reads branch by branch.
+3. Commits are conventional: `feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`; subject aimed at 50 characters and never over 72; body explains why when not obvious. No tool attribution.
+4. `main` is protected on GitHub (since 20 Sep 2026): changes arrive only through a pull request from `dev` whose CI checks (Backend, Frontend, AI gate, End to end, Secret scan, Dependency and code audit) have passed; no force pushes, no deletion, the rule applies to the owner too. `dev` is protected against force pushes and deletion; story branches merge into it locally with `--no-ff` and CI runs on every push.
+5. A release is the pull request `dev` into `main`, merged when green, then a git tag `v0.<sprint>.0` on that merge commit. Bump `frontend/package.json` `version` to the same number before the release: it is shown in the app shell and landing footer, and CI refuses a tag that does not match it. Only a push of a `v*` tag makes CI write the `:v0.x.0` image tags (branch pushes write `sha-<commit>` and the branch name), so a release image can never be overwritten by a later merge. Production runs a pinned `sha-<commit>` image; a release changes that pin, then the approved deploy job rolls it out (`OPERATIONS.md`).
 6. A hotfix branches from `main`, merges into `main` (tag `v0.x.y`), then into `dev` so the fix is not lost.
-7. Nothing is pushed without the user's explicit confirmation in that turn (project rule). Pull requests are used when a remote is in play; until then the same flow runs locally.
+7. Nothing is pushed without the user's explicit confirmation in that turn (project rule). `dev` to `main` goes through a pull request; story branches into `dev` are local `--no-ff` merges.
 8. History is never rewritten on `main` or `dev`. Work branches may be rebased on `dev` before merge.
 
 ## Day-to-day
