@@ -81,7 +81,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` | written (19 Sep) | The owner's legal, privacy and accessibility checklist answered item by item with evidence; laws considered; risks flagged; contrast computation (US-057) |
 | `../CHANGELOG.md` | written (Sprints 1 to 3 closed; v0.3.0 released 19 Sep) | Milestones, sprint closes with Shipped / Slipped / Retro |
 | `../README.md` | written | What it is, stack and why, hosts, setup, demo accounts, security, tests, CI, deployment, AI verification, AI Usage, What I would do next |
-| `../debrief/README.md` | written (19 Sep) | The pitch deck, the technical deck, the launch video and the narrated walkthrough, with the plans they were built from |
+| `debrief/README.md` | written (19 Sep) | The pitch deck, the technical deck, the launch video and the narrated walkthrough (videos in Git LFS) |
 
 ## Review history
 - 18 Sep 2026: UI/UX design phase: two independent design-critique passes on the prototype (pass 1 scored 6.6/10 with 11 rendering bugs and 15 fixes; all applied; pass 2 results recorded in `design/UI_DESIGN.md`). Scope changes from the phase: public landing page (M1, FR-031), admin user management (S7, FR-030, US-073, T19), upload validation and hash-based duplicate detection made explicit (M3, SEC-005).
