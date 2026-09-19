@@ -2,6 +2,8 @@
 
 ## Live: [permitflow.space](https://permitflow.space)
 
+![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/13-debrief/video/permitflow-launch-poster.jpg)
+
 https://github.com/user-attachments/assets/942739f7-e2bd-4360-b525-ecf960a7e796
 
 *Launch video, 70 seconds. The full-resolution file, the narrated walkthrough (4 min 36 s) and the technical video (1 min 28 s) are in `docs/13-debrief/video/`.*
