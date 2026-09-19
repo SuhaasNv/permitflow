@@ -10,9 +10,9 @@ The shipped system is a complete, tested vertical slice of use cases 1 and 2 wit
 
 | # | Area | Gap | Severity | Today | Production would need |
 |---|------|-----|----------|-------|-----------------------|
-| 1 | Functional | Use case 3 (site-visit checklist and post-site clarification) | High for the full product, by design for this release | Two post-site statuses and transitions exist and are tested; not reachable from the UI | Checklist model and screens, per-item clarification, operator response with uploads (US-060 to US-066) |
+| 1 | Functional | Use case 3 (site-visit checklist and post-site clarification) | High for the full product, by design for this release | Three post-site statuses and transitions exist and are tested; not reachable from the UI | Checklist model and screens, per-item clarification, operator response with uploads (US-060 to US-066) |
 | 2 | Identity | Seeded accounts, email and password only; no registration, reset, MFA or SSO | High | Argon2, JWT 8 h re-validated per request, login rate limit | OIDC (Singpass/Corppass for operators, agency SSO for officers), MFA for officers and admins |
-| 3 | Session | JWT held in `sessionStorage` | Medium | Accepted for a demo; XSS is mitigated by React escaping and security headers, not by a CSP | httpOnly, SameSite cookie with CSRF token; short access token plus refresh |
+| 3 | Session | JWT held in `sessionStorage` | Medium | Accepted for a demo; XSS is mitigated by React escaping, the CSP (`style-src 'unsafe-inline'` remains) and the security headers, not by an httpOnly cookie | httpOnly, SameSite cookie with CSRF token; short access token plus refresh |
 | 4 | Frontend security | CSP allows inline styles (`style-src 'unsafe-inline'`); the JWT lives in `sessionStorage` | Low | CSP on both tiers with one API origin, HSTS, Permissions-Policy, frame-ancestors none (US-058) | A nonce-based style policy; `httpOnly` cookie sessions |
 | 5 | AI checks | Background tasks in the API process (ADR-004) | Medium | Restart marks running checks failed; re-run recovers; one entry point | Broker plus worker (Redis/RQ or Celery), retries, dead-letter, per-run cost accounting |
 | 6 | Files | Local disk on a Railway volume behind `FileStorage` | Medium | Server keys, magic bytes, allowlist, 10 MB, authorised download only | S3-compatible object storage, signed URLs, virus scanning (ClamAV or vendor) with a quarantine state, lifecycle rules |
@@ -28,12 +28,12 @@ The shipped system is a complete, tested vertical slice of use cases 1 and 2 wit
 | 16 | Supply chain | No image scan or SBOM | Low | gitleaks, pip-audit, bandit (medium) and npm audit (high) all blocking; the image job waits for them; pinned dependencies (`uv.lock`, `package-lock.json`) (US-058) | Semgrep (PR-blocking) and CodeQL on `main`, Trivy on the GHCR images with an SBOM |
 | 17 | Certificate | Base-14 fonts (Latin only); no digital signature; no public verification page | Low | Hash recorded, verification code printed, owner-or-officer download (T20) | CJK-capable font, PAdES signature, verify-by-code endpoint |
 | 18 | Product | One licence type, fixed form schema; no officer assignment | Low, by design | Form schema shared between server and client | Configurable schemas, assignment and workload routing |
-| 19 | Accessibility | axe-core gate (WCAG 2.2 AA plus best practice) over 22 screen states in CI, contrast recomputed for every token, skip links, keyboard tests (US-057); no assistive-technology session yet | Low | Semantic markup and landmarks, labels, native dialogs, reduced-motion support, the gate | A VoiceOver or NVDA pass over the two journeys; `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` |
+| 19 | Accessibility | axe-core gate (WCAG 2.2 AA plus best practice) over 23 screen states in CI, contrast recomputed for every token, skip links, keyboard tests (US-057); no assistive-technology session yet | Low | Semantic markup and landmarks, labels, native dialogs, reduced-motion support, the gate | A VoiceOver or NVDA pass over the two journeys; `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` |
 | 20 | Load | No load or soak testing | Low | Pool sizing configured (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`) | k6 or Locust runs against staging before go-live |
 
 ## What is ready
 
-- Authorization: role per router, ownership as 404, sub-resource checks, one test per endpoint per role (22 × 403, 15 × 404 assertions).
+- Authorization: role per router, ownership as 404, sub-resource checks, authorization cases in every router's test file (wrong role, wrong owner, wrong state), with `POST /notifications/read-all` covered by ownership in the query rather than a cross-user test.
 - Integrity: state machine as data (588 tested combinations), row locks with an optimistic version, immutable revisions, audit rows in the same transaction, licence issued in the approval transaction.
 - Input handling: error envelope everywhere, Pydantic 422 with field details, upload allowlist and magic bytes, `Content-Length` pre-check, 10 MB.
 - Tests: 748 backend (real PostgreSQL, migrations from scratch), 152 vitest, 8 Playwright specs (journey, six scenarios, accessibility gate) in CI against the full stack; coverage thresholds enforced (backend 80, frontend 80 statements).
@@ -42,4 +42,4 @@ The shipped system is a complete, tested vertical slice of use cases 1 and 2 wit
 
 ## Go / no-go for the assessment demo
 
-Go. The development environment is live and seeded; production goes live with v0.3.0 on the owner's domain behind the approval gate. For a real authority: no-go until items 1, 2, 8 and 14 are addressed.
+Go. The development environment is live and seeded; production is live since v0.3.0 (19 Sep 2026) on the owner's domain, deployed by hand behind the approval gate. For a real authority: no-go until items 1, 2, 8 and 14 are addressed.

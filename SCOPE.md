@@ -1,4 +1,4 @@
-# SCOPE.md — PermitFlow MVP
+# SCOPE.md: PermitFlow MVP
 
 **Assessment:** Regulatory and Licensing Platform, 3 calendar days.
 **Decision in one line:** build Use Case 1 (Operator Submission & Resubmission) and Use Case 2 (Officer Review & Feedback) as one polished, tested, deployed vertical slice; support the full 12-state lifecycle in the state machine; defer Use Case 3 (On-Site Assessment checklist) with an honest description of what production would need.
@@ -24,7 +24,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | M7 | Role-specific status labels enforced by the API serializer, per the assessment table | UC2 status mapping; UC3 constraint |
 | M8 | Officer queue + full application view (sections, documents, AI results) | UC2 review |
 | M9 | Officer feedback linked to section or document; comment templates | UC2 feedback |
-| M10 | Status transitions via explicit state machine with server-side role checks; all 12 assessment states + `draft`; site visit, route to approval, approve/reject with a note so the lifecycle completes; reject possible from every non-terminal post-submission state so nothing gets stuck | UC2 status mapping; UC2 "no applications lost" |
+| M10 | Status transitions via explicit state machine with server-side role checks; all 12 assessment states plus `draft` and `withdrawn` (C5); site visit, route to approval, approve/reject with a note so the lifecycle completes; reject possible from every non-terminal post-submission state so nothing gets stuck | UC2 status mapping; UC2 "no applications lost" |
 | M11 | Operator resubmission: feedback on top, each item anchored to its section/document (click to jump), only flagged sections/documents editable, new immutable revision | UC1 resubmission |
 | M12 | Officer resubmission view: changed sections highlighted, revision compare (field-level + document-level diff), feedback resolution tracking (open → addressed → resolved) | UC2 resubmission management |
 | M13 | Unlimited rounds; revision history and prior comments visible to both roles | UC1/UC2 multi-round |
@@ -46,7 +46,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | S4 | Compare any two revisions (not only current vs previous) · **done in Sprint 2** | Same diff function; only the selector changes |
 | S5 | AI evaluation dataset + runner script · **done and grown** (14 cases, mock gate in CI, live run nightly, US-004, US-054, US-056) | Six fixtures, manual run documented |
 | S6 | Structured request logging with request id · **done** (Sprint 1) | Middleware only, no log shipping |
-| S7 | Admin persona: seeded admin account, `/admin/*` router, an operations dashboard (counts by status, idle applications, AI verification health, cross-application audit feed, read-only application view) and **user management** (create user, change role, deactivate/reactivate; every change audited; the last active admin cannot be demoted or deactivated). **Beyond the brief** — added because a regulator operating the platform needs oversight and account control; the assessment names only Operator and Officer. The `admin` role value exists in the enum from Day 1 (cheap); everything else in this row is built only after the MUST list is Done, so cutting it removes a router and two pages, not a concept. · **deferred at the Sprint 3 close (19 Sep)**: not started, cut per the cut order (admin epic first); `/admin/overview` ships as a placeholder that says so; US-070 to US-073 remain on the board as Not started | Overview page first; user management second (US-073); no password reset or self-registration |
+| S7 | Admin persona: seeded admin account, `/admin/*` router, an operations dashboard (counts by status, idle applications, AI verification health, cross-application audit feed, read-only application view) and **user management** (create user, change role, deactivate/reactivate; every change audited; the last active admin cannot be demoted or deactivated). **Beyond the brief**: added because a regulator operating the platform needs oversight and account control; the assessment names only Operator and Officer. The `admin` role value exists in the enum from Day 1 (cheap); everything else in this row is built only after the MUST list is Done, so cutting it removes a router and two pages, not a concept. · **deferred at the Sprint 3 close (19 Sep)**: not started, cut per the cut order (admin epic first); `/admin/overview` ships as a placeholder that says so; US-070 to US-073 remain on the board as Not started | Overview page first; user management second (US-073); no password reset or self-registration |
 
 ## COULD HAVE (only if the core is stable)
 
@@ -57,7 +57,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | C3 | Image OCR for document verification (currently images are marked "not extractable") |
 | C4 | Download all documents as a bundle |
 | C6 | Licence certificate issued on approval, officer preview, PDF download · **built 19 Sep (US-051)** on its own branch, merged after review |
-| C7 | The owner's domain for both environments: `permitflow.space` and `api.permitflow.space` (production), `dev.permitflow.space` and `api.dev.permitflow.space` (development), Railway TLS · **done 19 Sep (US-052)**: development live on the domain, production goes live with v0.3.0 |
+| C7 | The owner's domain for both environments: `permitflow.space` and `api.permitflow.space` (production), `dev.permitflow.space` and `api.dev.permitflow.space` (development), Railway TLS · **done 19 Sep (US-052)**: development live on the domain, production live since v0.3.0 (19 Sep) |
 | C8 | Legal, privacy and accessibility review: policy pages, demonstration notices, self-hosted fonts, axe gate in CI, contrast fix · **done 19 Sep (US-057)**, `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` |
 | C5 | Operator withdraws a submitted application with an optional reason · **done 19 Sep (US-038)**: new terminal status, officers notified, audited |
 
@@ -76,6 +76,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | Rate limiting, WAF, DDoS protection | **Simplified** (in-process sliding-window limiter on every request and on sign-in attempts; database quotas on drafts and on verification runs per applicant and per platform per day, US-058) | Infra-level concern for the distributed case. | Edge rate limiting, the same windows in Redis, WAF rules. |
 | Officer assignment / workload routing | **Omitted** | Not in the acceptance criteria. | Assignment model, queue ownership, reassignment audit. |
 | Virus scanning of uploads | **Omitted** (type/size allowlist and magic-byte check only) | Requires ClamAV or a vendor. | Scan on upload, quarantine state. |
+| Session token in `sessionStorage`, no retention or deletion schedule, providers in the US region (OpenAI, LangSmith), a CSP that still allows inline styles, one replica per environment, migrations on container start | **Simplified** (each accepted for a demonstration, each disclosed) | Recorded with severity in `docs/reviews/PRODUCTION_READINESS_REVIEW.md` rows 3, 4, 8, 12, 13 and in the threat model (T14, T18, T21). | httpOnly cookie sessions; a retention policy (SEC-012); in-region providers; CSP nonces; two replicas; migrations as a release step |
 | Non-Latin text on the licence certificate | **Limitation** (the PDF uses the base-14 fonts, so Chinese, Tamil or other non-Latin business names print as boxes; Latin accents are fine) | A CJK-capable TrueType font is an asset and licence decision, not a code change. | Register a Noto Sans font in the renderer and cover it in the render test. |
 
 ## Assumptions (where the assessment is ambiguous)
@@ -96,7 +97,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 14. **Drafts are not records:** a draft that was never submitted can be deleted outright by its owner (rows, files and audit events). Only submission creates the licensing record; after that an application can be withdrawn but never deleted (US-045, 19 Sep).
 15. **Document slots:** exactly one current document per required type; no free-form "other" slot in the MVP (feedback targets a type, and multi-file slots would need per-file targets).
 16. **Third-party AI processing:** extracted document text (capped) and the relevant form section are sent to OpenAI for verification. This is a data-transfer decision a regulator would have to approve; the MVP documents it and the production gap (region, retention, redaction) in the threat model rather than pretending it is solved.
-17. **"Operators cannot see the internal approval stage" versus the brief's own table:** the brief's status table gives operators the label "Pending Approval" for the internal `pending_approval` status, and its UC2 criteria say operators never see the approval stage. We follow the table (the operator sees "Pending Approval" as a waiting state, like "Pending Site Visit") and the spirit of the criteria: no operator response ever carries an internal status code, the officer-only labels ("Route to Approval") never reach an operator, and the decision note is served only with the final outcome (FR-026, US-032).
+17. **"Operators cannot see the internal approval stage" versus the brief's own table:** the brief's status table gives operators the label "Pending Approval" for the internal `pending_approval` status, and the Constraints listed under Use Case 3 say operators never see the approval stage. We follow the table (the operator sees "Pending Approval" as a waiting state, like "Pending Site Visit") and the spirit of the criteria: no operator response ever carries an internal status code, the officer-only labels ("Route to Approval") never reach an operator, and the decision note is served only with the final outcome (FR-026, US-032).
 
 ## Design phase (17–18 Sep 2026)
 
