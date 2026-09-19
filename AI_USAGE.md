@@ -7,11 +7,12 @@ How AI tools were used to build PermitFlow, what they were given, how their outp
 | Tool | Used for |
 |------|----------|
 | Claude Code (Anthropic's terminal coding agent), models Claude Opus 5 for most sessions and Claude Fable 5.1 for some | The pair for the whole build: solutioning documents, design system and prototype, every story's code and tests, docs, commit messages, the sprint rituals. It worked under two standing instruction files (below) and never pushed to GitHub without an explicit yes in that turn. |
-| Claude Code subagents | Independent reviews run in parallel with separate briefs: two design-critique passes on the prototype (design phase), three devil's-advocate edge-case reviews (Sprint 2, `docs/reviews/EDGE_CASE_REVIEW.md`), a layout audit at five widths (`docs/reviews/LAYOUT_AUDIT.md`), three bug hunts (backend rules, frontend interaction, seams; `docs/reviews/BUG_HUNT_REVIEW.md`), a read-only audit of the Document checks counters, a read-only "strict assessor" review against the brief on the last day, and a final read-only bug hunt on the last day's changes. Reviews were read-only; fixes went through the normal story flow with tests. |
-| Claude in Chrome | Two persona run-throughs in a real browser with the demo PDFs (operator, then officer, then operator again), the Railway dashboard steps that the CLI could not do (project tokens), and layout checks at phone, tablet and desktop widths. I typed every password myself; the agent never handled credentials. |
+| Claude Code subagents | Independent reviews run in parallel with separate briefs, each read-only and each required to reproduce a finding before reporting it: two design-critique passes on the prototype (design phase), three devil's-advocate edge-case reviews (Sprint 2, `docs/reviews/EDGE_CASE_REVIEW.md`), a layout audit at five widths (`docs/reviews/LAYOUT_AUDIT.md`), three bug hunts (backend rules, frontend interaction, seams; `docs/reviews/BUG_HUNT_REVIEW.md`), a logic audit of the Document checks counters, a strict assessor review against the brief, a final bug hunt on the last day's changes, and a research pass on current AI-assurance tooling (promptfoo, LangSmith, Langfuse, OpenTelemetry GenAI, Project Moonshot). Fixes never came from a reviewer; they went through the normal story flow with tests. |
+| Claude in Chrome | Three persona run-throughs in a real browser with the demo PDFs (operator, officer, operator again; the third on the deployed development environment as the Sprint 3 acceptance), the DNS and Railway dashboard steps the CLI could not do (registrar records, custom domains, project tokens), the LangSmith setup (API key creation, checking traces and experiments), and layout checks at phone, tablet and desktop widths. I signed in myself every time; secrets moved from the clipboard into GitHub, Railway and `.env` through shell commands, so the agent never read a credential. |
 | Notion, through its MCP server connected to Claude Code | The story board ("PermitFlow, Xtremax Assessment"): five epics (E0 foundation and delivery, UC1, UC2, UC3 deferred, E4 admin) and stories US-000 to US-073 with status, priority, sprint day and notes; status moved as stories started and finished, notes with branch names and follow-ups; kept 1:1 with `docs/planning/USER_STORIES.md`. The board was the live truth for planning, the markdown the record in the repository. |
-| Railway MCP and CLI, GitHub CLI | Environments, variables, volumes, domains, deployments; CI runs, environment secrets, branch pushes (always after my yes). |
-| OpenAI `gpt-4.1-mini` | Inside the product only: the advisory document verifier behind a provider interface, with a deterministic mock used in tests and CI. Not used to write code. |
+| Railway MCP and CLI, GitHub CLI | Environments, variables, volumes, domains, deployments; CI runs, workflow dispatches, repository secrets, branch pushes (always after my yes). |
+| LangSmith | Tracing of the product's verifier (off unless a key is set, inputs hidden by default) and the golden set as a dataset with one experiment per evaluation run, so a prompt change has a pass-rate history. Not used to write code. |
+| OpenAI `gpt-4.1-mini` | Inside the product only: the advisory document verifier behind a provider interface, strict JSON schema on the wire, a deterministic mock in tests and the CI gate, the real model in the nightly evaluation. Not used to write code. |
 
 ## 2. How the work was organised (the workflow the AI worked inside)
 
@@ -23,9 +24,9 @@ The tools did not set the process; the process was fixed first and the tools wer
 4. **Design phase** (17 to 18 Sep): design direction, tokens, screen and component inventories, UI states, a 23-artboard clickable prototype, two independent design-critique passes.
 5. **Agile delivery** in three one-day sprints with a Notion board mirrored 1:1 by `docs/planning/USER_STORIES.md` (US-000 to US-073), a sprint plan with goals, cut order and a close ritual (`docs/planning/SPRINTS.md`), and a definition of done per story (tests, docs, Notion, env vars, migrations, ADRs, scope). Sprint 1 "An operator can submit", Sprint 2 "The loop closes, twice", Sprint 3 "Ship it honestly". Each story on its own branch from `dev`, merged `--no-ff`; `main` only at releases (`docs/operations/BRANCHING.md`).
 6. **Implementation** story by story, with the per-story checklist in `CLAUDE.md` enforced every time: tests per layer, browser check at three widths, docs updated in the same change, Notion moved.
-7. **CI/CD and deployment**: seven-job CI, images built once to GHCR, two Railway environments, production behind a human approval, health gates (ADR-011).
-8. **Reviews**: three edge-case reviews after Sprint 2, a layout audit, three bug hunts, two persona run-throughs, a strict assessor review and a final bug hunt on the last day; every finding fixed with a test or recorded as a decision (`docs/reviews/ISSUES_AND_MITIGATIONS.md`).
-9. **Documentation and release**: README, this file, production readiness, UAT, traceability and final review; then the v0.3.0 release.
+7. **CI/CD and deployment**: CI with backend, frontend, end-to-end (including the accessibility gate), secret scan, dependency audit and image jobs; a six-stage AI gate called from CI (model approval, contracts, golden set, adversarial, fairness, verdict); a separate live evaluation against the real model; images built once to GHCR; two Railway environments on the owner's domain; production behind a human approval; health gates after every rollout (ADR-011).
+8. **Reviews**: three edge-case reviews after Sprint 2, a layout audit, three bug hunts, three persona run-throughs, a strict assessor review, a final bug hunt, and a legal, privacy and accessibility review on the last day; every finding fixed with a test or recorded as a decision (`docs/reviews/ISSUES_AND_MITIGATIONS.md`, `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`).
+9. **Documentation and release**: README, this file, AI assurance, production readiness, UAT, traceability and final review; then the v0.3.0 release.
 
 ## 3. The context the AI was given
 
@@ -36,51 +37,62 @@ Two instruction files were loaded into every session (the project one is checked
 
 Before any code, the solutioning documents were written and reviewed (requirements with ids, use cases, domain model, state machine, ADRs, threat model, test strategy), then a design system and a clickable prototype. The code phase started from those documents, so every prompt could point at an id (FR-024, SEC-005, T5) instead of re-describing the requirement.
 
-## 4. Examples of prompts and instructions
+## 4. Prompts and instructions
 
-Standing instructions from the two files, paraphrased, in the order the project went (the verbatim chat prompts follow):
+Two kinds. The standing instructions lived in the two `CLAUDE.md` files and applied to every session; the session prompts were typed during the work. Both are given in the form they were meant, edited for readability, and each is followed by what it produced. Grouped by the decision they carry rather than by date.
 
-- Scoping (standing instruction, paraphrased from `CLAUDE.md`): "Three roles, never reduce to two: operator, officer, admin (read-only oversight, beyond the brief by product decision). UC3 is deferred; the two post-site statuses must still exist in the state machine and be tested because the brief lists them."
-- State machine: "All status changes go through `domain/workflow.py`. Write the transition table as data (source, target, actor, guard, label) and a test that iterates every (state, target, actor) combination and asserts allowed, forbidden or invalid."
-- Resubmission: "Operator edits only the flagged sections and documents. Editability comes from open, released feedback; a section that was not flagged returns 403. Resubmit is a new immutable revision; items whose target changed become `addressed` automatically."
-- Officer feedback: "Feedback is a draft until the officer requests resubmission; then it is released and frozen. Officers can resolve only items the operator has seen. Give withdraw and resolve a 10 second undo and audit the undo."
-- Scope discipline (when the AI proposed a new "Accept AI finding" story): "Don't create different user stories because you are just increasing the scope." The story was dropped; the approval path was explained instead.
-- Testing: "Explicitly test each workflow separately": one Playwright spec per workflow, each ending on the audit trail, plus the end-to-end journey.
-- Reviews: "Deploy an agent that takes care of orientation and layouts" and later "deploy bug fixer agents" with three separate briefs; findings had to be reproduced before being reported and fixed with regression tests.
-- CI/CD trade-off: "Go with the cut, GHCR is fine": one CI build of two images pushed to GHCR, Railway pulls; promptfoo, LangSmith and SAST tooling recorded under "what I would do next" rather than built.
-- Deployment safety: "Production should be approved by a person": GitHub environment with a required reviewer, `main` only, health gates after the rollout.
-- Product: "What if the user can download the certificate: render it on approval, let the officer preview it, let the operator download it" (US-051, marked beyond the brief in `SCOPE.md`).
-- Last day: "Check Notion and all the user stories and every .md; everything should be consistent", then "rate our application the way the assessors would, strictly, and tell me what can be improved."
+### Architecture and domain rules (standing instructions)
 
+- "Three roles, never reduce to two: operator, officer, admin as read-only oversight. Use case 3 is deferred, but its two statuses must exist in the state machine and be tested, because the brief lists them."
+- "All status changes go through `domain/workflow.py`. Write the transition table as data (source, target, actor, guard, label) and a test that iterates every (state, target, actor) combination and asserts allowed, forbidden or invalid." (588 parametrised cases; the officer's actions and their disabled reasons are derived from the same table)
+- "Operators edit only the flagged sections and documents. Editability is derived from open, released feedback; a section that was not flagged returns 403. A resubmission is a new immutable revision, and items whose target changed become `addressed` automatically."
+- "Feedback is a draft until the officer requests resubmission; then it is released and frozen. Officers resolve only items the operator has seen. Withdraw and resolve get a 10-second undo, and the undo is audited."
+- "The AI never mutates application state, feedback or status. It writes a run row; a person decides." (the advisory principle every later AI decision was held to)
+- "Modular monolith: `api` calls `services`, `services` call `domain` and `repositories`; `domain/` is pure Python with no framework or I/O imports." (enforced by a layering test)
 
-### Prompts from the sessions
+### Scope and product decisions (session prompts)
 
-The instructions that shaped the build, edited for readability (chat shorthand removed, intent kept). Each is followed by what it produced.
+- "Don't create a new user story for this; you are increasing the scope." (a proposed "accept AI finding" story, dropped; the approval path was explained in the UI instead)
+- "What if the operator could download the licence: render a certificate on approval, let the officer preview it before deciding, and let the operator download it afterwards." (US-051, marked beyond the brief in `SCOPE.md`, kept on its branch until I had reviewed the rendered PDF)
+- "Keep the feature and fix its label instead of reverting it." (after the AI offered to remove a feature to tighten scope)
+- "Reject this application, then add a warning at approval rather than a hard block." (the Approve dialog warns about unresolved checks and stays enabled, so the officer decides)
+- "Add Return to review and fix the verifier prompt; leave the other three scope items." (two of five proposed items taken; the rest recorded, not built)
+- "One naming convention per environment on the domain: `permitflow.space` and `api.` for production, `dev.` and `api.dev.` for development; keep the platform hosts as fallbacks." (US-052)
 
-- "Keep Notion in step with the work, and define the merging and branching strategy." (early Sprint 2; the answer became `docs/operations/BRANCHING.md` and the story-per-branch rule)
-- "Explicitly test each workflow separately." (US-042, one Playwright spec per workflow)
-- "Deploy an agent that takes care of orientation and layouts." (the layout audit, US-043)
-- "I don't want you to add this. Don't create different user stories, because you are just increasing the scope." (a proposed "accept AI finding" story, dropped)
-- "Take the cut: build the images once in CI and push them to GHCR." (ADR-011)
-- "Push it and go with the certificate, and test it in that branch. Don't merge it to dev yet." (US-051 stayed on its branch until I had reviewed it in the browser)
-- "Yes, push it. Don't start with Day 3 yet. I want you to deploy bug-fixer agents." (US-050, three parallel bug hunts)
-- "What if the user can download the certificate: render a certificate on approval, let the officer preview it, and let the user download it." (US-051)
-- "Make sure these are mentioned in the architecture documents and all the diagrams too." (docs in the same change, every time)
-- "Can you do a run-through with Claude in Chrome for me with the actual documents you have created?" (first persona run-through; found R1 and R2)
-- "Keep the feature and fix its label instead of reverting it." (after the AI offered to revert a feature to tighten scope: kept, one-line fix instead)
-- "Reject this application, then add a warning on approval rather than a hard block." (approval warning instead of a hard gate, keeping the advisory principle)
-- "Add Return to review and fix the prompt; leave the other three scope items." (items 3 to 5 of the scope list deliberately left)
-- "Now check Notion for me, and all the user stories, and verify everything; all the documents should be consistent."
-- "Deploy an agent to review the application, its output and the standards we follow as a strict assessor would, and report what can be improved." and "One more sub-agent to check for any other bugs."
+### Quality, reviews and evidence (session prompts)
+
+- "Test each workflow separately, one Playwright spec per workflow, each ending on the audit trail." (US-042)
+- "Deploy a review agent for orientation and layouts at every width." (`docs/reviews/LAYOUT_AUDIT.md`)
+- "Deploy three bug-hunt agents with separate briefs: backend rules, frontend interaction, the seams between them. Reproduce before reporting." (US-050, 45 findings, 43 fixed, 2 kept as decisions)
+- "Do a run-through in the browser with the real demo documents, as each persona, and take notes on every step." (three run-throughs; the first found two defects the tests had missed, the third was the Sprint 3 acceptance on the deployed environment)
+- "Review the application, its output and the standards we follow as a strict assessor would, against the brief, and report what can be improved." (`docs/reviews/PRODUCTION_READINESS_REVIEW.md`; it scored documentation 5/10, which produced the README sections and this file)
+- "Check Notion, every user story and every document against each other and against the code; everything must be consistent." (the consistency pass before the release: dates against `git log`, API table against the routers, state table against `workflow.py`)
 - "Record every issue found and its mitigation." (`docs/reviews/ISSUES_AND_MITIGATIONS.md`)
-- "Build a separate AI evaluation pipeline against the real model, add LangSmith tracing, and move the AI checks into a gate of their own with a fairness check." (US-054, US-055, US-056; `docs/ai/AI_ASSURANCE.md`)
-- The legal and accessibility brief, in full because the AI's first move was to audit the code and cut the list down before building anything: "I do not want the website to expose me legally, so please: add a privacy policy page, a terms and conditions page, and a cookie policy. Check if I need cookie consent, and add a refund policy and form consent. Only connect necessary data. Check analytics tracking. Check third-party embeds. Make the site accessible. Add alt text. Check colour contrast and make forms keyboard-friendly. Use clear button labels. Remove fake reviews. Remove unsupported claims. Add business details and check copyright on images. Check applicable local laws and flag any other risks, and make no mistakes. Create a user story for this, and put it in a document so that the reviewer can see it." The audit found no cookies, no analytics, no embeds, no images and no reviews, so five items became "not applicable, and here is why"; the real work was the policies (written from the code, PDPA framing), the two in-app notices, self-hosting the fonts (the one third-party call), an axe gate on 22 screen states that found four landmark and contrast defects, and `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` (US-057). I chose "name plus GitHub, no email" and "self-host fonts" when asked.
+- "Raise unit and integration coverage of the business logic to about 80 percent, measured with every source file counted, testing behaviour rather than buttons, and enforce it in CI." (US-053: frontend 47 to 80.5 percent statements, backend 96 percent, thresholds in both jobs)
+
+### Delivery and operations (session prompts)
+
+- "Keep Notion in step with the work, and define the merging and branching strategy." (`docs/operations/BRANCHING.md`: story per branch from `dev`, `--no-ff` merges, `main` only at releases)
+- "Take the cut: build the images once in CI and push them to GHCR; Railway pulls." (ADR-011)
+- "Production must be approved by a person." (GitHub environment with a required reviewer, `main` only, health gates after the rollout)
+- "Make sure every change is reflected in the architecture documents and the diagrams too." (docs in the same change, every time)
+
+### AI assurance (session prompts)
+
+- "If someone asks how we know the verifier's output is legitimate, the answer must be a pipeline, not a paragraph: a separate evaluation against the real model, tracing, and the AI checks as a gate of their own." (US-054 nightly and on-change live evaluation, blocking at 14 of 14; US-055 LangSmith tracing with inputs hidden by default; US-056 the six-stage AI gate called from CI)
+- "Add a fairness check: the same document with the applicant's and the business's names swapped across Singapore's communities must get the same verdict." (21 name-swapped runs, mock and live, both blocking; the first live run's two differences were a harness fault and are recorded as such in `docs/ai/AI_ASSURANCE.md`)
+
+### Legal, privacy and accessibility (session prompt, in full)
+
+Given in full because the AI's first move was to audit the code and cut the list down before building anything: "I do not want the website to expose me legally, so please: add a privacy policy page, a terms and conditions page, and a cookie policy. Check if I need cookie consent, and add a refund policy and form consent. Only connect necessary data. Check analytics tracking. Check third-party embeds. Make the site accessible. Add alt text. Check colour contrast and make forms keyboard-friendly. Use clear button labels. Remove fake reviews. Remove unsupported claims. Add business details and check copyright on images. Check applicable local laws and flag any other risks, and make no mistakes. Create a user story for this, and put it in a document so that the reviewer can see it."
+
+The audit found no cookies, no analytics, no embeds, no images and no reviews, so five items became "not applicable, and here is why". The work that remained: policies written from the code with PDPA framing, two demonstration-only notices, self-hosting the fonts (the browser's one third-party request), an axe-core gate over 22 screen states that found and fixed four landmark, skip-link and contrast defects, and `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` (US-057). Two decisions were mine when asked: operator named with the repository link and no email; fonts self-hosted rather than disclosed.
 
 ## 5. How output was reviewed, validated and corrected
 
-- Every story ran the full backend suite on a real PostgreSQL (`permitflow_test`, migrations from scratch), vitest, and Playwright where a UI path changed; `ruff`, `mypy --strict` and `tsc --strict` had to be clean before a commit. CI repeats all of it, plus the AI golden set, gitleaks and dependency audits.
+- Every story ran the full backend suite on a real PostgreSQL (`permitflow_test`, migrations from scratch), vitest, and Playwright where a UI path changed; `ruff`, `mypy --strict` and `tsc --strict` had to be clean before a commit. CI repeats all of it with coverage thresholds, plus the six-stage AI gate, the accessibility gate, gitleaks and dependency audits; the live model is evaluated nightly and on every change to the AI module.
 - Every screen was checked in the browser at 390, 1024 and 1280 before its story moved to Done; two full persona run-throughs with the demo PDFs were done on the last day and found two defects the tests had not (the licence download hidden when the approval carried no note; a misleading feedback heading). Both were fixed with tests.
-- Prompt changes to the product's verifier had to pass the 14-case harness on the mock in CI and by hand against OpenAI; the harness rejected two of the three wordings tried on the last day (one left the false finding in place, one turned clean documents into `issues_found`, 11 of 14). Only the third shipped.
+- Prompt changes to the product's verifier had to pass the 14-case harness on the mock in CI and against OpenAI; the harness rejected two of the three wordings tried on the last day (one left the false finding in place, one turned clean documents into `issues_found`, 11 of 14). Only the third shipped. The 21-run fairness check was added after that and passes on the live model.
 - Subagent reviews were treated as claims, not facts: each finding had to come with a reproduction and was re-verified before a fix; three findings were kept as product choices and documented rather than "fixed".
 - Docs were checked against code at the end of each sprint and once more on the last day (API table against the routers, state machine table against `workflow.py`, test counts, dates against `git log`).
 - Git hygiene: story per branch, `--no-ff` merges into `dev`, `main` only at releases; the AI proposed commit messages, I read every diff before the commit; pushes only on my explicit yes.
@@ -96,7 +108,9 @@ The instructions that shaped the build, edited for readability (chat shorthand r
 - Licence dates were first computed in UTC (a day off in Singapore); fixed to `Asia/Singapore`.
 - The verifier flagged the demo documents' "fictional document" footer as a possible prompt injection; it took three prompt wordings and the harness to fix without breaking the clean cases.
 - The AI's own strict review on the last day scored Documentation 5/10 because the two README sections the brief names were still missing while nice-to-have features had been built; this document is part of the answer.
+- The first fairness run reported 2 of 21 name-swapped cases as differing, and the AI's first reading was "the model is sensitive to names". It was the harness: the form still carried the baseline applicant's email and the document its upper-case director line, so the model was right that form and document disagreed. Two more swaps and it was 21 of 21, twice. Recorded in `docs/ai/AI_ASSURANCE.md` because a fairness check that hides that would be measuring the wrong thing.
+- Two configuration slips on the last day: a vitest coverage option that the installed version had removed (caught by `tsc -b` in the build, not by the test run), and a repository secret set from the wrong `.env` file, so the first live evaluation ran with an empty key and refused, as designed. Both fixed within the hour.
 
 ## 7. What I would say in the debrief
 
-The AI wrote most of the code and the docs; the design of the system (personas, state machine as data, immutable revisions, same-transaction audit, advisory AI behind an interface, edit-only-flagged as an authorization rule) came from the solutioning phase and the standing instruction files, and every piece of generated code went through tests I can run in front of you. I can explain any file in the repository. Where I cut corners: no queue or worker for the AI checks (FastAPI background tasks, `docs/architecture/decisions/ADR-004`), local-disk uploads on a Railway volume, in-process rate limiting, no CSP on the frontend, a 14-case evaluation set. Those are listed with what I would do about them in `README.md` under "What I would do next".
+The AI wrote most of the code and the docs; the design of the system (personas, state machine as data, immutable revisions, same-transaction audit, advisory AI behind an interface, edit-only-flagged as an authorization rule) came from the solutioning phase and the standing instruction files, and every piece of generated code went through tests I can run in front of you. I can explain any file in the repository. Where I cut corners: no queue or worker for the AI checks (FastAPI background tasks, `docs/architecture/decisions/ADR-004`), local-disk uploads on a Railway volume, in-process rate limiting, no CSP on the frontend, a 14-case evaluation set and a 7-name fairness set (enough to catch a broken prompt, not to estimate accuracy), no retention schedule, US-region providers for a Singapore service. Those are listed with what I would do about them in `README.md` under "What I would do next".

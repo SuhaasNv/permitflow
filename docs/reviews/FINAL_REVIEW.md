@@ -22,7 +22,7 @@ By the numbers: 730 backend tests on a real PostgreSQL, 51 frontend tests, 7 Pla
 
 - Background tasks instead of a queue (ADR-004): a restart marks running checks failed and re-run recovers; a worker is the first infrastructure change for production.
 - Local-disk files on a volume instead of object storage; in-process login limiter; JWT in `sessionStorage`; no CSP: all accepted for a demo, all listed with severity in the readiness review.
-- A 14-case AI evaluation set, run live by hand: enough to catch regressions in the contract and the prompt, not a benchmark; promptfoo and tracing recorded as next steps rather than half-built.
+- A 14-case AI evaluation set and a 21-run name-swap fairness check, run on the mock in a six-stage gate on every push and against the live model nightly and on AI changes, with LangSmith tracing and an experiment per run: enough to catch a broken prompt and to show a history, not a benchmark; promptfoo red-teaming and Project Moonshot recorded as next steps rather than half-built.
 - Hand-written frontend API types instead of OpenAPI codegen: they stayed small; drift is caught by the integration and end-to-end suites.
 - Nice-to-have features on the last day (certificate, landing hero, search) before the closing documents: the assessor review called this out fairly; the documents were then written in one pass, and the features are marked beyond the brief. In a real team I would have held them behind the release.
 
