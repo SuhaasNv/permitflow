@@ -1,0 +1,43 @@
+# Give an existing pair of images another tag without rebuilding: the release tag for images built
+# before CI tagged releases, or a rollback that names a release. Nothing is deployed by this workflow.
+
+name: Retag images
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Existing tag on both images (for example sha-38df991 or main)
+        required: true
+      target:
+        description: New tag to add (for example v0.3.0)
+        required: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  retag:
+    name: Retag ${{ inputs.source }} as ${{ inputs.target }}
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add the tag to both manifests
+        env:
+          OWNER: ${{ github.repository_owner }}
+          SOURCE: ${{ inputs.source }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          for image in permitflow-backend permitflow-frontend; do
+            docker buildx imagetools create -t "ghcr.io/$owner/$image:$TARGET" "ghcr.io/$owner/$image:$SOURCE"
+            docker buildx imagetools inspect "ghcr.io/$owner/$image:$TARGET" | head -3
+          done
+          echo "tagged ghcr.io/$owner/permitflow-{backend,frontend}:$SOURCE as :$TARGET" >> "$GITHUB_STEP_SUMMARY"

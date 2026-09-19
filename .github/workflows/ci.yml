@@ -225,8 +225,17 @@ jobs:
           short=${GITHUB_SHA::7}
           # Pull requests have refs like 12/merge, which is not a valid tag: keep it a plain word.
           ref=$(echo "$GITHUB_REF_NAME" | tr '/' '-')
-          echo "backend=ghcr.io/$owner/permitflow-backend:sha-$short,ghcr.io/$owner/permitflow-backend:$ref" >> "$GITHUB_OUTPUT"
-          echo "frontend=ghcr.io/$owner/permitflow-frontend:sha-$short,ghcr.io/$owner/permitflow-frontend:$ref" >> "$GITHUB_OUTPUT"
+          backend="ghcr.io/$owner/permitflow-backend:sha-$short,ghcr.io/$owner/permitflow-backend:$ref"
+          frontend="ghcr.io/$owner/permitflow-frontend:sha-$short,ghcr.io/$owner/permitflow-frontend:$ref"
+          # A push to main is a release: the images also carry the version from frontend/package.json
+          # (v0.3.0), the same string as the git tag, so a rollback can name a release, not a commit.
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            version=$(python3 -c 'import json; print(json.load(open("frontend/package.json"))["version"])')
+            backend="$backend,ghcr.io/$owner/permitflow-backend:v$version"
+            frontend="$frontend,ghcr.io/$owner/permitflow-frontend:v$version"
+          fi
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
       - name: Backend image
         uses: docker/build-push-action@v6
         with:
