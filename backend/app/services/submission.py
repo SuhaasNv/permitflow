@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import InvalidTransition, ValidationFailed
 from app.domain import completeness as completeness_rules
 from app.domain.enums import ApplicationStatus, NotificationKind
+from app.domain.operator_errors import refusal
 from app.domain.workflow import Actor, TransitionContext, TransitionError, transition
 from app.models import Application, ApplicationRevision, User
 from app.repositories.applications import ApplicationRepository
@@ -38,7 +39,8 @@ class SubmissionService:
         except TransitionError as exc:
             if exc.kind == "guard":
                 raise ValidationFailed(exc.message, details={"missing": list(comp.missing)}) from exc
-            raise InvalidTransition(exc.message, details={"allowed": [s.value for s in exc.allowed]}) from exc
+            # Operator bodies never carry internal status codes (FR-026): no `allowed` list, own label only.
+            raise InvalidTransition(refusal(app.status, "submit")) from exc
 
         number = self.revisions.next_number(app.id)
         revision = ApplicationRevision(

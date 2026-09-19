@@ -8,7 +8,8 @@ from app.models.base import Base, TimestampMixin, new_id
 
 
 class AuditEvent(TimestampMixin, Base):
-    """Append-only. No update or delete path exists in the application layer (SEC-009)."""
+    """Append-only for submitted applications: no update path anywhere, and the only delete path is the
+    draft purge in `AuditRepository.purge_draft` (SEC-009, US-045), enforced by a layering test."""
 
     __tablename__ = "audit_events"
 
