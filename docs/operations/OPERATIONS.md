@@ -80,7 +80,7 @@ One Railway project (`permitflow`), two environments that share nothing:
 | Uploads | volume `uploads` at `/data/uploads` | own volume at `/data/uploads` |
 | AI | `AI_PROVIDER=openai`, `gpt-4.1-mini` | same |
 
-Two images, built once in CI and pulled by Railway (Railway never builds): `backend/Dockerfile` (uvicorn, runs `alembic upgrade head` on start) and `frontend/Dockerfile` (Vite build served by nginx; the API URL is written into `config.js` at container start from `API_URL`, so one image serves both environments). Images are public packages on GHCR, tagged `sha-<commit>` and with the branch name; a push to `main` also tags them with the release version from `frontend/package.json` (`v0.3.0`), the same string as the git tag. `retag.yml` (manual) adds a tag to an existing pair of images without a rebuild.
+Two images, built once in CI and pulled by Railway (Railway never builds): `backend/Dockerfile` (uvicorn, runs `alembic upgrade head` on start) and `frontend/Dockerfile` (Vite build served by nginx; the API URL is written into `config.js` at container start from `API_URL`, so one image serves both environments). Images are public packages on GHCR, tagged `sha-<commit>` and with the branch name; a push to `main` also tags them with the release version from `frontend/package.json` (`v0.3.0`), the same string as the git tag.
 
 ### Continuous deployment, one push at a time
 
@@ -124,7 +124,7 @@ In Railway, per environment: frontend service → Settings → Networking → Cu
 
 ### Rollback
 
-Every image carries a `sha-<commit>` tag and every release a `v<version>` tag. Point the service at the previous tag in the Railway dashboard and redeploy, or run `retag.yml` to move a tag. (Re-running `deploy.yml` does not roll back: it pulls whatever the branch tag points at now.) Migrations are forward-only; a rollback that needs a schema change is a new migration.
+Every image carries a `sha-<commit>` tag and every release a `v<version>` tag. Point the service at the previous tag in the Railway dashboard and redeploy. (Re-running `deploy.yml` does not roll back: it pulls whatever the branch tag points at now.) Migrations are forward-only; a rollback that needs a schema change is a new migration.
 
 ### Verified
 

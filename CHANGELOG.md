@@ -128,7 +128,7 @@ Numbers at close: backend 748 tests (ruff, mypy strict, pytest on Postgres, 96 %
 
 ### Release v0.3.0 (19 Sep 2026)
 
-`dev` merged into `main` at `38df991`, tagged `v0.3.0`; CI green on `main`; images tagged `sha-38df991`, `main` and `v0.3.0`; production services given their image sources and deployed; the manual production run of `deploy.yml` approved by the owner and green with the health gates (the automatic `workflow_run` path is rejected by the branch policy, recorded in OPERATIONS); production seeded; production UAT passed (U1, U2, U5, U10, U11, `docs/uat/UAT_PLAN.md`). Live at https://permitflow.space and https://api.permitflow.space.
+`dev` merged into `main` at `38df991`, tagged `v0.3.0`; CI green on `main`; images tagged `sha-<commit>`, `main` and, from this release on, the version `v0.3.0`; production services given their image sources and deployed; the manual production run of `deploy.yml` approved by the owner and green with the health gates (the automatic `workflow_run` path is rejected by the branch policy, recorded in OPERATIONS); production seeded; production UAT passed (U1, U2, U5, U10, U11, `docs/uat/UAT_PLAN.md`). Live at https://permitflow.space and https://api.permitflow.space.
 
 ### Milestones during the sprint (Sprint 3)
 
