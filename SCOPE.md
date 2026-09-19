@@ -46,7 +46,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | S4 | Compare any two revisions (not only current vs previous) · **done in Sprint 2** | Same diff function; only the selector changes |
 | S5 | AI evaluation dataset + runner script | Six fixtures, manual run documented |
 | S6 | Structured request logging with request id | Middleware only, no log shipping |
-| S7 | Admin persona: seeded admin account, `/admin/*` router, an operations dashboard (counts by status, idle applications, AI verification health, cross-application audit feed, read-only application view) and **user management** (create user, change role, deactivate/reactivate; every change audited; the last active admin cannot be demoted or deactivated). **Beyond the brief** — added because a regulator operating the platform needs oversight and account control; the assessment names only Operator and Officer. The `admin` role value exists in the enum from Day 1 (cheap); everything else in this row is built only after the MUST list is Done, so cutting it removes a router and two pages, not a concept. | Overview page first; user management second (US-073); no password reset or self-registration |
+| S7 | Admin persona: seeded admin account, `/admin/*` router, an operations dashboard (counts by status, idle applications, AI verification health, cross-application audit feed, read-only application view) and **user management** (create user, change role, deactivate/reactivate; every change audited; the last active admin cannot be demoted or deactivated). **Beyond the brief** — added because a regulator operating the platform needs oversight and account control; the assessment names only Operator and Officer. The `admin` role value exists in the enum from Day 1 (cheap); everything else in this row is built only after the MUST list is Done, so cutting it removes a router and two pages, not a concept. · **deferred at the Sprint 3 close (19 Sep)**: not started, cut per the cut order (admin epic first); `/admin/overview` ships as a placeholder that says so; US-070 to US-073 remain on the board as Not started | Overview page first; user management second (US-073); no password reset or self-registration |
 
 ## COULD HAVE (only if the core is stable)
 
@@ -57,7 +57,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | C3 | Image OCR for document verification (currently images are marked "not extractable") |
 | C4 | Download all documents as a bundle |
 | C6 | Licence certificate issued on approval, officer preview, PDF download · **built 19 Sep (US-051)** on its own branch, merged after review |
-| C7 | The owner's domain for both environments: `permitflow.space` and `api.permitflow.space` (production), `dev.permitflow.space` and `api.dev.permitflow.space` (development), Railway TLS · **planned 19 Sep (US-052)** for the v0.3.0 release |
+| C7 | The owner's domain for both environments: `permitflow.space` and `api.permitflow.space` (production), `dev.permitflow.space` and `api.dev.permitflow.space` (development), Railway TLS · **done 19 Sep (US-052)**: development live on the domain, production goes live with v0.3.0 |
 | C8 | Legal, privacy and accessibility review: policy pages, demonstration notices, self-hosted fonts, axe gate in CI, contrast fix · **done 19 Sep (US-057)**, `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` |
 | C5 | Operator withdraws a submitted application with an optional reason · **done 19 Sep (US-038)**: new terminal status, officers notified, audited |
 

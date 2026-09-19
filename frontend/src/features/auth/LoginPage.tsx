@@ -49,7 +49,8 @@ export function LoginPage() {
       navigate(from && from.startsWith(`/${area}/`) ? from : home, { replace: true })
     } catch (error) {
       if (error instanceof AppError && error.status === 429) {
-        setServerError('Too many failed attempts. Sign-in is paused for a minute.')
+        // Two limits share the status: failed attempts, or too many sign-ins from this network (US-058).
+        setServerError(error.message || 'Too many attempts. Sign-in is paused for a minute.')
       } else if (error instanceof AppError && error.status === 401) {
         setServerError('Email or password is incorrect.')
       } else {

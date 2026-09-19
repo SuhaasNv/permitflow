@@ -22,13 +22,23 @@ from fastapi import Request
 
 
 def client_key(request: Request, trusted_proxies: str) -> str:
-    """The socket address, or the first X-Forwarded-For hop when the socket is a trusted proxy."""
+    """The socket address, or the client address a trusted proxy recorded in X-Forwarded-For.
+
+    A proxy appends the address it saw to the end of the header, so the rightmost hop that is not itself a
+    trusted proxy is the one the proxy vouches for; anything left of it was supplied by the caller and would
+    let an attacker pick a fresh limiter bucket per request (T4). With `*`, every hop but the last is
+    treated as caller-supplied.
+    """
     host = request.client.host if request.client else "unknown"
     trusted = {p.strip() for p in trusted_proxies.split(",") if p.strip()}
     forwarded = request.headers.get("x-forwarded-for")
-    if forwarded and (host in trusted or "*" in trusted):
-        return forwarded.split(",")[0].strip()
-    return host
+    if not forwarded or not (host in trusted or "*" in trusted):
+        return host
+    hops = [h.strip() for h in forwarded.split(",") if h.strip()]
+    for hop in reversed(hops):
+        if hop not in trusted:
+            return hop
+    return hops[-1] if hops else host
 
 
 class _Window:
@@ -43,13 +53,13 @@ class _Window:
         return self.limit > 0
 
     def _prune(self, key: str, now: float) -> deque[float]:
+        if len(self._hits) > 10_000:
+            # Many distinct clients (a scan, or spoofed addresses): drop every window that has gone quiet,
+            # so the map is bounded by the number of clients active in the last minute.
+            self._hits = {k: v for k, v in self._hits.items() if v and now - v[-1] <= self.window}
         q = self._hits.setdefault(key, deque())
         while q and now - q[0] > self.window:
             q.popleft()
-        if not q and len(self._hits) > 10_000:
-            # Keep the map bounded when many distinct clients come and go.
-            self._hits = {k: v for k, v in self._hits.items() if v}
-            q = self._hits.setdefault(key, deque())
         return q
 
     def clear(self) -> None:

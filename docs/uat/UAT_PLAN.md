@@ -38,6 +38,8 @@ Acceptance scenarios for PermitFlow, run by a person in a browser against a depl
 | 19 Sep 2026 | CI (full stack in the job) | every merge to `dev` | journey + 01 to 06 | Pass | Playwright report attached on failure only |
 | 19 Sep 2026 | Development on the domain | dev at `8d75c31` | U2 (scenario 02 against https://dev.permitflow.space), health gates in deploy run #6 | Pass | US-052 |
 | 19 Sep 2026 | Development on the domain, full persona run (below) | dev at `8d75c31` | U1 to U5, U8, U11, plus undo, notifications, history, compare, audit | 26 of 26 steps pass; one Low finding (R12, fixed) | Sprint 3 acceptance before the release |
+| 19 Sep 2026 | CI (full stack in the job) | every merge to `dev` since US-057 | a11y gate: 22 screen states at desktop and 390 px, keyboard sign-in, skip link | Pass | `frontend/e2e/a11y.spec.ts` |
+| not run by hand | | | U6 (withdraw) has only its automated scenario 05; U10 (phone and tablet) rests on `LAYOUT_AUDIT.md` and the 390 px a11y states; U12 (session end) rests on the `AuthContext` tests. Stated so a reader does not assume a manual pass | | |
 | to run | Production | v0.3.0 | U1, U2, U5, U10, U11 on https://permitflow.space after the approval gate | | Recorded here after the release |
 
 ## Run 3 record, step by step (Sprint 3 acceptance)

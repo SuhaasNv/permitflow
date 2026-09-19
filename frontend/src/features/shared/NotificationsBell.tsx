@@ -83,7 +83,7 @@ export function NotificationsBell({ role }: { role: Role }) {
         </svg>
         {unread > 0 ? (
           <span
-            className="absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-semibold leading-none text-white"
+            className="absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-medium leading-none text-white"
             aria-hidden="true"
           >
             {unread > 9 ? '9+' : unread}

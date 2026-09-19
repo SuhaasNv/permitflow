@@ -11,8 +11,8 @@ UX-002 requires explicit loading, empty, error and success states for every data
 | Checking (document) | badge "Checking" with pulsing dot; verification block lists the four check steps advancing while the server run is pending | result copy always from the server |
 | Success (toast) | bottom-right toast, 4.5 s | section saved, document uploaded |
 | Loading (mutation) | button shows spinner + "Saving…", inputs stay editable-but-disabled | input never cleared |
-| Empty | `EmptyState` with icon, one-line title, one-line explanation, one action | copy is specific ("No applications yet: start a new application") |
-| Error (query) | `ErrorState` with request id and Retry | REL-005 |
+| Empty | `EmptyPanel` with icon, one-line title, one-line explanation, one action | copy is specific ("No applications yet: start a new application") |
+| Error (query) | `ErrorPanel` with request id and Retry; mutation errors as an inline `Alert` with the server message | REL-005 |
 | Error (mutation) | inline `Alert error` above the form/action + field errors; input preserved | REL-005 |
 | Permission denied (403) | full-panel "Not available for your role" | UC0-A 3a |
 | Not found (404) | "Application not found" with back link | SEC-002 (other operators' applications look like 404) |
@@ -22,7 +22,10 @@ UX-002 requires explicit loading, empty, error and success states for every data
 | Unsaved changes | browser "leave site?" prompt on refresh or close while a section is dirty; in-app navigation and Sign out show the "Leave without saving?" / "Sign out without saving?" dialog with Stay focused; "Save and exit" saves the partial draft first | built |
 | Updated elsewhere | a dirty section is never overwritten by data from another tab: warning with "Discard my edits" | built |
 | Check taking too long | after 3 minutes pending or running, polling stops, the block says so and Re-run is offered | built |
-| Offline / network | toast "You appear to be offline"; retries on reconnect for reads |: |
+| Offline / network | the request fails as `network_error` ("Could not reach the server") in the `ErrorPanel` or the inline `Alert`; reads retry through the query client when the page is refreshed. No offline toast or reconnect listener is built | partial |
+| Rate limited (429, US-058) | the server message ("Too many requests. Try again in a moment.") in the `ErrorPanel` or inline `Alert`; on sign-in, the message names which limit was hit; queries do not retry a 4xx, so a limit never causes a retry storm | built |
+| Draft limit (409 `draft_limit`, US-058) | "You already have 20 draft applications. Submit or delete one before starting another." in the dashboard and list alerts, without the generic retry advice | built |
+| Unknown route (404) | `NotFoundPanel` "Page not found" with a link to the front page; an application that does not exist keeps "Application not found" | built |
 
 ## Upload → verification lifecycle (S-12, S-15)
 
@@ -30,11 +33,11 @@ These are two separate stages and are shown separately: the **upload badge** in 
 
 | # | Stage | Upload badge | Verification block | User can |
 |---|-------|--------------|--------------------|----------|
-| 1 | Idle slot | "Missing" (neutral) |: | drop / browse |
-| 2 | Dragging over | drop zone `over` style (primary border, soft fill) "Drop to upload <file>" |: | drop |
-| 3 | Client validation fails | inline error in the slot: "Word documents are not accepted. Save the file as PDF and try again." / "File is larger than 10 MB." / "Only PDF, PNG, JPG or TXT." |: | choose another file |
-| 4 | Uploading | progress bar with % |: | cancel |
-| 5 | Server validation fails (400: extension/MIME/magic bytes/size) | error with the server message |: | choose another file |
+| 1 | Idle slot | "Missing" (neutral) | none | drop / browse |
+| 2 | Dragging over | drop zone `over` style (primary border, soft fill) "Drop to upload <file>" | none | drop |
+| 3 | Client validation fails | inline error in the slot: "Word documents are not accepted. Save the file as PDF and try again." / "File is larger than 10 MB." / "Only PDF, PNG, JPG or TXT." | none | choose another file |
+| 4 | Uploading | progress bar with % | none | cancel |
+| 5 | Server validation fails (400: extension/MIME/magic bytes/size) | error with the server message | none | choose another file |
 | 6 | Duplicate (same sha256 as the current file of that type) | info: "This is the same file as the one already attached: nothing changed." | unchanged | pick a different file |
 | 7 | Upload complete | "Upload complete" (success) | **pending** "Queued for checking" | download, remove (draft) |
 | 8 | Check running | "Upload complete" | **running** spinner + indeterminate bar + what is being compared; card polls every 2 s | download |
@@ -61,25 +64,25 @@ Progress on S-15: "Items addressed n of m"; Resubmit enabled once n ≥ 1.
 
 | Screen | Loading | Empty | Error | Success / other |
 |--------|---------|-------|-------|-----------------|
-| S-00 | button spinner |: | generic "Email or password is incorrect"; 429 "Too many attempts: try again in a minute" | redirect by role |
-| S-10 | strip + table skeleton | no applications | retry |: |
+| S-00 | button spinner | none | generic "Email or password is incorrect"; 429 shows the server message (failed-attempt window, or too many sign-ins from this network) | redirect by role |
+| S-10 | strip + table skeleton | no applications | retry | none |
 | S-11 | form skeleton | new draft (all sections "Not started") | save failed (input kept); 403 if not draft ("This application can no longer be edited") | "Draft saved" note; section "Complete" badge |
-| S-11 (application) | sections + completion skeleton |: | withdraw 409 ("A decided application cannot be withdrawn.") as an error toast, dialog closes | withdraw: danger dialog (Cancel focused, reason optional) → toast "Application withdrawn" → neutral outcome panel with the reason; Withdraw panel disappears (US-038) |
+| S-11 (application) | sections + completion skeleton | none | withdraw 409 ("A decided application cannot be withdrawn.") as an error toast, dialog closes | withdraw: danger dialog (Cancel focused, reason optional) → toast "Application withdrawn" → neutral outcome panel with the reason; Withdraw panel disappears (US-038) |
 | S-12 | slot skeletons | all four slots empty | upload errors above; poll error → block shows "Could not refresh: retry" | see lifecycle |
-| S-13 | summary skeleton |: | 422 gaps listed and linked; submit disabled until complete | → S-14 |
+| S-13 | summary skeleton | none | 422 gaps listed and linked; submit disabled until complete | → S-14 |
 | S-15 | status bar + feedback skeleton | no released feedback (read-only view) | 403 non-flagged, 422 no change, 409 conflict | toast "Resubmitted"; status bar updates |
-| S-16 | list skeleton | single revision ("Compare available after your first resubmission") | retry |: |
-| S-20 | strip + rows skeleton | "No applications in the queue" / filtered empty | retry |: |
+| S-16 | list skeleton | single revision ("Compare available after your first resubmission") | retry | none |
+| S-20 | strip + rows skeleton | "No applications in the queue" / filtered empty | retry | none |
 | S-21 | facts + sections skeleton | feedback rail empty ("No feedback yet: use Comment on a section or document") | 409 stale (reload banner), composer disabled with reason and closed automatically when the case locks | toast per feedback action; Withdraw and Mark resolved toasts carry Undo for 10 s; Mark resolved only on items sent to the operator (US-039) |
 | S-23 | as S-21 | nothing changed (cannot happen: resubmit requires change) | as S-21 | toast on resolve |
-| S-24 | table skeleton | single revision → disabled control with explanation | retry |: |
-| S-25 | rows skeleton | new application (only created event) | retry |: |
+| S-24 | table skeleton | single revision → disabled control with explanation | retry | none |
+| S-25 | rows skeleton | new application (only created event) | retry | none |
 | S-26 | viewer skeleton | not applicable (only linked while pending approval) | 409 when the application is no longer pending approval (link back to the case); fetch error with retry | PDF inline with the preview watermark; download fallback link |
 | S-11b (approved) | as S-11 | not applicable | download failed toast | outcome panel with the officer's note when present and Download licence (PDF) with number and validity |
-| S-40 | strip skeleton | provider none → "Provider: none (mock)" | retry |: |
+| S-40 | strip skeleton | provider none → "Provider: none (mock)" | retry | none |
 
 ## Partial failure
 
-- Upload succeeded but verification `failed` / `unavailable`: card shows the state and re-run; nothing else changes.
+- Upload succeeded but verification `failed` / `unavailable`: card shows the state and re-run; nothing else changes. An `unavailable` run with reason `daily_limit_reached` (US-058 quota) says so in operator words, offers no re-run for the day, and the officer's check panel names the limit.
 - Resubmit succeeded but notification delivery (mock email) failed: no user-visible effect (in-app notification is in the same transaction).
 - One of several polled cards errors: only that block shows the error; others keep updating.

@@ -29,7 +29,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: DoD checklist + unit tests for each malformed case and the heuristic.
 
 ### US-004 — As an engineer, I want a small AI evaluation set with expected outcomes, so that provider behaviour can be checked and documented honestly.
-- Acceptance criteria: a golden set with expected outcomes (built: fourteen cases, the eight demo PDFs plus wrong type, missing information, ambiguous, empty, oversized and two prompt-injection styles) run through the real pipeline by `backend/evals/run.py`; a results table, a JSON report and a pass threshold; the mock run is a blocking CI job with a configuration audit; the OpenAI run is by hand and recorded with its date in `docs/ai/AI_EVALUATION.md`.
+- Acceptance criteria: a golden set with expected outcomes (built: fourteen cases, the eight demo PDFs plus wrong type, missing information, ambiguous, empty, oversized and two prompt-injection styles) run through the real pipeline by `backend/evals/run.py`; a results table, a JSON report and a pass threshold; the mock run is a blocking CI stage with a configuration audit (since US-056 the "Golden set" stage of `ai-gate.yml`); the OpenAI run is recorded with its date in `docs/ai/AI_EVALUATION.md` (since US-054 it runs as `ai-eval.yml`).
 - Priority: Nice-to-have · Day 3 · Dependencies: US-002, US-006 · Requirements: AI-008 · Branch `feat/us-004-ai-evaluation`
 - Definition of Done: runner executes against mock and OpenAI providers; CI job green; document updated.
 
@@ -226,7 +226,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 
 ### US-045 — As an operator, I want to delete a draft I no longer need, so that abandoned drafts do not clutter my list.
 - Acceptance criteria: a draft can be deleted by its owner from the application page (Discard draft when nothing was entered, Delete draft otherwise) after a confirmation that names the reference; `DELETE /applications/{id}` removes the application, its sections, documents (files on disk), verification runs and audit events; submitted applications answer 409 (withdraw instead), other operators 404, officers and admins 403. A draft was never part of the licensing record, so nothing is kept (SCOPE assumption 14).
-- Priority: MVP · Day 3 (requested 19 Sep: drafts are created the moment New application is pressed) · Dependencies: US-010 · Requirements: FR-034 · Branch `feat/us-045-delete-draft`
+- Priority: Nice-to-have · Day 3 (requested 19 Sep: drafts are created the moment New application is pressed; a product decision, FR-034) · Dependencies: US-010 · Requirements: FR-034 · Branch `feat/us-045-delete-draft` · Beyond the brief
 - Definition of Done: `tests/integration/test_draft_deletion.py`; `ApplicationPage.test.tsx`; browser check; docs updated. Same branch fixes the Declarations resubmission dead end: re-confirming stamps `confirmed_at`, which the diff reports as "Confirmed on".
 
 ## UC2 — Officer Review & Feedback
@@ -299,7 +299,22 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 
 ---
 
-## E4 — Admin Oversight & Monitoring
+### US-039 — As an officer, I want feedback decisions to be safe and clear: resolve only items the operator saw, undo a withdraw or resolve for 10 seconds, and never see a composer on a locked case, so that I do not make mistakes I cannot take back.
+- Acceptance criteria: Mark resolved is offered only for items released to the operator (open after release, or addressed); a draft item that was never sent offers Withdraw only and the API returns 409 for resolving an unreleased item; after Withdraw or Mark resolved a toast offers Undo for 10 seconds, undo restores the previous resolution, is audited (`feedback.restored`) and is refused by the server after the grace window or once the state no longer allows it; the composer closes itself when the case stops being editable and the lock reason is shown instead; item actions sit on their own row on phones.
+- Priority: MVP · Day 3 (added 19 Sep from phone screenshots) · Dependencies: US-023, US-028 · Requirements: FR-018, FR-024, FR-033, AUD-001 · Branch `feat/us-039-feedback-undo`
+- Definition of Done: backend tests for the release rule and undo (window, audit, authorization); component test for the toast undo; browser check at 390 and 1440.
+
+### US-049 — As an officer reviewing a resubmission, I want to mark an addressed item as not fixed so it reopens with the same text, so that I can request the next round without retyping the feedback.
+- Acceptance criteria: Not fixed on an addressed item (only while Under Review) sets it back to Open with the same message and target, takes it out of the operator's view until the next round is requested (freeze rule kept), is audited as `feedback.reopened` and counts as open so Request resubmission is available; Undo for 10 s like withdraw and resolve; the operator then sees the item as Needs your change again with the same text and history keeps both rounds.
+- Priority: MVP · Day 3 (from the user's walkthrough, 19 Sep: a replaced document flips the item to Addressed, leaving nothing open to send) · Dependencies: US-028, US-039 · Requirements: FR-024 · Branch `feat/us-049-reopen-feedback`
+- Definition of Done: `tests/integration/test_feedback_reopen.py`; scenario 04 extended with a not-fixed round; STATE_MACHINE, ARCHITECTURE, USER_JOURNEY updated.
+
+### US-051 — As an operator whose application is approved, I want to download my licence certificate as a PDF, and as an officer I want to preview it before approving, so that the approval ends in a document the business can show.
+- Acceptance criteria: on Approve the backend renders a PDF certificate (fictional issuing unit, licence number `FEL-<year>-<n>`, business, UEN, premises, holder, valid one year in Singapore calendar dates, approving officer, decision date, application reference, verification code) inside the approval transaction, stores it under a server key on the uploads volume, records it in `licences` and audits `licence.issued`; the operator's approval notification names the licence; officers get a watermarked preview page while the application awaits a decision (nothing stored) and Download licence on the case after approval; the operator gets Download licence (PDF) in the outcome panel; owner or officer only, admin 403, 404 before approval; rejection issues nothing.
+- Priority: Nice-to-have · Day 3 (requested 19 Sep, beyond the brief) · Dependencies: US-031 · Requirements: FR-035 · Branch `feat/us-051-licence-certificate` (merged after the browser review)
+- Definition of Done: `tests/unit/test_licence_render.py`, `tests/integration/test_licence.py`; the Playwright journey covers preview and both downloads; STATE_MACHINE side effect, DOMAIN_MODEL, ARCHITECTURE, USER_JOURNEY, SCREEN_INVENTORY, SCOPE updated.
+
+## E4 — Admin Oversight & Monitoring (deferred: not started, cut per the Sprint 3 cut order)
 
 Not in the assessment brief; added as a product decision (SCOPE.md, S7). Read-only on applications.
 
@@ -322,21 +337,6 @@ Not in the assessment brief; added as a product decision (SCOPE.md, S7). Read-on
 - Acceptance criteria: `GET /admin/users` lists users with name, email, role, active flag, created and last-active; `POST /admin/users` creates a user with a role (email unique, 409 on duplicate); `PATCH /admin/users/{id}` changes role and/or deactivates/reactivates; a change that would leave no active admin returns 409; an admin cannot change their own role; every change writes an audit event (`user.created`, `user.role_changed`, `user.deactivated`, `user.reactivated`); deactivated users get 401 on their next request; UI: users table with role filter, Add user drawer, Change role and Deactivate with confirmation; operators and officers receive 403.
 - Priority: Nice-to-have · Day 3 · Dependencies: US-070, US-001 · Requirements: FR-030, SEC-003 · Threat model T19 · Use case UC4-A
 - Definition of Done: DoD checklist + role test + last-admin protection test + audit event test.
-
-### US-039 — As an officer, I want feedback decisions to be safe and clear: resolve only items the operator saw, undo a withdraw or resolve for 10 seconds, and never see a composer on a locked case, so that I do not make mistakes I cannot take back.
-- Acceptance criteria: Mark resolved is offered only for items released to the operator (open after release, or addressed); a draft item that was never sent offers Withdraw only and the API returns 409 for resolving an unreleased item; after Withdraw or Mark resolved a toast offers Undo for 10 seconds, undo restores the previous resolution, is audited (`feedback.restored`) and is refused by the server after the grace window or once the state no longer allows it; the composer closes itself when the case stops being editable and the lock reason is shown instead; item actions sit on their own row on phones.
-- Priority: MVP · Day 3 (added 19 Sep from phone screenshots) · Dependencies: US-023, US-028 · Requirements: FR-018, FR-024, AUD-001 · Branch `feat/us-039-feedback-undo`
-- Definition of Done: backend tests for the release rule and undo (window, audit, authorization); component test for the toast undo; browser check at 390 and 1440.
-
-### US-049 — As an officer reviewing a resubmission, I want to mark an addressed item as not fixed so it reopens with the same text, so that I can request the next round without retyping the feedback.
-- Acceptance criteria: Not fixed on an addressed item (only while Under Review) sets it back to Open with the same message and target, takes it out of the operator's view until the next round is requested (freeze rule kept), is audited as `feedback.reopened` and counts as open so Request resubmission is available; Undo for 10 s like withdraw and resolve; the operator then sees the item as Needs your change again with the same text and history keeps both rounds.
-- Priority: MVP · Day 3 (from the user's walkthrough, 19 Sep: a replaced document flips the item to Addressed, leaving nothing open to send) · Dependencies: US-028, US-039 · Requirements: FR-024 · Branch `feat/us-049-reopen-feedback`
-- Definition of Done: `tests/integration/test_feedback_reopen.py`; scenario 04 extended with a not-fixed round; STATE_MACHINE, ARCHITECTURE, USER_JOURNEY updated.
-
-### US-051 — As an operator whose application is approved, I want to download my licence certificate as a PDF, and as an officer I want to preview it before approving, so that the approval ends in a document the business can show.
-- Acceptance criteria: on Approve the backend renders a PDF certificate (fictional issuing unit, licence number `FEL-<year>-<n>`, business, UEN, premises, holder, valid one year in Singapore calendar dates, approving officer, decision date, application reference, verification code) inside the approval transaction, stores it under a server key on the uploads volume, records it in `licences` and audits `licence.issued`; the operator's approval notification names the licence; officers get a watermarked preview page while the application awaits a decision (nothing stored) and Download licence on the case after approval; the operator gets Download licence (PDF) in the outcome panel; owner or officer only, admin 403, 404 before approval; rejection issues nothing.
-- Priority: Nice-to-have · Day 3 (requested 19 Sep, beyond the brief) · Dependencies: US-031 · Requirements: FR-035 · Branch `feat/us-051-licence-certificate` (kept unmerged until reviewed)
-- Definition of Done: `tests/unit/test_licence_render.py`, `tests/integration/test_licence.py`; the Playwright journey covers preview and both downloads; STATE_MACHINE side effect, DOMAIN_MODEL, ARCHITECTURE, USER_JOURNEY, SCREEN_INVENTORY, SCOPE updated.
 
 ## UC3 — On-Site Assessment & Post-Site Clarification (DEFERRED)
 

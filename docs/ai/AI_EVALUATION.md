@@ -31,7 +31,7 @@ The form data the documents are checked against is the seeded demo application (
 
 ## Results
 
-### Mock provider (hermetic, runs in CI on every push, `ci.yml` job "AI verification")
+### Mock provider (hermetic, runs in CI on every push as the "Golden set" stage of the AI gate, `ai-gate.yml`)
 
 Run on 19 Sep 2026: **12 of 12 counted cases pass**. Two cases are marked `mock_gap` in `cases.json` and are reported but not counted, because the mock's heuristics are deliberately simple:
 

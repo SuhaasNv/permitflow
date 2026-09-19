@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import type { ApplicationSummary } from '@/api/applications'
+import { AppError } from '@/api/client'
 import { useAuth } from '@/features/auth/AuthContext'
 import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
@@ -168,7 +169,8 @@ export function OperatorDashboardPage() {
               </Button>
             }
           >
-            {create.error.message} Press New application to try again.
+            {create.error.message}
+            {create.error instanceof AppError && create.error.details?.code === 'draft_limit' ? '' : ' Press New application to try again.'}
           </Alert>
         </div>
       ) : null}

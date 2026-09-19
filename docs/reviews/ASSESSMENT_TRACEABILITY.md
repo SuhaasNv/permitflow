@@ -17,9 +17,9 @@ The brief, in one paragraph: build a regulatory licensing platform with three pe
 | README "AI Usage" (tools, prompts, verification, discarded output) | Met | `README.md` "AI Usage"; full record `AI_USAGE.md` |
 | README "What I would do next" | Met | `README.md`; severity table in `PRODUCTION_READINESS_REVIEW.md` |
 | Stack justified in the README | Met | `README.md` stack paragraph; `docs/architecture/decisions/ADR-009` |
-| Error handling and input validation on key paths | Met | Error envelope `{error: {code, message, details?}}` everywhere (`backend/app/main.py`); Pydantic 422 with per-field details; upload allowlist, size, magic bytes (`domain/uploads.py`); 409 for invalid transitions and version conflicts; frontend inline validation from the server schema (`zodFromSchema`) |
-| No secrets committed | Met | gitleaks in CI over full history; `.env` ignored; `.env.example` documents every variable; tokens set as GitHub environment secrets |
-| Honest debrief material | Met | `AI_USAGE.md` section 7, `ISSUES_AND_MITIGATIONS.md`, `FINAL_REVIEW.md` |
+| Error handling and input validation on key paths | Met | Error envelope `{error: {code, message, details?}}` everywhere (`backend/app/main.py`); Pydantic 422 with per-field details; upload allowlist, size, magic bytes (`domain/uploads.py`); 409 for invalid transitions and version conflicts; frontend inline validation from the server schema (`zodFromSchema`); 429 with `Retry-After` on every route and 409 `draft_limit` (US-058) |
+| No secrets committed | Met | gitleaks in CI over full history; `.env` ignored; `.env.example` documents every variable; tokens set as GitHub environment secrets; pip-audit, bandit and npm audit block the build (US-058) |
+| Honest account of the work | Met | `AI_USAGE.md` sections 5 and 6 (verification, what was wrong or discarded), `ISSUES_AND_MITIGATIONS.md`, `FINAL_REVIEW.md` |
 
 ## Use case 1: operator submission and resubmission
 
@@ -65,14 +65,17 @@ The brief, in one paragraph: build a regulatory licensing platform with three pe
 
 ## Beyond the brief (product decisions, all marked in SCOPE.md)
 
-Withdraw with reason (US-038), delete draft (US-045), feedback undo (US-039) and reopen (US-049), respond-mode walk (US-041), search (US-036), landing page (FR-031), licence certificate with preview and download (US-051), Return to review (US-031 follow-up), custom domain (US-052), admin role reserved (US-070 to US-073 not built).
+Product: withdraw with reason (US-038), delete draft (US-045), feedback undo (US-039) and reopen (US-049), respond-mode walk (US-041), search (US-036), landing page (FR-031), licence certificate with preview and download (US-051), the owner's domain (US-052).
+
+Engineering and assurance, all on the last day: coverage thresholds in CI (US-053), a live AI evaluation workflow (US-054), LangSmith tracing (US-055), the six-stage AI gate with a fairness check (US-056), the legal, privacy and accessibility review with policy pages and an axe gate (US-057), abuse resistance with rate limits, quotas, CSP and blocking audits (US-058)., Return to review (US-031 follow-up), custom domain (US-052), admin role reserved (US-070 to US-073 not built).
 
 ## Evaluation areas
 
 | Area | Where to look |
 |------|---------------|
 | Scope judgement | `SCOPE.md`, `docs/planning/SPRINTS.md` (cut order), `FINAL_REVIEW.md` |
-| Production readiness | `PRODUCTION_READINESS_REVIEW.md`, `docs/security/THREAT_MODEL.md`, `docs/operations/OPERATIONS.md`, `.github/workflows` |
+| Production readiness | `PRODUCTION_READINESS_REVIEW.md`, `docs/security/THREAT_MODEL.md`, `docs/security/SECURITY_REVIEW.md`, `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`, `docs/operations/OPERATIONS.md`, `.github/workflows` |
 | AI tool usage | `README.md` "AI Usage", `AI_USAGE.md` |
+| AI assurance | `docs/ai/AI_ASSURANCE.md`, `docs/ai/AI_EVALUATION.md`, `.github/workflows/ai-gate.yml`, `ai-eval.yml` |
 | Code quality | `docs/architecture/ARCHITECTURE.md`, `tests/unit/test_layering.py`, mypy strict and TypeScript strict in CI |
 | Documentation and communication | `docs/README.md` index, `CHANGELOG.md`, this file |
