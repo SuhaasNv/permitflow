@@ -149,7 +149,7 @@ export function OperatorDashboardPage() {
       <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-[36px] leading-[1.05] sm:text-[42px]">
-            {greeting()}, {firstName}
+            {greeting()}, <span className="text-primary">{firstName}</span>
           </h1>
           <p className="mt-3 text-[15px] leading-[22px] text-text-2">
             {apps.data && apps.data.length > 0 ? summaryLine(apps.data) : 'Here is what needs your attention today.'}

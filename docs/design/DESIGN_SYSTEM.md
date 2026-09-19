@@ -29,7 +29,7 @@ Three families, each with one job: Public Sans carries every control, label and 
 | Style | Size / line | Weight | Use |
 |-------|-------------|--------|-----|
 | Display serif | 44 to 72 / 1.02 | 400, Instrument Serif | landing hero; 34 to 40 for landing section titles |
-| Greeting serif | 36 to 42 / 1.05 | 400, Instrument Serif | dashboard greeting, sign-in title, submitted title |
+| Greeting serif | 36 to 42 / 1.05 | 400, Instrument Serif | dashboard greeting (first name in `primary`, matching the landing hero accent), sign-in title, submitted title |
 | Page title | 28 / 36, tracking -0.015em | 600 | one per screen |
 | Form section title | 22 / 28 | 600 | section form header |
 | Section heading | 17 / 24 | 600 | review summaries, side panels |
@@ -47,6 +47,7 @@ Three families, each with one job: Public Sans carries every control, label and 
 - Spacing scale: 4, 8, 12, 16, 20, 24, 32, 40. Page padding 24×32; card padding 20; card header 14×20; table cell 14×16.
 - Radius: 4 (tags), 6 (controls, small cards), 10 (containers), 12 (badges pill).
 - Elevation: `shadow-1` (1 px hairline) only on secondary buttons; panels are one bordered white surface (`.pf-surface`) with no shadow; `shadow-2` for toasts; `shadow-3` for dialogs. Never a card inside a card: hierarchy comes from rules (`divide-y`), whitespace and type.
+- Scrolling: `overscroll-behavior: none` on `html`, so trackpad and touch rubber-banding never shows the canvas past the page edges.
 - Layout: masthead 28; top bar 56 (sticky, blurred); side nav 232, collapsed 64 (width animates 220 ms); bottom tab bar 64 on phones; content column max 1360 with 16 / 32 / 40 px gutters; officer feedback rail 400.
 
 ## Motion
