@@ -50,6 +50,36 @@ const SETS = {
     FH_ISSUED: '4 January 2022',
     FH_VALID_TO: '3 January 2025', // expired
   },
+  // A second, unrelated business with a clean set: the production example application, so the
+  // demonstration record is not the same restaurant as every test fixture (19 Sep 2026).
+  second_business: {
+    UEN: '202411223K',
+    TENANCY_UNIT: '#01-05',
+    FH_ASSESSED: '12 March 2026',
+    FH_ISSUED: '14 March 2026',
+    FH_VALID_TO: '13 March 2029',
+    replace: [
+      ['Kopi &amp; Kaya Toast House Pte. Ltd.', 'Serangoon Spice House Pte. Ltd.'],
+      ['KOPI &amp; KAYA TOAST HOUSE PTE. LTD.', 'SERANGOON SPICE HOUSE PTE. LTD.'],
+      ['KOPI &amp; TEH BREWING', 'TANDOOR &amp; GRILL'],
+      ['Tan Wei Ling', 'Priya Raghavan'],
+      ['TAN WEI LING', 'PRIYA RAGHAVAN'],
+      ['weiling.tan@kopikaya.sg', 'priya@serangoonspice.sg'],
+      ['S****512A', 'S****804C'],
+      ['10 Jalan Besar', '52 Serangoon Garden Way'],
+      ['Jalan Besar frontage', 'Serangoon Garden Way frontage'],
+      ['208787', '555949'],
+      ['10 JALAN BESAR', '52 SERANGOON GARDEN WAY'],
+      ['#01-12', '#01-05'],
+      ['+65 9123 4567', '+65 9876 5432'],
+      ['202355555E', '202411223K'],
+      ['<td class="mono">56122</td>', '<td class="mono">56111</td>'],
+      ['Cafes and coffee houses.', 'Restaurants.'],
+      ['14 March 2023', '8 May 2024'],
+      ['21 March 2023', '15 May 2024'],
+      ['Sale of kaya toast, soft-boiled eggs, kopi and teh', 'Sale of South Indian meals, tandoor dishes and teh tarik'],
+    ],
+  },
 };
 
 const FOOTER_DISCLAIMER = 'Fictional document produced for a software demonstration. Not issued by any authority.';
@@ -75,11 +105,13 @@ async function main() {
     for (const [setName, setValues] of Object.entries(SETS)) {
       const outDir = path.join(here, setName);
       await mkdir(outDir, { recursive: true });
-      const values = { ...setValues, BASE_CSS: baseCss };
+      const { replace = [], ...placeholders } = setValues;
+      const values = { ...placeholders, BASE_CSS: baseCss };
 
       for (const doc of DOCS) {
         const template = await readFile(path.join(srcDir, `${doc.name}.html`), 'utf8');
-        const html = fill(template, values);
+        let html = fill(template, values);
+        for (const [from, to] of replace) html = html.split(from).join(to);
         const htmlPath = path.join(outDir, `${doc.name}.html`);
         const pdfPath = path.join(outDir, `${doc.name}.pdf`);
         await writeFile(htmlPath, html, 'utf8');
