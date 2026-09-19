@@ -2,8 +2,6 @@
 
 ## Live: [permitflow.space](https://permitflow.space)
 
-Open **https://permitflow.space** and sign in with the demo accounts below (operator or officer); nothing to install. The API is at https://api.permitflow.space/api/v1 (`/health` answers without a login). A development copy with disposable data runs at https://dev.permitflow.space.
-
 [![PermitFlow launch video: the officer's review queue with the application, checks and feedback of a licence case. Click to watch (70 seconds).](docs/13-debrief/video/permitflow-launch-poster.jpg)](docs/13-debrief/video/permitflow-launch.mp4)
 
 *Launch video, 70 seconds (click the picture). The narrated walkthrough (4 min 36 s) and the technical video (1 min 28 s) are in `docs/13-debrief/video/`.*
