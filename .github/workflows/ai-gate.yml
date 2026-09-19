@@ -23,7 +23,7 @@ env:
 
 jobs:
   model-approval:
-    name: 1. Model approval (configuration audit)
+    name: Model approval
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -58,7 +58,7 @@ jobs:
           echo "| 1. Model approval | pass | gpt-4.1-mini, prompt $(uv run python -c 'from app.infra.ai.openai_provider import PROMPT_VERSION; print(PROMPT_VERSION)') |" >> "$GITHUB_STEP_SUMMARY"
 
   contracts:
-    name: 2. Provider, rules and tracing contracts
+    name: Contracts
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -76,7 +76,7 @@ jobs:
           echo "| 2. Contracts | pass | $(tail -n 1 /tmp/contracts.txt) |" >> "$GITHUB_STEP_SUMMARY"
 
   golden-set:
-    name: 3. Golden set (14 cases, mock, blocking)
+    name: Golden set
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -115,7 +115,7 @@ jobs:
           path: /tmp/ai-eval.json
 
   adversarial:
-    name: 4. Adversarial (injection cases, blocking)
+    name: Adversarial
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -138,7 +138,7 @@ jobs:
           PY
 
   fairness:
-    name: 5. Fairness (name-swap invariance, blocking)
+    name: Fairness
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -175,7 +175,7 @@ jobs:
           path: /tmp/fairness.json
 
   verdict:
-    name: 6. Verdict
+    name: Verdict
     runs-on: ubuntu-latest
     needs: [model-approval, contracts, golden-set, adversarial, fairness]
     if: always()
