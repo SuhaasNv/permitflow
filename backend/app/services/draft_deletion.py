@@ -10,14 +10,16 @@ from sqlalchemy.orm import Session
 from app.core.errors import Conflict
 from app.domain.enums import ApplicationStatus
 from app.infra.storage import FileStorage, get_storage
-from app.models import AuditEvent, Document, User, VerificationRun
+from app.models import Document, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
+from app.repositories.audit import AuditRepository
 
 
 class DraftDeletionService:
     def __init__(self, db: Session, storage: FileStorage | None = None) -> None:
         self.db = db
         self.applications = ApplicationRepository(db)
+        self.audit = AuditRepository(db)
         self.storage = storage or get_storage()
 
     def delete(self, operator: User, application_id: uuid.UUID) -> str:
@@ -33,7 +35,7 @@ class DraftDeletionService:
                 delete(VerificationRun).where(VerificationRun.document_id.in_([d.id for d in documents]))
             )
             self.db.execute(delete(Document).where(Document.application_id == app.id))
-        self.db.execute(delete(AuditEvent).where(AuditEvent.application_id == app.id))
+        self.audit.purge_draft(app.id)
         self.db.delete(app)
         self.db.commit()
         # Files go after the commit: a failed transaction must not leave dangling document rows.

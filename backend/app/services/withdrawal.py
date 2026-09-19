@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import InvalidTransition
 from app.domain.enums import ApplicationStatus, NotificationKind
+from app.domain.operator_errors import refusal
 from app.domain.workflow import Actor, TransitionContext, TransitionError, transition
 from app.models import Application, User
 from app.repositories.applications import ApplicationRepository
@@ -29,14 +30,16 @@ class WithdrawalService:
                 app.status, ApplicationStatus.WITHDRAWN, Actor.OPERATOR, TransitionContext()
             )
         except TransitionError as exc:
-            message = exc.message
+            # Operator bodies never carry internal status codes (FR-026): no `allowed` list, own label only.
             if app.status == ApplicationStatus.DRAFT:
                 message = "A draft has not been submitted, so there is nothing to withdraw."
             elif app.status in (ApplicationStatus.APPROVED, ApplicationStatus.REJECTED):
                 message = "A decided application cannot be withdrawn."
-            raise InvalidTransition(
-                message, details={"kind": exc.kind, "allowed": [s.value for s in exc.allowed]}
-            ) from exc
+            elif app.status == ApplicationStatus.WITHDRAWN:
+                message = "This application has already been withdrawn."
+            else:
+                message = refusal(app.status, "withdraw")
+            raise InvalidTransition(message, details={"kind": exc.kind}) from exc
         previous = app.status
         app.status = resolved
         app.withdrawal_reason = reason

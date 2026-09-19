@@ -1,7 +1,7 @@
 # SCOPE.md: PermitFlow MVP
 
 **Assessment:** Regulatory and Licensing Platform, 3 calendar days.
-**Decision in one line:** build Use Case 1 (Operator Submission & Resubmission) and Use Case 2 (Officer Review & Feedback) as one polished, tested, deployed vertical slice; support the full 12-state lifecycle in the state machine; defer Use Case 3 (On-Site Assessment checklist) with an honest description of what production would need.
+**Decision in one line:** build Use Case 1 (Operator Submission & Resubmission) and Use Case 2 (Officer Review & Feedback) as one polished, tested, deployed vertical slice; support the full 12-state lifecycle in the state machine; defer Use Case 3 (On-Site Assessment checklist) and write down what production would need for it.
 
 ## Why this scope
 
@@ -109,7 +109,7 @@ Re-read at the Sprint 1 close: M1 to M7 and M16, M17 are built for the operator 
 
 ## Sprint 2 check (18 Sep 2026)
 
-Re-read at the Sprint 2 close: M8 to M15 (officer review, feedback, resubmission, compare, resolution, outcome, audit, notifications) are built and verified in the browser; M2 (OpenAI provider) is live with `gpt-4.1-mini`; S2 (officer re-run) and S4 (any-two-revision compare) landed. Two stories were added for the edge-case pass (US-033, US-034); nothing was removed from MUST. Assumption 10 (who the operator is) was written down. Remaining MUST items are the E2E half of M18, the Playwright, Docker-build and deployment half of M19, and M20 (final documents), all Sprint 3.
+Re-read at the Sprint 2 close: M8 to M15 (officer review, feedback, resubmission, compare, resolution, outcome, audit, notifications) are built and verified in the browser; M4 (the OpenAI provider) is live with `gpt-4.1-mini`; S2 (officer re-run) and S4 (any-two-revision compare) landed. Two stories were added for the edge-case pass (US-033, US-034); nothing was removed from MUST. Assumption 10 (who the operator is) was written down. Remaining MUST items are the E2E half of M18, the Playwright, Docker-build and deployment half of M19, and M20 (final documents), all Sprint 3.
 
 ## Sprint 3 check (19 Sep 2026, at the close)
 

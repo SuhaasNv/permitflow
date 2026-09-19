@@ -72,9 +72,10 @@ class Settings(BaseSettings):
         return url
 
     def validate_for_startup(self) -> None:
-        """Refuse to start without a real JWT secret outside the test environment (SEC-006)."""
-        if self.app_env != "test" and len(self.jwt_secret) < 16:
-            raise RuntimeError("JWT_SECRET must be set to at least 16 characters when APP_ENV is not 'test'")
+        """Refuse to start without a real JWT secret in every environment, tests included (SEC-006). The
+        placeholder from `.env.example` counts as unset."""
+        if len(self.jwt_secret) < 16 or self.jwt_secret == "change-me-to-a-long-random-string":
+            raise RuntimeError("JWT_SECRET must be set to at least 16 random characters")
 
 
 @lru_cache

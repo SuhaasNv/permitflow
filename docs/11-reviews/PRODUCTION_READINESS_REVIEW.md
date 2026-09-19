@@ -1,10 +1,10 @@
 # Production readiness review
 
-An honest gap list for PermitFlow as shipped in v0.3.0 (19 Sep 2026), by area, with severity for a real licensing authority (not for the assessment demo), what is in place today, and what production would need. Severity: **High** (would block a real go-live), **Medium** (fix in the first weeks), **Low** (improvement). Items marked "by design" are recorded decisions in `SCOPE.md` or an ADR.
+The gap list for PermitFlow as shipped in v0.3.0 (19 Sep 2026), by area, with severity for a real licensing authority (not for the assessment demo), what is in place today, and what production would need. Severity: **High** (would block a real go-live), **Medium** (fix in the first weeks), **Low** (improvement). Items marked "by design" are recorded decisions in `SCOPE.md` or an ADR.
 
 ## Summary
 
-The shipped system is a complete, tested vertical slice of use cases 1 and 2 with server-side authorization on every route, an explicit state machine, immutable revisions, same-transaction audit, an advisory AI verifier behind an interface, a seven-job CI, two isolated environments and a human-approved production deploy. What separates it from a production licensing system is mostly infrastructure and operations (queue, object storage, identity, observability, retention) plus the deferred use case 3. Nothing in the list below is hidden by the code or the docs.
+The shipped system is a complete, tested vertical slice of use cases 1 and 2 with server-side authorization on every route, an explicit state machine, immutable revisions, same-transaction audit, an advisory AI verifier behind an interface, a seven-job CI, two isolated environments and a human-approved production deploy. What separates it from a production licensing system is mostly infrastructure and operations (queue, object storage, identity, observability, retention) plus the deferred use case 3..
 
 ## Gaps
 
@@ -30,6 +30,8 @@ The shipped system is a complete, tested vertical slice of use cases 1 and 2 wit
 | 18 | Product | One licence type, fixed form schema; no officer assignment | Low, by design | Form schema shared between server and client | Configurable schemas, assignment and workload routing |
 | 19 | Accessibility | axe-core gate (WCAG 2.2 AA plus best practice) over 23 screen states in CI, contrast recomputed for every token, skip links, keyboard tests (US-057); no assistive-technology session yet | Low | Semantic markup and landmarks, labels, native dialogs, reduced-motion support, the gate | A VoiceOver or NVDA pass over the two journeys; `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` |
 | 20 | Load | No load or soak testing | Low | Pool sizing configured (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`) | k6 or Locust runs against staging before go-live |
+| 21 | Database parity | Local, CI and the test suite run PostgreSQL 16 (`docker-compose.yml`, `ci.yml`); both Railway environments run 18 | Low | Only standard SQL and JSONB features are used; migrations ran clean on 18 | Pin one major everywhere (bump Compose and CI to 18) |
+| 22 | Frontend, 20 Sep review | Two screens compute the flagged-items count differently; list rows branch on label and tone strings; the feedback anchor does not scroll on a cold load; resolve eligibility is a client-side status list | Low | Each is cosmetic or reproduces a server rule the server also enforces (the API refuses what the client would wrongly offer) | A server-provided `phase`, `outcome` and `can_resolve` field, one `slotStatus()` helper, a `scrollIntoView` on data-ready |
 
 ## What is ready
 

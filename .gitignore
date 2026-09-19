@@ -48,3 +48,6 @@ docs/04-design/prototype-src/shots/
 
 # Personal study notes (not part of the deliverable)
 notes/
+
+# vitest reporter output
+frontend/.vitest/

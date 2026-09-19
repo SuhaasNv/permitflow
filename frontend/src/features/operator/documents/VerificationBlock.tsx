@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 
 import type { VerificationView } from '@/api/documents'
 import { cn } from '@/lib/cn'
@@ -82,61 +81,23 @@ function Icon({ kind }: { kind: Kind }) {
   )
 }
 
-const CHECK_STEPS = ['Reading the document', 'Extracting key details', 'Comparing with your application', 'Checking dates in the document']
-
-/** Visual progress through the check while the server run is pending/running. The result always comes from the server. */
-function CheckProgress({ started }: { started: boolean }) {
-  const [step, setStep] = useState(started ? 1 : 0)
-  useEffect(() => {
-    if (!started) return
-    const timer = setInterval(() => setStep((s) => Math.min(s + 1, CHECK_STEPS.length - 1)), 700)
-    return () => clearInterval(timer)
-  }, [started])
+/** What the server reports while a check is live: queued or running. Nothing here is simulated; the two
+ * states are the ones the run row carries, and the result always comes from the server. */
+function CheckProgress({ status }: { status: 'pending' | 'running' }) {
+  const label = status === 'pending' ? 'Waiting for a checker' : 'Reading the document and comparing it with your application'
   return (
-    <ol className="mt-3 flex flex-col gap-1.5" aria-label="Check progress">
-      {CHECK_STEPS.map((label, i) => {
-        const state = i < step ? 'done' : i === step && started ? 'active' : 'todo'
-        return (
-          <li
-            key={label}
-            className={cn(
-              'flex items-center gap-2.5 text-[13px] transition-colors duration-[var(--dur-base)]',
-              state === 'todo' ? 'text-text-3' : 'text-text-2',
-            )}
-          >
-            <span className="flex h-4 w-4 items-center justify-center" aria-hidden="true">
-              {state === 'done' ? (
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-success"
-                >
-                  <path className="pf-check" d="M20 6 9 17l-5-5" />
-                </svg>
-              ) : state === 'active' ? (
-                <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-info-line border-t-info" />
-              ) : (
-                <span className="h-[5px] w-[5px] rounded-full bg-line-strong" />
-              )}
-            </span>
-            {label}
-          </li>
-        )
-      })}
-    </ol>
+    <p className="mt-2 flex items-center gap-2 text-[13px] text-text-2" aria-live="polite">
+      <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-info-line border-t-info" aria-hidden="true" />
+      {label}
+    </p>
   )
 }
 
 /** Operator-facing verification result: state, plain explanation, issues, what to do. No confidence numbers. */
 export function VerificationBlock({ verification, stale = false }: { verification: VerificationView; stale?: boolean }) {
   const copy = COPY[verification.status]
-  const live = verification.status === 'running' || verification.status === 'pending'
+  const liveStatus = verification.status === 'running' || verification.status === 'pending' ? verification.status : null
+  const live = liveStatus !== null
   const showSummary = Boolean(verification.summary) && !live
   const title =
     live && stale
@@ -170,7 +131,7 @@ export function VerificationBlock({ verification, stale = false }: { verificatio
           <span className="text-xs text-text-3">AI-assisted check</span>
         </div>
         <div className="mt-0.5 text-[13px] leading-[19px] text-text-2">{showSummary ? verification.summary : text}</div>
-        {live && !stale ? <CheckProgress started={verification.status === 'running'} /> : null}
+        {liveStatus && !stale ? <CheckProgress status={liveStatus} /> : null}
         {verification.issues.length > 0 ? (
           <ul className="mt-3 divide-y divide-line rounded-md border border-line bg-surface-2">
             {verification.issues.map((issue, i) => (

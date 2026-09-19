@@ -12,6 +12,7 @@ from app.core.errors import Unauthorized
 from app.core.settings import get_settings
 
 _hasher = PasswordHasher()
+MIN_SECRET_LENGTH = 16
 ALGORITHM = "HS256"
 
 
@@ -28,17 +29,24 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
+def _secret(value: str) -> str:
+    """There is no fallback secret in any environment (SEC-006): an empty or short value is a configuration
+    error, never a silent default that would make tokens forgeable."""
+    if len(value) < MIN_SECRET_LENGTH:
+        raise RuntimeError(f"JWT_SECRET must be set to at least {MIN_SECRET_LENGTH} characters")
+    return value
+
+
 def create_access_token(user_id: uuid.UUID, role: str) -> tuple[str, datetime]:
     settings = get_settings()
     expires_at = datetime.now(UTC) + timedelta(minutes=settings.jwt_expires_minutes)
     payload: dict[str, Any] = {"sub": str(user_id), "role": role, "exp": expires_at, "iat": datetime.now(UTC)}
-    secret = settings.jwt_secret or "test-only-secret-not-for-production"
-    return jwt.encode(payload, secret, algorithm=ALGORITHM), expires_at
+    return jwt.encode(payload, _secret(settings.jwt_secret), algorithm=ALGORITHM), expires_at
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
     settings = get_settings()
-    secret = settings.jwt_secret or "test-only-secret-not-for-production"
+    secret = _secret(settings.jwt_secret)
     try:
         payload: dict[str, Any] = jwt.decode(token, secret, algorithms=[ALGORITHM])
     except jwt.ExpiredSignatureError as exc:

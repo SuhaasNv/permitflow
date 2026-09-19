@@ -18,7 +18,7 @@ api  ──▶  services  ──▶  domain
 ```
 
 Rules:
-- `api` never touches `repositories` or `models` directly; it calls services and maps exceptions to HTTP.
+- `api` never imports `repositories` and never queries or mutates `models`; it may name two model types (`User`, `Application`) in annotations. It calls services and maps exceptions to HTTP. Operator-facing refusals are worded by `domain/operator_errors.py` with the operator's own label and no internal code (FR-026).
 - `domain` is pure Python: no SQLAlchemy, no FastAPI, no I/O. It contains the enumerations (`domain/enums.py`, re-exported by `models/enums.py` for the persistence layer), the state machine (`domain/workflow.py`: transition table, guards, `available_actions` for the UI), labels (`domain/labels.py`: the assessment table verbatim plus the badge tone), form schema, diff and resolution rules: the code a reviewer should read first.
 - `schemas` (`app/schemas/`): Pydantic request and response models shared by the API and the services. No ORM, no I/O; they may import `domain` enums. Services return these so routers stay thin, and the layering test forbids services, schemas and repositories from importing `app.api` or FastAPI.
 - `services` orchestrate: load via repositories, apply domain rules, mutate, write audit events, create notifications, commit. One service method = one transaction.
@@ -142,7 +142,6 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /admin/ai-health (planned, US-070) | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
 | GET | /admin/audit-feed (planned, US-071) | admin | latest 50 audit events across applications |
 | GET | /admin/users (planned, US-073) | admin | user directory |
-| POST | /admin/users (planned, US-073) | admin | create user `{full_name, email, role}`; audit `user.created` |
 | PATCH | /admin/users/{id} (planned, US-073) | admin | change `role` and/or `is_active`; audit `user.role_changed` / `user.deactivated` / `user.reactivated`; 409 when it would remove the last active admin |
 | GET | /admin/applications/{id} (planned, US-072) | admin | officer view, read-only (mutations 403) |
 | GET | /notifications | any | own notifications (newest first, 50) plus `unread_count` (built, US-025) |

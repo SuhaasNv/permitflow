@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import InvalidTransition, ValidationFailed
 from app.domain.enums import ApplicationStatus, DocumentType, FeedbackResolution, NotificationKind
 from app.domain.form_schema import DOCUMENT_TYPE_LABELS, get_section
+from app.domain.operator_errors import refusal
 from app.domain.resolution import FeedbackTarget, addressed_items, changed_targets, open_targets
 from app.domain.workflow import Actor, TransitionContext, TransitionError, transition
 from app.models import Application, ApplicationRevision, Document, User
@@ -113,7 +114,8 @@ class ResubmissionService:
         except TransitionError as exc:
             if exc.kind == "guard":
                 raise ValidationFailed(exc.message, details={"reason": "no_change"}) from exc
-            raise InvalidTransition(exc.message, details={"allowed": [s.value for s in exc.allowed]}) from exc
+            # Operator bodies never carry internal status codes (FR-026): no `allowed` list, own label only.
+            raise InvalidTransition(refusal(app.status, "resubmit")) from exc
         if changes is None:  # pragma: no cover - the guard guarantees a current revision exists
             raise ValidationFailed(
                 "Nothing has changed since the last submission.", details={"reason": "no_change"}

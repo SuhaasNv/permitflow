@@ -9,7 +9,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 ## E0 — Foundation, AI Pipeline & Delivery
 
 ### US-000 — As an engineer, I want a runnable backend, frontend and database skeleton, so that every feature builds on a working base.
-- Acceptance criteria: `docker compose up` starts Postgres; `alembic upgrade head` creates the schema; `GET /api/v1/health` returns 200 with database status and 503 when the database is down; every error (including FastAPI's own 401/403/422) uses `{ "error": { "code", "message", "details"? } }` via explicit exception handlers; security headers and CORS allowlist are set; the app refuses to start without `JWT_SECRET` outside the test environment; the frontend dev server renders the app shell; CI skeleton runs lint and type checks.
+- Acceptance criteria: `docker compose up` starts Postgres; `alembic upgrade head` creates the schema; `GET /api/v1/health` returns 200 with database status and 503 when the database is down; every error (including FastAPI's own 401/403/422) uses `{ "error": { "code", "message", "details"? } }` via explicit exception handlers; security headers and CORS allowlist are set; the app refuses to start without a real `JWT_SECRET` in every environment (no fallback secret in the code); the frontend dev server renders the app shell; CI skeleton runs lint and type checks.
 - Priority: MVP · Day 1 · Dependencies: none · Requirements: NFR-001, NFR-005, REL-006
 - Definition of Done: DoD checklist + a clean clone runs with the README steps.
 
@@ -41,7 +41,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 ### US-006 — As an engineer, I want a CI pipeline that lints, type-checks, tests, builds and scans for secrets, so that broken or unsafe code is never considered done.
 - Acceptance criteria: GitHub Actions workflow runs frontend lint/typecheck/test/build, backend ruff/mypy/pytest on a Postgres service, Playwright E2E, gitleaks and a Docker build; required on pull requests.
 - Priority: MVP · Day 1 (skeleton), Day 3 (complete) · Dependencies: US-000 · Requirements: NFR-004, NFR-005
-- Definition of Done: branch protection requires the workflow; green on `main`.
+- Definition of Done: branch protection requires the workflow (in place since 20 Sep 2026: `main` takes pull requests only, seven required checks); green on `main`.
 
 ### US-007 — As a reviewer, I want the application deployed with seeded accounts, so that I can try it without local setup.
 - Acceptance criteria: two images built once in CI and pushed to GHCR (backend; frontend nginx with the API URL injected at start); Railway `development` and `production` environments, each with its own Postgres, uploads volume, secrets and domains, deployed from `dev` and `main` by `deploy.yml` with pre and post-deploy gates; migrations run on container start; seed run once per environment by hand; `/health` and `/healthz` green.

@@ -26,6 +26,9 @@ on:
         default: development
         options: [development, production]
 
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.event.workflow_run.head_branch }}
   cancel-in-progress: false
@@ -52,30 +55,44 @@ jobs:
           echo "deploying ${{ github.event.workflow_run.head_sha || 'current images (manual run)' }} to $RAILWAY_ENV"
       - name: Install Railway CLI
         run: npm install -g @railway/cli
+      - name: Record the deployments that are live before the redeploy
+        id: before
+        run: |
+          latest_id() {
+            railway deployment list --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service "$1" --limit 1 --json \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[0]["id"] if d else "")'
+          }
+          echo "backend=$(latest_id backend)" >> "$GITHUB_OUTPUT"
+          echo "frontend=$(latest_id frontend)" >> "$GITHUB_OUTPUT"
       - name: Redeploy backend and frontend from the new images
         run: |
           railway redeploy --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service backend --from-source --yes
           railway redeploy --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service frontend --from-source --yes
       - name: Wait for the NEW deployments to succeed (redeploy returns before the rollout)
         run: |
-          # The health URLs keep answering from the old containers during the rollout, so the gate must
-          # first wait for Railway to report the new deployment of each service as SUCCESS.
+          # The health URLs keep answering from the old containers during the rollout, so the gate waits
+          # for a deployment whose id differs from the one recorded before the redeploy to reach SUCCESS.
+          # Accepting the first SUCCESS in the list would pass on the previous rollout.
           wait_for() {
-            service="$1"
+            service="$1"; before="$2"
             for i in $(seq 1 60); do
               json=$(railway deployment list --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service "$service" --limit 1 --json)
-              status=$(echo "$json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[0]["status"] if d else "NONE")')
-              echo "$service: $status"
-              case "$status" in
-                SUCCESS) return 0 ;;
-                FAILED|CRASHED|REMOVED) echo "$service deployment ended in $status"; return 1 ;;
-              esac
+              read -r id status < <(echo "$json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d[0]["id"] + " " + d[0]["status"]) if d else "NONE NONE")')
+              if [ "$id" = "$before" ]; then
+                echo "$service: new deployment not listed yet"
+              else
+                echo "$service: $id $status"
+                case "$status" in
+                  SUCCESS) return 0 ;;
+                  FAILED|CRASHED|REMOVED) echo "$service deployment $id ended in $status"; return 1 ;;
+                esac
+              fi
               sleep 10
             done
-            echo "$service did not reach SUCCESS in time"; return 1
+            echo "$service: no new deployment reached SUCCESS in time"; return 1
           }
-          wait_for backend
-          wait_for frontend
+          wait_for backend "${{ steps.before.outputs.backend }}"
+          wait_for frontend "${{ steps.before.outputs.frontend }}"
       - name: Post-deploy gate (health of both tiers)
         run: |
           for i in $(seq 1 30); do

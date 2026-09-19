@@ -15,7 +15,7 @@ Status: written (UI/UX design phase, 17 to 18 Sep 2026, after solutioning and be
 | `SCREEN_INVENTORY.md` | Every screen: ID, persona, purpose, use case, requirements, actions, states, responsive notes, priority |
 | `COMPONENT_INVENTORY.md` | Reusable components, their variants and where they are used |
 | `UI_STATES.md` | Loading / empty / error / permission / not-found / success / partial states per screen, plus the upload → verification lifecycle |
-| `FRONTEND_ARCHITECTURE.md` | How the React/Vite/Tailwind/TanStack Query/RHF/Zod frontend is organised to implement this design |
+| `FRONTEND_ARCHITECTURE.md` | The frontend as built (rewritten 20 Sep from the tree): folders, data flow, polling, forms, errors, known gaps |
 | `UI_REQUIREMENTS_TRACEABILITY.md` | Requirement and use-case IDs → screens and components |
 
 Assumptions made during design are listed at the end of `UI_DESIGN.md`. None changes product behaviour defined in `SCOPE.md`, `STATE_MACHINE.md` or `DOMAIN_MODEL.md`.

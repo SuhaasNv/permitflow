@@ -19,6 +19,14 @@ import {
 export const officerKeys = {
   queue: ['officer', 'queue'] as const,
   case: (id: string) => ['officer', 'case', id] as const,
+  audit: (id: string) => ['officer', 'audit', id] as const,
+}
+
+/** Every officer action writes audit rows, so the open trail is refetched along with the queue. */
+function afterCaseChange(qc: ReturnType<typeof useQueryClient>, id: string, view: unknown) {
+  qc.setQueryData(officerKeys.case(id), view)
+  void qc.invalidateQueries({ queryKey: officerKeys.queue })
+  void qc.invalidateQueries({ queryKey: officerKeys.audit(id) })
 }
 
 /** The queue refreshes every 30 s while open so new submissions appear without a reload. */
@@ -40,10 +48,7 @@ export function useTransition(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: { target: string; note?: string; expected_version: number }) => transitionApplication(id, body),
-    onSuccess: (view) => {
-      qc.setQueryData(officerKeys.case(id), view)
-      void qc.invalidateQueries({ queryKey: officerKeys.queue })
-    },
+    onSuccess: (view) => afterCaseChange(qc, id, view),
   })
 }
 
@@ -51,10 +56,7 @@ export function useRerunCheck(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (documentId: string) => rerunOfficerCheck(id, documentId),
-    onSuccess: (view) => {
-      qc.setQueryData(officerKeys.case(id), view)
-      void qc.invalidateQueries({ queryKey: officerKeys.queue })
-    },
+    onSuccess: (view) => afterCaseChange(qc, id, view),
   })
 }
 
@@ -66,10 +68,7 @@ export function useCreateFeedback(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: FeedbackInput) => createFeedback(id, body),
-    onSuccess: (view) => {
-      qc.setQueryData(officerKeys.case(id), view)
-      void qc.invalidateQueries({ queryKey: officerKeys.queue })
-    },
+    onSuccess: (view) => afterCaseChange(qc, id, view),
   })
 }
 
@@ -77,10 +76,7 @@ export function useWithdrawFeedback(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (feedbackId: string) => withdrawFeedback(id, feedbackId),
-    onSuccess: (view) => {
-      qc.setQueryData(officerKeys.case(id), view)
-      void qc.invalidateQueries({ queryKey: officerKeys.queue })
-    },
+    onSuccess: (view) => afterCaseChange(qc, id, view),
   })
 }
 
@@ -97,10 +93,7 @@ export function useResolveFeedback(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (feedbackId: string) => resolveFeedback(id, feedbackId),
-    onSuccess: (view) => {
-      qc.setQueryData(officerKeys.case(id), view)
-      void qc.invalidateQueries({ queryKey: officerKeys.queue })
-    },
+    onSuccess: (view) => afterCaseChange(qc, id, view),
   })
 }
 
@@ -108,10 +101,7 @@ export function useReopenFeedback(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (feedbackId: string) => reopenFeedback(id, feedbackId),
-    onSuccess: (view) => {
-      qc.setQueryData(officerKeys.case(id), view)
-      void qc.invalidateQueries({ queryKey: officerKeys.queue })
-    },
+    onSuccess: (view) => afterCaseChange(qc, id, view),
   })
 }
 
@@ -119,13 +109,10 @@ export function useRestoreFeedback(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (feedbackId: string) => restoreFeedback(id, feedbackId),
-    onSuccess: (view) => {
-      qc.setQueryData(officerKeys.case(id), view)
-      void qc.invalidateQueries({ queryKey: officerKeys.queue })
-    },
+    onSuccess: (view) => afterCaseChange(qc, id, view),
   })
 }
 
 export function useAuditTrail(id: string, enabled: boolean) {
-  return useQuery({ queryKey: ['officer', 'audit', id], queryFn: () => getAuditTrail(id), enabled, staleTime: 10_000 })
+  return useQuery({ queryKey: officerKeys.audit(id), queryFn: () => getAuditTrail(id), enabled, staleTime: 10_000 })
 }
