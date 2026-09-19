@@ -42,7 +42,6 @@ class Settings(BaseSettings):
     max_drafts_per_user: int = 20
     ai_runs_per_user_per_day: int = 60
     ai_runs_per_day: int = 1000
-    # Comma-separated proxy IPs whose X-Forwarded-For is trusted. Empty: use the socket address.
     # Comma-separated proxy addresses whose X-Forwarded-For is trusted, or "*" on a platform whose edge
     # proxy is the only thing that can reach the container (Railway, most PaaS).
     trusted_proxies: str = ""

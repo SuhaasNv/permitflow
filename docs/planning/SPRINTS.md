@@ -126,6 +126,11 @@ Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done;
 | US-051 | Licence certificate: issued on approval, preview for the officer, PDF download | Nice-to-have (added 19 Sep) |
 | US-052 | Custom domain permitflow.space for production (frontend and api hosts) | Nice-to-have (added 19 Sep) |
 | US-053 | Coverage at industry level: business-logic tests, thresholds in CI | MVP (added 19 Sep) |
+| US-054 | Live AI evaluation workflow against the real model | Nice-to-have (added 19 Sep) |
+| US-055 | LangSmith tracing behind a key, experiments per run | Nice-to-have (added 19 Sep) |
+| US-056 | AI gate as its own six-stage workflow, name-swap fairness check | Nice-to-have (added 19 Sep) |
+| US-057 | Legal, privacy and accessibility review: policies, notices, fonts, axe gate | Nice-to-have (added 19 Sep) |
+| US-058 | Abuse resistance: request limits, quotas, headers, blocking audits | Nice-to-have (added 19 Sep) |
 | US-070–073 | Admin oversight dashboard | Nice-to-have (only after US-005/006/007 are Done) |
 
 **Exit criteria:** Sprint DoD + UAT plan executed on the deployed URL + production readiness review + assessment traceability + final review written honestly.

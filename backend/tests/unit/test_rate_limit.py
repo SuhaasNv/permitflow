@@ -34,9 +34,21 @@ def test_request_limiter_uses_the_login_bucket_for_sign_in_only_and_exempts_heal
         assert limiter.check(_request("/api/v1/health")) is None
 
 
-def test_client_key_honours_forwarded_for_only_behind_a_trusted_proxy() -> None:
+def test_client_key_takes_the_hop_the_trusted_proxy_appended_not_the_one_the_caller_sent() -> None:
+    # The caller sent "10.0.0.9"; the proxy at 203.0.113.5 appended the real client 198.51.100.1.
     spoof = _request("/x", host="203.0.113.5", forwarded="10.0.0.9, 198.51.100.1")
-    assert client_key(spoof, "") == "203.0.113.5"
-    assert client_key(spoof, "203.0.113.5") == "10.0.0.9"
-    assert client_key(spoof, "*") == "10.0.0.9"
+    assert client_key(spoof, "") == "203.0.113.5"  # no trusted proxy: the socket address
+    assert client_key(spoof, "203.0.113.5") == "198.51.100.1"
+    assert client_key(spoof, "*") == "198.51.100.1"
+    # Two trusted proxies in a chain: skip both, take the client they vouch for.
+    chain = _request("/x", host="203.0.113.5", forwarded="10.0.0.9, 198.51.100.1, 203.0.113.6")
+    assert client_key(chain, "203.0.113.5,203.0.113.6") == "198.51.100.1"
     assert client_key(_request("/x", host="1.2.3.4"), "*") == "1.2.3.4"
+
+
+def test_limiter_map_stays_bounded_under_many_distinct_clients() -> None:
+    limiter = WindowLimiter(5)
+    for i in range(10_500):
+        limiter.hit(f"10.0.{i // 256}.{i % 256}")
+    limiter.hit("fresh")
+    assert len(limiter._hits) <= 10_501  # noqa: SLF001 - the bound is the property under test

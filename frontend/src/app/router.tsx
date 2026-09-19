@@ -73,7 +73,12 @@ export const router = createBrowserRouter([
     path: '*',
     element: (
       <div className="mx-auto max-w-lg px-4 py-10">
-        <NotFoundPanel backTo="/" backLabel="Back to PermitFlow" />
+        <NotFoundPanel
+          backTo="/"
+          backLabel="Back to PermitFlow"
+          title="Page not found"
+          description="There is nothing at this address. Check the link, or start from the front page."
+        />
       </div>
     ),
   },

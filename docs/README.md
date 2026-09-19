@@ -17,7 +17,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `architecture/ARCHITECTURE.md` | written | Layers, modules, API surface, request flows, boundaries |
 | `architecture/DOMAIN_MODEL.md` | written | Entities, verification vocabulary, issue codes, invariants |
 | `architecture/STATE_MACHINE.md` | written | 12 states + draft + withdrawn, labels, transitions (incl. Return to review), guards, feedback rules |
-| `architecture/decisions/README.md` + `ADR-001 … ADR-011` | written (index with "chose X over Y because Z" per ADR; 003, 006, 007, 009 amended as built; 010 and 011 added 19 Sep) | Architecture decision records |
+| `architecture/decisions/README.md` + `ADR-001` to `ADR-012` | written (index with "chose X over Y because Z" per ADR; 003, 006, 007, 009, 011 amended as built; 010, 011 and 012 added 19 Sep) | Architecture decision records |
 | `architecture/permitflow-architecture.drawio` / `.png` | written | Overall architecture diagram |
 | `architecture/diagrams/uc1-use-case`, `uc2-use-case`, `e4-admin-use-case` (`.drawio` / `.png`) | written | UML use case diagrams per epic |
 | `architecture/diagrams/sequences/*.mmd` / `.png` | written | Sequence diagrams UC1-A, UC1-B, UC2-A, UC2-B (Mermaid) |

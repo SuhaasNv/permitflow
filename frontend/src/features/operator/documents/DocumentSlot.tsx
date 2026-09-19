@@ -141,7 +141,12 @@ export function DocumentSlot({
 
   const live = doc?.verification?.status === 'running' || doc?.verification?.status === 'pending'
   const stale = Boolean(doc?.verification && live && isCheckStale(doc.verification.requested_at))
-  const canRerun = Boolean(doc?.verification && slot.editable && (RERUNNABLE.has(doc.verification.status) || stale))
+  const canRerun = Boolean(
+    doc?.verification &&
+    slot.editable &&
+    doc.verification.error_reason !== 'daily_limit_reached' &&
+    (RERUNNABLE.has(doc.verification.status) || stale),
+  )
 
   const download = async () => {
     if (!doc) return

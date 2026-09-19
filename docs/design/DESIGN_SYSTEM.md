@@ -60,7 +60,7 @@ Badge = dot + label, 24 px (28 px "lg" in status bars). Labels are the role-spec
 
 | Internal | Officer badge | Operator badge | Colour |
 |----------|---------------|----------------|--------|
-| draft |: | Draft | neutral |
+| draft | Draft (never in the queue) | Draft | neutral |
 | application_received | Application Received | Submitted | info |
 | under_review | Under Review | Under Review | info |
 | pending_pre_site_resubmission | Pending Pre-Site Resubmission | Pending Pre-Site Resubmission | warning |
@@ -73,6 +73,7 @@ Badge = dot + label, 24 px (28 px "lg" in status bars). Labels are the role-spec
 | pending_approval | Route to Approval | Pending Approval | info |
 | approved | Approved | Approved | success |
 | rejected | Rejected | Rejected | error |
+| withdrawn | Withdrawn | Withdrawn | neutral |
 
 ## Tags (facts and markers) vs badges (state)
 

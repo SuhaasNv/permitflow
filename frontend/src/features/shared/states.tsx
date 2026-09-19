@@ -88,12 +88,22 @@ export function NotAvailableForRole() {
   )
 }
 
-export function NotFoundPanel({ backTo, backLabel }: { backTo: string; backLabel: string }) {
+export function NotFoundPanel({
+  backTo,
+  backLabel,
+  title = 'Application not found',
+  description = 'It may have been removed, or the link is incorrect.',
+}: {
+  backTo: string
+  backLabel: string
+  title?: string
+  description?: string
+}) {
   return (
     <Panel
       icon={SearchIcon}
-      title="Application not found"
-      description="It may have been removed, or the link is incorrect."
+      title={title}
+      description={description}
       action={
         <Link to={backTo} className="text-sm font-semibold">
           {backLabel}

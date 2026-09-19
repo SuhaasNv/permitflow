@@ -135,7 +135,7 @@ POST /applications/{id}/resubmit
 
 ## API surface (v1)
 
-All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string, "details"?: object } }`.
+All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string, "details"?: object } }`. Every route can answer `429 rate_limited` with a `Retry-After` header (per-client sliding-minute limits, US-058; `/health` exempt); every answer carries the security headers listed in `docs/security/SECURITY_REVIEW.md` item 7.
 
 | Method | Path | Role | Purpose |
 |--------|------|------|---------|
@@ -144,7 +144,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /form-schema | any | sections/fields definition |
 | GET | /officer/feedback-templates | officer | comment templates from `domain/feedback_templates.py` (key, title, suggested target, message); the officer edits before sending (built, US-024) |
 | GET | /applications | operator | own applications |
-| POST | /applications | operator | create draft |
+| POST | /applications | operator | create draft; `409 conflict` with `details.code = draft_limit` once the operator holds `MAX_DRAFTS_PER_USER` open drafts (US-058) |
 | GET | /applications/{id} | operator (own) | operator view: sections, documents + verification, released feedback (all rounds, no author), `resubmit` readiness (changed and untouched flagged targets), editability from open released feedback, `needs_operator_action` (built) |
 | PATCH | /applications/{id}/sections/{key} | operator (own) | update a section of the working copy (checked against editability) |
 | POST | /applications/{id}/submit | operator (own) | draft → application_received |
@@ -205,7 +205,7 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 
 - API: a global exception handler maps domain exceptions (`NotFound`, `Forbidden`, `InvalidTransition`, `ValidationFailed`, `VersionConflict`) to the standard error body; unexpected exceptions → 500 with a request id and no stack trace.
 - Verification task: catches everything, records failure, never propagates.
-- Frontend: route-level error boundary; query errors rendered by `ErrorState` with retry; mutation errors shown inline and preserve input.
+- Frontend: query errors rendered by `ErrorPanel` with the request id and Retry; mutation errors shown inline as an `Alert` and preserve input; 429 shows the server message and queries never retry a 4xx; an unknown route renders `NotFoundPanel`. There is no React error boundary for render crashes (recorded as a gap in the US-058 review).
 
 ## Authorization boundaries
 
