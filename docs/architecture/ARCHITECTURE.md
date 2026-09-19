@@ -1,8 +1,12 @@
-# PermitFlow — Architecture
+# PermitFlow: Architecture
 
 A modular monolith (ADR-001): one FastAPI backend, one React frontend, one PostgreSQL database, local file storage, and an isolated AI verification module.
 
 ## System diagram
+
+![Solution architecture: users, the web application and the API with its modules, PostgreSQL and file storage, OpenAI and LangSmith](diagrams/views/solution-architecture.png)
+
+The same picture as text, kept in step with the code:
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
@@ -18,7 +22,7 @@ A modular monolith (ADR-001): one FastAPI backend, one React frontend, one Postg
 │    │  (auth, role, ownership resolved here)                        │
 │  services/       use cases: ApplicationService, SubmissionService, │
 │    │             FeedbackService, DocumentService, VerificationSvc │
-│    │             — the only layer that mutates and writes audit    │
+│    │             : the only layer that mutates and writes audit    │
 │  domain/         pure logic: workflow (state machine), form_schema,│
 │    │             diff, labels, feedback resolution rules           │
 │  repositories/   SQLAlchemy queries; ownership filters             │
@@ -49,7 +53,7 @@ api  ──▶  services  ──▶  domain
 
 Rules:
 - `api` never touches `repositories` or `models` directly; it calls services and maps exceptions to HTTP.
-- `domain` is pure Python: no SQLAlchemy, no FastAPI, no I/O. It contains the enumerations (`domain/enums.py`, re-exported by `models/enums.py` for the persistence layer), the state machine (`domain/workflow.py`: transition table, guards, `available_actions` for the UI), labels (`domain/labels.py`: the assessment table verbatim plus the badge tone), form schema, diff and resolution rules — the code a reviewer should read first.
+- `domain` is pure Python: no SQLAlchemy, no FastAPI, no I/O. It contains the enumerations (`domain/enums.py`, re-exported by `models/enums.py` for the persistence layer), the state machine (`domain/workflow.py`: transition table, guards, `available_actions` for the UI), labels (`domain/labels.py`: the assessment table verbatim plus the badge tone), form schema, diff and resolution rules: the code a reviewer should read first.
 - `schemas` (`app/schemas/`): Pydantic request and response models shared by the API and the services. No ORM, no I/O; they may import `domain` enums. Services return these so routers stay thin, and the layering test forbids services, schemas and repositories from importing `app.api` or FastAPI.
 - `services` orchestrate: load via repositories, apply domain rules, mutate, write audit events, create notifications, commit. One service method = one transaction.
 - `infra.ai` exposes `VerificationProvider`; `services.verification` is the only caller. No other module imports `infra.ai`.
@@ -69,7 +73,7 @@ Rules:
 | feedback | feedback | `create(officer, id, target, message, template_key)`, `resolve`, `withdraw`, `list`, `templates()` |
 | notifications | notifications | `notify(user_ids, kind, application, ...)`, `list(user)`, `mark_read` |
 | audit | audit_events | `record(application_id, actor, event_type, payload)`, `list(application_id)`, `feed(limit)` |
-| admin | — (reads other modules' tables through their repositories; writes users through the auth module's service) | `overview()`, `ai_health()`, `audit_feed()`, `users()`, `create_user()`, `update_user(role, is_active)` |
+| admin | none (reads other modules' tables through their repositories; writes users through the auth module's service) | `overview()`, `ai_health()`, `audit_feed()`, `users()`, `create_user()`, `update_user(role, is_active)` |
 
 Cross-module writes go through services, never across repositories.
 

@@ -61,11 +61,15 @@ JSON lines on stdout: one `request` line per request with `request_id`, method, 
 
 ## CI (US-006)
 
+![CI/CD: the four GitHub Actions workflows and their jobs](../architecture/diagrams/views/ci-cd-pipeline.png)
+
 `.github/workflows/ci.yml`, seven jobs: backend (ruff, mypy, pytest on a Postgres service), frontend (lint, typecheck, vitest, build), AI gate (calls `ai-gate.yml`: model approval, contracts, golden set, adversarial, fairness, verdict; all on the mock provider, blocking), dependency and code audit (pip-audit, bandit, npm audit, all blocking since US-058), E2E (the full stack started inside the job: Postgres service, `alembic upgrade head`, `scripts/seed.py`, uvicorn on :8000 with `AI_PROVIDER=mock` and a CI-only `JWT_SECRET`, `vite preview` on :3000, then `npm run e2e`), gitleaks, and images (both Docker images built; on `dev` and `main` pushed to GHCR, after every other job is green). The E2E job needs the two test suites first. On failure it prints the last 200 lines of both server logs and uploads `playwright-report` and `test-results` as an artifact for seven days. CI does not deploy; `deploy.yml` does, after CI (see Deployment). `ai-eval.yml` is the fourth workflow (with `ai-gate.yml`, which CI calls): the golden set and the fairness check against the real OpenAI model, nightly at 04:00 Singapore, by hand, and on pushes to `dev` or `main` that touch the AI module or the set; blocking at 14 of 14; needs the `OPENAI_API_KEY` repository secret and skips nothing silently (it fails with a clear error when the secret is missing).
 
 ## Deployment (US-007)
 
 ### Shape
+
+![Deployment: images built once in CI, pulled by tag into two Railway environments, production behind an approval](../architecture/diagrams/views/deployment.png)
 
 One Railway project (`permitflow`), two environments that share nothing:
 

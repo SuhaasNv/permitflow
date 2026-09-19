@@ -1,5 +1,7 @@
 # PermitFlow
 
+![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](debrief/video/permitflow-launch-poster.jpg)
+
 A regulatory licensing platform built for a 3-day full-stack assessment. Business operators apply for a Food Establishment Licence through a guided form with checked uploads; licensing officers review the submission, leave feedback tied to a specific section or document, and request a resubmission in which only the flagged parts reopen; every status change, feedback round and decision is audited; approval issues a licence certificate the business can download. An advisory AI verifier reads each uploaded document and compares it with the form before anyone submits; it never decides anything.
 
 **Try it:** development environment https://dev.permitflow.space (platform host as a fallback: https://frontend-development-afe2.up.railway.app), demo accounts below. Production, v0.3.0: https://permitflow.space (one example application waiting in the officer's queue). Local setup takes about ten minutes (below).
@@ -8,7 +10,7 @@ A regulatory licensing platform built for a 3-day full-stack assessment. Busines
 
 **Stack, in one paragraph** (`docs/architecture/decisions/ADR-009-stack-and-delivery-pipeline.md`): FastAPI + SQLAlchemy 2 + Alembic + Pydantic v2 on PostgreSQL 16 for the backend, because Pydantic validates both the HTTP boundary and the AI provider's output with one vocabulary, and PostgreSQL gives row locks, UUIDs and JSONB for immutable revision snapshots. React 19 + TypeScript strict + Vite + Tailwind + TanStack Query + React Hook Form + Zod for the frontend, because polling a verification status and validating a sectioned form inline are what those libraries are for. pytest on a real database, vitest, Playwright; GitHub Actions; Docker images to GHCR; Railway with two environments. A modular monolith (`api → services → domain / repositories → models`, `domain/` pure Python) with an explicit state-machine table, same-transaction audit rows and an AI module behind a provider interface (`docs/architecture/`).
 
-Everything else you might look for: `CHANGELOG.md` (what shipped when), `docs/README.md` (index of every document), `AI_USAGE.md` (full account of how AI tools were used), `docs/reviews/ISSUES_AND_MITIGATIONS.md` (what went wrong and what we did about it).
+Everything else you might look for: `CHANGELOG.md` (what shipped when), `docs/README.md` (index of every document), `AI_USAGE.md` (full account of how AI tools were used), `docs/reviews/ISSUES_AND_MITIGATIONS.md` (what went wrong and what we did about it), `debrief/` (the pitch deck, the technical deck, the launch video and the narrated walkthrough).
 
 Contents: Run locally · Demo accounts · Security · Tests and checks · Environment variables · Project layout · Branching and deployment · CI · AI verification · AI Usage · What I would do next.
 
@@ -81,15 +83,20 @@ See `.env.example`; every runtime variable is documented there and in `docs/oper
 backend/   FastAPI + SQLAlchemy 2 + Alembic (api → services → domain / repositories → models)
 frontend/  React + TypeScript + Vite + Tailwind + TanStack Query + React Hook Form + Zod
 docs/      requirements, architecture, ADRs, design system and prototype, planning, security, operations
+debrief/   pitch deck, technical deck, launch video and narrated walkthrough (videos in Git LFS)
 ```
 
 ## Branching and deployment
+
+![Deployment: build once, promote by tag, production behind a person](docs/architecture/diagrams/views/deployment.png)
 
 `main` is production, `dev` is integration, work happens on `feat/*` branches: `docs/operations/BRANCHING.md`.
 
 Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway pulls them. Push to `dev` deploys the `development` environment automatically; a push to `main` builds the release images; production is then deployed by hand (`gh workflow run deploy.yml --ref main -f environment=production`), and that job pauses for the owner's approval in GitHub Actions before Railway is touched (the automatic path is rejected by GitHub's branch policy for `workflow_run` jobs, recorded in `docs/operations/OPERATIONS.md`). Each environment has its own database, uploads volume and secrets, and every deployment is gated on health afterwards. Either can be redeployed by hand from the Deploy workflow. Hosts (US-052): production https://permitflow.space and https://api.permitflow.space (live since v0.3.0, 19 Sep 2026); development https://dev.permitflow.space and https://api.dev.permitflow.space (Railway fallbacks: https://frontend-development-afe2.up.railway.app, https://backend-development-4e04.up.railway.app/api/v1). Details, secrets, seeding and rollback: `docs/operations/OPERATIONS.md`.
 
 ## CI
+
+![CI/CD: four workflows, every job blocking](docs/architecture/diagrams/views/ci-cd-pipeline.png)
 
 `.github/workflows/ci.yml` runs on every push and pull request to `main` and `dev`, seven jobs:
 
