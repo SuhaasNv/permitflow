@@ -66,6 +66,10 @@ Prompt change: the demo documents carry a footer "Fictional document produced fo
 
 Two earlier wordings were rejected by the harness before this one landed: a soft "do not report it as an issue" left the false code in place, and a wording that repeated "not issued by an authority" primed the model to report the footer under `other`, which turned all three clean documents into `issues_found` (11 of 14). The final wording passes **14 of 14 twice in a row**, with no `possible_prompt_injection` or `other` on any demo document: uen_mismatch reports `field_mismatch` only and the expired certificate `expired_document` only. The adversarial cases still land on `needs_review` with `possible_prompt_injection`. Latency 1.0 s to 2.8 s.
 
+### Live workflow (`.github/workflows/ai-eval.yml`, US-054)
+
+From 19 Sep 2026 the OpenAI run is a workflow rather than a by-hand record: the same harness with `--provider openai`, blocking at 14 of 14, nightly (04:00 Singapore), on demand, and on every push to `dev` or `main` that changes `app/infra/ai`, `app/domain/verification_rules.py`, `app/infra/extraction` or `evals`. The harness stamps the provider, model and `PROMPT_VERSION` into the JSON result, the run summary shows the per-case table with issue codes and latency, and the result files are kept for 90 days, so a regression can be traced to the commit and the prompt version that introduced it. The key is a GitHub repository secret; the workflow refuses to run without it, and pull requests never trigger it. Manual runs accept a lower `fail_under` for exploring a prompt change without turning the run red. Local equivalent: `uv run python -m evals.run --provider openai --json out.json --fail-under 1.0`.
+
 ## What the numbers mean, and do not
 
 - The adversarial cases pass because of the deterministic heuristic in `domain/verification_rules.py`, not because the model resisted the instruction. That is the design (AI-004): the check is advisory, an injection sends the document to a person, and no model verdict can mark it verified.
@@ -74,6 +78,7 @@ Two earlier wordings were rejected by the harness before this one landed: a soft
 
 ## Next steps (not in scope)
 
+- Model-quality evidence now comes from `ai-eval.yml` (above); what remains is observability and scale.
 - Grow the set from the officer's real decisions: every case where an officer overrides a check is a candidate golden case. LangSmith or self-hosted Langfuse datasets and tracing would make that capture routine (self-hosted matters because extracted document text should not leave the platform more than it must); promptfoo, driving the real pipeline through a Python provider, would give a threshold gate and an injection red-team suite in CI; Project Moonshot (AI Verify Foundation, `moonshot-cicd`) mapped to IMDA's Starter Kit for Testing LLM-Based Applications would give the Singapore assurance evidence. All were judged more than this release needs (`docs/reviews/PRODUCTION_READINESS_REVIEW.md`).
 - Bias and fairness: no bias evaluation has been run. A first pass would be a Project Moonshot bias benchmark and per-issue-code accuracy split by document language, so that a Chinese-, Malay- or Tamil-language document is not flagged more often than an English one for the same facts.
 - Confidence calibration: reliability diagram and Brier score over the labelled set, replacing the fixed 0.6 threshold.

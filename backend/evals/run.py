@@ -29,6 +29,7 @@ from app.domain.verification_rules import (
 )
 from app.infra.ai.base import VerificationProvider
 from app.infra.ai.mock import MockProvider
+from app.infra.ai.openai_provider import PROMPT_VERSION
 from app.infra.extraction import extract_text
 
 HERE = Path(__file__).resolve().parent
@@ -125,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
     outcomes = [run_case(c, spec["form"], provider) for c in spec["cases"]]
 
     width = max(len(o.id) for o in outcomes)
-    print(f"provider={provider.name} model={provider.model or '-'}")
+    print(f"provider={provider.name} model={provider.model or '-'} prompt={PROMPT_VERSION}")
     print(f"{'case':<{width}}  {'expected':<34} {'actual':<14} {'result':<9} ms")
     for o in outcomes:
         mark = "pass" if o.passed else ("gap" if not o.counted else "FAIL")
@@ -147,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "provider": provider.name,
                     "model": provider.model,
+                    "prompt_version": PROMPT_VERSION,
                     "pass_rate": rate,
                     "passed": passed,
                     "counted": len(counted),

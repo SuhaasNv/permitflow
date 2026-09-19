@@ -58,6 +58,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: MVP · Day 3 (added 19 Sep, before the v0.3.0 release) · Dependencies: US-005 · Requirements: NFR-004 · Branch `test/us-053-coverage`
 - Definition of Done: thresholds green in CI; no test asserts presentation only; numbers recorded.
 
+### US-054 — As a reviewer, I want the AI's answers evaluated against the real model on a schedule and on every change to the AI module, so that the quality claim is a green check with history rather than a paragraph.
+- Acceptance criteria: a separate workflow `ai-eval.yml` runs the 14-case golden set through the real pipeline with `--provider openai` (temperature 0), blocking at 14 of 14; triggers: nightly, manual (with an optional lower pass rate), and pushes to `dev` or `main` touching `app/infra/ai`, `verification_rules.py`, `app/infra/extraction` or `evals`; never on pull requests; refuses to run without the `OPENAI_API_KEY` repository secret; the harness stamps provider, model and prompt version in the JSON result; per-case table (status, codes, latency) in the run summary; result files kept 90 days; `docs/ai/AI_EVALUATION.md`, `README.md`, `OPERATIONS.md` and `TEST_STRATEGY.md` describe it.
+- Priority: Nice-to-have · Day 3 (added 19 Sep, after the coverage story) · Dependencies: US-004 · Requirements: AI-008 · Branch `feat/us-054-ai-eval-workflow`
+- Definition of Done: the workflow is green on the first manual run after the owner sets the secret; the mock job in `ci.yml` unchanged and green.
+
 ### US-008 — As a reviewer, I want clear documentation of scope, architecture, AI usage, testing and operations, so that every decision is explainable.
 - Acceptance criteria: README (setup, env vars, tests, AI usage, what I would do next), SCOPE.md, ADRs, threat model, test strategy, UAT plan, operations guide, production readiness review, assessment traceability, CHANGELOG.
 - Priority: MVP · Day 3 (continuous) · Dependencies: all

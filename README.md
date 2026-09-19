@@ -100,6 +100,8 @@ Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway 
 
 `deploy.yml` runs after a green CI on `dev` or `main` and redeploys the matching Railway environment from the new images (see Branching and deployment).
 
+`ai-eval.yml` is the AI's own pipeline (US-054): the same 14 golden and adversarial cases through the real model (`gpt-4.1-mini`, temperature 0), blocking at 14 of 14, with the model and prompt version stamped in the result. It runs nightly at 04:00 Singapore, by hand (with an optional lower pass rate for exploration), and on every push to `dev` or `main` that touches the AI module, the extraction, the rules or the golden set. It needs the `OPENAI_API_KEY` repository secret and refuses to run without it, so a fork's pull request never spends the key. The mock job in `ci.yml` proves the pipeline on every push; this one proves the model, and keeps 90 days of results as artifacts (`docs/ai/AI_EVALUATION.md`).
+
 The E2E job waits for the backend and frontend suites, so a broken unit test never spends the browser minutes.
 
 ## AI verification

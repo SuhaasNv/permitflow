@@ -66,7 +66,7 @@ The E2E test signs in with the seeded `operator@permitflow.example.sg` and `offi
 | Gap | Reason | Plan |
 |-----|--------|------|
 | Visual regression | No screenshot comparison; layouts are verified by hand at 1440, 820 and 390 per story and captured in `../design/screens/as-built/` | Deferred; a Playwright screenshot assertion per screen would be the next step |
-| Live AI in CI | Costs money and is non-deterministic | Evaluation set run by hand and recorded (US-004) |
+| Live AI on every push | Costs money and is non-deterministic | Covered separately (US-054): `ai-eval.yml` runs the golden set against OpenAI nightly, by hand, and when the AI module or the set changes; blocking at 14 of 14, results kept 90 days |
 | Load and soak | Out of scope for the assessment | Noted in `../reviews/PRODUCTION_READINESS_REVIEW.md` (Day 3) |
 | Accessibility audit | Manual checks only (labels, focus order, `aria-live` on status) | `axe` run per screen would be the next step |
 
