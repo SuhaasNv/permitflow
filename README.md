@@ -92,7 +92,7 @@ Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway 
 |-----|--------------|
 | Backend | `uv sync`, ruff (lint and format), mypy strict, pytest with coverage against a Postgres 16 service (fails under 80 %) |
 | Frontend | `npm ci`, oxlint, tsc, vitest with coverage thresholds (80 % statements and lines), vite build |
-| E2E | Starts Postgres, migrates and seeds, serves the backend on :8000 with the mock provider, builds the frontend and serves it with `vite preview` on :3000, then runs the Playwright journey and the six scenario specs; server logs and the Playwright report are attached when it fails |
+| End to end | Starts Postgres, migrates and seeds, serves the backend on :8000 with the mock provider, builds the frontend and serves it with `vite preview` on :3000, then runs the Playwright journey and the six scenario specs; server logs and the Playwright report are attached when it fails |
 | Secret scan | gitleaks over the full history |
 | AI gate | Its own workflow (`ai-gate.yml`, US-056) called from CI: six stages on the mock provider, each a job named in the summary: model approval (pinned model, closed enums, strict schemas, prompt version), contracts, the 14-case golden set (blocking at 100 % of the counted cases), adversarial (injection cases must land on `needs_review`), fairness (21 name-swapped runs must match their baseline), verdict |
 | Dependency audit | pip-audit and npm audit (production dependencies), reported in the run summary, non-blocking |
