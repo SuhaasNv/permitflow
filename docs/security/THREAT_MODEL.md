@@ -125,5 +125,11 @@ Scope: the MVP as designed (this document is written before implementation and w
 - **Validation:** `tests/integration/test_licence.py` (preview 409 outside pending approval, issue on approve, download by owner and officer, 404 before approval, admin 403, nothing issued on reject); `tests/unit/test_licence_render.py`.
 - **Gap:** No digital signature or public verification endpoint; production would sign the PDF (PAdES) and expose a verify-by-code page.
 
+### T21 Document text leaks through observability (LangSmith traces) — Medium
+- **Risk:** With tracing on (US-055), every OpenAI check is recorded in LangSmith: a second processor beyond OpenAI, in a region fixed at sign-up (US, EU or APAC in Sydney). A trace with the full prompt would carry the extracted document text and the form section, and LangSmith's default retention keeps it for 14 days on the free plan (400 days on the extended tier).
+- **Mitigation:** Tracing is off without `LANGSMITH_API_KEY`; when on, `LANGSMITH_HIDE_INPUTS=true` is the default and the parent run carries only the document type and the text length; the wrapped OpenAI call inherits the same client, so its inputs are hidden too. What remains visible: status, codes, severity, confidence, the summary, and evidence quotes capped at 300 characters (the domain limit), plus our own identifiers (verification run, application, document) and the prompt version. The endpoint is a setting so the organisation's region can be chosen; the recommended region for a Singapore deployment is APAC.
+- **Validation:** `tests/unit/test_tracing.py` (no key means no client and no network; the provider's inputs to the trace contain the text length and never the text; hidden inputs passed to the client).
+- **Gap:** Evidence quotes are still document excerpts; a production deployment would set `hide_outputs` with a redaction callable, or self-host Langfuse so nothing leaves the platform, and sign a DPA with LangChain (offered, per their regions FAQ).
+
 ## Production gaps summary
 Antivirus scanning, httpOnly cookie sessions, edge rate limiting and WAF, tamper-evident audit storage, encryption and retention policies, per-user quotas, SSO/MFA. All listed with recommendations in `docs/reviews/PRODUCTION_READINESS_REVIEW.md`.

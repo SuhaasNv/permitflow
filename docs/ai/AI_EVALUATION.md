@@ -70,6 +70,10 @@ Two earlier wordings were rejected by the harness before this one landed: a soft
 
 From 19 Sep 2026 the OpenAI run is a workflow rather than a by-hand record: the same harness with `--provider openai`, blocking at 14 of 14, nightly (04:00 Singapore), on demand, and on every push to `dev` or `main` that changes `app/infra/ai`, `app/domain/verification_rules.py`, `app/infra/extraction` or `evals`. The harness stamps the provider, model and `PROMPT_VERSION` into the JSON result, the run summary shows the per-case table with issue codes and latency, and the result files are kept for 90 days, so a regression can be traced to the commit and the prompt version that introduced it. The key is a GitHub repository secret; the workflow refuses to run without it, and pull requests never trigger it. Manual runs accept a lower `fail_under` for exploring a prompt change without turning the run red. Local equivalent: `uv run python -m evals.run --provider openai --json out.json --fail-under 1.0`.
 
+### LangSmith (US-055)
+
+`uv run python -m evals.run --provider openai --langsmith` runs the same cases through LangSmith's `evaluate`: the first run creates the dataset `permitflow-golden-set` (one example per case: id, group, document type, expected outcome), and every run after that is an experiment named `openai-<prompt version>-...` with a `passed` score per case and the provider, model and prompt version as metadata. The console table and the JSON file are unchanged, so `ai-eval.yml` can add the flag once the repository holds a `LANGSMITH_API_KEY` secret. Runtime traces from the deployed backend land in the project named by `LANGSMITH_PROJECT`; an officer override can be found by the verification run id in the trace metadata and added to the dataset as a new case, which is how the set is meant to grow.
+
 ## What the numbers mean, and do not
 
 - The adversarial cases pass because of the deterministic heuristic in `domain/verification_rules.py`, not because the model resisted the instruction. That is the design (AI-004): the check is advisory, an injection sends the document to a person, and no model verdict can mark it verified.

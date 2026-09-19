@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict
 from app.domain.enums import IssueCode
 from app.domain.verification_rules import VerificationRequest, VerificationResult
 from app.infra.ai.base import ProviderError, ProviderUnavailable
+from app.infra.ai.tracing import Tracer
 
 PROMPT_VERSION = "2026-09-19.3"
 
@@ -80,17 +81,32 @@ def build_messages(request: VerificationRequest, today: date | None = None) -> l
 class OpenAIProvider:
     name = "openai"
 
-    def __init__(self, *, api_key: str, model: str, timeout: int) -> None:
+    def __init__(self, *, api_key: str, model: str, timeout: int, tracer: Tracer | None = None) -> None:
         self.model: str | None = model
         self._api_key = api_key
         self._timeout = timeout
+        self._tracer = tracer or Tracer(api_key="", project="", hide_inputs=True)
 
     def verify(self, request: VerificationRequest) -> VerificationResult:
+        # One trace per check (US-055): our ids and the prompt version on the parent, the model call below.
+        metadata = {
+            "prompt_version": PROMPT_VERSION,
+            "document_type": request.document_type,
+            "model": self.model,
+            **{k: str(v) for k, v in request.extra.items()},
+        }
+        inputs = {"document_type": request.document_type, "text_chars": len(request.text)}
+        with self._tracer.run("verify_document", metadata=metadata, inputs=inputs) as span:
+            result = self._verify(request)
+            span.end(outputs=result.model_dump(mode="json"))
+            return result
+
+    def _verify(self, request: VerificationRequest) -> VerificationResult:
         try:
             from openai import APIConnectionError, APITimeoutError, OpenAI
         except ImportError as exc:  # pragma: no cover
             raise ProviderUnavailable("openai package not installed") from exc
-        client = OpenAI(api_key=self._api_key, timeout=self._timeout, max_retries=1)
+        client = self._tracer.wrap(OpenAI(api_key=self._api_key, timeout=self._timeout, max_retries=1))
         schema: dict[str, Any] = WireResult.model_json_schema()
         _strictify(schema)
         try:

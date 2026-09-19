@@ -17,6 +17,7 @@ dependencies = [
   "pypdf>=4.3",
   "openai>=1.40",
   "reportlab>=5.0.1",
+  "langsmith>=0.13.0",
 ]
 
 [dependency-groups]

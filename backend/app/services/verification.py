@@ -103,6 +103,7 @@ def run_verification(run_id: uuid.UUID) -> None:
                 document_type_description=DOCUMENT_TYPE_DESCRIPTIONS[doc.document_type.value],
                 form_section=dict(app.draft_data.get(section_key) or {}),
                 text=extracted.text,
+                extra={"verification_run_id": run.id, "application_id": app.id, "document_id": doc.id},
             )
             try:
                 result: VerificationResult = provider.verify(request)

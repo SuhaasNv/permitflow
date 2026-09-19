@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     ai_timeout_seconds: int = 30
     ai_confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     ai_max_text_chars: int = 20_000
+    # LangSmith tracing of the OpenAI provider (US-055): off without a key; inputs hidden by default.
+    langsmith_api_key: str = ""
+    # Regional endpoint: APAC (Sydney) is https://apac.api.smith.langchain.com; region fixed at sign-up.
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
+    langsmith_project: str = "permitflow"
+    langsmith_hide_inputs: bool = True
 
     @property
     def cors_origin_list(self) -> list[str]:
