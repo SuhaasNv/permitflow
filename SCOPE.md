@@ -40,12 +40,12 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 
 | # | Feature | Simplification |
 |---|---------|----------------|
-| S1 | Officer queue filtering by status | Client-side filter over a single list endpoint; the queue itself is M8 |
+| S1 | Officer queue filtering by status · **done** (queue groups: all, mine, waiting on operator, decided; plus search, US-036) | Client-side filter over a single list endpoint; the queue itself is M8 |
 | S2 | Re-run AI verification action for a document · **done in Sprint 1 (operator) and Sprint 2 (officer)** | Same code path as upload; the live status itself is M4 |
-| S3 | Operator can delete a document while in draft | Simple DELETE; without it a wrong upload is fixed by replacing the type |
+| S3 | Operator can delete a document while in draft · **done** (`DELETE .../documents/{id}`) | Simple DELETE; without it a wrong upload is fixed by replacing the type |
 | S4 | Compare any two revisions (not only current vs previous) · **done in Sprint 2** | Same diff function; only the selector changes |
-| S5 | AI evaluation dataset + runner script | Six fixtures, manual run documented |
-| S6 | Structured request logging with request id | Middleware only, no log shipping |
+| S5 | AI evaluation dataset + runner script · **done and grown** (14 cases, mock gate in CI, live run nightly, US-004, US-054, US-056) | Six fixtures, manual run documented |
+| S6 | Structured request logging with request id · **done** (Sprint 1) | Middleware only, no log shipping |
 | S7 | Admin persona: seeded admin account, `/admin/*` router, an operations dashboard (counts by status, idle applications, AI verification health, cross-application audit feed, read-only application view) and **user management** (create user, change role, deactivate/reactivate; every change audited; the last active admin cannot be demoted or deactivated). **Beyond the brief** — added because a regulator operating the platform needs oversight and account control; the assessment names only Operator and Officer. The `admin` role value exists in the enum from Day 1 (cheap); everything else in this row is built only after the MUST list is Done, so cutting it removes a router and two pages, not a concept. · **deferred at the Sprint 3 close (19 Sep)**: not started, cut per the cut order (admin epic first); `/admin/overview` ships as a placeholder that says so; US-070 to US-073 remain on the board as Not started | Overview page first; user management second (US-073); no password reset or self-registration |
 
 ## COULD HAVE (only if the core is stable)
@@ -109,6 +109,10 @@ Re-read at the Sprint 1 close: M1 to M7 and M16, M17 are built for the operator 
 ## Sprint 2 check (18 Sep 2026)
 
 Re-read at the Sprint 2 close: M8 to M15 (officer review, feedback, resubmission, compare, resolution, outcome, audit, notifications) are built and verified in the browser; M2 (OpenAI provider) is live with `gpt-4.1-mini`; S2 (officer re-run) and S4 (any-two-revision compare) landed. Two stories were added for the edge-case pass (US-033, US-034); nothing was removed from MUST. Assumption 10 (who the operator is) was written down. Remaining MUST items are the E2E half of M18, the Playwright, Docker-build and deployment half of M19, and M20 (final documents), all Sprint 3.
+
+## Sprint 3 check (19 Sep 2026, at the close)
+
+Re-read at the Sprint 3 close and the v0.3.0 release: every MUST (M1 to M20) is built, tested and deployed; the SHOULD items S1 to S6 are done or documented; S7 (admin) is deferred to v0.4.0 with a tightened scope (overview with AI health and quota counters; audit feed and read-only case; user management without in-app account creation; cut: create-user UI, "last active", cross-application search, per-operator draft counters); COULD items C1, C5, C6, C7 and C8 are done, C2 to C4 remain open. Added during the sprint and marked beyond the brief: US-053 to US-058 (coverage thresholds, live AI evaluation, tracing, AI gate with fairness, legal and accessibility review, abuse resistance). Nothing was removed from MUST. Assumptions 15 to 17 were written down during the sprint.
 
 ## What "done" means for this MVP
 

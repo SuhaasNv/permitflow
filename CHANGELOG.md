@@ -84,9 +84,49 @@ Also in this sprint, not tied to a story: the tidy pass (layering, schemas packa
 - What to change tomorrow: write the Playwright journey first thing so the loop is protected while the Day 3 documents are written; keep the admin epic strictly after the MUSTs (tests, CI, deployment, documents).
 - Risk into Sprint 3: Railway deployment needs the user's account; everything else is in our hands.
 
-## Sprint 3 (in progress, 18 to 19 Sep 2026)
+## Sprint 3 — 18 to 19 Sep 2026 — "Ship it honestly"
 
-**Handover (19 Sep 2026, 04:15 SGT, session paused):** `dev` is at the merge of `fix/us-050-run3-findings` (5 commits ahead of `origin/dev`, not pushed: ADR index, domain rollout record, R12 verifier date, run-3 UAT record). Sprint 3 acceptance passed 26/26 on https://dev.permitflow.space. Local Docker is stopped, so the backend suite was last run green before R12; CI runs it on the next push. Next steps, in order: (1) push `dev` and `fix/us-050-run3-findings` (ask first), wait for CI and the development deploy; (2) Sprint 3 close ritual per `docs/planning/SPRINTS.md` (tests green, Notion statuses: US-007, US-008 and US-052 to Done after the release, CHANGELOG "Sprint 3" with Shipped / Slipped / Retro, SCOPE re-check, `docs: close sprint 3`); (3) release v0.3.0: bump `frontend/package.json` to 0.3.0, merge `dev` into `main` with `--no-ff`, tag `v0.3.0`, push (ask), approve the production deploy in GitHub Actions (owner), attach the `:main` image sources to the production services if the deploy job reports none, seed production once (`railway ssh --environment production --service backend -- .venv/bin/python scripts/seed.py`), run the production UAT row on https://permitflow.space and record it in `docs/uat/UAT_PLAN.md` and `OPERATIONS.md` "Verified"; (4) rotate the OpenAI key after the assessment. Open questions for the owner: none blocking.
+Sprint goal met: the critical journey and six workflow scenarios run in a real browser in CI against the full stack; images are built once and deployed to two Railway environments on the owner's domain, production behind a person; the Day 3 documents exist and describe what is there; the AI has a six-stage gate on every push, a live evaluation against the real model, tracing, and a fairness check; the site has policies, an accessibility gate, rate limits and quotas. Sprint 3 acceptance: a third persona run-through on the deployed development environment, 26 of 26 steps. Released as v0.3.0 to production the same day.
+
+Numbers at close: backend 748 tests (ruff, mypy strict, pytest on Postgres, 96 % statements), frontend 152 tests (oxlint, tsc, vitest, vite build, 80.6 % statements), 8 Playwright specs, 14 golden cases plus 21 fairness runs on the live model, 22 threats, 12 ADRs, 70 stories. 129 commits on `dev` since `v0.2.0`, every one conventional, every story on its own branch merged with `--no-ff`. CI green on the release commit, including the AI gate, the accessibility gate and the blocking audits.
+
+### Shipped
+
+| Story | Outcome |
+|-------|---------|
+| US-005 Critical journey E2E | Done |
+| US-006 CI complete | Done (seven jobs plus the reusable AI gate) |
+| US-004 AI evaluation set | Done (14 cases; live runs 14 of 14) |
+| US-007 Railway deployment | Done (development on 19 Sep; production with v0.3.0) |
+| US-008 Day 3 documents | Done |
+| US-035 to US-037 hotfixes (rail, search, phone width) | Done |
+| US-038 Withdraw, US-045 Delete draft | Done (beyond the brief) |
+| US-039 to US-041 Feedback safety, flagged markers, respond flow | Done |
+| US-042 Scenario suite | Done (six specs) |
+| US-043 Layout audit, US-044 Errors inside CORS | Done |
+| US-046 to US-048 Sign-in, landing hero, session warning | Done |
+| US-049 Not fixed reopens an item | Done |
+| US-050 Bug hunt | Done (45 findings, 43 fixed, 2 kept as decisions) |
+| US-051 Licence certificate | Done (beyond the brief) |
+| US-052 Custom domain | Done (development live; production with the release) |
+| US-053 Coverage thresholds | Done (frontend 47 to 80.6 %) |
+| US-054 Live AI evaluation, US-055 LangSmith tracing, US-056 AI gate and fairness | Done (beyond the brief) |
+| US-057 Legal, privacy and accessibility | Done (beyond the brief) |
+| US-058 Abuse resistance | Done (beyond the brief; one gate defect found and fixed after) |
+
+### Slipped
+
+- US-070 to US-073, the admin epic: not started, cut per the cut order (admin first), deferred to v0.4.0 with a tightened scope recorded in `SCOPE.md` S7 and on the board ("slipped from Sprint 3: cut per cut order; v0.4.0"). `/admin/overview` ships as a placeholder that says so.
+- Nothing else: every other story on the plan, including the twenty-four added during the sprint, is Done.
+
+### Retro
+
+- What slowed us: the last day grew by six stories the brief never asked for (coverage, AI gate, live evaluation, tracing, legal review, abuse limits). Each was worth having and each is documented, but together they cost the admin epic and pushed the release into the evening. Lesson: put a hard time box on "beyond the brief" work once the MUST list is green.
+- What went well: every one of those stories went through the same path as the product stories (branch, tests, docs, Notion, review), so the repository stayed truthful; the five review agents before the close found one real security defect (the forwarded-for hop), one silently broken CI stage and thirty small inconsistencies, all fixed before the tag.
+- What to change: run the reviewer pass before the last story, not after; treat any CI step with a pipe as suspect until `pipefail` is on.
+- Risk into v0.4.0: the admin epic needs officer read endpoints to accept a second role and three tests to flip; scope it story by story, overview first.
+
+### Milestones during the sprint (Sprint 3)
 
 - Remote proof (19 Sep, 14:20 SGT): first push with the gate: AI gate 6 of 6 stages green on `dev`; `ai-eval.yml` green with 14 of 14 and 21 of 21 once both repository secrets were set (the OpenAI key lives in the root `.env`, not `backend/.env`; the first attempt set an empty secret); development redeployed with tracing and the first `permitflow-dev` trace came from a real upload through the API (draft deleted afterwards). US-054, US-055 and US-056 Done.
 - Gate defect (19 Sep, `fix/us-056-gate-contracts`): the AI gate's Contracts stage had passed falsely since US-056 (no database in the job, so every test errored at setup; the exit code was lost behind `| tee`). Postgres service added, `shell: bash` (pipefail) on every workflow, a guard that requires pytest to report passes, and per-stage summaries as headings with one table in the verdict.
