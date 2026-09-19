@@ -1,12 +1,16 @@
 # PermitFlow
 
+## Live: [permitflow.space](https://permitflow.space)
+
+Open **https://permitflow.space** and sign in with the demo accounts below (operator or officer); nothing to install. The API is at https://api.permitflow.space/api/v1 (`/health` answers without a login). A development copy with disposable data runs at https://dev.permitflow.space.
+
 [![PermitFlow launch video: the officer's review queue with the application, checks and feedback of a licence case. Click to watch (70 seconds).](docs/13-debrief/video/permitflow-launch-poster.jpg)](docs/13-debrief/video/permitflow-launch.mp4)
 
 *Launch video, 70 seconds (click the picture). The narrated walkthrough (4 min 36 s) and the technical video (1 min 28 s) are in `docs/13-debrief/video/`.*
 
 A regulatory licensing platform built for a 3-day full-stack assessment. Business operators apply for a Food Establishment Licence through a guided form with checked uploads; licensing officers review the submission, leave feedback tied to a specific section or document, and request a resubmission in which only the flagged parts reopen; every status change, feedback round and decision is audited; approval issues a licence certificate the business can download. An advisory AI verifier reads each uploaded document and compares it with the form before anyone submits; it never decides anything.
 
-**Try it:** development environment https://dev.permitflow.space (platform host as a fallback: https://frontend-development-afe2.up.railway.app), demo accounts below. Production, v0.3.0: https://permitflow.space (one example application waiting in the officer's queue). Local setup takes about ten minutes (below).
+**Try it:** production, v0.3.0: https://permitflow.space (one example application waiting in the officer's queue). Development environment: https://dev.permitflow.space (platform host as a fallback: https://frontend-development-afe2.up.railway.app). Demo accounts below. Local setup takes about ten minutes (below).
 
 **For the debrief:** `docs/13-debrief/` holds the pitch deck, the technical deck (scope, architecture, the four decisions that carry the brief's guarantees, branching, delivery, evidence, and how AI was used, with speaker notes) and three videos: a 70 second launch video, a narrated walkthrough and a short technical video. Start with the technical deck's handout PDF if you have ten minutes.
 
