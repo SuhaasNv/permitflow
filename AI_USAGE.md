@@ -1,6 +1,6 @@
 # AI Usage
 
-How AI tools were used to build PermitFlow, what they were given, how their output was checked, and where they were wrong. The short version is in `README.md`; this is the full record for the debrief. The AI inside the product (the document verifier) is a separate topic, covered in `docs/ai/AI_VERIFICATION_DESIGN.md` and `docs/ai/AI_EVALUATION.md`.
+How AI tools were used to build PermitFlow, what they were given, how their output was checked, and where they were wrong. The short version is in `README.md`; this is the full record. The AI inside the product (the document verifier) is a separate topic, covered in `docs/ai/AI_VERIFICATION_DESIGN.md` and `docs/ai/AI_EVALUATION.md`.
 
 ## 1. Tools and what each did
 
@@ -110,7 +110,3 @@ The audit found no cookies, no analytics, no embeds, no images and no reviews, s
 - The AI's own strict review on the last day scored Documentation 5/10 because the two README sections the brief names were still missing while nice-to-have features had been built; this document is part of the answer.
 - The first fairness run reported 2 of 21 name-swapped cases as differing, and the AI's first reading was "the model is sensitive to names". It was the harness: the form still carried the baseline applicant's email and the document its upper-case director line, so the model was right that form and document disagreed. Two more swaps and it was 21 of 21, twice. Recorded in `docs/ai/AI_ASSURANCE.md` because a fairness check that hides that would be measuring the wrong thing.
 - Two configuration slips on the last day: a vitest coverage option that the installed version had removed (caught by `tsc -b` in the build, not by the test run), and a repository secret set from the wrong `.env` file, so the first live evaluation ran with an empty key and refused, as designed. Both fixed within the hour.
-
-## 7. What I would say in the debrief
-
-The AI wrote most of the code and the docs; the design of the system (personas, state machine as data, immutable revisions, same-transaction audit, advisory AI behind an interface, edit-only-flagged as an authorization rule) came from the solutioning phase and the standing instruction files, and every piece of generated code went through tests I can run in front of you. I can explain any file in the repository. Where I cut corners: no queue or worker for the AI checks (FastAPI background tasks, `docs/architecture/decisions/ADR-004`), local-disk uploads on a Railway volume, in-process rate limiting, no CSP on the frontend, a 14-case evaluation set and a 7-name fairness set (enough to catch a broken prompt, not to estimate accuracy), no retention schedule, US-region providers for a Singapore service. Those are listed with what I would do about them in `README.md` under "What I would do next".
