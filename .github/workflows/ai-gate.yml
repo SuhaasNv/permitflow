@@ -13,9 +13,10 @@
 
 name: AI gate
 
+# Called from ci.yml only (workflow_call), so it never appears as a separate entry in the Actions list;
+# to run the gate by hand, re-run the CI workflow.
 on:
   workflow_call:
-  workflow_dispatch:
 
 env:
   APP_ENV: test
