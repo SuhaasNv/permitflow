@@ -68,6 +68,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: Nice-to-have · Day 3 (added 19 Sep, after US-054) · Dependencies: US-002, US-054 · Requirements: AI-007, AI-008, AI-009 · Branch `feat/us-055-langsmith-tracing` · Beyond the brief
 - Definition of Done: unit tests green; a trace of a live check visible in the owner's LangSmith project (development); documented.
 
+### US-056 — As a reviewer, I want the AI checks to run as a named gate of their own (model approval, contracts, golden set, adversarial, fairness, verdict) with a fairness check that swaps applicant names, so that "how do you evaluate the AI" is answered by a run summary anyone can read.
+- Acceptance criteria: `ai-gate.yml` as a reusable workflow called from `ci.yml` (still blocks images and deploys), six jobs each named in the run summary; the old `ai` job removed from `ci.yml`; `evals.run --group` filter; `evals/fairness.py`: 7 name sets (Chinese, Malay, Indian, Eurasian, Western and the baseline) × 3 scenarios = 21 runs, every variant must match its baseline's status and codes, `--fail` exit code, JSON output; fairness runs in the gate on the mock and in `ai-eval.yml` on the live model, both blocking; `docs/ai/AI_ASSURANCE.md` one-page explainer (layers, two pipelines, what the first fairness run found, limits, tools chosen and not); README, OPERATIONS, TEST_STRATEGY, AI_EVALUATION, PRODUCTION_READINESS_REVIEW updated.
+- Priority: Nice-to-have · Day 3 (added 19 Sep, after US-055) · Dependencies: US-004, US-054 · Requirements: AI-008 · Branch `feat/us-056-ai-gate` · Beyond the brief
+- Definition of Done: AI gate green on `dev`; fairness 21 of 21 on the live model recorded; explainer written.
+
 ### US-008 — As a reviewer, I want clear documentation of scope, architecture, AI usage, testing and operations, so that every decision is explainable.
 - Acceptance criteria: README (setup, env vars, tests, AI usage, what I would do next), SCOPE.md, ADRs, threat model, test strategy, UAT plan, operations guide, production readiness review, assessment traceability, CHANGELOG.
 - Priority: MVP · Day 3 (continuous) · Dependencies: all

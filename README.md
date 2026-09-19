@@ -94,13 +94,13 @@ Two images (backend, frontend) are built once in CI and pushed to GHCR; Railway 
 | Frontend | `npm ci`, oxlint, tsc, vitest with coverage thresholds (80 % statements and lines), vite build |
 | E2E | Starts Postgres, migrates and seeds, serves the backend on :8000 with the mock provider, builds the frontend and serves it with `vite preview` on :3000, then runs the Playwright journey and the six scenario specs; server logs and the Playwright report are attached when it fails |
 | Secret scan | gitleaks over the full history |
-| AI verification | Configuration audit, provider contract tests, the golden set through the real pipeline on the mock provider (blocking at 100 %), verdict in the run summary and as an artifact |
+| AI gate | Its own workflow (`ai-gate.yml`, US-056) called from CI: six stages on the mock provider, each a job named in the summary: model approval (pinned model, closed enums, strict schemas, prompt version), contracts, the 14-case golden set (blocking at 100 % of the counted cases), adversarial (injection cases must land on `needs_review`), fairness (21 name-swapped runs must match their baseline), verdict |
 | Dependency audit | pip-audit and npm audit (production dependencies), reported in the run summary, non-blocking |
 | Images | Builds the backend and frontend images; on `dev` and `main` pushes them to GHCR tagged with the branch and `sha-<commit>` |
 
 `deploy.yml` runs after a green CI on `dev` or `main` and redeploys the matching Railway environment from the new images (see Branching and deployment).
 
-`ai-eval.yml` is the AI's own pipeline (US-054): the same 14 golden and adversarial cases through the real model (`gpt-4.1-mini`, temperature 0), blocking at 14 of 14, with the model and prompt version stamped in the result. It runs nightly at 04:00 Singapore, by hand (with an optional lower pass rate for exploration), and on every push to `dev` or `main` that touches the AI module, the extraction, the rules or the golden set. It needs the `OPENAI_API_KEY` repository secret and refuses to run without it, so a fork's pull request never spends the key. The mock job in `ci.yml` proves the pipeline on every push; this one proves the model, and keeps 90 days of results as artifacts (`docs/ai/AI_EVALUATION.md`).
+`ai-eval.yml` is the live pipeline (US-054): the same 14 golden and adversarial cases and the fairness check through the real model (`gpt-4.1-mini`, temperature 0), blocking at 14 of 14 and 21 of 21, with the model and prompt version stamped in the result. It runs nightly at 04:00 Singapore, by hand (with an optional lower pass rate for exploration), and on every push to `dev` or `main` that touches the AI module, the extraction, the rules or the golden set. It needs the `OPENAI_API_KEY` repository secret and refuses to run without it, so a fork's pull request never spends the key. The gate proves the pipeline on every push; this one proves the model, and keeps 90 days of results as artifacts. The one-page explanation of all of it: `docs/ai/AI_ASSURANCE.md`.
 
 The E2E job waits for the backend and frontend suites, so a broken unit test never spends the browser minutes.
 
