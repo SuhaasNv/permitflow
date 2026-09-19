@@ -10,10 +10,10 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 
 | Variable | Default | Used by | Notes |
 |----------|---------|---------|-------|
-| `APP_ENV` | `development` | backend | `development`, `test` or `production`. `test` selects `TEST_DATABASE_URL`, disables the login rate limiter and relaxes the JWT secret check. |
+| `APP_ENV` | `development` | backend | `development`, `test` or `production`. `test` selects `TEST_DATABASE_URL` and disables the login rate limiter. |
 | `DATABASE_URL` | local Postgres | backend | Postgres only (`postgresql+psycopg://`). |
 | `TEST_DATABASE_URL` | local `permitflow_test` | pytest, CI | Truncated between tests. |
-| `JWT_SECRET` | empty | backend | Required (≥ 16 chars) outside `APP_ENV=test`; the app refuses to start otherwise. |
+| `JWT_SECRET` | empty | backend | Required (at least 16 random characters) in every environment, tests included; the `.env.example` placeholder is refused; the app does not start without it. |
 | `JWT_EXPIRES_MINUTES` | `480` | backend | 8 hours. |
 | `CORS_ORIGINS` | `http://localhost:3000` | backend | Comma separated allowlist. |
 | `UPLOAD_DIR` | `./data/uploads` | backend | Local disk storage; Railway volume at `/data/uploads`. |

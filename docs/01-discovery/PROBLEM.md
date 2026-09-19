@@ -12,7 +12,7 @@ PermitFlow is a small licensing operations platform that makes the submission â†
 
 Three personas: Operator, Licensing Officer and Admin. The first two come from the assessment; Admin is our addition (see `SCOPE.md`).
 
-### Operator (business seeking a licence)
+### Operator (the business seeking a licence, or the person applying on its behalf)
 - The person who fills in and submits the application. One account is one person; the business itself is described in the form, not modelled as a separate entity (SCOPE assumption 10).
 - Wants to get a licence with the fewest possible rounds.
 - Is not an expert in the regulator's requirements; needs guidance and specific feedback.
