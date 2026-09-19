@@ -1,4 +1,4 @@
-# PermitFlow — Documentation Index
+# PermitFlow: Documentation Index
 
 Status legend: **written** (solutioning phase, before code) · **to be written** (produced during or after implementation). Documents written before code describe the intended design; the production readiness review on Day 3 re-checks each against the actual code.
 
@@ -21,6 +21,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `architecture/permitflow-architecture.drawio` / `.png` | written | Overall architecture diagram |
 | `architecture/diagrams/uc1-use-case`, `uc2-use-case`, `e4-admin-use-case` (`.drawio` / `.png`) | written | UML use case diagrams per epic |
 | `architecture/diagrams/sequences/*.mmd` / `.png` | written | Sequence diagrams UC1-A, UC1-B, UC2-A, UC2-B (Mermaid) |
+| `architecture/diagrams/views/*.png` | written (19 Sep) | Solution architecture, deployment and CI/CD views used in the technical deck; generated from `debrief/technical-deck/DIAGRAM_PROMPTS.md` and rated against the code |
 
 ## Design (UI/UX phase, 17–18 Sep 2026)
 | Document | Status | Purpose |
@@ -41,7 +42,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Security
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `security/THREAT_MODEL.md` | written | Threats T1–T20, planned controls, validation, production gaps |
+| `security/THREAT_MODEL.md` | written | Threats T1 to T22, planned controls, validation, production gaps |
 
 ## AI
 | Document | Status | Purpose |
@@ -64,7 +65,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | Document | Status | Purpose |
 |----------|--------|---------|
 | `testing/TEST_STRATEGY.md` | written (19 Sep) | Layers, what each layer protects, how to run |
-| `uat/UAT_PLAN.md` | written (19 Sep) | Twelve acceptance scenarios, environments and accounts, the record of every run (local, development, CI; production after v0.3.0) |
+| `uat/UAT_PLAN.md` | written (19 Sep) | Twelve acceptance scenarios, environments and accounts, the record of every run (local, development, CI, production after v0.3.0) |
 | `operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
 | `operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |
 | `reviews/EDGE_CASE_REVIEW.md` | written (Sprint 2) | Three devil's-advocate reviews: every finding, its fix or its plan |
@@ -75,10 +76,13 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `reviews/FINAL_REVIEW.md` | written (19 Sep) | What was built, the decisions to defend, trade-offs, what the AI got wrong, what to show in the debrief |
 | `reviews/ISSUES_AND_MITIGATIONS.md` | written (19 Sep) | Every issue found across the reviews and run-throughs, its risk, mitigation and evidence; what was kept as a decision |
 | `security/SECURITY_REVIEW.md` | written (19 Sep) | The owner's hardening checklist and four abuse scenarios, before and after US-058, with tests and what production adds |
+| `demo/documents/README.md` and `demo/documents/with_issues/NOTES.md` | written | The three generated document sets (clean, with planted issues, second business), how to regenerate them, the planted values |
+| `design/prototype-src/README.md` | written | How the clickable prototype was generated |
 | `reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` | written (19 Sep) | The owner's legal, privacy and accessibility checklist answered item by item with evidence; laws considered; risks flagged; contrast computation (US-057) |
-| `../CHANGELOG.md` | written (Sprints 1 and 2 closed; Sprint 3 in progress) | Milestones, sprint closes with Shipped / Slipped / Retro |
+| `../CHANGELOG.md` | written (Sprints 1 to 3 closed; v0.3.0 released 19 Sep) | Milestones, sprint closes with Shipped / Slipped / Retro |
 | `../README.md` | written | What it is, stack and why, hosts, setup, demo accounts, security, tests, CI, deployment, AI verification, AI Usage, What I would do next |
+| `../debrief/README.md` | written (19 Sep) | The pitch deck, the technical deck, the launch video and the narrated walkthrough, with the plans they were built from |
 
 ## Review history
-- 18 Sep 2026 — UI/UX design phase: two independent design-critique passes on the prototype (pass 1 scored 6.6/10 with 11 rendering bugs and 15 fixes; all applied; pass 2 results recorded in `design/UI_DESIGN.md`). Scope changes from the phase: public landing page (M1, FR-031), admin user management (S7, FR-030, US-073, T19), upload validation and hash-based duplicate detection made explicit (M3, SEC-005).
-- 17 Sep 2026 — Solutioning documents reviewed by a stringent solution-architect pass (six blocking findings: feedback withdraw deadlock, document target semantics, undefined verification vocabulary, background-task session lifetime, assessment brief in git history, incomplete concurrency design). All six were fixed in the documents before implementation; the significant findings (priority conflicts, SQLite fallback, admin cuttability, notification kinds, stuck-application exits, structured-output constraints, error shape, sub-resource IDOR, third-party data transfer, rate limiter definition, diff by hash, cut order) were also applied.
+- 18 Sep 2026: UI/UX design phase: two independent design-critique passes on the prototype (pass 1 scored 6.6/10 with 11 rendering bugs and 15 fixes; all applied; pass 2 results recorded in `design/UI_DESIGN.md`). Scope changes from the phase: public landing page (M1, FR-031), admin user management (S7, FR-030, US-073, T19), upload validation and hash-based duplicate detection made explicit (M3, SEC-005).
+- 17 Sep 2026: Solutioning documents reviewed by a stringent solution-architect pass (six blocking findings: feedback withdraw deadlock, document target semantics, undefined verification vocabulary, background-task session lifetime, assessment brief in git history, incomplete concurrency design). All six were fixed in the documents before implementation; the significant findings (priority conflicts, SQLite fallback, admin cuttability, notification kinds, stuck-application exits, structured-output constraints, error shape, sub-resource IDOR, third-party data transfer, rate limiter definition, diff by hash, cut order) were also applied.

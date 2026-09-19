@@ -61,13 +61,13 @@ The brief, in one paragraph: build a regulatory licensing platform with three pe
 
 | Acceptance criterion | Status | Note |
 |----------------------|--------|------|
-| Checklist capture, draft save, per-item "Need Further Clarification", automatic move to Awaiting Post-Site Clarification, operator sees only flagged items, per-item response with uploads, multiple rounds with audit | Deferred | `SCOPE.md`; the two post-site statuses, their transitions and labels exist and are unit-tested (`test_workflow.py`); stories US-060 to US-066 recorded Not started on the board |
+| Checklist capture, draft save, per-item "Need Further Clarification", automatic move to Awaiting Post-Site Clarification, operator sees only flagged items, per-item response with uploads, multiple rounds with audit | Deferred | `SCOPE.md`; the three post-site statuses, their transitions and labels exist and are unit-tested (`test_workflow.py`); stories US-060 to US-066 recorded Not started on the board |
 
 ## Beyond the brief (product decisions, all marked in SCOPE.md)
 
 Product: withdraw with reason (US-038), delete draft (US-045), feedback undo (US-039) and reopen (US-049), respond-mode walk (US-041), search (US-036), landing page (FR-031), licence certificate with preview and download (US-051), the owner's domain (US-052).
 
-Engineering and assurance, all on the last day: coverage thresholds in CI (US-053), a live AI evaluation workflow (US-054), LangSmith tracing (US-055), the six-stage AI gate with a fairness check (US-056), the legal, privacy and accessibility review with policy pages and an axe gate (US-057), abuse resistance with rate limits, quotas, CSP and blocking audits (US-058)., Return to review (US-031 follow-up), custom domain (US-052), admin role reserved (US-070 to US-073 not built).
+Engineering and assurance, all on the last day: coverage thresholds in CI (US-053), a live AI evaluation workflow (US-054), LangSmith tracing (US-055), the six-stage AI gate with a fairness check (US-056), the legal, privacy and accessibility review with policy pages and an axe gate (US-057), abuse resistance with rate limits, quotas, CSP and blocking audits (US-058); Return to review (US-031 follow-up), custom domain (US-052), admin role reserved (US-070 to US-073 not built).
 
 ## Evaluation areas
 

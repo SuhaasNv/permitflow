@@ -31,10 +31,11 @@ uploads/
 .vscode/
 *.log
 
-# Assessment brief and other office docs never enter the repo
+# Assessment brief and other office docs never enter the repo (the decks under debrief/ are the exception)
 *.docx
 *.pptx
 *.xlsx
+!debrief/**/*.pptx
 
 # Large design exports stay out of git (link to the canvas instead)
 docs/extra-images/*.pdf

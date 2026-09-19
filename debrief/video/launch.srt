@@ -1,0 +1,59 @@
+1
+00:00:00,120 --> 00:00:01,891
+Which one did the officer read?
+
+2
+00:00:03,350 --> 00:00:05,697
+It came back with one word: resubmit.
+
+3
+00:00:06,050 --> 00:00:09,058
+Which document? Which section? Everything, again.
+
+4
+00:00:09,410 --> 00:00:10,967
+So I built PermitFlow.
+
+5
+00:00:11,320 --> 00:00:14,712
+The check finds an expired certificate before you submit.
+
+6
+00:00:15,370 --> 00:00:19,338
+Submit once. The application is recorded as Revision 1.
+
+7
+00:00:21,810 --> 00:00:25,138
+It appears in the officer's queue, with the checks already run.
+
+8
+00:00:28,050 --> 00:00:32,381
+Now, the officer's side: the same finding, and the evidence behind it.
+
+9
+00:00:32,730 --> 00:00:36,847
+Feedback points at the exact document, not at the whole application.
+
+10
+00:00:39,870 --> 00:00:41,790
+Only the flagged parts reopen.
+
+11
+00:00:43,330 --> 00:00:46,999
+One file replaced, one click: Revision 2 is recorded.
+
+12
+00:00:48,140 --> 00:00:51,425
+Back with the officer, the item is already marked addressed.
+
+13
+00:00:51,780 --> 00:00:56,409
+After the site visit, approval issues the licence. Every step on record.
+
+14
+00:00:57,050 --> 00:01:04,346
+Checked before submission. Feedback tied to the document. Only the flagged parts reopened. Every step on record.
+
+15
+00:01:05,250 --> 00:01:07,469
+Checks help you. Officers decide.
