@@ -8,7 +8,7 @@ Shared instruction, put at the top of every prompt:
 
 Acceptance rules I will use when rating each diagram follow each prompt.
 
-Outcome (19 Sep 2026): diagrams 1, 4 and 5 were accepted and live in `docs/architecture/diagrams/views/` as `solution-architecture.png`, `deployment.png` and `ci-cd-pipeline.png`. Diagram 2 was skipped (the layering is in `docs/architecture/ARCHITECTURE.md` as text) and diagram 3 was dropped after three attempts kept mis-routing the browser-to-API and OpenAI arrows. The working names during generation were:
+Outcome (19 Sep 2026): diagrams 1, 4 and 5 were accepted and live in `../../architecture/diagrams/views/` as `solution-architecture.png`, `deployment.png` and `ci-cd-pipeline.png`. Diagram 2 was skipped (the layering is in `docs/architecture/ARCHITECTURE.md` as text) and diagram 3 was dropped after three attempts kept mis-routing the browser-to-API and OpenAI arrows. The working names during generation were:
 
 - `01-solution-architecture.png`
 - `02-logical-architecture.png`
