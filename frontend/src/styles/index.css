@@ -57,6 +57,8 @@
   html {
     background: var(--color-bg);
     color: var(--color-text);
+    /* No rubber-band past the page edges (trackpad and touch): the ground never shows through. */
+    overscroll-behavior: none;
     font-family: var(--font-sans);
     font-size: 15px;
     line-height: 22px;

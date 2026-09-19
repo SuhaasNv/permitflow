@@ -23,8 +23,7 @@ export default defineConfig({
     css: false,
     coverage: {
       provider: 'v8',
-      // Every source file counts, tested or not, so the number cannot be flattered by leaving files out.
-      all: true,
+      // Every file matched by include counts, tested or not, so the number cannot be flattered by leaving files out.
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/main.tsx'],
       reporter: ['text-summary', 'text', 'lcov'],

@@ -31,7 +31,7 @@ Measured with every source file counted, not only the files a test happens to im
 | Suite | Command | Result (19 Sep 2026) | Threshold |
 |-------|---------|----------------------|-----------|
 | Backend (`app/`, branch coverage on) | `uv run pytest --cov=app` (`[tool.coverage.*]` in `pyproject.toml`) | 96 % statements, 736 tests | `--cov-fail-under=80` |
-| Frontend (`src/**/*.{ts,tsx}` minus tests, fixtures and `main.tsx`) | `npm run test:coverage` (v8, `coverage.all` in `vite.config.ts`) | 80.5 % statements, 83.7 % lines, 77.9 % functions, 69.3 % branches, 146 tests | statements 80, lines 80, functions 75, branches 65 |
+| Frontend (`src/**/*.{ts,tsx}` minus tests, fixtures and `main.tsx`) | `npm run test:coverage` (v8, `coverage.include` in `vite.config.ts`) | 80.5 % statements, 83.7 % lines, 77.9 % functions, 69.3 % branches, 146 tests | statements 80, lines 80, functions 75, branches 65 |
 
 What the numbers do not say: a covered line is a line that ran, not a line whose behaviour is asserted. The tests added for US-053 were chosen by behaviour first (the acceptance criteria list them in `../planning/USER_STORIES.md`); the percentage is the check that nothing was left untested, not the goal. Playwright coverage is not counted: it runs against a built bundle.
 
