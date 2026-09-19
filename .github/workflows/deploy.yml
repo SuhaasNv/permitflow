@@ -2,8 +2,12 @@ name: Deploy
 
 # Continuous deployment (US-007). Runs after CI succeeded on dev or main, never on pull requests:
 #   dev  -> Railway environment "development" (services track the :dev image tag), automatic
-#   main -> Railway environment "production"  (services track the :main image tag), pauses for a
-#           required reviewer on the GitHub "production" environment before Railway is touched
+#   main -> Railway environment "production"  (services track the :main image tag): started by hand
+#           (gh workflow run deploy.yml --ref main -f environment=production) and paused for a
+#           required reviewer on the GitHub "production" environment before Railway is touched.
+#           The automatic path is not used: a workflow_run job executes on the default branch (dev)
+#           and the production environment admits main only, so that job is skipped here rather
+#           than left to be rejected.
 # "Run workflow" (workflow_dispatch) redeploys either environment from its current images by hand,
 # for example after a platform incident. Railway pulls the images CI pushed to GHCR; nothing is
 # built here. Rollback: redeploy an earlier sha- tag from the Railway dashboard.
@@ -12,7 +16,7 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-    branches: [dev, main]
+    branches: [dev]
   workflow_dispatch:
     inputs:
       environment:

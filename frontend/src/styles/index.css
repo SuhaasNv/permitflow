@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 @import './fonts.css';
 
-/* Design tokens: docs/design/DESIGN_SYSTEM.md */
+/* Design tokens: docs/04-design/DESIGN_SYSTEM.md */
 @theme {
   --font-sans: 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;

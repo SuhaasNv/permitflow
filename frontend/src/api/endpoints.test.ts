@@ -1,6 +1,6 @@
 /**
  * Contract test for the thin API wrappers: each one must hit the path and method the backend router
- * exposes (docs/architecture/ARCHITECTURE.md API table). A renamed route or a wrong verb fails here, not
+ * exposes (docs/03-architecture/ARCHITECTURE.md API table). A renamed route or a wrong verb fails here, not
  * in the browser.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

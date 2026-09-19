@@ -1,6 +1,6 @@
 """Deterministic, dependency-free provider used in tests and when no API key is configured (AI-007).
 
-Heuristics are documented in docs/ai/AI_VERIFICATION_DESIGN.md.
+Heuristics are documented in docs/07-ai/AI_VERIFICATION_DESIGN.md.
 """
 
 import re

@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test'
 export const PASSWORD = process.env.SEED_PASSWORD ?? 'PermitFlow!2026'
 export const OPERATOR = 'operator@permitflow.example.sg'
 export const OFFICER = 'officer@permitflow.example.sg'
-/** Backend the scenarios seed through. Locally the backend runs on 8001 (see docs/operations/OPERATIONS.md). */
+/** Backend the scenarios seed through. Locally the backend runs on 8001 (see docs/09-operations/OPERATIONS.md). */
 export const API_URL = process.env.E2E_API_URL ?? 'http://localhost:8000/api/v1'
 
 export const TXT =

@@ -1,7 +1,7 @@
 /**
  * Policy pages (US-057). Plain statements of what the service actually does, written for Singapore's
  * Personal Data Protection Act 2012 and reviewed against the code, not a template. Every claim here has a
- * counterpart in docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md. Dates are the last review, not the deploy.
+ * counterpart in docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md. Dates are the last review, not the deploy.
  */
 
 export type PolicySlug = 'privacy' | 'terms' | 'cookies'
