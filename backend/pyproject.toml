@@ -54,3 +54,13 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 addopts = "-q"
 filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+# Industry floor (US-053); the suite sits well above it. Enforced in CI with --cov-fail-under.
+fail_under = 80
+skip_covered = true
+show_missing = true

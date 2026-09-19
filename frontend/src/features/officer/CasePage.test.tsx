@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
 
+import { AppError } from '@/api/client'
 import * as formApi from '@/api/formSchema'
 import * as api from '@/api/officer'
 import type { OfficerApplication } from '@/api/officer'
@@ -257,6 +258,68 @@ describe('OfficerCasePage', () => {
     )
     expect(await screen.findByText('1 open feedback')).toBeInTheDocument()
     expect(screen.getByText('Draft, not sent yet')).toBeInTheDocument()
+  })
+
+  it('shows the stale banner on a version conflict and reloads the case on request', async () => {
+    const get = vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(view)
+    vi.spyOn(api, 'transitionApplication').mockRejectedValue(
+      new AppError(409, { code: 'version_conflict', message: 'The application changed.', details: { current: 4 } }),
+    )
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Start review' }))
+    await userEvent.click(screen.getAllByRole('button', { name: 'Start review' }).at(-1)!)
+    expect(await screen.findByText('This application changed since you opened it')).toBeInTheDocument()
+    const calls = get.mock.calls.length
+    await userEvent.click(screen.getByRole('button', { name: /Reload/ }))
+    await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(calls))
+  })
+
+  it('re-runs a document check from the case and reports a refusal', async () => {
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(view)
+    const rerun = vi
+      .spyOn(api, 'rerunOfficerCheck')
+      .mockRejectedValue(new AppError(409, { code: 'check_in_progress', message: 'A check is already running.' }))
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Re-run check' }))
+    await waitFor(() => expect(rerun).toHaveBeenCalledWith('a1', 'd1'))
+    expect(await screen.findByText('Could not re-run the check')).toBeInTheDocument()
+  })
+
+  it('fills the composer from a template and lets the officer change the target', async () => {
+    const underReview: OfficerApplication = {
+      ...view,
+      status: 'under_review',
+      status_label: 'Under Review',
+      feedback_editable: true,
+      feedback_locked_reason: null,
+      actions: [],
+    }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(underReview)
+    vi.spyOn(api, 'getFeedbackTemplates').mockResolvedValue([
+      {
+        key: 'floor_plan_unclear',
+        title: 'Floor plan does not show the food preparation area',
+        target_type: 'document',
+        section_key: null,
+        document_type: 'floor_plan',
+        message: 'Please upload a plan that marks the preparation, storage and washing areas.',
+      },
+    ])
+    const spy = vi.spyOn(api, 'createFeedback').mockResolvedValue(underReview)
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Add feedback' }))
+    await userEvent.selectOptions(screen.getByLabelText(/Template/), 'floor_plan_unclear')
+    expect(screen.getByLabelText(/Feedback for the operator/)).toHaveValue(
+      'Please upload a plan that marks the preparation, storage and washing areas.',
+    )
+    expect(screen.getByLabelText(/About/)).toHaveValue('document:floor_plan')
+    await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }))
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        'a1',
+        expect.objectContaining({ target_type: 'document', document_type: 'floor_plan', template_key: 'floor_plan_unclear' }),
+      ),
+    )
   })
 
   it('offers Withdraw only on an unsent draft item, and Undo after withdrawing (US-039)', async () => {
