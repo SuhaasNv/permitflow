@@ -75,7 +75,7 @@ One Railway project (`permitflow`), two environments that share nothing:
 | Images | `ghcr.io/suhaasnv/permitflow-backend:dev`, `...-frontend:dev` | `:main` |
 | Frontend | https://dev.permitflow.space (US-052; Railway host https://frontend-development-afe2.up.railway.app) | https://permitflow.space (also `www`; Railway host https://frontend-production-2d8b.up.railway.app) |
 | API | https://api.dev.permitflow.space/api/v1 (US-052; Railway host https://backend-development-4e04.up.railway.app/api/v1) | https://api.permitflow.space/api/v1 (Railway host https://backend-production-19cd.up.railway.app/api/v1) |
-| State (19 Sep 2026) | live: deployed on every merge to `dev`, seeded | configured (variables, volume, domains, approval rule); no image attached until the v0.3.0 release, so the hosts answer 404 until then |
+| State (19 Sep 2026) | live: deployed on every merge to `dev`, seeded | live since v0.3.0 (19 Sep, 17:00 SGT): images `ghcr.io/suhaasnv/permitflow-{backend,frontend}:main` attached, first deployment committed from the Railway staging area, then the approved `deploy.yml` run redeployed with the health gates; seeded once; production UAT recorded in `docs/uat/UAT_PLAN.md` |
 | Database | own Postgres 18 service | own Postgres 18 service |
 | Uploads | volume `uploads` at `/data/uploads` | own volume at `/data/uploads` |
 | AI | `AI_PROVIDER=openai`, `gpt-4.1-mini` | same |

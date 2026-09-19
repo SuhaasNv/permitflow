@@ -126,6 +126,10 @@ Numbers at close: backend 748 tests (ruff, mypy strict, pytest on Postgres, 96 %
 - What to change: run the reviewer pass before the last story, not after; treat any CI step with a pipe as suspect until `pipefail` is on.
 - Risk into v0.4.0: the admin epic needs officer read endpoints to accept a second role and three tests to flip; scope it story by story, overview first.
 
+### Release v0.3.0 (19 Sep 2026)
+
+`dev` merged into `main` at `38df991`, tagged `v0.3.0`; CI green on `main`; images tagged `sha-38df991`, `main` and `v0.3.0`; production services given their image sources and deployed; the manual production run of `deploy.yml` approved by the owner and green with the health gates (the automatic `workflow_run` path is rejected by the branch policy, recorded in OPERATIONS); production seeded; production UAT passed (U1, U2, U5, U10, U11, `docs/uat/UAT_PLAN.md`). Live at https://permitflow.space and https://api.permitflow.space.
+
 ### Milestones during the sprint (Sprint 3)
 
 - Remote proof (19 Sep, 14:20 SGT): first push with the gate: AI gate 6 of 6 stages green on `dev`; `ai-eval.yml` green with 14 of 14 and 21 of 21 once both repository secrets were set (the OpenAI key lives in the root `.env`, not `backend/.env`; the first attempt set an empty secret); development redeployed with tracing and the first `permitflow-dev` trace came from a real upload through the API (draft deleted afterwards). US-054, US-055 and US-056 Done.
