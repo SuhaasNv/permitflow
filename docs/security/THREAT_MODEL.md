@@ -88,6 +88,7 @@ Scope: the MVP as designed (this document is written before implementation and w
 - **Validation:** Test for 429 after limit.
 - **Gap:** limiter is per-process; production uses edge rate limiting.
 - **Sprint 2 amendment:** the limiter keys on the socket address and honours `X-Forwarded-For` only when the socket is listed in `TRUSTED_PROXIES` (a client could otherwise pick a fresh bucket per request); a successful login no longer resets the failure window (an attacker with one valid account could otherwise clear it); an unknown email costs the same argon2 check as a wrong password (timing oracle). Tests in `tests/integration/test_edge_cases.py`.
+- **US-058 amendment (19 Sep):** every request is now counted per client in a sliding minute (`RATE_LIMIT_PER_MINUTE`, 240) and sign-in attempts of any outcome separately (`LOGIN_ATTEMPTS_PER_MINUTE`, 20), answered 429 with `Retry-After` inside the CORS layer; health endpoints exempt. Still per process by design. `tests/integration/test_abuse_limits.py`; `SECURITY_REVIEW.md`.
 
 ### T14 Token theft via XSS (JWT in sessionStorage) — Medium
 - **Mitigation:** XSS controls above; token expires in 8 hours; role is in the token but authorization is re-checked against the database user on each request.
@@ -101,7 +102,7 @@ Scope: the MVP as designed (this document is written before implementation and w
 ### T16 Denial of service via AI cost — Low
 - **Risk:** Repeated re-verification burns API credits.
 - **Mitigation:** Re-run allowed only when the latest run is terminal; text truncated to 20 000 characters; one model call per run.
-- **Gap:** no per-user quota.
+- **Gap:** ~~no per-user quota~~ closed by US-058 (19 Sep): runs are counted in the database over a rolling day per applicant (`AI_RUNS_PER_USER_PER_DAY`, 60) and per platform (`AI_RUNS_PER_DAY`, 1,000); over quota the run is stored `unavailable` with reason `daily_limit_reached` and nothing reaches the model; an operator may also hold at most `MAX_DRAFTS_PER_USER` (20) open drafts. Remaining gap: the limits are static; a production version would alert on approach and expose the counters to the admin.
 
 ### T17 Race conditions on status — Medium
 - **Risk:** Two officers or an officer and operator change status concurrently, producing an invalid sequence.
@@ -138,4 +139,4 @@ Scope: the MVP as designed (this document is written before implementation and w
 - **Gap:** A scheduled reset of the development database and volume; NRIC-pattern redaction in extracted text before storage and before the model call (PDPC NRIC advisory guidelines); SEC-012 retention; for a real deployment, regional providers or contractual transfer terms (PDPA s. 26). Full review: `../reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.
 
 ## Production gaps summary
-Antivirus scanning, httpOnly cookie sessions, edge rate limiting and WAF, tamper-evident audit storage, encryption and retention policies, per-user quotas, SSO/MFA. All listed with recommendations in `docs/reviews/PRODUCTION_READINESS_REVIEW.md`.
+Antivirus scanning, httpOnly cookie sessions, edge rate limiting and WAF (the in-process limiter and the database quotas are the MVP answer, US-058), tamper-evident audit storage, encryption and retention policies, SSO/MFA. All listed with recommendations in `docs/reviews/PRODUCTION_READINESS_REVIEW.md`.

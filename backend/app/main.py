@@ -15,6 +15,7 @@ from starlette.responses import Response
 from app.api.v1.router import api_router
 from app.core.errors import AppError
 from app.core.logging import configure_logging, request_logging_middleware
+from app.core.rate_limit import RequestLimiter
 from app.core.settings import get_settings
 
 logger = logging.getLogger("permitflow")
@@ -79,6 +80,25 @@ def create_app() -> FastAPI:
             logger.exception("unhandled", extra={"extra_fields": {"request_id": request_id}})
             return _error_response(request, 500, "internal_error", _INTERNAL_MESSAGE)
 
+    # Per-client request limits (US-058), inside CORS so a 429 carries the headers the browser needs.
+    # Off in the test environment; tests that exercise it install their own limiter on app.state.
+    app.state.limiter = RequestLimiter(
+        per_minute=0 if settings.app_env == "test" else settings.rate_limit_per_minute,
+        login_per_minute=0 if settings.app_env == "test" else settings.login_attempts_per_minute,
+        trusted_proxies=settings.trusted_proxies,
+    )
+
+    @app.middleware("http")
+    async def rate_limit(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        retry_after = app.state.limiter.check(request)
+        if retry_after is not None:
+            response = _error_response(
+                request, 429, "rate_limited", "Too many requests. Try again in a moment."
+            )
+            response.headers["Retry-After"] = str(retry_after)
+            return response
+        return await call_next(request)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -97,6 +117,13 @@ def create_app() -> FastAPI:
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cache-Control"] = "no-store"
+        # US-058: the API serves JSON and files, never a page, so nothing may run or be embedded. The
+        # interactive docs (non-production only) load Swagger from a CDN and are exempted.
+        if not request.url.path.startswith("/api/docs") and not request.url.path.startswith("/api/openapi"):
+            response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         return response
 
     app.middleware("http")(request_logging_middleware)

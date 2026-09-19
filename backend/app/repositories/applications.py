@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound
@@ -54,6 +54,13 @@ class ApplicationRepository:
             .order_by(Application.updated_at.desc())
         )
         return [(row[0], row[1]) for row in self.db.execute(stmt)]
+
+    def count_drafts(self, operator_id: uuid.UUID) -> int:
+        """Open drafts an operator holds (US-058 quota)."""
+        stmt = select(func.count()).where(
+            Application.operator_id == operator_id, Application.status == ApplicationStatus.DRAFT
+        )
+        return int(self.db.execute(stmt).scalar_one())
 
     def next_reference_no(self, year: int) -> str:
         n = int(self.db.scalar(text("SELECT nextval('application_reference_seq')")) or 0)

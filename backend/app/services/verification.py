@@ -35,6 +35,7 @@ from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.services.applications import ApplicationService
+from app.services.quotas import new_run
 
 logger = logging.getLogger("permitflow.verification")
 
@@ -281,7 +282,7 @@ class VerificationService:
         latest = self.documents.latest_run(doc.id)
         if latest is not None and latest.status not in TERMINAL:
             raise Conflict("A check is already in progress for this document.")
-        run = VerificationRun(document_id=doc.id, status=VerificationStatus.PENDING, provider="none")
+        run = new_run(self.db, doc.id, app.operator_id)
         self.documents.add_run(run)
         self.audit.record(
             application_id=app.id,

@@ -74,6 +74,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `reviews/ASSESSMENT_TRACEABILITY.md` | written (19 Sep) | The brief decoded; every deliverable and acceptance criterion → implementation → test → evidence |
 | `reviews/FINAL_REVIEW.md` | written (19 Sep) | What was built, the decisions to defend, trade-offs, what the AI got wrong, what to show in the debrief |
 | `reviews/ISSUES_AND_MITIGATIONS.md` | written (19 Sep) | Every issue found across the reviews and run-throughs, its risk, mitigation and evidence; what was kept as a decision |
+| `security/SECURITY_REVIEW.md` | written (19 Sep) | The owner's hardening checklist and four abuse scenarios, before and after US-058, with tests and what production adds |
 | `reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` | written (19 Sep) | The owner's legal, privacy and accessibility checklist answered item by item with evidence; laws considered; risks flagged; contrast computation (US-057) |
 | `../CHANGELOG.md` | written (Sprints 1 and 2 closed; Sprint 3 in progress) | Milestones, sprint closes with Shipped / Slipped / Retro |
 | `../README.md` | written | What it is, stack and why, hosts, setup, demo accounts, security, tests, CI, deployment, AI verification, AI Usage, What I would do next |

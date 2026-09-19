@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import BadRequest, Forbidden, NotFound
 from app.core.settings import get_settings
-from app.domain.enums import ApplicationStatus, DocumentType, VerificationStatus
+from app.domain.enums import ApplicationStatus, DocumentType
 from app.domain.uploads import (
     UploadRejected,
     canonical_content_type,
@@ -25,6 +25,7 @@ from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.services.applications import ApplicationService
+from app.services.quotas import new_run
 
 CHUNK = 64 * 1024
 
@@ -122,7 +123,7 @@ class DocumentService:
             previous.is_current = False
         self.documents.add(doc)
         self.db.flush()
-        run = VerificationRun(document_id=doc.id, status=VerificationStatus.PENDING, provider="none")
+        run = new_run(self.db, doc.id, app.operator_id)
         self.documents.add_run(run)
         self.audit.record(
             application_id=app.id,

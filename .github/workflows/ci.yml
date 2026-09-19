@@ -73,7 +73,10 @@ jobs:
     uses: ./.github/workflows/ai-gate.yml
 
   audit:
-    name: Dependency audit
+    # Blocking since US-058: a known vulnerability in a production dependency, or a bandit finding of
+    # medium severity or above, fails the build. (Before US-058 pip-audit had been failing on the
+    # project's own editable line and nobody noticed, because the step was allowed to fail.)
+    name: Dependency and code audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -81,27 +84,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: pip-audit
+      - name: pip-audit (production dependencies, blocking)
         working-directory: backend
-        continue-on-error: true
         run: |
-          uv sync --frozen
-          uv export --frozen --no-dev --format requirements-txt > /tmp/req.txt
-          uvx pip-audit -r /tmp/req.txt --desc 2>&1 | tee /tmp/pip-audit.txt
-      - name: npm audit (production dependencies)
+          uv export --frozen --no-dev --no-emit-project --format requirements-txt > /tmp/req.txt
+          uvx pip-audit -r /tmp/req.txt --desc --strict 2>&1 | tee /tmp/pip-audit.txt
+      - name: bandit (backend source, blocking at medium)
+        working-directory: backend
+        run: uvx bandit -r app -q -ll -ii 2>&1 | tee /tmp/bandit.txt
+      - name: npm audit (production dependencies, blocking at high)
         working-directory: frontend
-        continue-on-error: true
         run: |
           npm ci --ignore-scripts
-          npm audit --omit=dev 2>&1 | tee /tmp/npm-audit.txt
+          npm audit --omit=dev --audit-level=high 2>&1 | tee /tmp/npm-audit.txt
       - name: Summary
         if: always()
         run: |
           {
-            echo "## Dependency audit"
+            echo "## Dependency and code audit"
             echo '```'
-            tail -n 5 /tmp/pip-audit.txt 2>/dev/null
-            tail -n 5 /tmp/npm-audit.txt 2>/dev/null
+            tail -n 3 /tmp/pip-audit.txt 2>/dev/null
+            tail -n 3 /tmp/bandit.txt 2>/dev/null
+            tail -n 3 /tmp/npm-audit.txt 2>/dev/null
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -186,7 +190,7 @@ jobs:
   images:
     name: Images
     runs-on: ubuntu-latest
-    needs: [backend, frontend, ai, e2e, secrets]
+    needs: [backend, frontend, ai, e2e, secrets, audit]
     permissions:
       contents: read
       packages: write

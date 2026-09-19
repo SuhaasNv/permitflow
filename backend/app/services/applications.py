@@ -16,6 +16,7 @@ from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
+from app.services.quotas import ensure_draft_capacity
 
 
 class ApplicationService:
@@ -29,6 +30,7 @@ class ApplicationService:
 
     def create(self, operator: User) -> Application:
         """One transaction: application row + `application.created` audit event (AUD-005)."""
+        ensure_draft_capacity(self.db, operator.id)
         app = Application(
             reference_no=self.applications.next_reference_no(datetime.now(UTC).year),
             operator_id=operator.id,
