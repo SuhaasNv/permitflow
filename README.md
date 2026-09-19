@@ -6,7 +6,7 @@
 
 https://github.com/user-attachments/assets/942739f7-e2bd-4360-b525-ecf960a7e796
 
-*Launch video, 70 seconds. The full-resolution file, the narrated walkthrough (4 min 36 s) and the technical video (1 min 28 s) are in `docs/13-debrief/video/`.*
+*Launch video, 70 seconds. The full-resolution file, the narrated walkthrough (4 min 36 s) and the technical video (4 min) are in `docs/13-debrief/video/`.*
 
 A regulatory licensing platform built for a 3-day full-stack assessment. Business operators apply for a Food Establishment Licence through a guided form with checked uploads; licensing officers review the submission, leave feedback tied to a specific section or document, and request a resubmission in which only the flagged parts reopen; every status change, feedback round and decision is audited; approval issues a licence certificate the business can download. An advisory AI verifier reads each uploaded document and compares it with the form before anyone submits; it never decides anything.
 

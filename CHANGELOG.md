@@ -4,7 +4,7 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 
 ## Debrief material (19 Sep 2026, after v0.3.0, US-059)
 
-- `docs/13-debrief/`: the pitch deck (11 slides) and the technical deck (18 slides) as PowerPoint with handout PDFs, the launch video (70.7 s) with its poster, the narrated walkthrough (4 min 36 s) and the technical video (1 min 28 s), videos in Git LFS. Diagrams (solution architecture, deployment, CI/CD) added under `docs/03-architecture/diagrams/views/` and embedded in `ARCHITECTURE.md`, `OPERATIONS.md` and the README; the launch poster heads the README. No product code changed.
+- `docs/13-debrief/`: the pitch deck (11 slides) and the technical deck (18 slides) as PowerPoint with handout PDFs, the launch video (70.7 s) with its poster, the narrated walkthrough (4 min 36 s) and the technical video (4 min, with a chapter on how the product and the films were built), videos in Git LFS. Diagrams (solution architecture, deployment, CI/CD) added under `docs/03-architecture/diagrams/views/` and embedded in `ARCHITECTURE.md`, `OPERATIONS.md` and the README; the launch poster heads the README. No product code changed.
 
 ## Sprint 1, 18 Sep 2026: "An operator can submit"
 
