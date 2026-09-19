@@ -41,7 +41,7 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 
 ## Seeding
 
-`cd backend && uv run python scripts/seed.py` creates the demo operator and officer if they do not exist. `SEED_PASSWORD` sets their password (default `PermitFlow!2026`); set it to something else in any shared environment.
+`cd backend && uv run python scripts/seed.py` creates the demo operator (`operator@permitflow.example.sg`) and officer (`officer@permitflow.example.sg`) if they do not exist. `SEED_PASSWORD` sets their password (default `PermitFlow!2026`); set it to something else in any shared environment.
 
 ## Uploads
 
@@ -75,20 +75,20 @@ One Railway project (`permitflow`), two environments that share nothing:
 | Images | `ghcr.io/suhaasnv/permitflow-backend:dev`, `...-frontend:dev` | `:main` |
 | Frontend | https://dev.permitflow.space (US-052; Railway host https://frontend-development-afe2.up.railway.app) | https://permitflow.space (also `www`; Railway host https://frontend-production-2d8b.up.railway.app) |
 | API | https://api.dev.permitflow.space/api/v1 (US-052; Railway host https://backend-development-4e04.up.railway.app/api/v1) | https://api.permitflow.space/api/v1 (Railway host https://backend-production-19cd.up.railway.app/api/v1) |
-| State (19 Sep 2026) | live: deployed on every merge to `dev`, seeded | configured (variables, volume, domains, approval rule); no image attached until the v0.3.0 release, so the hosts answer 404 until then |
+| State (19 Sep 2026) | live: deployed on every merge to `dev`, seeded | live since v0.3.0 (19 Sep, 17:00 SGT): images `ghcr.io/suhaasnv/permitflow-{backend,frontend}:main` attached, first deployment committed from the Railway staging area, then the approved `deploy.yml` run redeployed with the health gates; seeded once; production UAT recorded in `docs/uat/UAT_PLAN.md` |
 | Database | own Postgres 18 service | own Postgres 18 service |
 | Uploads | volume `uploads` at `/data/uploads` | own volume at `/data/uploads` |
 | AI | `AI_PROVIDER=openai`, `gpt-4.1-mini` | same |
 
-Two images, built once in CI and pulled by Railway (Railway never builds): `backend/Dockerfile` (uvicorn, runs `alembic upgrade head` on start) and `frontend/Dockerfile` (Vite build served by nginx; the API URL is written into `config.js` at container start from `API_URL`, so one image serves both environments). Images are public packages on GHCR, tagged `sha-<commit>` and with the branch name.
+Two images, built once in CI and pulled by Railway (Railway never builds): `backend/Dockerfile` (uvicorn, runs `alembic upgrade head` on start) and `frontend/Dockerfile` (Vite build served by nginx; the API URL is written into `config.js` at container start from `API_URL`, so one image serves both environments). Images are public packages on GHCR, tagged `sha-<commit>` and with the branch name; a push to `main` also tags them with the release version from `frontend/package.json` (`v0.3.0`), the same string as the git tag. `retag.yml` (manual) adds a tag to an existing pair of images without a rebuild.
 
 ### Continuous deployment, one push at a time
 
 1. Push to `dev` (or `main`). `ci.yml` runs: backend, frontend, AI verification, gitleaks, dependency audit, then the E2E job against a stack started in the runner.
-2. Green → the `images` job builds both images and pushes them to GHCR (`:dev` or `:main`, plus `sha-<commit>`). Pull requests build but never push.
+2. Green → the `images` job builds both images and pushes them to GHCR (`:dev` or `:main`, plus `sha-<commit>`, plus `v<version>` on `main`). Pull requests build but never push.
 3. `deploy.yml` runs when CI completed successfully on that branch. Using the environment's `RAILWAY_TOKEN` it calls `railway redeploy --from-source` for `backend` and `frontend` in the matching Railway environment, which pulls the new images.
 4. The job then waits until Railway reports the NEW deployment of each service as SUCCESS (a redeploy call returns before the rollout, and the old containers keep answering meanwhile); Railway's own health checks (`/api/v1/health`, `/healthz`) gate the rollout too.
-5. Production only: the job pauses at the GitHub `production` environment until a required reviewer (the repository owner) approves it in the Actions run. Development needs no approval. Either environment can also be redeployed from its current images by hand with "Run workflow" on the Deploy workflow (choose the environment), for example after a platform incident.
+5. Production only: the job pauses at the GitHub `production` environment until a required reviewer (the repository owner) approves it in the Actions run. Development needs no approval. Known limit, found at the v0.3.0 release: a `workflow_run`-triggered job executes on the repository's default branch (`dev`), and the production environment's branch policy admits only `main`, so GitHub rejects the automatic production job before its first step. Production is therefore deployed by hand: `gh workflow run deploy.yml --ref main -f environment=production` after CI is green on `main`; the approval gate still applies. (Making `main` the default branch would restore the automatic path; not done, because `dev` is where pull requests land.) Either environment can also be redeployed from its current images by hand with "Run workflow" on the Deploy workflow (choose the environment), for example after a platform incident.
 6. Post-deploy gates: `/api/v1/health` and `/healthz` must answer 200 within about seven minutes, and the frontend's `config.js` must name that environment's API. A failed gate marks the deployment red; the previous containers keep serving until the new ones are healthy (Railway's default).
 
 The GitHub `production` environment only accepts deployments from `main`. Development and production cannot affect each other: separate databases, volumes, secrets, URLs, and a project token scoped to one environment each.
@@ -109,7 +109,7 @@ The GitHub `production` environment only accepts deployments from `main`. Develo
 
 ### Seeding
 
-The database starts empty. `scripts/seed.py` creates the two demo accounts only (idempotent). It is not part of a deploy on purpose, a deploy must never touch data; run it once per environment: `railway ssh --environment development --service backend -- .venv/bin/python scripts/seed.py`. Development was seeded on 19 Sep 2026.
+The database starts empty. `scripts/seed.py` creates the two demo accounts only (idempotent). It is not part of a deploy on purpose, a deploy must never touch data; run it once per environment: `railway ssh --environment development --service backend -- .venv/bin/python scripts/seed.py` (and `--environment production` for production). Development was seeded on 19 Sep 2026; production on 19 Sep 2026 after the v0.3.0 deploy. Accounts and password in every environment: `operator@permitflow.example.sg` and `officer@permitflow.example.sg`, password `PermitFlow!2026` (the `SEED_PASSWORD` default; deliberately public for the demonstration, see the privacy policy). To change it, set `SEED_PASSWORD` and re-run the seed: existing accounts keep their password (the script is create-only), so a rotation is a new seed plus a manual update, or a reset of the environment.
 
 ### Custom domain (US-052)
 
@@ -124,7 +124,7 @@ In Railway, per environment: frontend service → Settings → Networking → Cu
 
 ### Rollback
 
-Every image carries a `sha-<commit>` tag. Point the service at the previous tag in the Railway dashboard and redeploy. (Re-running `deploy.yml` does not roll back: it pulls whatever the branch tag points at now.) Migrations are forward-only; a rollback that needs a schema change is a new migration.
+Every image carries a `sha-<commit>` tag and every release a `v<version>` tag. Point the service at the previous tag in the Railway dashboard and redeploy, or run `retag.yml` to move a tag. (Re-running `deploy.yml` does not roll back: it pulls whatever the branch tag points at now.) Migrations are forward-only; a rollback that needs a schema change is a new migration.
 
 ### Verified
 

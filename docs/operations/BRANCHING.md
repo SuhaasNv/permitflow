@@ -31,7 +31,7 @@ hotfix/<issue>  ── branched from main, merged into main AND dev.
 2. Merge into `dev` with `--no-ff` so each story is one visible merge commit; the branch is deleted after merge.
 3. Commits are conventional: `feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`; subject 50 characters or fewer; body explains why when not obvious. No tool attribution.
 4. `dev` must pass CI (lint, type check, tests, build, secret scan) before it is merged to `main`.
-5. A release is a `--no-ff` merge of `dev` into `main`, tagged `v0.<sprint>.0` (Sprint 1 → `v0.1.0`). Bump `frontend/package.json` `version` to the same number before tagging: it is injected at build time and shown in the app shell and landing footer. Railway never builds: CI pushes images on `dev` (deploys `development`) and `main` (deploys `production`, behind an approval), see `OPERATIONS.md`.
+5. A release is a `--no-ff` merge of `dev` into `main`, tagged `v0.<sprint>.0` (Sprint 1 → `v0.1.0`). Bump `frontend/package.json` `version` to the same number before tagging: it is injected at build time, shown in the app shell and landing footer, and used by CI to tag the release images (`v0.3.0`). Railway never builds: CI pushes images on `dev` (deploys `development`) and `main` (deploys `production`, behind an approval), see `OPERATIONS.md`.
 6. A hotfix branches from `main`, merges into `main` (tag `v0.x.y`), then into `dev` so the fix is not lost.
 7. Nothing is pushed without the user's explicit confirmation in that turn (project rule). Pull requests are used when a remote is in play; until then the same flow runs locally.
 8. History is never rewritten on `main` or `dev`. Work branches may be rebased on `dev` before merge.
