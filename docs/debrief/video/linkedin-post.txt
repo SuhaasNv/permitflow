@@ -1,7 +1,0 @@
-A licence application comes back with one line: please resubmit. Which document? Which section? Everything, again.
-
-PermitFlow is a licensing workflow I built in three days for an engineering assessment. An operator applies with checked uploads and an advisory AI reads each document before submission. The officer's feedback points at the exact section or document, only the flagged parts reopen, every revision is kept and every step is audited. Approval issues the licence.
-
-Seventy seconds of it below. What to look for: the check landing on an expired certificate, the feedback tied to that document, and the resubmission that reopens one slot. The AI never decides; the officer does.
-
-Code, tests, threat model and the honest list of what is not built: https://github.com/SuhaasNv/permitflow · permitflow.space
