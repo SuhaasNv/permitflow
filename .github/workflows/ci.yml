@@ -142,6 +142,10 @@ jobs:
       CORS_ORIGINS: http://localhost:3000
       AI_PROVIDER: mock
       UPLOAD_DIR: /tmp/permitflow-uploads
+      # Eight specs sign in from one runner address; the per-client limits (US-058) would throttle them.
+      # They are exercised by their own integration tests, not by the browser suite.
+      RATE_LIMIT_PER_MINUTE: "0"
+      LOGIN_ATTEMPTS_PER_MINUTE: "0"
       E2E_API_URL: http://localhost:8000/api/v1
       VITE_API_URL: http://localhost:8000/api/v1
     steps:
