@@ -2,7 +2,7 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
-## Debrief material (19 Sep 2026, after v0.3.0)
+## Debrief material (19 Sep 2026, after v0.3.0, US-059)
 
 - `docs/13-debrief/`: the pitch deck (11 slides) and the technical deck (18 slides) as PowerPoint with handout PDFs, the launch video (70.7 s) with its poster, the narrated walkthrough (4 min 36 s) and the technical video (1 min 28 s), videos in Git LFS. Diagrams (solution architecture, deployment, CI/CD) added under `docs/03-architecture/diagrams/views/` and embedded in `ARCHITECTURE.md`, `OPERATIONS.md` and the README; the launch poster heads the README. No product code changed.
 

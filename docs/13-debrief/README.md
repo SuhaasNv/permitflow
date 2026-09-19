@@ -1,6 +1,6 @@
 # Debrief material
 
-What is presented at the debrief, in its final form. Made after the code was frozen at v0.3.0 (19 September 2026); nothing here changes the product.
+What is presented at the debrief, in its final form (story US-059). Made after the code was frozen at v0.3.0 (19 September 2026); nothing here changes the product.
 
 | File | What it is |
 |------|------------|
