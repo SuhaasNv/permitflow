@@ -16,6 +16,7 @@ from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
+from app.services.quotas import ensure_draft_capacity
 
 
 class ApplicationService:
@@ -29,6 +30,7 @@ class ApplicationService:
 
     def create(self, operator: User) -> Application:
         """One transaction: application row + `application.created` audit event (AUD-005)."""
+        ensure_draft_capacity(self.db, operator.id)
         app = Application(
             reference_no=self.applications.next_reference_no(datetime.now(UTC).year),
             operator_id=operator.id,
@@ -76,6 +78,10 @@ class ApplicationService:
             raise ValidationFailed("Some fields need attention.", details={"fields": errors})
         draft = dict(app.draft_data)
         previous = draft.get(key) or {}
+        data = dict(data)
+        if key == "declarations" and app.status == ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION:
+            # A fresh confirmation is the change the officer asked for; the values themselves cannot differ.
+            data["confirmed_at"] = datetime.now(UTC).isoformat(timespec="seconds")
         changed = sorted(k for k in set(previous) | set(data) if previous.get(k) != data.get(k))
         draft[key] = data
         app.draft_data = draft

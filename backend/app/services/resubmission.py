@@ -114,7 +114,10 @@ class ResubmissionService:
             if exc.kind == "guard":
                 raise ValidationFailed(exc.message, details={"reason": "no_change"}) from exc
             raise InvalidTransition(exc.message, details={"allowed": [s.value for s in exc.allowed]}) from exc
-        assert changes is not None  # guaranteed by the guard: a current revision exists
+        if changes is None:  # pragma: no cover - the guard guarantees a current revision exists
+            raise ValidationFailed(
+                "Nothing has changed since the last submission.", details={"reason": "no_change"}
+            )
 
         number = self.revisions.next_number(app.id)
         revision = ApplicationRevision(

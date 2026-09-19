@@ -10,6 +10,8 @@ import {
   getQueue,
   rerunOfficerCheck,
   resolveFeedback,
+  reopenFeedback,
+  restoreFeedback,
   transitionApplication,
   withdrawFeedback,
 } from '@/api/officer'
@@ -95,6 +97,28 @@ export function useResolveFeedback(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (feedbackId: string) => resolveFeedback(id, feedbackId),
+    onSuccess: (view) => {
+      qc.setQueryData(officerKeys.case(id), view)
+      void qc.invalidateQueries({ queryKey: officerKeys.queue })
+    },
+  })
+}
+
+export function useReopenFeedback(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (feedbackId: string) => reopenFeedback(id, feedbackId),
+    onSuccess: (view) => {
+      qc.setQueryData(officerKeys.case(id), view)
+      void qc.invalidateQueries({ queryKey: officerKeys.queue })
+    },
+  })
+}
+
+export function useRestoreFeedback(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (feedbackId: string) => restoreFeedback(id, feedbackId),
     onSuccess: (view) => {
       qc.setQueryData(officerKeys.case(id), view)
       void qc.invalidateQueries({ queryKey: officerKeys.queue })

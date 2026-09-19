@@ -2,6 +2,7 @@
 verification detail, the revision history and the transitions available right now."""
 
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,7 @@ from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
 from app.repositories.users import UserRepository
+from app.schemas.applications import LicenceView
 from app.schemas.officer import (
     ActionOut,
     ApplicantOut,
@@ -29,7 +31,8 @@ from app.schemas.officer import (
     VerificationSummaryOut,
 )
 from app.services.compare import CompareService
-from app.services.feedback import target_label
+from app.services.feedback import restorable, target_label
+from app.services.licence import LicenceService, licence_view
 from app.services.operator_view import LICENCE_TITLE
 
 _NOTE_REQUIRED_TARGETS = {ApplicationStatus.REJECTED}
@@ -56,9 +59,9 @@ class OfficerViewService:
 
     def get(self, officer: User, application_id: uuid.UUID) -> OfficerApplicationOut:
         app = self.applications.get_for(officer, application_id)
-        return self.build(app)
+        return self.build(app, viewer=officer)
 
-    def build(self, app: Application) -> OfficerApplicationOut:
+    def build(self, app: Application, *, viewer: User | None = None) -> OfficerApplicationOut:
         if app.status == ApplicationStatus.DRAFT:
             raise NotFound("Application not found.")
         revisions = self.revisions.list_for(app.id)
@@ -98,6 +101,8 @@ class OfficerViewService:
             feedback,
             self.users,
             changed=(changed_sections, changed_docs, previous_no),
+            viewer_id=viewer.id if viewer else None,
+            licence=licence_view(LicenceService(self.db).for_application(app.id)),
         )
 
 
@@ -112,7 +117,10 @@ def _assemble(
     feedback: list[Feedback],
     users: UserRepository,
     changed: tuple[set[str], set[DocumentType], int | None] = (set(), set(), None),
+    viewer_id: uuid.UUID | None = None,
+    licence: LicenceView | None = None,
 ) -> OfficerApplicationOut:
+    now = datetime.now(UTC)
     form = current.form_data if current else app.draft_data
     comp = completeness_rules.compute(form, {d.document_type for d in docs})
     sections = [
@@ -187,6 +195,7 @@ def _assemble(
                 revision_numbers.get(f.addressed_in_revision_id) if f.addressed_in_revision_id else None
             ),
             resolved_at=f.resolved_at,
+            can_undo=viewer_id is not None and restorable(f, app.status, viewer_id, now),
         )
         for f in feedback
     ]
@@ -228,6 +237,8 @@ def _assemble(
         feedback_locked_reason=locked_reason,
         actions=actions,
         decision_note=app.decision_note,
+        withdrawal_reason=app.withdrawal_reason,
+        licence=licence,
         version=app.version,
         created_at=app.created_at,
         updated_at=app.updated_at,

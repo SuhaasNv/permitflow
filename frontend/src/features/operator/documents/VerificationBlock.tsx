@@ -144,7 +144,12 @@ export function VerificationBlock({ verification, stale = false }: { verificatio
       : verification.status === 'issues_found'
         ? `${verification.issues.length} ${verification.issues.length === 1 ? 'issue' : 'issues'} to check`
         : copy.title
-  const text = live && stale ? 'Your upload is safe. Re-run the check, or continue and let the officer review the document.' : copy.text
+  const text =
+    live && stale
+      ? 'Your upload is safe. Re-run the check, or continue and let the officer review the document.'
+      : verification.error_reason === 'daily_limit_reached'
+        ? 'The daily limit on automatic checks has been reached. Your upload is safe; you can still submit and an officer will review the document.'
+        : copy.text
   return (
     <div
       key={verification.status}

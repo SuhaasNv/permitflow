@@ -2,10 +2,10 @@
 appear here by construction (ADR-005, FR-026)."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SectionView(BaseModel):
@@ -25,6 +25,8 @@ class VerificationView(BaseModel):
     issues: list[dict[str, Any]]
     missing_information: list[str]
     error_reason: str | None
+    # When this run was requested (upload or re-run): the client measures "taking too long" from here.
+    requested_at: datetime
     finished_at: datetime | None
 
 
@@ -108,6 +110,20 @@ class ApplicationSummaryOut(BaseModel):
     updated_at: datetime
 
 
+class LicenceView(BaseModel):
+    """Issued on approval (US-051). Served to the owner and officers; never before approval."""
+
+    licence_no: str
+    issued_at: datetime
+    valid_from: date
+    valid_to: date
+    verification_code: str
+
+
+class WithdrawIn(BaseModel):
+    reason: str | None = Field(default=None, max_length=1000)
+
+
 class ApplicationOperatorView(BaseModel):
     id: uuid.UUID
     reference_no: str
@@ -127,6 +143,12 @@ class ApplicationOperatorView(BaseModel):
     revisions: list[RevisionSummaryView] = []
     # Officer's note shown with the final outcome only (Approved or Rejected).
     decision_note: str | None = None
+    # Withdrawal (US-038): allowed after submission and before a decision; reason served once withdrawn.
+    can_withdraw: bool = False
+    # Drafts can be deleted outright (US-045).
+    can_delete: bool = False
+    licence: LicenceView | None = None
+    withdrawal_reason: str | None = None
     created_at: datetime
     updated_at: datetime
 

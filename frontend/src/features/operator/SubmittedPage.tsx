@@ -23,11 +23,12 @@ export function SubmittedPage() {
   if (app.isPending) return <Skeleton className="mx-auto h-72 max-w-3xl" />
   if (app.isError) {
     if (app.error instanceof AppError && app.error.status === 404)
-      return <NotFoundPanel backTo="/app/dashboard" backLabel="Back to my applications" />
+      return <NotFoundPanel backTo="/app/applications" backLabel="Back to my applications" />
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   const view = app.data
-  if (view.revision_count === 0) return <Navigate to={`/app/applications/${id}`} replace />
+  const decided = view.decision_note !== null || ['Approved', 'Rejected', 'Withdrawn'].includes(view.status_label)
+  if (view.revision_count === 0 || decided) return <Navigate to={`/app/applications/${id}`} replace />
   return (
     <div className="mx-auto max-w-3xl pt-4 sm:pt-8">
       <div className="pf-stagger text-center" role="status">

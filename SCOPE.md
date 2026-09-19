@@ -9,7 +9,7 @@ The assessment evaluates scope judgement, production readiness, AI usage, code q
 
 ## Tech stack and architecture (3–5 sentences)
 
-A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL, and a React 18 + TypeScript (strict) + Vite + Tailwind frontend using TanStack Query, React Hook Form and Zod. The backend is organised by domain module (auth, applications, revisions, documents, verification, feedback, notifications, audit) with a single explicit state machine owning all status transitions and server-side authorization on every application-scoped endpoint. AI document verification runs asynchronously in-process behind a provider interface (OpenAI structured outputs via the official SDK, plus a deterministic mock used in tests and when no API key is configured) and its output is schema-validated and post-processed by deterministic rules before persistence; AI never changes authoritative workflow state. Files live on local disk behind a storage interface; notifications are in-app records. Tests are pytest (unit + integration against Postgres), Vitest, and a Playwright critical-journey E2E, all run in GitHub Actions; deployment targets Railway.
+A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL, and a React 19 + TypeScript (strict) + Vite + Tailwind frontend using TanStack Query, React Hook Form and Zod. The backend is organised by domain module (auth, applications, revisions, documents, verification, feedback, notifications, audit) with a single explicit state machine owning all status transitions and server-side authorization on every application-scoped endpoint. AI document verification runs asynchronously in-process behind a provider interface (OpenAI structured outputs via the official SDK, plus a deterministic mock used in tests and when no API key is configured) and its output is schema-validated and post-processed by deterministic rules before persistence; AI never changes authoritative workflow state. Files live on local disk behind a storage interface; notifications are in-app records. Tests are pytest (unit + integration against Postgres), Vitest, and a Playwright critical-journey E2E, all run in GitHub Actions; deployment targets Railway.
 
 ## MUST HAVE (the vertical slice)
 
@@ -40,13 +40,13 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 
 | # | Feature | Simplification |
 |---|---------|----------------|
-| S1 | Officer queue filtering by status | Client-side filter over a single list endpoint; the queue itself is M8 |
+| S1 | Officer queue filtering by status · **done** (queue groups: all, mine, waiting on operator, decided; plus search, US-036) | Client-side filter over a single list endpoint; the queue itself is M8 |
 | S2 | Re-run AI verification action for a document · **done in Sprint 1 (operator) and Sprint 2 (officer)** | Same code path as upload; the live status itself is M4 |
-| S3 | Operator can delete a document while in draft | Simple DELETE; without it a wrong upload is fixed by replacing the type |
+| S3 | Operator can delete a document while in draft · **done** (`DELETE .../documents/{id}`) | Simple DELETE; without it a wrong upload is fixed by replacing the type |
 | S4 | Compare any two revisions (not only current vs previous) · **done in Sprint 2** | Same diff function; only the selector changes |
-| S5 | AI evaluation dataset + runner script | Six fixtures, manual run documented |
-| S6 | Structured request logging with request id | Middleware only, no log shipping |
-| S7 | Admin persona: seeded admin account, `/admin/*` router, an operations dashboard (counts by status, idle applications, AI verification health, cross-application audit feed, read-only application view) and **user management** (create user, change role, deactivate/reactivate; every change audited; the last active admin cannot be demoted or deactivated). **Beyond the brief** — added because a regulator operating the platform needs oversight and account control; the assessment names only Operator and Officer. The `admin` role value exists in the enum from Day 1 (cheap); everything else in this row is built only after the MUST list is Done, so cutting it removes a router and two pages, not a concept. | Overview page first; user management second (US-073); no password reset or self-registration |
+| S5 | AI evaluation dataset + runner script · **done and grown** (14 cases, mock gate in CI, live run nightly, US-004, US-054, US-056) | Six fixtures, manual run documented |
+| S6 | Structured request logging with request id · **done** (Sprint 1) | Middleware only, no log shipping |
+| S7 | Admin persona: seeded admin account, `/admin/*` router, an operations dashboard (counts by status, idle applications, AI verification health, cross-application audit feed, read-only application view) and **user management** (create user, change role, deactivate/reactivate; every change audited; the last active admin cannot be demoted or deactivated). **Beyond the brief** — added because a regulator operating the platform needs oversight and account control; the assessment names only Operator and Officer. The `admin` role value exists in the enum from Day 1 (cheap); everything else in this row is built only after the MUST list is Done, so cutting it removes a router and two pages, not a concept. · **deferred at the Sprint 3 close (19 Sep)**: not started, cut per the cut order (admin epic first); `/admin/overview` ships as a placeholder that says so; US-070 to US-073 remain on the board as Not started | Overview page first; user management second (US-073); no password reset or self-registration |
 
 ## COULD HAVE (only if the core is stable)
 
@@ -56,6 +56,10 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | C2 | Officer assignment (assign application to an officer) |
 | C3 | Image OCR for document verification (currently images are marked "not extractable") |
 | C4 | Download all documents as a bundle |
+| C6 | Licence certificate issued on approval, officer preview, PDF download · **built 19 Sep (US-051)** on its own branch, merged after review |
+| C7 | The owner's domain for both environments: `permitflow.space` and `api.permitflow.space` (production), `dev.permitflow.space` and `api.dev.permitflow.space` (development), Railway TLS · **done 19 Sep (US-052)**: development live on the domain, production goes live with v0.3.0 |
+| C8 | Legal, privacy and accessibility review: policy pages, demonstration notices, self-hosted fonts, axe gate in CI, contrast fix · **done 19 Sep (US-057)**, `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` |
+| C5 | Operator withdraws a submitted application with an optional reason · **done 19 Sep (US-038)**: new terminal status, officers notified, audited |
 
 ## DEFERRED / MOCKED
 
@@ -69,9 +73,10 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | Multiple licence types / configurable forms | **Omitted** (one licence type, form schema defined in code and shared with the frontend) | Form-builder is a product in itself. | Form definitions in the database, versioned; renderer driven by schema. |
 | Image OCR | **Omitted** (images accepted and stored; verification returns `unreadable` with an explicit reason) | OCR is a dependency and cost decision. | Vision-capable model or OCR service, with cost controls. |
 | Real-time push (WebSocket/SSE) for verification status | **Simplified** (polling every 2 s while any document is verifying) | Polling meets "real-time status visible" at MVP scale. | SSE endpoint or WebSocket with reconnect. |
-| Rate limiting, WAF, DDoS protection | **Simplified** (in-memory limiter on auth endpoints) | Infra-level concern. | Edge rate limiting, WAF rules. |
+| Rate limiting, WAF, DDoS protection | **Simplified** (in-process sliding-window limiter on every request and on sign-in attempts; database quotas on drafts and on verification runs per applicant and per platform per day, US-058) | Infra-level concern for the distributed case. | Edge rate limiting, the same windows in Redis, WAF rules. |
 | Officer assignment / workload routing | **Omitted** | Not in the acceptance criteria. | Assignment model, queue ownership, reassignment audit. |
 | Virus scanning of uploads | **Omitted** (type/size allowlist and magic-byte check only) | Requires ClamAV or a vendor. | Scan on upload, quarantine state. |
+| Non-Latin text on the licence certificate | **Limitation** (the PDF uses the base-14 fonts, so Chinese, Tamil or other non-Latin business names print as boxes; Latin accents are fine) | A CJK-capable TrueType font is an asset and licence decision, not a code change. | Register a Noto Sans font in the renderer and cover it in the render test. |
 
 ## Assumptions (where the assessment is ambiguous)
 
@@ -88,8 +93,10 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 11. **Admin persona:** the brief names Operator and Officer only. We add an Admin role for oversight, monitoring and user management (S7). It never changes application state, so it does not affect the assessment's workflow or visibility rules; user changes are audited.
 12. **Feedback freeze:** officers can add or withdraw feedback only while the application is Under Review. Requesting resubmission releases that round's feedback to the operator and freezes it; this is what makes "edit only the flagged sections" safe (no item can disappear under an operator mid-edit).
 13. **"Only flagged sections" is enforced, not just suggested:** the API rejects changes to non-flagged sections during resubmission (403). We read the brief's "operator updates only the flagged sections" as a rule that protects the officer's review scope; the trade-off is that an operator who spots their own mistake elsewhere must wait for the officer to flag it. Documented as a product decision open to reversal.
-14. **Document slots:** exactly one current document per required type; no free-form "other" slot in the MVP (feedback targets a type, and multi-file slots would need per-file targets).
-15. **Third-party AI processing:** extracted document text (capped) and the relevant form section are sent to OpenAI for verification. This is a data-transfer decision a regulator would have to approve; the MVP documents it and the production gap (region, retention, redaction) in the threat model rather than pretending it is solved.
+14. **Drafts are not records:** a draft that was never submitted can be deleted outright by its owner (rows, files and audit events). Only submission creates the licensing record; after that an application can be withdrawn but never deleted (US-045, 19 Sep).
+15. **Document slots:** exactly one current document per required type; no free-form "other" slot in the MVP (feedback targets a type, and multi-file slots would need per-file targets).
+16. **Third-party AI processing:** extracted document text (capped) and the relevant form section are sent to OpenAI for verification. This is a data-transfer decision a regulator would have to approve; the MVP documents it and the production gap (region, retention, redaction) in the threat model rather than pretending it is solved.
+17. **"Operators cannot see the internal approval stage" versus the brief's own table:** the brief's status table gives operators the label "Pending Approval" for the internal `pending_approval` status, and its UC2 criteria say operators never see the approval stage. We follow the table (the operator sees "Pending Approval" as a waiting state, like "Pending Site Visit") and the spirit of the criteria: no operator response ever carries an internal status code, the officer-only labels ("Route to Approval") never reach an operator, and the decision note is served only with the final outcome (FR-026, US-032).
 
 ## Design phase (17–18 Sep 2026)
 
@@ -99,9 +106,13 @@ A UI/UX design phase was run between solutioning and implementation: design dire
 
 Re-read at the Sprint 1 close: M1 to M7 and M16, M17 are built for the operator side; M18 (tests) and M19 (CI skeleton) are partial by plan; nothing was added to or removed from MUST; S2 (re-run check) and S3 (delete while draft) landed with M3/M4; C1 landed as part of the dashboard redesign. No scope change.
 
-## Sprint 2 check (19 Sep 2026)
+## Sprint 2 check (18 Sep 2026)
 
 Re-read at the Sprint 2 close: M8 to M15 (officer review, feedback, resubmission, compare, resolution, outcome, audit, notifications) are built and verified in the browser; M2 (OpenAI provider) is live with `gpt-4.1-mini`; S2 (officer re-run) and S4 (any-two-revision compare) landed. Two stories were added for the edge-case pass (US-033, US-034); nothing was removed from MUST. Assumption 10 (who the operator is) was written down. Remaining MUST items are the E2E half of M18, the Playwright, Docker-build and deployment half of M19, and M20 (final documents), all Sprint 3.
+
+## Sprint 3 check (19 Sep 2026, at the close)
+
+Re-read at the Sprint 3 close and the v0.3.0 release: every MUST (M1 to M20) is built, tested and deployed; the SHOULD items S1 to S6 are done or documented; S7 (admin) is deferred to v0.4.0 with a tightened scope (overview with AI health and quota counters; audit feed and read-only case; user management without in-app account creation; cut: create-user UI, "last active", cross-application search, per-operator draft counters); COULD items C1, C5, C6, C7 and C8 are done, C2 to C4 remain open. Added during the sprint and marked beyond the brief: US-053 to US-058 (coverage thresholds, live AI evaluation, tracing, AI gate with fairness, legal and accessibility review, abuse resistance). Nothing was removed from MUST. Assumptions 15 to 17 were written down during the sprint.
 
 ## What "done" means for this MVP
 

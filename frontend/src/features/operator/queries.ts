@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { createApplication, getApplication, listApplications, resubmitApplication, submitApplication } from '@/api/applications'
+import {
+  createApplication,
+  deleteDraft,
+  getApplication,
+  listApplications,
+  resubmitApplication,
+  withdrawApplication,
+  submitApplication,
+} from '@/api/applications'
 import { getFormSchema } from '@/api/formSchema'
 import { updateSection } from '@/api/sections'
 
@@ -13,8 +21,8 @@ const ACTIVE_VERIFICATION = new Set(['pending', 'running'])
 /** Stop polling a check that has been pending or running longer than this; the slot then offers Re-run. */
 export const CHECK_STALE_MS = 3 * 60 * 1000
 
-export function isCheckStale(uploadedAt: string, now: number = Date.now()): boolean {
-  return now - new Date(uploadedAt).getTime() > CHECK_STALE_MS
+export function isCheckStale(requestedAt: string, now: number = Date.now()): boolean {
+  return now - new Date(requestedAt).getTime() > CHECK_STALE_MS
 }
 
 export function useApplications() {
@@ -32,7 +40,10 @@ export function useApplication(id: string) {
       const view = query.state.data
       if (!view) return false
       const active = view.document_slots.some(
-        (s) => s.document?.verification && ACTIVE_VERIFICATION.has(s.document.verification.status) && !isCheckStale(s.document.uploaded_at),
+        (s) =>
+          s.document?.verification &&
+          ACTIVE_VERIFICATION.has(s.document.verification.status) &&
+          !isCheckStale(s.document.verification.requested_at),
       )
       return active ? 2000 : false
     },
@@ -84,5 +95,26 @@ export function useResubmitApplication(id: string) {
       qc.setQueryData(applicationKeys.detail(id), view)
       void qc.invalidateQueries({ queryKey: applicationKeys.all })
     },
+  })
+}
+
+export function useWithdrawApplication(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (reason: string | null) => withdrawApplication(id, reason),
+    onSuccess: (view) => {
+      qc.setQueryData(applicationKeys.detail(id), view)
+      void qc.invalidateQueries({ queryKey: applicationKeys.all })
+    },
+  })
+}
+
+export function useDeleteDraft(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => deleteDraft(id),
+    // The detail query is left alone: the page navigates away and the cache entry is garbage-collected.
+    // Removing it here would make the still-mounted page refetch a row that is gone (404).
+    onSuccess: () => void qc.invalidateQueries({ queryKey: applicationKeys.all }),
   })
 }

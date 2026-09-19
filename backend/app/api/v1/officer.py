@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, status
+from fastapi import APIRouter, BackgroundTasks, Response, status
 
 from app.api.deps import DbSession, OfficerUser
 from app.domain.feedback_templates import TEMPLATES
@@ -16,6 +16,7 @@ from app.schemas.officer import (
 )
 from app.services.audit_trail import AuditTrailService
 from app.services.feedback import FeedbackService
+from app.services.licence import LicenceService
 from app.services.officer_queue import OfficerQueueService
 from app.services.officer_view import OfficerViewService
 from app.services.verification import VerificationService, run_verification
@@ -44,7 +45,7 @@ def transition_application(
     app = WorkflowService(db).transition(
         user, application_id, payload.target, note=payload.note, expected_version=payload.expected_version
     )
-    return OfficerViewService(db).build(app)
+    return OfficerViewService(db).build(app, viewer=user)
 
 
 @router.post(
@@ -124,6 +125,35 @@ def resolve_feedback(
     """Mark an open or addressed item resolved (FR-024). Audited; 409 outside the officer's states."""
     FeedbackService(db).resolve(user, application_id, feedback_id)
     return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
+    "/applications/{application_id}/feedback/{feedback_id}/reopen", response_model=OfficerApplicationOut
+)
+def reopen_feedback(
+    application_id: uuid.UUID, feedback_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """Not fixed (US-049): an addressed item is open again for the next round. 409 unless Under Review."""
+    FeedbackService(db).reopen(user, application_id, feedback_id)
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
+    "/applications/{application_id}/feedback/{feedback_id}/restore", response_model=OfficerApplicationOut
+)
+def restore_feedback(
+    application_id: uuid.UUID, feedback_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """Undo the caller's own withdraw or resolve within the grace window (US-039). 409 once it has closed."""
+    FeedbackService(db).restore(user, application_id, feedback_id)
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.get("/applications/{application_id}/licence/preview")
+def preview_licence(application_id: uuid.UUID, user: OfficerUser, db: DbSession) -> Response:
+    """What the certificate will say if the officer approves now (US-051). Watermarked; nothing is stored."""
+    pdf = LicenceService(db).preview(user, application_id)
+    return Response(content=pdf, media_type="application/pdf", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/applications/{application_id}/audit", response_model=AuditTrailOut)

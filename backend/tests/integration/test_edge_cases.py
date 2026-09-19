@@ -16,7 +16,7 @@ from app.models import AuditEvent, Document, VerificationRun
 from app.models.enums import Role
 from app.services.verification import mark_stale_runs_failed
 from tests.factories import DEFAULT_PASSWORD, login, make_user
-from tests.journeys import PDF
+from tests.journeys import PDF, VALID_PREMISES
 from tests.journeys import draft as _draft
 from tests.journeys import upload as _upload
 
@@ -41,6 +41,38 @@ def test_forwarded_for_is_ignored_from_untrusted_clients(
         headers={"X-Forwarded-For": "10.0.0.99"},
     )
     assert r.status_code == 429, "a fresh X-Forwarded-For must not open a fresh bucket"
+    limiter.clear()
+
+
+def test_forwarded_for_is_honoured_behind_a_wildcard_trusted_proxy(
+    client: TestClient, db: Session, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    """TRUSTED_PROXIES=* (a PaaS edge proxy is the only peer): each forwarded client gets its own bucket.
+    The client is the hop the proxy appended (the last one); the leading hop is whatever the caller sent."""
+    make_user(db, "op@example.sg", Role.OPERATOR)
+    limiter = auth_module.login_limiter
+    monkeypatch.setattr(limiter, "limit", 2)
+    monkeypatch.setattr(auth_module._settings, "trusted_proxies", "*")
+    limiter.clear()
+    for _ in range(2):
+        r = client.post(
+            "/api/v1/auth/login",
+            json={"email": "op@example.sg", "password": "bad"},
+            headers={"X-Forwarded-For": "10.0.0.1, 203.0.113.5"},
+        )
+        assert r.status_code == 401
+    blocked = client.post(
+        "/api/v1/auth/login",
+        json={"email": "op@example.sg", "password": DEFAULT_PASSWORD},
+        headers={"X-Forwarded-For": "10.0.0.2, 203.0.113.5"},
+    )
+    assert blocked.status_code == 429, "a caller-supplied leading hop must not open a fresh bucket"
+    other = client.post(
+        "/api/v1/auth/login",
+        json={"email": "op@example.sg", "password": DEFAULT_PASSWORD},
+        headers={"X-Forwarded-For": "10.0.0.1, 203.0.113.6"},
+    )
+    assert other.status_code == 200, "another client behind the same proxy is not blocked"
     limiter.clear()
 
 
@@ -180,3 +212,44 @@ def test_stale_pending_runs_are_failed_on_startup(client: TestClient, db: Sessio
     assert r.status_code == 202
     events = list(db.scalars(select(AuditEvent).where(AuditEvent.event_type == "verification.requested")))
     assert len(events) == 1
+
+
+def test_bug_hunt_regressions(client: TestClient, db: Session) -> None:
+    """20 Sep audit: not-a-uuid path is 404; operator cannot re-run once the document is with the officer;
+    a multibyte character on the sniff boundary is still text; undoing a resolve cannot reopen an item
+    after the site visit was scheduled."""
+    from tests.journeys import add_feedback, submitted, transition
+
+    make_user(db, "solo@example.sg", Role.OPERATOR)
+    solo = login(client, "solo@example.sg")
+    r = client.get("/api/v1/applications/not-a-uuid", headers=solo)
+    assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
+
+    app_id = _draft(client, solo)
+    boundary = b"A" * 15 + "é and more text after the boundary. Tenancy agreement.".encode()
+    r = _upload(client, solo, app_id, "tenancy_agreement", "notes.txt", boundary, "text/plain")
+    assert r.status_code == 201, r.text
+
+    app_id, op, off = submitted(client, db)
+    doc = client.get(f"/api/v1/applications/{app_id}", headers=op).json()["document_slots"][0]["document"]
+    r = client.post(f"/api/v1/applications/{app_id}/documents/{doc['id']}/verify", headers=op)
+    assert r.status_code == 403, "operator re-run is closed once the application is with the office"
+
+    transition(client, off, app_id, "under_review")
+    add_feedback(client, off, app_id, target_type="section", section_key="premises", message="x")
+    body = add_feedback(client, off, app_id, target_type="section", section_key="operations", message="y")
+    fid = next(f["id"] for f in body["feedback"] if f["section_key"] == "operations")  # stays open
+    transition(client, off, app_id, "pending_pre_site_resubmission")
+    r = client.patch(
+        f"/api/v1/applications/{app_id}/sections/premises",
+        headers=op,
+        json={**VALID_PREMISES, "address_line_1": "10 Jalan Besar #01-21"},
+    )
+    assert r.status_code == 200
+    assert client.post(f"/api/v1/applications/{app_id}/resubmit", headers=op).status_code == 200
+    transition(client, off, app_id, "under_review")
+    body = client.post(f"/api/v1/officer/applications/{app_id}/feedback/{fid}/resolve", headers=off).json()
+    assert next(f for f in body["feedback"] if f["id"] == fid)["resolution"] == "resolved"
+    transition(client, off, app_id, "site_visit_scheduled")
+    r = client.post(f"/api/v1/officer/applications/{app_id}/feedback/{fid}/restore", headers=off)
+    assert r.status_code == 409, "an undo may not put an open item under a scheduled site visit"

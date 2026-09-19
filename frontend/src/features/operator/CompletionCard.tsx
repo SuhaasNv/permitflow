@@ -76,7 +76,7 @@ export function CompletionCard({ view }: { view: ApplicationView }) {
             <span className="min-w-0 flex-1 truncate">{s.title}</span>
             <span className="text-xs text-text-3">{s.complete ? 'Complete' : s.started ? 'Needs attention' : 'Not started'}</span>
             {s.editable && !s.complete ? (
-              <Link to={`${base}/form/${s.key}`} className="text-xs font-semibold">
+              <Link to={`${base}/form/${s.key}`} className="inline-block py-2 text-xs font-semibold sm:py-0">
                 {s.started ? 'Fix' : 'Start'}
               </Link>
             ) : null}
@@ -88,7 +88,7 @@ export function CompletionCard({ view }: { view: ApplicationView }) {
             <span className="min-w-0 flex-1 truncate">{d.label}</span>
             <span className="text-xs text-text-3">{d.present ? 'Uploaded' : 'Missing'}</span>
             {d.editable && !d.present ? (
-              <Link to={`${base}/documents`} className="text-xs font-semibold">
+              <Link to={`${base}/documents`} className="inline-block py-2 text-xs font-semibold sm:py-0">
                 Upload
               </Link>
             ) : null}

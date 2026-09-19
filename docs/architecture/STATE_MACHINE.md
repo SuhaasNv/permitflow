@@ -1,10 +1,10 @@
 # PermitFlow — Application State Machine
 
-To be implemented in `backend/app/domain/workflow.py` (ADR-003). The transition table below is the specification; unit tests in `backend/tests/unit/test_workflow.py` will iterate over every combination.
+Implemented in `backend/app/domain/workflow.py` (ADR-003). The transition table below is the specification; unit tests in `backend/tests/unit/test_workflow.py` will iterate over every combination.
 
 ## States and role-specific labels
 
-The twelve states from the assessment plus one pre-submission state (`draft`, an engineering assumption needed for "save and return"; never visible to officers).
+The twelve states from the assessment plus one pre-submission state (`draft`, an engineering assumption needed for "save and return"; never visible to officers) and one operator-initiated terminal state (`withdrawn`, US-038).
 
 | Internal code | Assessment internal status | Officer label | Operator label |
 |---------------|----------------------------|---------------|----------------|
@@ -21,6 +21,7 @@ The twelve states from the assessment plus one pre-submission state (`draft`, an
 | `pending_approval` | Pending Approval | Route to Approval | Pending Approval |
 | `approved` | Approved | Approved | Approved |
 | `rejected` | Rejected | Rejected | Rejected |
+| `withdrawn` | — (assumption, US-038) | Withdrawn | Withdrawn |
 
 Labels are copied verbatim from the assessment table, including "Awaiting Post-Site Resubmission" as the officer label for `pending_post_site_resubmission`.
 
@@ -38,7 +39,7 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `pre_site_resubmitted` | `under_review` | officer | — | Officer clicks Start review |
 | `pre_site_resubmitted` | `rejected` | officer | — (note required) | Officer clicks Reject |
 | `under_review` | `pending_pre_site_resubmission` | officer | `open_feedback_count ≥ 1` | Officer clicks Request resubmission |
-| `under_review` | `site_visit_scheduled` | officer | `open_feedback_count = 0` | Officer clicks Schedule site visit |
+| `under_review` | `site_visit_scheduled` | officer | `open_feedback_count = 0` | Officer clicks Mark site visit scheduled (status only: no appointment is booked, UC3 deferred) |
 | `under_review` | `rejected` | officer | — (note required) | Officer clicks Reject |
 | `pending_pre_site_resubmission` | `rejected` | officer | — (note required) | Officer clicks Reject (abandoned or unsalvageable application; prevents stuck cases) |
 | `pending_pre_site_resubmission` | `pre_site_resubmitted` | operator (owner) | `has_changes_to_flagged_targets` | Operator clicks Resubmit |
@@ -52,12 +53,14 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `pending_post_site_resubmission` | `post_site_clarification_resubmitted` | operator (owner) | — | UC3 (deferred) |
 | `post_site_clarification_resubmitted` | `awaiting_post_site_clarification` | officer | — | UC3 (deferred) |
 | `post_site_clarification_resubmitted` | `pending_approval` | officer | — | UC3 (deferred) |
-| `pending_approval` | `approved` | officer | — (note optional) | Officer clicks Approve |
+| `pending_approval` | `approved` | officer | — (note optional) | Officer clicks Approve; side effect: the licence certificate is issued in the same transaction (`licence.issued`, US-051) |
 | `pending_approval` | `rejected` | officer | — (note required) | Officer clicks Reject |
+| `pending_approval` | `under_review` | officer | — | Officer clicks Return to review (US-031 follow-up, 19 Sep 2026): something noticed at the decision step is handled with feedback or a resubmission instead of a rejection |
+| any post-submission, non-terminal state | `withdrawn` | operator (owner) | — (reason optional) | Operator clicks Withdraw application (US-038); `POST /applications/{id}/withdraw` |
 
-Everything not listed is invalid and returns HTTP 409 `invalid_transition` with `allowed_targets` for the caller's role. Role mismatches on a listed transition return 403. The `admin` role has no transitions: it is read-only on applications.
+Everything not listed is invalid and returns HTTP 409 `invalid_transition` with `details.allowed` for the caller's role. Role mismatches on a listed transition also return 409 (`details.kind = "forbidden"`): the transition table encodes the actor, and the role-gated routers already answered 403 before a wrong role could reach it. The `admin` role has no transitions: it is read-only on applications.
 
-Terminal states: `approved`, `rejected`.
+Terminal states: `approved`, `rejected`, `withdrawn`.
 
 ## Diagram
 
@@ -83,15 +86,22 @@ Terminal states: `approved`, `rejected`.
           ▼                               │                                     ▲
    post_site_clarification_resubmitted ───┘── route to approval ────────────────┘
 
+   pending_approval ──return to review (officer)──▶ under_review
+
    reject (officer, note) is allowed from every non-terminal post-submission state:
    application_received, under_review, pending_pre_site_resubmission, pre_site_resubmitted,
    site_visit_scheduled, site_visit_done, pending_approval ──────────────────▶ rejected
+
+   withdraw (operator, reason optional) is allowed from every non-terminal post-submission
+   state, including the UC3 states ─────────────────────────────────────────▶ withdrawn
 ```
 
 ## Feedback lifecycle rules (prevent stuck applications)
 
 - Officers may create or withdraw feedback only while the status is `under_review`. In `pending_pre_site_resubmission` the feedback set is frozen, so the operator's editable targets cannot change underneath them (this closes the deadlock where a withdrawn item would leave an edited section without an open item).
 - Requesting resubmission releases the current round's feedback to the operator: every `open` item gets `released_to_operator_at` set. Operators see only released feedback, so items being drafted during `under_review` are not visible until the officer asks for the resubmission.
+- An addressed item the officer judges not fixed can be reopened while Under Review (`feedback.reopened`): it becomes a draft again with the same text, leaves the operator's view until the next round is requested, and counts as open for Request resubmission (US-049).
+- An officer may resolve only items that were released to the operator (an unsent draft can only be withdrawn), and may undo their own withdraw or resolve within 15 seconds on the server (the toast offers it for 10 seconds; the extra 5 seconds absorb a slow click) while the state still allows the original action; the undo is audited as `feedback.restored` (US-039).
 - Feedback targets are section keys or document types (both stable across revisions); resolution moves `open → addressed` automatically on resubmission when the target's content changed (sections compared by value, documents by `sha256`), and `addressed → resolved` by officer action.
 - An officer can reject an application from `pending_pre_site_resubmission`, `site_visit_scheduled` or `site_visit_done` so that an abandoned application always has an exit.
 

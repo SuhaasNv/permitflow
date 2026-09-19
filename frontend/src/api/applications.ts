@@ -67,6 +67,14 @@ export interface ResubmitReadiness {
   reason: string | null
 }
 
+export interface LicenceView {
+  licence_no: string
+  issued_at: string
+  valid_from: string
+  valid_to: string
+  verification_code: string
+}
+
 export interface ApplicationView {
   id: string
   reference_no: string
@@ -85,6 +93,14 @@ export interface ApplicationView {
   resubmit: ResubmitReadiness | null
   revisions: { number: number; submitted_at: string }[]
   decision_note: string | null
+  /** Owner may withdraw: after submission, before a decision. */
+  can_withdraw: boolean
+  /** Drafts can be deleted outright (US-045). */
+  can_delete: boolean
+  /** The operator's own reason, served once withdrawn. */
+  withdrawal_reason: string | null
+  /** Issued on approval (US-051). */
+  licence: LicenceView | null
   created_at: string
   updated_at: string
 }
@@ -107,6 +123,14 @@ export function submitApplication(id: string): Promise<ApplicationView> {
 
 export function resubmitApplication(id: string): Promise<ApplicationView> {
   return request<ApplicationView>(`/applications/${id}/resubmit`, { method: 'POST' })
+}
+
+export function deleteDraft(id: string): Promise<void> {
+  return request<void>(`/applications/${id}`, { method: 'DELETE' })
+}
+
+export function withdrawApplication(id: string, reason: string | null): Promise<ApplicationView> {
+  return request<ApplicationView>(`/applications/${id}/withdraw`, { method: 'POST', body: { reason } })
 }
 
 export function compareMyRevisions(id: string, from: number, to: number): Promise<import('./officer').Compare> {

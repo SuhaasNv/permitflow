@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 
 import * as api from '@/api/applications'
+import * as authApi from '@/api/auth'
 import { AppProviders } from '@/app/providers'
 import { AuthProvider } from '@/features/auth/AuthContext'
 import { OperatorDashboardPage } from './DashboardPage'
@@ -36,6 +37,8 @@ describe('OperatorDashboardPage', () => {
   beforeEach(() => {
     sessionStorage.clear()
     vi.restoreAllMocks()
+    // The provider re-checks the stored session on mount; without this the 401 path ends the session.
+    vi.spyOn(authApi, 'me').mockResolvedValue({ id: '1', email: 'a@b.sg', full_name: 'Tan Wei Ling', role: 'operator' })
   })
 
   it('shows the empty state when there are no applications', async () => {

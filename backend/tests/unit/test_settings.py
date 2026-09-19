@@ -17,3 +17,10 @@ def test_test_env_does_not_require_secret() -> None:
 def test_cors_origins_parsed() -> None:
     s = Settings(cors_origins="http://a, http://b ,", _env_file=None)  # type: ignore[call-arg]
     assert s.cors_origin_list == ["http://a", "http://b"]
+
+
+def test_plain_postgresql_url_gets_the_psycopg_driver(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("JWT_SECRET", "x" * 32)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@host:5432/db")
+    assert Settings().effective_database_url == "postgresql+psycopg://u:p@host:5432/db"

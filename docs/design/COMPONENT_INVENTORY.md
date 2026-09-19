@@ -7,9 +7,13 @@ Components are extracted only where the prototype uses them in two or more place
 | Component | Variants / props | Used on |
 |-----------|------------------|---------|
 | `AppShell` | role (operator / officer / admin) → side nav items; top bar with bell count and user chip | every authenticated screen |
-| `SideNav` / `BottomNav` | active item, counts; bottom tab bar on phone | all / phone |
+| `SideNav` / `BottomNav` | active item, counts; rail column spans the page with the nav stuck to the top and the footer to the bottom; bottom tab bar on phone | all / phone |
 | `Breadcrumbs` | items (label, href) | nested screens |
 | `PageHeader` | title, subtitle, actions slot | all |
+| `Stepper` (locked state) | steps carry `locked` while responding to feedback: lock glyph, not a link (US-040) | S-12 |
+| `Field` (trailing) | trailing slot is interactive (password show/hide toggle on sign-in, US-046) | S-00 |
+| `Toast` (action) | optional action button (Undo) with a 10 s duration; pressing it closes the toast (US-039) | S-21 |
+| `SearchBox` | value, onChange, label (accessible name and placeholder); native clear | My applications, Review queue |
 | `StatusBar` | badge (role-aware), explanation, right meta, actions slot; `hasSteps` joins a `Stepper` band | application screens |
 | `Stepper` | steps (label, state done / current / attention / todo, href); equal-width grid, connectors fill on completion | S-11, S-12, S-13 |
 | `ApplicationHeader` | breadcrumb, reference + licence eyebrow, business name title, status badge + explanation, meta line, actions | S-10 detail, S-11, S-12, S-13 |
@@ -32,7 +36,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `SaveIndicator` | dirty / saving / saved (relative time, refreshed every 5 s) | section form footer |
 | `Toast` (`ToastProvider`, `useToast`) | title, body, tone; bottom-right stack, four max, auto-dismiss 4.5 s (errors stay) | section saved, document uploaded / removed / unchanged |
 | `Alert` | tone icon, optional title, optional action slot | inline messages |
-| `QueueRow` (in `OfficerQueuePage`) | reference + revision, business + applicant, officer status badge, document-check state (checking / n to check / clear), last activity, next-action chip (ink when it is the officer's turn) | S-20 |
+| `QueueRow` (in `OfficerQueuePage`) | reference + revision, business + applicant, officer status badge, document-check state (checking / n to check / clear; "to check" counts issues, needs review, unreadable, failed and unavailable, the same set the case card shows as anything but Verified), last activity, next-action chip (ink when it is the officer's turn) | S-20 |
 | `CheckResult` | officer-facing verification: outcome, confidence, model, time, issues with code, field and evidence quote, missing information, fixed-vocabulary error reasons | S-21 |
 | `ReviewRail` (in `OfficerCasePage`) | server-driven action buttons (primary + secondary, disabled with reason), document-check counts, feedback placeholder | S-21 |
 | `FeedbackPanel` | items grouped by round with resolution badge and sent/draft state, anchor link to the target, Withdraw; composer (template select fills target and message, target select, textarea) with per-field 422 errors; locked reason when not under review | S-21 |
@@ -44,7 +48,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `Tag` | default, changed, editable, readonly | facts, markers |
 | `Alert` | info, warning, error, success, neutral; icon + bold lead | guidance and blocking messages |
 | `Toast` | success (dark), with undo/secondary line | after mutations |
-| `Dialog` | title as question, body, optional note field, footer (Cancel + primary/danger) | transitions, unsaved changes, remove |
+| `Dialog` | title as question, body, optional note field, optional warning alert (Approve: unresolved check results, button stays enabled), footer (Cancel + primary/danger) | transitions, unsaved changes, remove |
 | `Table` | header uppercase, `rowlink` hover, `num` cells nowrap, right-aligned action column; `TableSkeleton`, `TableEmpty` | S-10, S-20, S-25, S-40 |
 | `Timeline` | dot kinds (primary/success/warning/info/neutral), title, description, time | S-10, S-14, S-16, S-25, S-40 |
 | `EmptyState`, `ErrorState`, `Skeleton` | icon, title, description, action | every data view (UX-002) |
@@ -66,7 +70,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `ChangedFieldValue` | new value highlighted + old value struck through | S-23 |
 | `CompletionCard` | percentage bar, sections/documents counts, or "items addressed n of m" | S-11, S-12, S-15 |
 | `RequiredDocumentsChecklist` | per-type status line | S-12, S-13 |
-| `NotificationsBell` | bell with unread badge; popover with unread tint, title, body, relative time, Mark all as read; Escape and outside click close it | S-17 |
+| `NotificationsBell` | bell with unread badge; popover with unread tint, title, body, relative time, Mark all as read; Escape and outside click close it; on phones the popover spans the header width below it | S-17 |
 | `AuditTrail` | event type (mono), plain summary, actor and role or System, time; family filter with `aria-pressed`; collapsed until opened | S-25, S-40 |
 | `PersonaPicker` | prototype/demo only: seeded accounts | S-00 |
 

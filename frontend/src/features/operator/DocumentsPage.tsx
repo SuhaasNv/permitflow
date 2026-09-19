@@ -24,7 +24,7 @@ export function DocumentsPage() {
   if (app.isPending) {
     return (
       <PageSkeleton label="Loading documents">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="flex flex-col gap-4">
             <Skeleton className="h-40" />
             <Skeleton className="h-40" />
@@ -36,7 +36,7 @@ export function DocumentsPage() {
   }
   if (app.isError) {
     if (app.error instanceof AppError && app.error.status === 404)
-      return <NotFoundPanel backTo="/app/dashboard" backLabel="Back to my applications" />
+      return <NotFoundPanel backTo="/app/applications" backLabel="Back to my applications" />
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   const view = app.data
@@ -61,7 +61,7 @@ export function DocumentsPage() {
                 Back to form
               </Link>
               <Link to={view.resubmit ? base : `${base}/review`} className={buttonClasses('primary')}>
-                {view.resubmit ? 'Back to application' : 'Review and submit'}
+                {view.resubmit ? (view.resubmit.can_resubmit ? 'Go to resubmit' : 'Back to application') : 'Review and submit'}
               </Link>
             </>
           ) : undefined
@@ -73,7 +73,7 @@ export function DocumentsPage() {
           <FeedbackNotice view={view} compact />
         </div>
       ) : null}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="pf-stagger flex flex-col gap-4">
           {view.document_slots.map((slot, i) => (
             <DocumentSlot
@@ -137,6 +137,10 @@ export function DocumentsPage() {
             <p className="mt-3 text-text-3">
               PDF, PNG, JPG or TXT, up to 10 MB each. PDF is recommended: it is the only format the check can read. Re-uploading an
               identical file is detected and does not count as a change.
+            </p>
+            <p className="mt-3 text-text-3">
+              This is a demonstration: upload only the fictional sample documents, never real identity or business records. Text from PDF
+              and TXT uploads is sent to the check provider (<Link to="/privacy">privacy policy</Link>).
             </p>
           </div>
         </aside>

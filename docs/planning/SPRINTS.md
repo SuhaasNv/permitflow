@@ -62,7 +62,7 @@ Closed 18 Sep 2026: goal met; US-002 OpenAI half moved to Sprint 2; retro in `CH
 
 **Cut order if behind:** progress indicator UI polish → CI skeleton (keep local checks) → nothing else; the rest is the foundation.
 
-## Sprint 2 — 19 September 2026 — "The loop closes, twice" — CLOSED
+## Sprint 2 — 18 September 2026 (afternoon) — "The loop closes, twice" — CLOSED
 
 Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done; retro in `CHANGELOG.md`.
 
@@ -96,7 +96,7 @@ Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done;
 
 **Cut order if behind:** follow `DELIVERY_PLAN.md` §Cut order — any-two-revision compare → static Zod schemas → queue filter / re-run / draft delete → notification bell → templates UI (endpoint stays). MUST stories (US-024 templates, US-031 outcome transitions) are never cut; their UI becomes plainer. The OpenAI provider may slip to Sprint 3 morning (mock stays default) without cutting anything.
 
-## Sprint 3 — 20 September 2026 — "Ship it honestly"
+## Sprint 3 — 18 to 19 September 2026 — "Ship it honestly"
 
 **Goal:** deployed, tested, documented, reviewed. Admin epic only if the core is stable by midday.
 
@@ -107,6 +107,30 @@ Closed 19 Sep 2026: goal met; nothing slipped; US-033 and US-034 added and Done;
 | US-004 | AI evaluation set + runner | Nice-to-have |
 | US-007 | Railway deployment + health | MVP |
 | US-008 | Documentation: README, AI_USAGE, reviews, UAT, operations | MVP |
+| US-035 | Side rail reaches the bottom while scrolling (hotfix) | MVP (added 19 Sep) |
+| US-036 | Search in My applications and the review queue | Nice-to-have (added 19 Sep) |
+| US-037 | Phone width fit on the officer case + scroll to top on navigation (hotfix) | MVP (added 19 Sep) |
+| US-038 | Withdraw application (operator) | Nice-to-have (added 19 Sep) |
+| US-039 | Feedback decisions: resolve only released items, 10 s undo, composer lock | MVP (added 19 Sep) |
+| US-040 | Flagged-section markers in the form rail and stepper | MVP (added 19 Sep) |
+| US-041 | Respond-to-feedback flow: walk flagged items, lead to Resubmit | MVP (added 19 Sep) |
+| US-042 | Playwright scenario suite: one spec per workflow, audit asserted | MVP (added 19 Sep) |
+| US-043 | Layout audit fixes (`docs/reviews/LAYOUT_AUDIT.md`) | MVP (added 19 Sep) |
+| US-044 | Unhandled errors inside CORS; engine pool sizing | MVP (added 19 Sep) |
+| US-045 | Delete draft | MVP (added 19 Sep) |
+| US-046 | Password show/hide; leaner sign-in copy | Nice-to-have (added 19 Sep) |
+| US-047 | Landing hero band and accent | Nice-to-have (added 19 Sep) |
+| US-048 | Session warning only in the last 30 minutes | MVP (added 19 Sep) |
+| US-049 | Not fixed: reopen an addressed item for the next round | MVP (added 19 Sep) |
+| US-050 | Bug hunt: three parallel reviews, 45 findings fixed or recorded | MVP (added 19 Sep) |
+| US-051 | Licence certificate: issued on approval, preview for the officer, PDF download | Nice-to-have (added 19 Sep) |
+| US-052 | Custom domain permitflow.space for production (frontend and api hosts) | Nice-to-have (added 19 Sep) |
+| US-053 | Coverage at industry level: business-logic tests, thresholds in CI | MVP (added 19 Sep) |
+| US-054 | Live AI evaluation workflow against the real model | Nice-to-have (added 19 Sep) |
+| US-055 | LangSmith tracing behind a key, experiments per run | Nice-to-have (added 19 Sep) |
+| US-056 | AI gate as its own six-stage workflow, name-swap fairness check | Nice-to-have (added 19 Sep) |
+| US-057 | Legal, privacy and accessibility review: policies, notices, fonts, axe gate | Nice-to-have (added 19 Sep) |
+| US-058 | Abuse resistance: request limits, quotas, headers, blocking audits | Nice-to-have (added 19 Sep) |
 | US-070–073 | Admin oversight dashboard | Nice-to-have (only after US-005/006/007 are Done) |
 
 **Exit criteria:** Sprint DoD + UAT plan executed on the deployed URL + production readiness review + assessment traceability + final review written honestly.

@@ -33,6 +33,7 @@ const REASON: Record<string, string> = {
   storage_error: 'The stored file could not be read.',
   internal_error: 'An internal error stopped the check.',
   interrupted: 'The check was interrupted by a restart.',
+  daily_limit_reached: 'The daily limit on automatic checks was reached; review this document by hand or re-run it tomorrow.',
 }
 
 function Icon({ kind }: { kind: Kind }) {
@@ -78,8 +79,8 @@ export function CheckResult({ verification }: { verification: OfficerVerificatio
           {v.confidence !== null && !live ? (
             <span className="font-mono text-xs text-text-3">confidence {Math.round(v.confidence * 100)}%</span>
           ) : null}
-          {v.model ? <span className="text-xs text-text-3">· {v.model}</span> : null}
-          {v.finished_at ? <span className="text-xs text-text-3">· {formatDateTime(v.finished_at)}</span> : null}
+          {v.model ? <span className="whitespace-nowrap text-xs text-text-3">· {v.model}</span> : null}
+          {v.finished_at ? <span className="whitespace-nowrap text-xs text-text-3">· {formatDateTime(v.finished_at)}</span> : null}
         </div>
         {v.summary && !live ? <p className="mt-0.5 text-[13px] leading-[19px] text-text-2">{v.summary}</p> : null}
         {v.error_reason && (v.status === 'failed' || v.status === 'unavailable' || v.status === 'unreadable') ? (
@@ -106,7 +107,7 @@ export function CheckResult({ verification }: { verification: OfficerVerificatio
                       {issue.field ? <span className="font-mono text-[11px] text-text-3">{issue.field}</span> : null}
                     </div>
                     {issue.evidence ? (
-                      <blockquote className="mt-1.5 border-l-2 border-line-strong pl-2.5 font-mono text-[12px] leading-[18px] text-text-2">
+                      <blockquote className="mt-1.5 break-words border-l-2 border-line-strong pl-2.5 font-mono text-[12px] leading-[18px] text-text-2">
                         {issue.evidence}
                       </blockquote>
                     ) : null}

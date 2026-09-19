@@ -60,8 +60,9 @@ def _looks_like_text(head: bytes) -> bool:
         return False
     try:
         head.decode("utf-8")
-    except UnicodeDecodeError:
-        return False
+    except UnicodeDecodeError as exc:
+        # The sample is a fixed-length prefix: a multibyte character cut at its end is not a bad file.
+        return exc.start >= len(head) - 3
     return True
 
 

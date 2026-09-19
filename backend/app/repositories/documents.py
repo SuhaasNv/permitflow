@@ -1,9 +1,10 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Document, VerificationRun
+from app.models import Application, Document, VerificationRun
 from app.models.enums import DocumentType
 
 
@@ -63,6 +64,18 @@ class DocumentRepository:
     def add(self, doc: Document) -> Document:
         self.db.add(doc)
         return doc
+
+    def count_runs_since(self, since: datetime, operator_id: uuid.UUID | None = None) -> int:
+        """Verification runs requested since `since`, for one applicant's documents or for everyone
+        (US-058 quotas: the cost ceiling is counted in the database, so it holds across restarts)."""
+        stmt = select(func.count()).select_from(VerificationRun).where(VerificationRun.created_at >= since)
+        if operator_id is not None:
+            stmt = (
+                stmt.join(Document, Document.id == VerificationRun.document_id)
+                .join(Application, Application.id == Document.application_id)
+                .where(Application.operator_id == operator_id)
+            )
+        return int(self.db.execute(stmt).scalar_one())
 
     def add_run(self, run: VerificationRun) -> VerificationRun:
         self.db.add(run)

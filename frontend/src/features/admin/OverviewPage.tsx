@@ -11,7 +11,7 @@ export function AdminOverviewPage() {
       />
       <EmptyPanel
         title="Nothing to show yet"
-        description="Platform metrics and user management arrive in Sprint 3. Nothing is required from you right now."
+        description="The administration screens (US-070 to US-073) are deferred beyond this release. Nothing is required from you."
       />
     </>
   )

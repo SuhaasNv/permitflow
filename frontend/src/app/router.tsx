@@ -3,10 +3,12 @@ import { createBrowserRouter } from 'react-router-dom'
 import { AppShell } from './AppShell'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { LandingPage } from '@/features/landing/LandingPage'
+import { PolicyPage } from '@/features/legal/PolicyPage'
 import { RequireRole } from '@/features/auth/RequireRole'
 import { AdminOverviewPage } from '@/features/admin/OverviewPage'
 import { OfficerQueuePage } from '@/features/officer/QueuePage'
 import { OfficerCasePage } from '@/features/officer/CasePage'
+import { LicencePreviewPage } from '@/features/officer/LicencePreviewPage'
 import { ApplicationPage } from '@/features/operator/ApplicationPage'
 import { DocumentsPage } from '@/features/operator/DocumentsPage'
 import { FormPage } from '@/features/operator/FormPage'
@@ -20,6 +22,9 @@ import { NotFoundPanel } from '@/features/shared/states'
 export const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
   { path: '/login', element: <LoginPage /> },
+  { path: '/privacy', element: <PolicyPage /> },
+  { path: '/terms', element: <PolicyPage /> },
+  { path: '/cookies', element: <PolicyPage /> },
   {
     element: <RequireRole roles={['operator']} />,
     children: [
@@ -50,6 +55,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/officer/queue', element: <OfficerQueuePage /> },
           { path: '/officer/applications/:id', element: <OfficerCasePage /> },
+          { path: '/officer/applications/:id/licence-preview', element: <LicencePreviewPage /> },
         ],
       },
     ],
@@ -67,7 +73,12 @@ export const router = createBrowserRouter([
     path: '*',
     element: (
       <div className="mx-auto max-w-lg px-4 py-10">
-        <NotFoundPanel backTo="/" backLabel="Back to PermitFlow" />
+        <NotFoundPanel
+          backTo="/"
+          backLabel="Back to PermitFlow"
+          title="Page not found"
+          description="There is nothing at this address. Check the link, or start from the front page."
+        />
       </div>
     ),
   },

@@ -17,6 +17,7 @@ export type Bucket = 'waiting' | 'draft' | 'office' | 'decided'
 export function bucketOf(app: ApplicationSummary): Bucket {
   if (app.needs_operator_action) return 'waiting'
   if (app.status_label === 'Draft') return 'draft'
+  if (app.status_label === 'Withdrawn') return 'decided'
   if (app.status_tone === 'success' || app.status_tone === 'error') return 'decided'
   return 'office'
 }
@@ -47,7 +48,7 @@ export function ApplicationRow({ app }: { app: ApplicationSummary }) {
         to={`/app/applications/${app.id}`}
         className={cn(
           'group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-4 text-text no-underline sm:px-5',
-          'md:grid-cols-[168px_minmax(0,1fr)_220px_120px_112px]',
+          'lg:grid-cols-[168px_minmax(0,1fr)_220px_120px_112px]',
           'transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out)] hover:bg-surface-2 hover:text-text focus-visible:bg-surface-2',
         )}
       >
@@ -57,20 +58,20 @@ export function ApplicationRow({ app }: { app: ApplicationSummary }) {
             {app.revision_count > 0 ? `Revision ${app.revision_count}` : `${app.percent}% complete`}
           </div>
         </div>
-        <div className="col-span-2 min-w-0 md:col-span-1">
+        <div className="col-span-2 min-w-0 lg:col-span-1">
           <div className="truncate font-medium">
             {app.business_name ?? <span className="text-text-3">Business name not entered yet</span>}
           </div>
           <div className="truncate text-[13px] text-text-3">{app.premises_summary ?? app.licence_title}</div>
         </div>
-        <div className="col-start-1 flex flex-wrap items-center gap-2 md:col-start-auto">
+        <div className="col-start-1 flex flex-wrap items-center gap-2 lg:col-start-auto">
           <StatusBadge label={app.status_label} tone={app.status_tone} />
           {needsYou ? <span className="text-xs font-semibold text-warning">Action required</span> : null}
         </div>
-        <div className="hidden text-[13px] tabular-nums text-text-2 md:block" title={formatDateTime(app.updated_at)}>
+        <div className="hidden text-[13px] tabular-nums text-text-2 lg:block" title={formatDateTime(app.updated_at)}>
           {formatRelative(app.updated_at)}
         </div>
-        <div className="col-start-2 row-start-1 justify-self-end md:col-start-auto md:row-start-auto">
+        <div className="col-start-2 row-start-1 justify-self-end lg:col-start-auto lg:row-start-auto">
           <span
             className={cn(
               'inline-flex h-8 items-center gap-1 rounded-md border px-3 text-[13px] font-semibold transition-[background-color,border-color,color] duration-[var(--dur-fast)]',

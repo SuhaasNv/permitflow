@@ -1,0 +1,9 @@
+# Rendered at container start (docker/entrypoint.sh): ${API_ORIGIN} is derived from API_URL, so the
+# policy admits exactly one API origin per environment (US-058). Everything else the app needs is
+# first-party: scripts and styles from the bundle, fonts from /fonts, the licence preview as a blob.
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "no-referrer" always;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ${API_ORIGIN}; object-src blob:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;

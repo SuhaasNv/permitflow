@@ -23,7 +23,7 @@ export const buttonClasses = (variant: Variant = 'primary', size: Size = 'md', e
     'active:translate-y-px active:duration-75',
     'disabled:pointer-events-none disabled:border-line disabled:bg-neutral-soft disabled:text-text-3 disabled:shadow-none',
     size === 'md' && 'h-10 px-4',
-    size === 'sm' && 'h-8 px-3 text-[13px]',
+    size === 'sm' && 'h-10 px-3 text-[13px] sm:h-8',
     size === 'lg' && 'h-12 px-6 text-[15px]',
     variant === 'primary' &&
       'pf-btn-primary border-transparent bg-primary text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)] hover:text-white',

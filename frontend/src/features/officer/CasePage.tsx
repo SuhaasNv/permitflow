@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
-import { downloadDocument } from '@/api/documents'
+import { downloadDocument, downloadLicence } from '@/api/documents'
 import type { OfficerAction, OfficerApplication } from '@/api/officer'
 import { useFormSchema } from '@/features/operator/queries'
 import { displayValue } from '@/features/operator/SectionSummary'
 import { Alert } from '@/features/shared/Alert'
-import { Button } from '@/features/shared/Button'
+import { Button, buttonClasses } from '@/features/shared/Button'
 import { TextAreaField } from '@/features/shared/Controls'
 import { Dialog } from '@/features/shared/Dialog'
 import { Breadcrumb } from '@/features/shared/Breadcrumb'
@@ -23,7 +23,14 @@ import { FeedbackPanel } from './FeedbackPanel'
 import type { Target } from './FeedbackPanel'
 import { useOfficerApplication, useRerunCheck, useTransition } from './queries'
 
-const ACTION_COPY: Record<string, { title: string; body: string; confirm: string; danger?: boolean }> = {
+interface ActionCopy {
+  title: string
+  body: string
+  confirm: string
+  danger?: boolean
+}
+
+const ACTION_COPY: Record<string, ActionCopy> = {
   under_review: {
     title: 'Start reviewing this application?',
     body: 'The status becomes Under Review and the operator is told a review has started. You can add feedback while it is under review.',
@@ -35,9 +42,9 @@ const ACTION_COPY: Record<string, { title: string; body: string; confirm: string
     confirm: 'Request resubmission',
   },
   site_visit_scheduled: {
-    title: 'Schedule a site visit?',
-    body: 'The operator is told an officer will contact them to arrange a visit.',
-    confirm: 'Schedule site visit',
+    title: 'Mark the site visit as scheduled?',
+    body: 'Status only: no appointment is booked here. The operator is told an officer will contact them to arrange the visit.',
+    confirm: 'Mark scheduled',
   },
   site_visit_done: {
     title: 'Mark the site visit as done?',
@@ -54,14 +61,25 @@ const ACTION_COPY: Record<string, { title: string; body: string; confirm: string
   },
 }
 
+// The same target can be reached from different places; the label tells them apart.
+const ACTION_COPY_BY_LABEL: Record<string, ActionCopy | undefined> = {
+  'Return to review': {
+    title: 'Return this application to review?',
+    body: 'The status goes back to Under Review so you can add feedback or request a resubmission. The operator is told the application is under review again.',
+    confirm: 'Return to review',
+  },
+}
+
 function KeyFacts({ view }: { view: OfficerApplication }) {
   const current = view.revisions[view.revisions.length - 1]
   return (
-    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-[13px] sm:grid-cols-4">
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-[13px] sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
       <div>
         <dt className="text-text-3">Applicant</dt>
         <dd className="font-medium">{view.applicant.full_name}</dd>
-        <dd className="truncate text-text-3">{view.applicant.email}</dd>
+        <dd className="truncate text-text-3" title={view.applicant.email}>
+          {view.applicant.email}
+        </dd>
       </div>
       <div>
         <dt className="text-text-3">Submitted</dt>
@@ -92,22 +110,45 @@ function ReviewRail({
   onAction: (action: OfficerAction) => void
   busy: boolean
 }) {
+  const toast = useToast()
   const s = view.verification_summary
   const primary = view.actions.find((a) => a.enabled && !a.requires_note)
   const rest = view.actions.filter((a) => a !== primary)
   return (
-    <aside className="flex flex-col gap-5 lg:sticky lg:top-[88px] lg:self-start">
+    <aside className="order-first flex flex-col gap-5 lg:order-none lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-104px)] lg:self-start lg:overflow-y-auto">
       <section className="pf-surface" aria-labelledby="review-title">
-        <div className="px-5 pt-5">
+        <div className={cn('px-5 pt-5', view.actions.length === 0 && 'pb-5')}>
           <h2 id="review-title" className="text-[17px] font-semibold leading-6">
             Review
           </h2>
           <p className="mt-1 text-[13px] leading-[19px] text-text-2">
-            {view.actions.length === 0
-              ? 'No further action is available for this application.'
-              : 'Every status change is recorded with your name in the audit trail.'}
+            {view.status === 'withdrawn'
+              ? 'The operator withdrew this application. Nothing further can happen to it.'
+              : view.actions.length === 0
+                ? 'No further action is available for this application.'
+                : 'Every status change is recorded with your name in the audit trail.'}
           </p>
         </div>
+        {view.licence ? (
+          <div className="mx-5 mb-5 mt-4 rounded-md border border-success-line bg-success-soft/50 px-4 py-3 text-sm">
+            <div className="font-semibold">Licence {view.licence.licence_no}</div>
+            <div className="mt-0.5 text-[13px] text-text-2">
+              Valid {formatDate(view.licence.valid_from)} to {formatDate(view.licence.valid_to)} · code {view.licence.verification_code}
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={() =>
+                void downloadLicence(view.id, view.licence?.licence_no ?? 'licence').catch((e: unknown) =>
+                  toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                )
+              }
+            >
+              Download licence (PDF)
+            </Button>
+          </div>
+        ) : null}
         {view.actions.length > 0 ? (
           <div className="flex flex-col gap-2 px-5 pb-5 pt-4">
             {primary ? (
@@ -126,6 +167,11 @@ function ReviewRail({
                 {a.label}
               </Button>
             ))}
+            {view.status === 'pending_approval' ? (
+              <Link to={`/officer/applications/${view.id}/licence-preview`} className={buttonClasses('ghost')}>
+                Preview licence
+              </Link>
+            ) : null}
             {rest.some((a) => !a.enabled && a.reason) ? (
               <ul className="mt-1 flex flex-col gap-1 text-xs leading-[17px] text-text-3">
                 {rest
@@ -136,6 +182,12 @@ function ReviewRail({
                     </li>
                   ))}
               </ul>
+            ) : null}
+            {view.actions.some((a) => a.target === 'site_visit_scheduled' || a.target === 'site_visit_done') ? (
+              <p className="mt-1 text-xs leading-[17px] text-text-3">
+                The site visit steps change the status only. The visit checklist and post-visit clarification rounds are out of scope for
+                this release.
+              </p>
             ) : null}
           </div>
         ) : null}
@@ -149,12 +201,12 @@ function ReviewRail({
           <span className="text-xs text-text-3">AI-assisted</span>
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 px-5 pb-4 text-[13px]">
-          <Stat label="Analysed" value={s.total} />
+          <Stat label="Documents" value={s.total} />
           <Stat label="Verified" value={s.verified} tone="success" />
           <Stat label="Issues found" value={s.issues_found} tone="warning" />
           <Stat label="Need your review" value={s.needs_review} tone="warning" />
           {s.checking > 0 ? <Stat label="Still checking" value={s.checking} tone="info" /> : null}
-          {s.other > 0 ? <Stat label="Unreadable or failed" value={s.other} /> : null}
+          {s.other > 0 ? <Stat label="Not checked" value={s.other} tone="warning" /> : null}
         </dl>
         <p className="border-t border-line px-5 py-3 text-xs leading-[18px] text-text-3">
           Checks compare each document with the submitted form. They are advisory: the decision is yours.
@@ -168,7 +220,7 @@ function ReviewRail({
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: 'success' | 'warning' | 'info' }) {
   return (
-    <div className="flex items-baseline justify-between border-b border-line py-1.5 last:border-b-0">
+    <div className="flex items-baseline justify-between py-1">
       <dt className="text-text-2">{label}</dt>
       <dd
         className={cn(
@@ -199,7 +251,7 @@ export function OfficerCasePage() {
   if (app.isPending || schema.isPending) {
     return (
       <PageSkeleton label="Loading case">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <Skeleton className="h-[480px]" />
           <Skeleton className="h-72" />
         </div>
@@ -214,6 +266,8 @@ export function OfficerCasePage() {
   if (schema.isError) return <ErrorPanel error={schema.error} onRetry={() => void schema.refetch()} />
 
   const view = app.data
+  // Anything but Verified or still checking: the same set the queue counts as "to check".
+  const unresolvedChecks = view.verification_summary.issues_found + view.verification_summary.needs_review + view.verification_summary.other
   const targets: Target[] = [
     ...view.sections.map((sec) => ({ value: `section:${sec.key}`, label: sec.title, target_type: 'section' as const, key: sec.key })),
     ...view.documents.map((d) => ({
@@ -247,7 +301,7 @@ export function OfficerCasePage() {
     )
   }
 
-  const copy = pending ? ACTION_COPY[pending.target] : null
+  const copy = pending ? (ACTION_COPY_BY_LABEL[pending.label] ?? ACTION_COPY[pending.target]) : null
 
   return (
     <>
@@ -266,6 +320,11 @@ export function OfficerCasePage() {
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           <StatusBadge label={view.status_label} tone={view.status_tone} size="lg" live={view.verification_summary.checking > 0} />
           {view.decision_note ? <span className="text-sm text-text-2">Note: {view.decision_note}</span> : null}
+          {view.status === 'withdrawn' ? (
+            <span className="text-sm text-text-2">
+              Withdrawn by the operator{view.withdrawal_reason ? `: ${view.withdrawal_reason}` : ' without a reason'}
+            </span>
+          ) : null}
         </div>
         <div className="mt-5 border-t border-line pt-4">
           <KeyFacts view={view} />
@@ -298,7 +357,14 @@ export function OfficerCasePage() {
             tone="warning"
             title="This application changed since you opened it"
             action={
-              <Button variant="secondary" size="sm" onClick={() => void app.refetch()}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  transition.reset()
+                  void app.refetch()
+                }}
+              >
                 Reload
               </Button>
             }
@@ -314,7 +380,7 @@ export function OfficerCasePage() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-6">
           <section className="pf-surface px-5 py-6 sm:px-7" aria-labelledby="submission-title">
             <div className="mb-2 flex items-baseline justify-between">
@@ -349,7 +415,7 @@ export function OfficerCasePage() {
                         <StatusBadge label={`Changed in Revision ${view.current_revision_number}`} tone="info" />
                       ) : null}
                     </div>
-                    <dl className="grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[220px_minmax(0,1fr)]">
+                    <dl className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[minmax(120px,220px)_minmax(0,1fr)] lg:grid-cols-1 xl:grid-cols-[minmax(120px,220px)_minmax(0,1fr)]">
                       {def.fields.map((f) => {
                         const value = section.data[f.key]
                         const empty = value === undefined || value === null || value === ''
@@ -458,7 +524,7 @@ export function OfficerCasePage() {
             </ol>
           </section>
 
-          <ComparePanel view={view} />
+          <ComparePanel key={view.current_revision_number} view={view} />
 
           <section className="pf-surface" aria-labelledby="history-title">
             <div className="border-b border-line px-5 py-4 sm:px-7">
@@ -470,8 +536,8 @@ export function OfficerCasePage() {
               {view.revisions.map((r) => (
                 <li key={r.id} className="flex items-baseline gap-4 px-5 py-3 text-sm sm:px-7">
                   <span className="font-mono text-xs text-text-3">R{r.number}</span>
-                  <span className="font-medium">Revision {r.number}</span>
-                  <span className="text-text-3">
+                  <span className="whitespace-nowrap font-medium">Revision {r.number}</span>
+                  <span className="min-w-0 flex-1 text-text-3">
                     submitted {formatDateTime(r.submitted_at)} by {r.submitted_by}
                   </span>
                   {r.number === view.current_revision_number ? (
@@ -481,7 +547,7 @@ export function OfficerCasePage() {
               ))}
             </ol>
             <p className="border-t border-line px-5 py-3 text-xs text-text-3 sm:px-7">
-              <Link to="/officer/queue" className="text-text-2">
+              <Link to="/officer/queue" className="inline-block py-2 text-text-2 sm:py-0">
                 Back to the queue
               </Link>
             </p>
@@ -490,6 +556,7 @@ export function OfficerCasePage() {
           <AuditTrail applicationId={id} />
         </div>
         <ReviewRail view={view} targets={targets} busy={transition.isPending} onAction={(a) => setPending(a)} />
+        {/* Below lg the rail renders first (order) so the officer's actions are not the last thing on the page. */}
       </div>
 
       <Dialog
@@ -501,10 +568,25 @@ export function OfficerCasePage() {
         onConfirm={confirm}
         onCancel={() => {
           setPending(null)
+          setNote('')
           setNoteError(null)
         }}
       >
         <p>{copy?.body}</p>
+        {pending?.target === 'approved' ? (
+          <p className="text-text-3">
+            Approving issues the licence certificate at once; the operator can download it from their application page. Use "Preview
+            licence" on the case first if you want to check it.
+          </p>
+        ) : null}
+        {pending?.target === 'approved' && unresolvedChecks > 0 ? (
+          <Alert
+            tone="warning"
+            title={`${unresolvedChecks} ${unresolvedChecks === 1 ? 'document still has' : 'documents still have'} unresolved check results`}
+          >
+            The checks are advisory and do not block approval. Approving records that you reviewed them.
+          </Alert>
+        ) : null}
         {pending?.requires_note || pending?.target === 'approved' ? (
           <TextAreaField
             label={pending.requires_note ? 'Note to the operator' : 'Note to the operator'}

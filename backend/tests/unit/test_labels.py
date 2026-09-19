@@ -53,4 +53,6 @@ def test_tones() -> None:
     assert tone_for(S.PENDING_PRE_SITE_RESUBMISSION) == "warning"
     assert tone_for(S.APPROVED) == "success"
     assert tone_for(S.REJECTED) == "error"
+    assert tone_for(S.WITHDRAWN) == "neutral"
+    assert operator_label(S.WITHDRAWN) == officer_label(S.WITHDRAWN) == "Withdrawn"
     assert tone_for(S.UNDER_REVIEW) == "info"

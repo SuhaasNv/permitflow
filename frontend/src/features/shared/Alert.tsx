@@ -33,7 +33,7 @@ export function Alert({ tone = 'info', title, children, className, action }: Ale
   return (
     <div
       role={tone === 'error' ? 'alert' : 'status'}
-      className={cn('pf-enter-fast flex gap-3 rounded-md border px-4 py-3 text-sm leading-5', tones[tone], className)}
+      className={cn('pf-enter-fast flex flex-wrap gap-3 rounded-md border px-4 py-3 text-sm leading-5', tones[tone], className)}
     >
       <svg
         width="18"
@@ -53,7 +53,7 @@ export function Alert({ tone = 'info', title, children, className, action }: Ale
         {title ? <div className="font-semibold">{title}</div> : null}
         <div className={cn(title && 'mt-0.5 text-[13px] leading-[19px] opacity-90')}>{children}</div>
       </div>
-      {action ? <div className="shrink-0 self-center">{action}</div> : null}
+      {action ? <div className="basis-full pl-[30px] sm:basis-auto sm:self-center sm:pl-0">{action}</div> : null}
     </div>
   )
 }

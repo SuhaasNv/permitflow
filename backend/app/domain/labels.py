@@ -31,6 +31,7 @@ _LABELS: dict[S, tuple[str, str]] = {
     S.PENDING_APPROVAL: ("Route to Approval", "Pending Approval"),
     S.APPROVED: ("Approved", "Approved"),
     S.REJECTED: ("Rejected", "Rejected"),
+    S.WITHDRAWN: ("Withdrawn", "Withdrawn"),
 }
 
 
@@ -49,7 +50,7 @@ def label_for(status: S, role: Role) -> str:
 
 # Badge colour group used by the UI (DESIGN_SYSTEM.md). Served so the client never maps codes.
 def tone_for(status: S) -> str:
-    if status == S.DRAFT:
+    if status in (S.DRAFT, S.WITHDRAWN):
         return "neutral"
     if status in (S.PENDING_PRE_SITE_RESUBMISSION, S.PENDING_POST_SITE_RESUBMISSION):
         return "warning"

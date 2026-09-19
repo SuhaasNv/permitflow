@@ -6,9 +6,14 @@ on:
   pull_request:
     branches: [main, dev]
 
+# `shell: bash` gives `-o pipefail`: a failing command behind `| tee` fails the step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   backend:
-    name: Backend (ruff, mypy, pytest)
+    name: Backend
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -27,6 +32,7 @@ jobs:
     defaults:
       run:
         working-directory: backend
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -36,14 +42,20 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy
-      - run: uv run pytest
+      - run: uv run pytest --cov=app --cov-report=term --cov-report=xml --cov-fail-under=80
+      - name: Coverage summary
+        if: always()
+        run: |
+          echo '### Backend coverage' >> "$GITHUB_STEP_SUMMARY"
+          uv run coverage report --format=total 2>/dev/null | sed 's/^/Total: /; s/$/ %/' >> "$GITHUB_STEP_SUMMARY" || true
 
   frontend:
-    name: Frontend (lint, typecheck, test, build)
+    name: Frontend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -54,11 +66,58 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
+      - name: Coverage summary
+        if: always()
+        run: |
+          echo '### Frontend coverage (all source files counted)' >> "$GITHUB_STEP_SUMMARY"
+          npx vitest run --coverage --coverage.reporter=text-summary 2>/dev/null | grep -E 'Statements|Branches|Functions|Lines' >> "$GITHUB_STEP_SUMMARY" || true
       - run: npm run build
 
+  ai:
+    name: AI gate
+    # The AI checks are their own workflow (US-056): six stages, each named in the run summary.
+    uses: ./.github/workflows/ai-gate.yml
+
+  audit:
+    # Blocking since US-058: a known vulnerability in a production dependency, or a bandit finding of
+    # medium severity or above, fails the build. (Before US-058 pip-audit had been failing on the
+    # project's own editable line and nobody noticed, because the step was allowed to fail.)
+    name: Dependency and code audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: pip-audit (production dependencies, blocking)
+        working-directory: backend
+        run: |
+          uv export --frozen --no-dev --no-emit-project --format requirements-txt > /tmp/req.txt
+          uvx pip-audit -r /tmp/req.txt --desc --strict 2>&1 | tee /tmp/pip-audit.txt
+      - name: bandit (backend source, blocking at medium)
+        working-directory: backend
+        run: uvx bandit -r app -q -ll -ii 2>&1 | tee /tmp/bandit.txt
+      - name: npm audit (production dependencies, blocking at high)
+        working-directory: frontend
+        run: |
+          npm ci --ignore-scripts
+          npm audit --omit=dev --audit-level=high 2>&1 | tee /tmp/npm-audit.txt
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Dependency and code audit"
+            echo '```'
+            tail -n 3 /tmp/pip-audit.txt 2>/dev/null
+            tail -n 3 /tmp/bandit.txt 2>/dev/null
+            tail -n 3 /tmp/npm-audit.txt 2>/dev/null
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   secrets:
-    name: Secret scan (gitleaks)
+    name: Secret scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,3 +126,130 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  e2e:
+    name: End to end
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: permitflow
+          POSTGRES_PASSWORD: permitflow
+          POSTGRES_DB: permitflow
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U permitflow -d permitflow"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow
+      JWT_SECRET: ci-only-secret-that-is-long-enough
+      CORS_ORIGINS: http://localhost:3000
+      AI_PROVIDER: mock
+      UPLOAD_DIR: /tmp/permitflow-uploads
+      # Eight specs sign in from one runner address; the per-client limits (US-058) would throttle them.
+      # They are exercised by their own integration tests, not by the browser suite.
+      RATE_LIMIT_PER_MINUTE: "0"
+      LOGIN_ATTEMPTS_PER_MINUTE: "0"
+      E2E_API_URL: http://localhost:8000/api/v1
+      VITE_API_URL: http://localhost:8000/api/v1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Backend up (migrate, seed, serve on :8000)
+        working-directory: backend
+        run: |
+          uv sync --frozen
+          uv run alembic upgrade head
+          uv run python scripts/seed.py
+          nohup uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://localhost:8000/api/v1/health && break; sleep 1; done
+          curl -fsS http://localhost:8000/api/v1/health > /dev/null || { echo 'backend did not start'; tail -n 50 /tmp/backend.log; exit 1; }
+      - name: Frontend up (build, preview on :3000)
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run build
+          nohup npx vite preview --port 3000 --strictPort > /tmp/frontend.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://localhost:3000/ > /dev/null && break; sleep 1; done
+          curl -fsS http://localhost:3000/ > /dev/null || { echo 'frontend did not start'; tail -n 50 /tmp/frontend.log; exit 1; }
+      - name: Playwright (journey + scenarios)
+        working-directory: frontend
+        run: npm run e2e
+      - name: Server logs on failure
+        if: failure()
+        run: tail -n 200 /tmp/backend.log /tmp/frontend.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
+
+  images:
+    name: Images
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, ai, e2e, secrets, audit]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      OWNER: ${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tags
+        id: tags
+        run: |
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          short=${GITHUB_SHA::7}
+          # Pull requests have refs like 12/merge, which is not a valid tag: keep it a plain word.
+          ref=$(echo "$GITHUB_REF_NAME" | tr '/' '-')
+          echo "backend=ghcr.io/$owner/permitflow-backend:sha-$short,ghcr.io/$owner/permitflow-backend:$ref" >> "$GITHUB_OUTPUT"
+          echo "frontend=ghcr.io/$owner/permitflow-frontend:sha-$short,ghcr.io/$owner/permitflow-frontend:$ref" >> "$GITHUB_OUTPUT"
+      - name: Backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.tags.outputs.backend }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.tags.outputs.frontend }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+      - name: Summary
+        run: |
+          {
+            echo "## Images"
+            echo '`'"${{ steps.tags.outputs.backend }}"'`'
+            echo
+            echo '`'"${{ steps.tags.outputs.frontend }}"'`'
+            echo
+            echo "Pushed: ${{ github.event_name == 'push' }} (pull requests only build)"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,43 @@
+server {
+    listen ${PORT};
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # nginx drops inherited add_header lines when a location adds its own: include the set everywhere.
+    include /etc/nginx/snippets/security-headers.conf;
+
+    location = /healthz {
+        default_type text/plain;
+        return 200 "ok";
+    }
+
+    # Runtime config is rewritten at container start: never cache it.
+    location = /config.js {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
+    }
+
+    # Hashed assets are immutable.
+    location /assets/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Self-hosted fonts (US-057): unhashed file names, versioned by release; a day of caching is plenty.
+    location /fonts/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=86400";
+    }
+
+    # Single-page app: every route falls back to index.html.
+    location / {
+        try_files $uri $uri/ /index.html;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+    }
+}

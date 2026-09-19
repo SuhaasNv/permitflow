@@ -43,30 +43,42 @@ export function FeedbackNotice({ view, compact = false }: { view: ApplicationVie
         ) : null}
       </div>
       <ul className="divide-y divide-line">
-        {[...open, ...(compact ? [] : rest)].map((f) => (
-          <li key={f.id} className="flex gap-4 px-5 py-4">
-            <span
-              className={cn(
-                'mt-[7px] h-[7px] w-[7px] shrink-0 rounded-full',
-                f.resolution === 'open' ? 'bg-warning' : f.resolution === 'addressed' ? 'bg-info' : 'bg-success',
-              )}
-              aria-hidden="true"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="text-[15px] font-semibold">{f.target_label}</span>
-                <StatusBadge label={RESOLUTION[f.resolution].label} tone={RESOLUTION[f.resolution].tone} />
-                <span className="text-xs text-text-3">Round {f.round}</span>
+        {[...open, ...(compact ? [] : rest)].map((f) => {
+          // Changed in this round but not yet resubmitted: the server still says "open"; the readiness says "changed".
+          const changed =
+            f.resolution === 'open' &&
+            (f.target_type === 'section'
+              ? (view.resubmit?.changed_sections ?? []).includes(f.section_key ?? '')
+              : (view.resubmit?.changed_document_types ?? []).includes(f.document_type ?? ''))
+          return (
+            <li key={f.id} className="flex gap-4 px-5 py-4">
+              <span
+                className={cn(
+                  'mt-[7px] h-[7px] w-[7px] shrink-0 rounded-full',
+                  changed ? 'bg-success' : f.resolution === 'open' ? 'bg-warning' : f.resolution === 'addressed' ? 'bg-info' : 'bg-success',
+                )}
+                aria-hidden="true"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="text-[15px] font-semibold">{f.target_label}</span>
+                  {changed ? (
+                    <StatusBadge label="Changed, ready to resubmit" tone="success" />
+                  ) : (
+                    <StatusBadge label={RESOLUTION[f.resolution].label} tone={RESOLUTION[f.resolution].tone} />
+                  )}
+                  <span className="text-xs text-text-3">Raised against Revision {f.round}</span>
+                </div>
+                <p className="mt-1 text-sm leading-[21px] text-text-2">{f.message}</p>
               </div>
-              <p className="mt-1 text-sm leading-[21px] text-text-2">{f.message}</p>
-            </div>
-            {f.resolution === 'open' && view.can_edit ? (
-              <Link to={targetHref(view, f)} className="shrink-0 self-center text-[13px] font-semibold">
-                {f.target_type === 'section' ? 'Edit section' : 'Replace document'}
-              </Link>
-            ) : null}
-          </li>
-        ))}
+              {f.resolution === 'open' && view.can_edit ? (
+                <Link to={targetHref(view, f)} className="shrink-0 self-center text-[13px] font-semibold">
+                  {changed ? 'Edit again' : f.target_type === 'section' ? 'Edit section' : 'Replace document'}
+                </Link>
+              ) : null}
+            </li>
+          )
+        })}
       </ul>
       {compact && rest.length > 0 ? (
         <p className="border-t border-line px-5 py-2.5 text-xs text-text-3">

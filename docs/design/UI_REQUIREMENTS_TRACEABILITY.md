@@ -44,7 +44,13 @@ Use cases and requirement IDs from `docs/requirements/`. Screens from `SCREEN_IN
 | FR-024 | FeedbackItem states Open → Addressed in Rev N → Resolved; Mark resolved |
 | FR-025 | S-25 AuditTable, Status history |
 | FR-027 | Header actions and dialogs for site visit, done, route to approval, approve, reject |
+| FR-027 (follow-ups) | Approve dialog warning on unresolved check results; Return to review action and dialog (S-21) |
 | FR-028 | S-00; role home routing; staff sign-in link |
+| FR-031 | S-01 landing page |
+| FR-032 | S-11 aside Withdraw application with danger dialog and optional reason; S-11b withdrawn outcome panel; officer S-21 withdrawal notice |
+| FR-033 | S-21 Mark resolved only on released items, Undo toasts, Not fixed reopen |
+| FR-034 | S-11 Discard draft / Delete draft dialogs |
+| FR-035 | S-26 licence preview page; S-21 licence block with download after approval; S-11b Download licence (PDF) in the outcome panel |
 | FR-029 | S-40 stats, status table, AI health bar, audit feed |
 | FR-030 | S-41 users table, Add user drawer, Change role, Deactivate; read-only application view |
 | NFR-007 | S-40 AI health (latency, outcomes) |

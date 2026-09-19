@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.errors import RateLimited, Unauthorized
-from app.core.rate_limit import FailedLoginLimiter
+from app.core.rate_limit import FailedLoginLimiter, client_key
 from app.core.settings import get_settings
 from app.schemas.auth import LoginRequest, TokenOut, UserOut
 from app.services.auth import AuthService
@@ -15,22 +15,9 @@ login_limiter = FailedLoginLimiter(
 )
 
 
-def _client_key(request: Request) -> str:
-    """Rate-limit key: the socket address, or X-Forwarded-For only when the socket is a trusted proxy.
-
-    Honouring the header from any client would let an attacker pick a fresh bucket per request (T4).
-    """
-    host = request.client.host if request.client else "unknown"
-    trusted = {p.strip() for p in _settings.trusted_proxies.split(",") if p.strip()}
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded and host in trusted:
-        return forwarded.split(",")[0].strip()
-    return host
-
-
 @router.post("/login", response_model=TokenOut)
 def login(payload: LoginRequest, request: Request, db: DbSession) -> TokenOut:
-    key = _client_key(request)
+    key = client_key(request, _settings.trusted_proxies)
     if login_limiter.is_blocked(key):
         raise RateLimited("Too many failed attempts. Try again in a minute.")
     try:

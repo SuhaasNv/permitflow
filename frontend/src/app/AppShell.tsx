@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router-dom'
 
 import type { Role } from '@/api/auth'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -9,6 +9,7 @@ import { Logo } from '@/features/shared/Logo'
 import { NotificationsBell } from '@/features/shared/NotificationsBell'
 import { hasUnsaved, setUnsaved } from '@/lib/unsaved'
 import { cn } from '@/lib/cn'
+import { sessionWarning } from '@/lib/session'
 
 interface NavItem {
   label: string
@@ -64,13 +65,6 @@ const ROLE_LABEL: Record<Role, string> = {
 
 const NAV_KEY = 'permitflow.nav.collapsed'
 
-function formatExpiry(iso: string): string {
-  const d = new Date(iso)
-  const sameDay = d.toDateString() === new Date().toDateString()
-  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  return sameDay ? `at ${time}` : `tomorrow at ${time}`
-}
-
 function initials(name: string): string {
   return name
     .split(/\s+/)
@@ -94,6 +88,13 @@ export function AppShell() {
   })
 
   const [confirmSignOut, setConfirmSignOut] = useState(false)
+  // Re-evaluate the session warning once a minute; silent until 30 minutes remain (US-048).
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const warning = useMemo(() => (expiresAt ? sessionWarning(expiresAt, now) : { level: 'none' as const }), [expiresAt, now])
   const doSignOut = () => {
     setUnsaved(false)
     signOut()
@@ -115,12 +116,19 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-      <div className="flex h-7 items-center gap-2 bg-ink px-4 text-xs text-[#aeb6c2] sm:px-6">
+      <a href="#main" className="pf-skip-link">
+        Skip to content
+      </a>
+      <div role="region" aria-label="Portal notice" className="flex h-7 items-center gap-2 bg-ink px-4 text-xs text-[#aeb6c2] sm:px-6">
         <span className="font-semibold text-white">Secure licensing portal</span>
         <span className="hidden sm:inline">· Food Establishments Unit</span>
-        {expiresAt ? (
-          <span className="ml-auto tabular-nums" title={new Date(expiresAt).toLocaleString()}>
-            Session expires {formatExpiry(expiresAt)}
+        {warning.level !== 'none' && expiresAt ? (
+          <span
+            role="status"
+            className={cn('ml-auto tabular-nums', warning.level === 'urgent' ? 'font-semibold text-white' : 'text-[#e6c8cc]')}
+            title={`Signed in until ${new Date(expiresAt).toLocaleString()}. Sign in again to continue afterwards.`}
+          >
+            {warning.text}
           </span>
         ) : null}
       </div>
@@ -173,12 +181,12 @@ export function AppShell() {
         <nav
           aria-label="Main"
           className={cn(
-            'sticky top-14 hidden h-[calc(100vh-56px-28px)] shrink-0 flex-col border-r border-line bg-surface md:flex',
+            'hidden shrink-0 flex-col border-r border-line bg-surface md:flex',
             'transition-[width] duration-[var(--dur-base)] ease-[var(--ease-out)]',
             collapsed ? 'w-16' : 'w-[232px]',
           )}
         >
-          <div className="flex flex-col gap-0.5 p-3">
+          <div className="sticky top-14 flex flex-col gap-0.5 p-3">
             <div
               className={cn(
                 'pf-eyebrow overflow-hidden whitespace-nowrap px-[11px] transition-[opacity,height,padding] duration-[var(--dur-fast)]',
@@ -210,15 +218,33 @@ export function AppShell() {
               </NavLink>
             ))}
           </div>
-          <div className={cn('mt-auto border-t border-line p-4 text-xs leading-[18px] text-text-3', collapsed && 'hidden')}>
-            <div className="font-medium text-text-2">PermitFlow</div>
+          <div
+            className={cn(
+              'sticky bottom-0 mt-auto border-t border-line bg-surface p-4 text-xs leading-[18px] text-text-3',
+              collapsed && 'hidden',
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-text-2">PermitFlow</span>
+              <span className="rounded border border-line px-1.5 font-mono text-[10px] leading-4 text-text-3">v{__APP_VERSION__}</span>
+            </div>
             <div>Fictional assessment product</div>
+            <nav aria-label="Policies" className="mt-1 flex gap-3">
+              <Link to="/privacy" className="text-text-3 no-underline hover:text-text">
+                Privacy
+              </Link>
+              <Link to="/terms" className="text-text-3 no-underline hover:text-text">
+                Terms
+              </Link>
+            </nav>
           </div>
         </nav>
-        <main className="min-w-0 flex-1 pb-24 md:pb-0">
+        <main id="main" tabIndex={-1} className="min-w-0 flex-1 pb-24 outline-none md:pb-0">
           <div key={pageKey} className="pf-enter mx-auto w-full max-w-[1360px] px-4 py-6 sm:px-8 sm:py-8 lg:px-10">
             <Outlet />
           </div>
+          {/* New pages open at the top; Back and Forward return to the remembered position. */}
+          <ScrollRestoration />
         </main>
       </div>
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/95 backdrop-blur md:hidden">

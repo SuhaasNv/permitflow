@@ -59,7 +59,7 @@ export function ReviewPage() {
   if (app.isPending || schema.isPending) {
     return (
       <PageSkeleton label="Loading review">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <Skeleton className="h-96" />
           <Skeleton className="h-64" />
         </div>
@@ -68,7 +68,7 @@ export function ReviewPage() {
   }
   if (app.isError) {
     if (app.error instanceof AppError && app.error.status === 404)
-      return <NotFoundPanel backTo="/app/dashboard" backLabel="Back to my applications" />
+      return <NotFoundPanel backTo="/app/applications" backLabel="Back to my applications" />
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   if (schema.isError) return <ErrorPanel error={schema.error} onRetry={() => void schema.refetch()} />
@@ -76,7 +76,10 @@ export function ReviewPage() {
   const view = app.data
   const base = `/app/applications/${id}`
   // Review is only for an editable application; a submitted or decided one shows its own page.
-  if (!view.can_edit) return <Navigate to={base} replace />
+  // Locked applications go back to their page, except right after this page's own submit succeeded:
+  // the mutation's data lands before its navigation to the confirmation page.
+  // Locked applications and resubmissions (Resubmit lives on the application page) go back to their page.
+  if ((!view.can_edit || view.resubmit) && !submit.isSuccess && !submit.isPending) return <Navigate to={base} replace />
   const withAttention = view.document_slots.filter((s) => s.document?.verification && ATTENTION.has(s.document.verification.status))
   const stillChecking = view.document_slots.filter(
     (s) => s.document?.verification && (s.document.verification.status === 'pending' || s.document.verification.status === 'running'),
@@ -96,7 +99,7 @@ export function ReviewPage() {
     <>
       <ApplicationHeader view={view} crumb="Review and submit" />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex flex-col gap-5">
           {submit.isError && !missing.length ? (
             <Alert tone="error" title={submitError?.status === 409 ? 'Already submitted' : 'Could not submit'}>
@@ -163,7 +166,7 @@ export function ReviewPage() {
                     tone={view.completeness.documents_present === view.completeness.documents_total ? 'success' : 'neutral'}
                   />
                   {view.can_edit ? (
-                    <Link to={`${base}/documents`} className="ml-auto text-[13px] font-semibold">
+                    <Link to={`${base}/documents`} className="ml-auto inline-block py-2 text-[13px] font-semibold sm:py-0">
                       Manage
                     </Link>
                   ) : null}
@@ -176,7 +179,7 @@ export function ReviewPage() {
                         <span className="min-w-0 flex-1">
                           <span className="font-medium">{slot.label}</span>
                           {slot.document ? (
-                            <span className="ml-2 break-all text-[13px] text-text-3">{slot.document.original_filename}</span>
+                            <span className="ml-2 break-words text-[13px] text-text-3">{slot.document.original_filename}</span>
                           ) : null}
                         </span>
                         <StatusBadge label={s.label} tone={s.tone} live={s.label === 'Checking'} />

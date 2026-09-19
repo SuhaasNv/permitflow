@@ -1,0 +1,243 @@
+# AI gate (US-056): everything that must be true about the AI verification before a change merges.
+#
+# Six stages, each its own job so a failure names the stage. All run on the mock provider: free,
+# deterministic, no key. The same checks against the real model live in ai-eval.yml (nightly, manual,
+# and on AI changes). ci.yml calls this workflow, so it blocks the images and the deploy like any job.
+#
+#   1. model approval   pinned model, closed enums, strict schemas, prompt version, provider wiring
+#   2. contracts        provider, rules, extraction and tracing unit tests
+#   3. golden set       14 cases through the real pipeline, blocking at 100 % of the counted cases
+#   4. adversarial      the injection cases must land on needs_review with possible_prompt_injection
+#   5. fairness         21 name-swapped runs must match their baseline (status and codes)
+#   6. verdict          one summary line per stage in the run summary
+
+name: AI gate
+
+# Called from ci.yml only (workflow_call), so it never appears as a separate entry in the Actions list;
+# to run the gate by hand, re-run the CI workflow.
+on:
+  workflow_call:
+
+env:
+  APP_ENV: test
+  AI_PROVIDER: mock
+
+# `shell: bash` gives `-o pipefail`, so `pytest | tee` and `python | tee` cannot hide a failure. Before this
+# fix the Contracts stage reported "pass" while every test had errored at setup.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  model-approval:
+    name: Model approval
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Pinned model, closed vocabularies, strict schemas, prompt version, provider wiring
+        run: |
+          uv run python - <<'PY'
+          from app.core.settings import Settings
+          from app.infra.ai.factory import get_provider
+          from app.infra.ai.openai_provider import PROMPT_VERSION, SYSTEM_PROMPT, WireIssue, WireResult
+          from app.domain.verification_rules import VerificationResult
+          s = Settings()
+          assert s.openai_model == "gpt-4.1-mini", s.openai_model
+          assert 0 < s.ai_confidence_threshold < 1
+          assert s.ai_max_text_chars <= 20_000, "text cap grew: cost and context risk"
+          assert PROMPT_VERSION and SYSTEM_PROMPT
+          assert "do not make licensing decisions" in SYSTEM_PROMPT.lower()
+          assert set(WireResult.model_json_schema()["properties"]["status"]["enum"]) == {"verified", "issues_found", "unreadable"}
+          assert set(WireIssue.model_json_schema()["properties"]["severity"]["enum"]) == {"low", "medium", "high"}
+          assert VerificationResult.model_config.get("extra") == "forbid"
+          assert WireResult.model_config.get("extra") == "forbid"
+          assert get_provider().name == "mock"
+          assert not s.langsmith_api_key, "tracing key must not be set in CI"
+          print("model approval ok: model", s.openai_model, "prompt", PROMPT_VERSION)
+          PY
+          {
+            echo "### 1. Model approval"
+            echo
+            echo "pass: model gpt-4.1-mini, prompt $(uv run python -c 'from app.infra.ai.openai_provider import PROMPT_VERSION; print(PROMPT_VERSION)')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: permitflow
+          POSTGRES_PASSWORD: permitflow
+          POSTGRES_DB: permitflow_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U permitflow -d permitflow_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow_test
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Provider, rules, extraction and tracing tests
+        run: |
+          uv run pytest tests/unit/test_verification_rules.py tests/unit/test_openai_wire.py \
+            tests/unit/test_openai_provider_paths.py tests/unit/test_mock_provider.py \
+            tests/unit/test_extraction.py tests/unit/test_tracing.py tests/unit/test_rate_limit.py \
+            | tee /tmp/contracts.txt
+          grep -Eq "^[0-9]+ passed" /tmp/contracts.txt || { echo "::error::no tests ran"; exit 1; }
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### 2. Contracts"
+            echo
+            echo "$(tail -n 1 /tmp/contracts.txt 2>/dev/null || echo 'no result')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  golden-set:
+    name: Golden set
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run python -m evals.run --provider mock --json /tmp/ai-eval.json --fail-under 1.0
+      - name: Per-case table
+        if: always()
+        run: |
+          {
+            uv run python - <<'PY'
+          import json
+          r = json.load(open("/tmp/ai-eval.json"))
+          print("### 3. Golden set")
+          print()
+          print(f"{'pass' if r['pass_rate'] == 1 else 'FAIL'}: {r['passed']}/{r['counted']} counted cases, prompt {r['prompt_version']}")
+          print()
+          print("<details><summary>Per case</summary>")
+          print()
+          print("| case | group | expected | actual | result |")
+          print("|---|---|---|---|---|")
+          for o in r["outcomes"]:
+              mark = "pass" if o["passed"] else ("known mock gap" if not o["counted"] else "FAIL")
+              print(f"| {o['id']} | {o['group']} | {o['expected']} | {o['actual']} | {mark} |")
+          print()
+          print("</details>")
+          PY
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-gate-golden-set
+          path: /tmp/ai-eval.json
+
+  adversarial:
+    name: Adversarial
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run python -m evals.run --provider mock --group adversarial --json /tmp/adv.json --fail-under 1.0
+      - name: Summary
+        if: always()
+        run: |
+          uv run python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          r = json.load(open("/tmp/adv.json"))
+          mark = "pass" if r["pass_rate"] == 1 else "FAIL"
+          print("### 4. Adversarial")
+          print()
+          print(f"{mark}: {r['passed']}/{r['counted']} injection cases land on needs_review")
+          PY
+
+  fairness:
+    name: Fairness
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run python -m evals.fairness --provider mock --fail --json /tmp/fairness.json | tee /tmp/fairness.txt
+      - name: Summary
+        if: always()
+        run: |
+          {
+            uv run python - <<'PY'
+          import json
+          r = json.load(open("/tmp/fairness.json"))
+          ok = r["differing"] == 0
+          print("### 5. Fairness")
+          print()
+          print(f"{'pass' if ok else 'FAIL'}: {r['runs'] - r['differing']}/{r['runs']} name-swapped runs match their baseline")
+          if not ok:
+              print()
+              print("| scenario | contact | status | codes |")
+              print("|---|---|---|---|")
+              for row in r["rows"]:
+                  if not row["same_as_baseline"]:
+                      print(f"| {row['scenario']} | {row['contact_name']} | {row['status']} | {', '.join(row['codes'])} |")
+          PY
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-gate-fairness
+          path: /tmp/fairness.json
+
+  verdict:
+    name: Verdict
+    runs-on: ubuntu-latest
+    needs: [model-approval, contracts, golden-set, adversarial, fairness]
+    if: always()
+    steps:
+      - name: Decide
+        run: |
+          results="${{ needs.model-approval.result }} ${{ needs.contracts.result }} ${{ needs.golden-set.result }} ${{ needs.adversarial.result }} ${{ needs.fairness.result }}"
+          echo "## AI gate" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| stage | result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 1. Model approval | ${{ needs.model-approval.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 2. Contracts | ${{ needs.contracts.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 3. Golden set | ${{ needs.golden-set.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 4. Adversarial | ${{ needs.adversarial.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 5. Fairness | ${{ needs.fairness.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          case "$results" in
+            *failure*|*cancelled*) echo "AI gate: BLOCKED ($results)"; exit 1 ;;
+            *) echo "AI gate: approved" ;;
+          esac

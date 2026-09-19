@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
 
+import { AppError } from '@/api/client'
 import * as formApi from '@/api/formSchema'
 import * as api from '@/api/officer'
 import type { OfficerApplication } from '@/api/officer'
@@ -101,6 +102,8 @@ const view: OfficerApplication = {
     { target: 'rejected', label: 'Reject', enabled: true, reason: null, requires_note: true },
   ],
   decision_note: null,
+  withdrawal_reason: null,
+  licence: null,
   version: 3,
   created_at: '2026-09-18T01:00:00Z',
   updated_at: '2026-09-18T01:40:00Z',
@@ -135,6 +138,27 @@ describe('OfficerCasePage', () => {
     expect(screen.getByText('wrong_document_type')).toBeInTheDocument()
   })
 
+  it('shows the hidden check rows only when they are non-zero', async () => {
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({
+      ...view,
+      verification_summary: { total: 4, verified: 1, issues_found: 1, needs_review: 0, checking: 1, other: 1 },
+    })
+    renderPage()
+    const card = (await screen.findByRole('heading', { name: 'Document checks' })).closest('section')!
+    expect(within(card).getByText('Documents').nextElementSibling).toHaveTextContent('4')
+    expect(within(card).getByText('Still checking').nextElementSibling).toHaveTextContent('1')
+    expect(within(card).getByText('Not checked').nextElementSibling).toHaveTextContent('1')
+    expect(screen.queryByText('Analysed')).not.toBeInTheDocument()
+  })
+
+  it('hides Still checking and Not checked when they are zero', async () => {
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(view)
+    renderPage()
+    await screen.findByRole('heading', { name: 'Document checks' })
+    expect(screen.queryByText('Still checking')).not.toBeInTheDocument()
+    expect(screen.queryByText('Not checked')).not.toBeInTheDocument()
+  })
+
   it('starts the review through the transition endpoint with the expected version', async () => {
     vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(view)
     const spy = vi
@@ -146,6 +170,33 @@ describe('OfficerCasePage', () => {
     await userEvent.click(confirm)
     await waitFor(() => expect(spy).toHaveBeenCalledWith('a1', { target: 'under_review', note: undefined, expected_version: 3 }))
     expect(await screen.findByText('Under Review')).toBeInTheDocument()
+  })
+
+  it('warns in the Approve dialog when checks are unresolved, and stays silent when they are not', async () => {
+    const approvable = {
+      ...view,
+      status: 'pending_approval',
+      status_label: 'Route to Approval',
+      actions: [{ target: 'approved', label: 'Approve', enabled: true, reason: null, requires_note: false }],
+    }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({
+      ...approvable,
+      verification_summary: { total: 4, verified: 2, issues_found: 1, needs_review: 0, checking: 0, other: 1 },
+    })
+    const { unmount } = renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    expect(await screen.findByText('2 documents still have unresolved check results')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Approve' }).at(-1)).toBeEnabled()
+    unmount()
+
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({
+      ...approvable,
+      verification_summary: { total: 4, verified: 4, issues_found: 0, needs_review: 0, checking: 0, other: 0 },
+    })
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    expect(await screen.findByRole('dialog', { name: 'Approve this application?' })).toBeInTheDocument()
+    expect(screen.queryByText(/unresolved check results/)).not.toBeInTheDocument()
   })
 
   it('requires a note before rejecting', async () => {
@@ -187,6 +238,7 @@ describe('OfficerCasePage', () => {
           released_to_operator_at: null,
           addressed_in_revision: null,
           resolved_at: null,
+          can_undo: false,
         },
       ],
     })
@@ -205,6 +257,114 @@ describe('OfficerCasePage', () => {
       }),
     )
     expect(await screen.findByText('1 open feedback')).toBeInTheDocument()
-    expect(screen.getByText('draft, not sent yet')).toBeInTheDocument()
+    expect(screen.getByText('Draft, not sent yet')).toBeInTheDocument()
+  })
+
+  it('shows the stale banner on a version conflict and reloads the case on request', async () => {
+    const get = vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(view)
+    vi.spyOn(api, 'transitionApplication').mockRejectedValue(
+      new AppError(409, { code: 'version_conflict', message: 'The application changed.', details: { current: 4 } }),
+    )
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Start review' }))
+    await userEvent.click(screen.getAllByRole('button', { name: 'Start review' }).at(-1)!)
+    expect(await screen.findByText('This application changed since you opened it')).toBeInTheDocument()
+    const calls = get.mock.calls.length
+    await userEvent.click(screen.getByRole('button', { name: /Reload/ }))
+    await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(calls))
+  })
+
+  it('re-runs a document check from the case and reports a refusal', async () => {
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(view)
+    const rerun = vi
+      .spyOn(api, 'rerunOfficerCheck')
+      .mockRejectedValue(new AppError(409, { code: 'check_in_progress', message: 'A check is already running.' }))
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Re-run check' }))
+    await waitFor(() => expect(rerun).toHaveBeenCalledWith('a1', 'd1'))
+    expect(await screen.findByText('Could not re-run the check')).toBeInTheDocument()
+  })
+
+  it('fills the composer from a template and lets the officer change the target', async () => {
+    const underReview: OfficerApplication = {
+      ...view,
+      status: 'under_review',
+      status_label: 'Under Review',
+      feedback_editable: true,
+      feedback_locked_reason: null,
+      actions: [],
+    }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(underReview)
+    vi.spyOn(api, 'getFeedbackTemplates').mockResolvedValue([
+      {
+        key: 'floor_plan_unclear',
+        title: 'Floor plan does not show the food preparation area',
+        target_type: 'document',
+        section_key: null,
+        document_type: 'floor_plan',
+        message: 'Please upload a plan that marks the preparation, storage and washing areas.',
+      },
+    ])
+    const spy = vi.spyOn(api, 'createFeedback').mockResolvedValue(underReview)
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Add feedback' }))
+    await userEvent.selectOptions(screen.getByLabelText(/Template/), 'floor_plan_unclear')
+    expect(screen.getByLabelText(/Feedback for the operator/)).toHaveValue(
+      'Please upload a plan that marks the preparation, storage and washing areas.',
+    )
+    expect(screen.getByLabelText(/About/)).toHaveValue('document:floor_plan')
+    await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }))
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        'a1',
+        expect.objectContaining({ target_type: 'document', document_type: 'floor_plan', template_key: 'floor_plan_unclear' }),
+      ),
+    )
+  })
+
+  it('offers Withdraw only on an unsent draft item, and Undo after withdrawing (US-039)', async () => {
+    const draftItem = {
+      id: 'f1',
+      target_type: 'section' as const,
+      section_key: 'business',
+      document_type: null,
+      target_label: 'Business details',
+      message: 'Please confirm the UEN.',
+      template_key: null,
+      resolution: 'open' as const,
+      raised_in_revision: 1,
+      author_name: 'Rahim',
+      created_at: '2026-09-19T01:00:00Z',
+      released_to_operator_at: null,
+      addressed_in_revision: null,
+      resolved_at: null,
+      can_undo: false,
+    }
+    const underReview = {
+      ...view,
+      status: 'under_review',
+      status_label: 'Under Review',
+      feedback_editable: true,
+      feedback_locked_reason: null,
+      actions: [],
+      open_feedback_count: 1,
+      feedback: [draftItem],
+    }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(underReview)
+    const withdrawn = {
+      ...underReview,
+      open_feedback_count: 0,
+      feedback: [{ ...draftItem, resolution: 'withdrawn' as const, can_undo: true }],
+    }
+    const withdraw = vi.spyOn(api, 'withdrawFeedback').mockResolvedValue(withdrawn)
+    const restore = vi.spyOn(api, 'restoreFeedback').mockResolvedValue(underReview)
+    renderPage()
+    expect(await screen.findByRole('button', { name: 'Withdraw' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mark resolved' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+    await waitFor(() => expect(withdraw).toHaveBeenCalledWith('a1', 'f1'))
+    await userEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(restore).toHaveBeenCalledWith('a1', 'f1'))
+    expect(await screen.findByRole('button', { name: 'Withdraw' })).toBeInTheDocument()
   })
 })

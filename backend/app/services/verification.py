@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import and_, or_, update
 from sqlalchemy.orm import Session
 
-from app.core.errors import Conflict, NotFound
+from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.settings import get_settings
 from app.domain.enums import Role, VerificationStatus
 from app.domain.verification_rules import (
@@ -34,6 +34,8 @@ from app.models import Application, Document, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
+from app.services.applications import ApplicationService
+from app.services.quotas import new_run
 
 logger = logging.getLogger("permitflow.verification")
 
@@ -102,6 +104,7 @@ def run_verification(run_id: uuid.UUID) -> None:
                 document_type_description=DOCUMENT_TYPE_DESCRIPTIONS[doc.document_type.value],
                 form_section=dict(app.draft_data.get(section_key) or {}),
                 text=extracted.text,
+                extra={"verification_run_id": run.id, "application_id": app.id, "document_id": doc.id},
             )
             try:
                 result: VerificationResult = provider.verify(request)
@@ -228,9 +231,10 @@ def _finish(
 
 
 def mark_stale_runs_failed(grace_seconds: int = 60) -> int:
-    """On startup, runs still `running` (or never started) longer than timeout + grace were interrupted by a
-    restart. Both become `failed: interrupted` so re-run is possible and the queue does not show them as
-    checking forever."""
+    """On startup, runs still `running` longer than timeout + grace were interrupted by a restart, and any
+    `pending` run was too: background tasks live in the process that died, so nothing will ever claim it.
+    Both become `failed: interrupted` so re-run is possible and the queue does not show them as checking
+    forever."""
     settings = get_settings()
     cutoff = datetime.now(UTC) - timedelta(seconds=settings.ai_timeout_seconds * 2 + grace_seconds)
     with session_factory()() as db:
@@ -242,10 +246,7 @@ def mark_stale_runs_failed(grace_seconds: int = 60) -> int:
                         VerificationRun.status == VerificationStatus.RUNNING,
                         VerificationRun.started_at < cutoff,
                     ),
-                    and_(
-                        VerificationRun.status == VerificationStatus.PENDING,
-                        VerificationRun.created_at < cutoff,
-                    ),
+                    VerificationRun.status == VerificationStatus.PENDING,
                 )
             )
             .values(
@@ -272,10 +273,16 @@ class VerificationService:
         doc = self.documents.get_in_application(app.id, document_id)
         if doc is None or not doc.is_current:
             raise NotFound("Document not found.")
+        if user.role == Role.OPERATOR:
+            # Same rule as replacing the file: once the document is with the officer, the operator cannot
+            # keep re-running a non-deterministic check until it flips (the officer still can).
+            _, editable_types = ApplicationService(self.db).editable_for(app)
+            if doc.document_type not in editable_types:
+                raise Forbidden("This document is with the licensing office and cannot be re-checked now.")
         latest = self.documents.latest_run(doc.id)
         if latest is not None and latest.status not in TERMINAL:
             raise Conflict("A check is already in progress for this document.")
-        run = VerificationRun(document_id=doc.id, status=VerificationStatus.PENDING, provider="none")
+        run = new_run(self.db, doc.id, app.operator_id)
         self.documents.add_run(run)
         self.audit.record(
             application_id=app.id,

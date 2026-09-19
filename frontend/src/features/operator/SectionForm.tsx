@@ -26,7 +26,8 @@ export interface SectionFormProps {
   editable: boolean
   saving: boolean
   savedAt?: number | null
-  isLast: boolean
+  /** Overrides the primary button label (responding to feedback walks flagged targets, not the next section). */
+  continueLabel?: string
   stepLabel?: string
   feedback?: OperatorFeedback[]
   lockedReason?: string
@@ -45,7 +46,7 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
     editable,
     saving,
     savedAt = null,
-    isLast,
+    continueLabel,
     stepLabel,
     feedback = [],
     lockedReason,
@@ -286,7 +287,7 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
             Another tab or device saved this section. Your unsaved edits are still here; saving will overwrite the other version.
           </Alert>
         ) : null}
-        <div className="grid gap-5 sm:grid-cols-2 sm:gap-x-6">{section.fields.map(render)}</div>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-x-6">{section.fields.map(render)}</div>
       </div>
       {editable ? (
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3.5 sm:px-7">
@@ -295,7 +296,7 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
             Save section
           </Button>
           <Button type="submit" loading={saving}>
-            {isLast ? 'Save and review' : 'Save and continue'}
+            {continueLabel ?? 'Save and continue'}
           </Button>
         </div>
       ) : null}

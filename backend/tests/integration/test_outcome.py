@@ -57,3 +57,21 @@ def test_reject_needs_a_note_and_is_final(client: TestClient, db: Session) -> No
         json={"target": "under_review", "expected_version": view["version"]},
     )
     assert again.status_code == 409
+
+
+def test_return_to_review_from_pending_approval(client: TestClient, db: Session) -> None:
+    """An officer who spots something at the decision step goes back instead of rejecting (US-031)."""
+    app_id, op, off, _ = under_review(client, db)
+    transition(client, off, app_id, "site_visit_scheduled")
+    transition(client, off, app_id, "site_visit_done")
+    view = transition(client, off, app_id, "pending_approval")
+    actions = {a["target"]: a["label"] for a in view["actions"]}
+    assert actions == {"approved": "Approve", "under_review": "Return to review", "rejected": "Reject"}
+
+    view = transition(client, off, app_id, "under_review")
+    assert view["status_label"] == "Under Review"
+    assert "pending_pre_site_resubmission" in {a["target"] for a in view["actions"]}
+    mine = client.get(f"/api/v1/applications/{app_id}", headers=op).json()
+    assert mine["status_label"] == "Under Review"
+    last = db.scalars(select(Notification).order_by(Notification.created_at.desc())).first()
+    assert last is not None and "Under Review" in last.title

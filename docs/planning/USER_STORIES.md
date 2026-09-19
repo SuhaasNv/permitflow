@@ -29,9 +29,9 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: DoD checklist + unit tests for each malformed case and the heuristic.
 
 ### US-004 — As an engineer, I want a small AI evaluation set with expected outcomes, so that provider behaviour can be checked and documented honestly.
-- Acceptance criteria: six cases (valid, wrong document type, missing information, ambiguous, empty, prompt injection); a runner script prints a results table; results recorded in `docs/ai/AI_EVALUATION.md`.
-- Priority: Nice-to-have · Day 3 · Dependencies: US-002 · Requirements: AI-008
-- Definition of Done: runner executes against mock and OpenAI providers; document updated.
+- Acceptance criteria: a golden set with expected outcomes (built: fourteen cases, the eight demo PDFs plus wrong type, missing information, ambiguous, empty, oversized and two prompt-injection styles) run through the real pipeline by `backend/evals/run.py`; a results table, a JSON report and a pass threshold; the mock run is a blocking CI stage with a configuration audit (since US-056 the "Golden set" stage of `ai-gate.yml`); the OpenAI run is recorded with its date in `docs/ai/AI_EVALUATION.md` (since US-054 it runs as `ai-eval.yml`).
+- Priority: Nice-to-have · Day 3 · Dependencies: US-002, US-006 · Requirements: AI-008 · Branch `feat/us-004-ai-evaluation`
+- Definition of Done: runner executes against mock and OpenAI providers; CI job green; document updated.
 
 ### US-005 — As an engineer, I want unit, integration and end-to-end tests for the critical journey, so that regressions are caught before they ship.
 - Acceptance criteria: unit tests for the state machine (every state/target/role), labels, diff, editability, AI validation; integration tests for the full loop and authorization; one Playwright journey (submit → flag → fix only flagged → resubmit → compare); all green in CI.
@@ -44,9 +44,44 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: branch protection requires the workflow; green on `main`.
 
 ### US-007 — As a reviewer, I want the application deployed with seeded accounts, so that I can try it without local setup.
-- Acceptance criteria: Railway backend (Docker, volume for uploads), managed Postgres and static frontend; migrations and seed run on deploy; `/health` green; deployment separate from CI.
+- Acceptance criteria: two images built once in CI and pushed to GHCR (backend; frontend nginx with the API URL injected at start); Railway `development` and `production` environments, each with its own Postgres, uploads volume, secrets and domains, deployed from `dev` and `main` by `deploy.yml` with pre and post-deploy gates; migrations run on container start; seed run once per environment by hand; `/health` and `/healthz` green.
 - Priority: MVP · Day 3 · Dependencies: US-006 · Requirements: NFR-006 · `docs/operations/OPERATIONS.md`
 - Definition of Done: UAT executed on the deployed URL.
+
+### US-052 — As a reviewer, I want the production deployment reachable on the project's own domain (permitflow.space), so that the demo URL is memorable and looks like a real service.
+- Acceptance criteria: one naming convention per environment on the owner's domain: production `https://permitflow.space` (and `www`) for the frontend and `https://api.permitflow.space` for the API; development `https://dev.permitflow.space` and `https://api.dev.permitflow.space`; all with Railway-managed TLS; per environment `CORS_ORIGINS`, the frontend `API_URL`, the GitHub environment variables (`FRONTEND_URL`, `BACKEND_URL`) and the deploy health gates use the new hosts; the railway.app hosts keep working as fallbacks; `README.md` and `docs/operations/OPERATIONS.md` name the hosts and the DNS records (owner adds them at the registrar).
+- Priority: Nice-to-have · Day 3 (added 19 Sep, domain bought by the owner) · Dependencies: US-007 · Requirements: NFR-006 · Beyond the brief
+- Definition of Done: all four hosts answer their health checks over HTTPS; the next development deploy and the v0.3.0 production deploy pass their gates against them.
+
+### US-053 — As an engineer, I want unit and integration coverage of the business logic to sit at industry level (about 80 percent statements, measured with every source file counted), so that the tests protect behaviour rather than count buttons.
+- Acceptance criteria: coverage measured with all source files included (`coverage.include` in `vite.config.ts`, `pytest --cov`); frontend at or above 80 percent statements, backend at or above 80 percent (it stands at 96); new tests target behaviour: the API client's error envelope and 401 handling, upload validation and progress, the document slot's verification states and staleness, the respond-mode walk, submit readiness, the session warning window, sign-in and cache clearing, history, compare and audit rendering, the OpenAI provider's error paths with a stubbed SDK; thresholds enforced in CI so coverage cannot regress; `docs/testing/TEST_STRATEGY.md` and the README carry the numbers.
+- Priority: MVP · Day 3 (added 19 Sep, before the v0.3.0 release) · Dependencies: US-005 · Requirements: NFR-004 · Branch `test/us-053-coverage`
+- Definition of Done: thresholds green in CI; no test asserts presentation only; numbers recorded.
+
+### US-054 — As a reviewer, I want the AI's answers evaluated against the real model on a schedule and on every change to the AI module, so that the quality claim is a green check with history rather than a paragraph.
+- Acceptance criteria: a separate workflow `ai-eval.yml` runs the 14-case golden set through the real pipeline with `--provider openai` (temperature 0), blocking at 14 of 14; triggers: nightly, manual (with an optional lower pass rate), and pushes to `dev` or `main` touching `app/infra/ai`, `verification_rules.py`, `app/infra/extraction` or `evals`; never on pull requests; refuses to run without the `OPENAI_API_KEY` repository secret; the harness stamps provider, model and prompt version in the JSON result; per-case table (status, codes, latency) in the run summary; result files kept 90 days; `docs/ai/AI_EVALUATION.md`, `README.md`, `OPERATIONS.md` and `TEST_STRATEGY.md` describe it.
+- Priority: Nice-to-have · Day 3 (added 19 Sep, after the coverage story) · Dependencies: US-004 · Requirements: AI-008 · Branch `feat/us-054-ai-eval-workflow`
+- Definition of Done: the workflow is green on the first manual run after the owner sets the secret; the mock job in `ci.yml` unchanged and green.
+
+### US-055 — As an officer or reviewer, I want every AI check traced (prompt version, model, tokens, latency, raw answer) and every evaluation run kept as an experiment, so that a wrong check can be explained from its trace and a prompt change has a history.
+- Acceptance criteria: LangSmith tracing behind `LANGSMITH_API_KEY` (off without it, no behaviour change); one parent run per check carrying the verification run id, application id, document id, document type and prompt version, the OpenAI call as a child run; inputs hidden by default (`LANGSMITH_HIDE_INPUTS`), endpoint per region (`LANGSMITH_ENDPOINT`), project per environment; tracing lives in `infra/ai/tracing.py`, never in `domain`, and a tracing failure cannot fail a check; `evals.run --langsmith` records a run as an experiment on the golden dataset; `ai-eval.yml` uses it when the secret exists; threat model T21; ADR-006 amended; env documented in `.env.example`, README, OPERATIONS.
+- Priority: Nice-to-have · Day 3 (added 19 Sep, after US-054) · Dependencies: US-002, US-054 · Requirements: AI-007, AI-008, AI-009 · Branch `feat/us-055-langsmith-tracing` · Beyond the brief
+- Definition of Done: unit tests green; a trace of a live check visible in the owner's LangSmith project (development); documented.
+
+### US-056 — As a reviewer, I want the AI checks to run as a named gate of their own (model approval, contracts, golden set, adversarial, fairness, verdict) with a fairness check that swaps applicant names, so that "how do you evaluate the AI" is answered by a run summary anyone can read.
+- Acceptance criteria: `ai-gate.yml` as a reusable workflow called from `ci.yml` (still blocks images and deploys), six jobs each named in the run summary; the old `ai` job removed from `ci.yml`; `evals.run --group` filter; `evals/fairness.py`: 7 name sets (Chinese, Malay, Indian, Eurasian, Western and the baseline) × 3 scenarios = 21 runs, every variant must match its baseline's status and codes, `--fail` exit code, JSON output; fairness runs in the gate on the mock and in `ai-eval.yml` on the live model, both blocking; `docs/ai/AI_ASSURANCE.md` one-page explainer (layers, two pipelines, what the first fairness run found, limits, tools chosen and not); README, OPERATIONS, TEST_STRATEGY, AI_EVALUATION, PRODUCTION_READINESS_REVIEW updated.
+- Priority: Nice-to-have · Day 3 (added 19 Sep, after US-055) · Dependencies: US-004, US-054 · Requirements: AI-008 · Branch `feat/us-056-ai-gate` · Beyond the brief
+- Definition of Done: AI gate green on `dev`; fairness 21 of 21 on the live model recorded; explainer written.
+
+### US-057 — As the owner, I want the site reviewed for legal, privacy and accessibility exposure (policies, consent, tracking, embeds, contrast, keyboard, labels, claims, copyright, applicable law), so that a demonstration with public credentials and a live AI provider does not mislead anyone or leak more than it says.
+- Acceptance criteria: `/privacy`, `/terms` and `/cookies` pages written from the code (operator named, repository linked, no email; PDPA purposes, transfers to OpenAI, LangSmith and Railway, retention, rights), linked from the landing footer and the app shell; a "demonstration only, no real data" notice on sign-in and on the documents page; no cookie banner, with the reason recorded; refund policy recorded as not applicable; fonts self-hosted (no third-party request from the browser at all), OFL notices kept with the files; an axe-core gate in Playwright (WCAG 2.0, 2.1, 2.2 A and AA plus best practice) on every public and signed-in screen at desktop and phone width, the feedback composer and a dialog, run in CI; keyboard sign-in and skip-link tests; contrast of every text token against every surface computed and the one failing token corrected; landing copy re-read for unsupported claims; `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` answers the owner's checklist item by item with evidence, lists the laws considered and the risks flagged; threat model T22; the owner's prompt recorded in `AI_USAGE.md`.
+- Priority: Nice-to-have · Day 3 (added 19 Sep, after US-056) · Dependencies: US-047, US-008 · Requirements: SEC-012, UX-001 · Branch `feat/us-057-legal-accessibility` · Beyond the brief
+- Definition of Done: a11y gate green locally and in CI; policies render at 1280 and 390 without overflow; review document complete; nothing in it that the code does not do.
+
+### US-058 — As the owner, I want the service to resist abuse (a hammered sign-in, draft spam, a run on the expensive AI endpoint, scraping) and to pass a hardening checklist, so that a public demonstration with published credentials cannot be knocked over or run up a bill.
+- Acceptance criteria: a per-client sliding-window limit on every request (`RATE_LIMIT_PER_MINUTE`) and on sign-in attempts of any outcome (`LOGIN_ATTEMPTS_PER_MINUTE`), 429 with `Retry-After` in the error envelope, inside CORS, health exempt, proxy-aware; quotas counted in the database: open drafts per operator (`MAX_DRAFTS_PER_USER`, 409), verification runs per applicant and per platform per rolling day (`AI_RUNS_PER_USER_PER_DAY`, `AI_RUNS_PER_DAY`; over quota the run is stored `unavailable` with `daily_limit_reached`, no model call, officer copy explains); CSP, HSTS, Permissions-Policy, COOP on the API and CSP (one API origin rendered from `API_URL`), HSTS, Permissions-Policy on nginx; `pip-audit` fixed and blocking, `bandit` blocking at medium, `npm audit` blocking at high, images wait for the audit; unit and integration tests for every limit; `docs/security/SECURITY_REVIEW.md` answers the owner's checklist and the four attacks item by item; threat model T13 and T16 amended; env vars documented; the owner's prompt recorded in `AI_USAGE.md`.
+- Priority: Nice-to-have · Day 3 (added 19 Sep, after US-057) · Dependencies: US-001, US-002, US-007 · Requirements: SEC-010, NFR-003 · Branch `feat/us-058-abuse-resistance` · Beyond the brief
+- Definition of Done: 748 backend tests green; the built frontend image serves the rendered CSP and the bundle runs under it with zero violations; CI audit job green and blocking; review document complete.
 
 ### US-008 — As a reviewer, I want clear documentation of scope, architecture, AI usage, testing and operations, so that every decision is explainable.
 - Acceptance criteria: README (setup, env vars, tests, AI usage, what I would do next), SCOPE.md, ADRs, threat model, test strategy, UAT plan, operations guide, production readiness review, assessment traceability, CHANGELOG.
@@ -64,6 +99,56 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Acceptance criteria: the login limiter keys on the socket address and honours `X-Forwarded-For` only from `TRUSTED_PROXIES`; a successful login does not reset the failure window; unknown emails cost the same hash check; an upload whose `Content-Length` exceeds the cap is refused before the body is read and rejected uploads leave no partial file; downloads work for any file name and return 404 when the file is missing; `NaN` in a number field is a 422; injection phrases are flagged even when the model calls the document unreadable; runs left `pending` by a restart are failed on startup and the pending-to-running claim is atomic; re-run takes the row lock and is audited; section saves are audited with field names only; error reasons served to clients come from a fixed vocabulary; notifications are delivered only after the commit; admin cannot download documents until US-072 grants it.
 - Priority: MVP · Day 2 · Dependencies: US-001, US-012, US-002 · Requirements: SEC-005, SEC-010, REL-003, AUD-001 · Threat model T4, T5, T13 · Source: `docs/reviews/EDGE_CASE_REVIEW.md` items 17 to 31 · Branch `fix/us-034-backend-edge-cases`
 - Definition of Done: DoD checklist + `tests/integration/test_edge_cases.py` (11 regression tests).
+
+### US-035 — As an operator or officer, I want the side rail to reach the bottom of the window while I scroll, so that the workspace never shows a broken edge.
+- Acceptance criteria: after scrolling past the top notice bar the side rail still ends at the bottom of the window with its footer visible; holds on every operator and officer screen, expanded and collapsed; short pages gain no scrollbar.
+- Priority: MVP · Day 3 (hotfix, added 19 Sep from a screenshot) · Dependencies: US-001 · Requirements: UX-001 · Branch `fix/rail-gap`
+- Definition of Done: Playwright measurement on dashboard, my applications, application, history, queue and case: rail bottom equals viewport height.
+
+### US-036 — As an operator or officer, I want to search my list by reference, business, address or applicant, so that I can open the right application without scrolling.
+- Acceptance criteria: My applications and the review queue carry a search box beside the status tabs; matching is case-insensitive and every word of the query must appear in the reference, business name, premises address or (officer only) applicant name; search combines with the active tab; no match shows the query and a Clear search action; fits 1440, 820 and 390.
+- Priority: Nice-to-have · Day 3 (added 19 Sep on request) · Dependencies: US-020, US-010 · Requirements: UX-003 · Branch `feat/us-036-list-search` · Client-side over the loaded list, same pattern as SCOPE S1
+- Definition of Done: unit test for the matcher, component tests on both pages, screenshots at three widths.
+
+### US-037 — As an officer or operator on a phone, I want every screen to fit the width of the phone and every navigation to open at the top of the page, so that I never scroll sideways or land mid-page.
+- Acceptance criteria: the officer case page (documents, check results, compare panel, revision history, review rail) and the operator dashboard fit 390 px with no horizontal scroll; the notifications popover fits the phone width below the header and the unread badge does not cover the bell; opening a new page scrolls to the top while Back and Forward keep the browser's remembered position; verified on every operator and officer route at 390 and 820.
+- Priority: MVP · Day 3 (hotfix, added 19 Sep from iPhone 12 Pro screenshots) · Dependencies: US-021 · Requirements: UX-001 · Branch `fix/us-037-phone-layout`
+- Definition of Done: Playwright measurement of `scrollWidth` on every route at 390; scroll position check after navigation.
+
+### US-042 — As an engineer, I want one Playwright scenario per workflow (apply with AI checks, reaches the officer, officer flags, two resubmission rounds, withdraw, rejection), each asserting the audit trail, so that every path is proven separately and recorded.
+- Acceptance criteria: six independent specs under `frontend/e2e/scenarios`; every spec ends by opening the audit trail as the officer and asserting the expected event sequence; each spec creates its own application and is re-runnable; traces kept on failure; listed in `docs/testing/TEST_STRATEGY.md`.
+- Priority: MVP · Day 3 (requested 19 Sep) · Dependencies: US-005, US-038 · Requirements: all · Branch `feat/us-042-scenario-suite`
+- Definition of Done: all six green locally against the mock provider; README and TEST_STRATEGY updated.
+
+### US-043 — As a user on any screen size, I want the layout audit findings fixed (tables at 820 and 1280, audit trail columns, sticky review rail, stepper labels, tap targets), so that no screen is unreadable or unreachable at a common width.
+- Acceptance criteria: every High and Medium item in `docs/reviews/LAYOUT_AUDIT.md` fixed and re-measured at the width it was found; Low items fixed where cheap, the rest marked open in the audit doc; no regression at 390, 820, 1024, 1280 and 1440.
+- Priority: MVP · Day 3 (from the layout audit, 19 Sep) · Dependencies: US-037 · Requirements: UX-001 · Branch `fix/us-043-layout-audit`
+- Definition of Done: audit doc status column updated; as-built screenshots refreshed for the changed screens.
+
+### US-044 — As an operator on a busy server, I want an unexpected server error to reach my browser as a proper error with a request id, so that I am not told the server is unreachable when it is not.
+- Acceptance criteria: unhandled exceptions are answered inside the CORS layer so the browser receives the JSON error envelope and request id; engine pool sized for the expected concurrency and documented; pool exhaustion surfaces as a clear 503 rather than a 30 s hang; a test injects an exception and asserts the envelope plus the CORS header for an allowed origin.
+- Priority: MVP · Day 3 (from the layout audit backend observation, 19 Sep) · Dependencies: US-000 · Requirements: REL-001, NFR-004 · Branch `fix/us-044-error-cors-pool`
+- Definition of Done: test green; `docs/operations/OPERATIONS.md` and `docs/security/THREAT_MODEL.md` (availability) updated.
+
+### US-046 — As a user signing in, I want to show or hide my password and a sign-in page without unnecessary text, so that I can type it right without distraction.
+- Acceptance criteria: an eye toggle inside the password field (accessible name Show password / Hide password), keyboard reachable, never submits the form; the helper text about the 10-attempt pause and shared sign-in is removed (the limiter still applies and the 429 message still explains it).
+- Priority: Nice-to-have · Day 3 (requested 19 Sep) · Dependencies: US-001 · Requirements: UX-002 · Branch `feat/us-046-password-toggle`
+- Definition of Done: `LoginPage.test.tsx` updated; browser check at 390 and 1440.
+
+### US-047 — As a visitor, I want the landing hero to feel alive and branded (accent on the headline, tinted document tiles, an ink band with drifting light behind the What you need panel), so that the first impression is polished rather than flat.
+- Acceptance criteria: brand red on "Apply once." and on the four document tiles, PDF chips stay quiet; the band behind the panel bleeds to the right edge of the screen at desktop widths, uses the ink tone with two soft lights drifting slowly and stops under `prefers-reduced-motion`; the panel is centred inside the band at every desktop width and flows under the copy below `lg`; the footer no longer links to staff sign-in.
+- Priority: Nice-to-have · Day 3 (from user screenshots, 19 Sep; a full red band was tried and rejected as too heavy) · Dependencies: US-009 · Requirements: FR-031 · Branches `feat/landing-accent`, `fix/landing-red-band`, `feat/us-047-landing-band`
+- Definition of Done: measured at 1024, 1440 and 2000: equal gaps either side of the panel, band reaches the viewport edge, no horizontal overflow.
+
+### US-048 — As a signed-in user, I want to be warned only when my session is about to end, so that the top bar does not raise questions the rest of the time.
+- Acceptance criteria: the top bar shows nothing about the session while more than 30 minutes remain; inside 30 minutes it shows "Session ends in n min", updated every minute, emphasised inside 5 minutes; at expiry the proactive sign-out and the sign-in explanation stay as they were (US-033).
+- Priority: MVP · Day 3 (from the user's walkthrough, 19 Sep) · Dependencies: US-001, US-033 · Requirements: UX-002, SEC-006 · Branch `fix/us-048-session-warning`
+- Definition of Done: `lib/session.test.ts`; browser check at 8 h, 12 min and 3 min remaining.
+
+### US-050 — As the team, I want the findings of three independent bug-hunting reviews (backend rules, frontend interaction, seams) fixed and recorded, so that the release ships without the defects a reviewer would find first.
+- Acceptance criteria: every High and Medium finding in `docs/reviews/BUG_HUNT_REVIEW.md` fixed with a regression test where one can capture it; Low findings fixed or explicitly kept with the reason; all suites green afterwards.
+- Priority: MVP · Day 3 (requested 19 Sep) · Dependencies: everything shipped before it · Requirements: all · Branch `fix/us-050-bug-hunt`
+- Definition of Done: review doc written; backend, vitest and the seven Playwright specs green.
 
 ## UC1 — Operator Submission & Resubmission
 
@@ -84,7 +169,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 
 ### US-013 — As an operator, I want to see each document's AI verification status update in real time, so that I know about problems before I submit.
 - Acceptance criteria: after upload the card shows "Verifying…"; without a page reload it changes to Verified / Issues found (n) / Needs review / Unreadable / Failed / Unavailable; summary and issues are expandable. (Re-run action is SCOPE S2, not required for this story.)
-- Priority: MVP · Day 2 (pipeline Day 1) · Dependencies: US-012, US-002 · Requirements: FR-005, AI-002, AI-006 · Use case UC1-A
+- Priority: MVP · Day 1 (pulled forward from Day 2 with the pipeline) · Dependencies: US-012, US-002 · Requirements: FR-005, AI-002, AI-006 · Use case UC1-A
 - Definition of Done: DoD checklist + E2E asserts the card changes state without reload.
 
 ### US-014 — As an operator, I want a progress indicator of overall completion, so that I know what remains before I can submit.
@@ -124,6 +209,26 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: MVP · Day 2 · Dependencies: US-011, US-015 · Requirements: SEC-006, UX-002, REL-005 · Source: `docs/reviews/EDGE_CASE_REVIEW.md` items 1 to 16 · Branch `fix/us-033-operator-edge-cases`
 - Definition of Done: DoD checklist + `lib/unsaved.test.ts`, `queries.test.ts`, Chrome check of the sign-out guard and Save and exit.
 
+### US-038 — As an operator, I want to withdraw my submitted application with an optional reason, so that the licensing office stops working on something I no longer need.
+- Acceptance criteria: Withdraw is available to the owner from every post-submission, non-terminal status; drafts are simply left and decided applications cannot be withdrawn (409); optional reason (up to 1000 characters) stored with the application, shown to the officer on the case and to the operator in an outcome panel; Withdrawn is a terminal status labelled Withdrawn for both roles and nothing can be edited, resubmitted or transitioned afterwards; officers are notified in-app; the audit trail records the status change with the operator as actor; officers and admins get 403.
+- Priority: Nice-to-have · Day 3 (added 19 Sep on request) · Dependencies: US-015, US-025 · Requirements: FR-032 · `docs/architecture/STATE_MACHINE.md` · Branch `feat/us-038-withdraw-application`
+- Definition of Done: state machine tests cover the new edges; `tests/integration/test_withdrawal.py`; `ApplicationPage.test.tsx`; browser check on both sides; STATE_MACHINE, DOMAIN_MODEL, ARCHITECTURE, REQUIREMENTS, SCOPE, USE_CASES, SCREEN_INVENTORY, UI_STATES, USER_JOURNEY updated.
+
+### US-040 — As an operator responding to feedback, I want the flagged sections marked with a warning in the form rail and the stepper, so that I can see at a glance where the officer asked for changes.
+- Acceptance criteria: while the application is Pending Pre-Site Resubmission, sections with open released feedback show a warning marker (dot plus label, never colour alone) in the form rail, the stepper and the documents row; untouched sections keep their complete marker but are visibly locked; the marker becomes an addressed marker once the section changed in this round; fits 1440, 820 and 390.
+- Priority: MVP · Day 3 (added 19 Sep from a phone screenshot) · Dependencies: US-017 · Requirements: FR-011, UX-003 · Branch `feat/us-040-flagged-markers`
+- Definition of Done: component test for the rail markers; browser check on the resubmission flow.
+
+### US-041 — As an operator responding to feedback, I want the form to walk me through only the flagged items and lead me straight to Resubmit, so that I always know what is left and how to send my changes back.
+- Acceptance criteria: while Pending Pre-Site Resubmission, Save and continue moves to the next flagged section, then the documents page if a document was flagged, then the application page where Resubmit lives (locked sections are never a destination); the form shows a readiness banner ("Responding to feedback: n flagged items" / "Ready to resubmit: n of m changed") with a link back; locked sections are non-navigable in the rail and stepper; the application page shows a readiness alert above the feedback notice and each changed item reads "Changed, ready to resubmit"; the documents page primary reads Go to resubmit once ready.
+- Priority: MVP · Day 3 (added 19 Sep: Save and continue landed on a locked section, no clear path to Resubmit) · Dependencies: US-018 · Requirements: FR-011, UX-003 · Branch `feat/us-041-respond-flow` (also delivers US-040)
+- Definition of Done: `respond.test.ts` for the next-target rule; browser check of the respond flow at 1440 and 390 on a scratch application.
+
+### US-045 — As an operator, I want to delete a draft I no longer need, so that abandoned drafts do not clutter my list.
+- Acceptance criteria: a draft can be deleted by its owner from the application page (Discard draft when nothing was entered, Delete draft otherwise) after a confirmation that names the reference; `DELETE /applications/{id}` removes the application, its sections, documents (files on disk), verification runs and audit events; submitted applications answer 409 (withdraw instead), other operators 404, officers and admins 403. A draft was never part of the licensing record, so nothing is kept (SCOPE assumption 14).
+- Priority: Nice-to-have · Day 3 (requested 19 Sep: drafts are created the moment New application is pressed; a product decision, FR-034) · Dependencies: US-010 · Requirements: FR-034 · Branch `feat/us-045-delete-draft` · Beyond the brief
+- Definition of Done: `tests/integration/test_draft_deletion.py`; `ApplicationPage.test.tsx`; browser check; docs updated. Same branch fixes the Declarations resubmission dead end: re-confirming stamps `confirmed_at`, which the diff reports as "Confirmed on".
+
 ## UC2 — Officer Review & Feedback
 
 ### US-020 — As an officer, I want a review queue of all submitted applications with their internal status, so that I can pick what to review next.
@@ -152,7 +257,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: DoD checklist + template endpoint test.
 
 ### US-025 — As an officer, I want to set the application status through allowed transitions and have the operator notified automatically, so that the case moves forward without manual follow-up.
-- Acceptance criteria: only allowed targets for the current state are offered; Request resubmission requires at least one open feedback item and releases the round's feedback to the operator; Schedule site visit requires no `open` items; Reject requires a note and is available from every non-terminal post-submission state; invalid transitions return 409 and stale `expected_version` returns 409; the operator receives an in-app notification carrying the operator label; email delivery is mocked (logged).
+- Acceptance criteria: only allowed targets for the current state are offered; Request resubmission requires at least one open feedback item and releases the round's feedback to the operator; Mark site visit scheduled requires no `open` items; Reject requires a note and is available from every non-terminal post-submission state; invalid transitions return 409 and stale `expected_version` returns 409; the operator receives an in-app notification carrying the operator label; email delivery is mocked (logged).
 - Priority: MVP (notification delivery: Mocked) · Day 2 · Dependencies: US-023 · Requirements: FR-019, FR-020, SEC-004, REL-007, AUD-002 · ADR-003 · Use case UC2-A
 - Definition of Done: DoD checklist + transition and notification tests.
 
@@ -183,6 +288,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 
 ### US-031 — As an officer, I want to schedule and complete a site visit, route the case to approval and approve or reject it with a note, so that applications reach a final outcome.
 - Acceptance criteria: transitions follow `STATE_MACHINE.md`; the decision note is stored and shown to the operator on Approved/Rejected; because UC3 is deferred, Site Visit Done may go directly to Pending Approval.
+- Follow-up (19 Sep 2026, run-through): the Approve dialog warns when documents in the current revision still have unresolved check results (issues found, needs review, not checked) and says approving records that the officer reviewed them; the button stays enabled because checks are advisory (AI-005). Decided against a hard gate. Same day: Return to review (Pending Approval back to Under Review) so an officer who notices something at the decision step can add feedback or request a resubmission instead of rejecting; one transition row, no new status.
 - Priority: MVP · Day 2 · Dependencies: US-025 · Requirements: FR-027 · Use case UC2-C
 - Definition of Done: DoD checklist + outcome transition tests.
 
@@ -193,7 +299,22 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 
 ---
 
-## E4 — Admin Oversight & Monitoring
+### US-039 — As an officer, I want feedback decisions to be safe and clear: resolve only items the operator saw, undo a withdraw or resolve for 10 seconds, and never see a composer on a locked case, so that I do not make mistakes I cannot take back.
+- Acceptance criteria: Mark resolved is offered only for items released to the operator (open after release, or addressed); a draft item that was never sent offers Withdraw only and the API returns 409 for resolving an unreleased item; after Withdraw or Mark resolved a toast offers Undo for 10 seconds, undo restores the previous resolution, is audited (`feedback.restored`) and is refused by the server after the grace window or once the state no longer allows it; the composer closes itself when the case stops being editable and the lock reason is shown instead; item actions sit on their own row on phones.
+- Priority: MVP · Day 3 (added 19 Sep from phone screenshots) · Dependencies: US-023, US-028 · Requirements: FR-018, FR-024, FR-033, AUD-001 · Branch `feat/us-039-feedback-undo`
+- Definition of Done: backend tests for the release rule and undo (window, audit, authorization); component test for the toast undo; browser check at 390 and 1440.
+
+### US-049 — As an officer reviewing a resubmission, I want to mark an addressed item as not fixed so it reopens with the same text, so that I can request the next round without retyping the feedback.
+- Acceptance criteria: Not fixed on an addressed item (only while Under Review) sets it back to Open with the same message and target, takes it out of the operator's view until the next round is requested (freeze rule kept), is audited as `feedback.reopened` and counts as open so Request resubmission is available; Undo for 10 s like withdraw and resolve; the operator then sees the item as Needs your change again with the same text and history keeps both rounds.
+- Priority: MVP · Day 3 (from the user's walkthrough, 19 Sep: a replaced document flips the item to Addressed, leaving nothing open to send) · Dependencies: US-028, US-039 · Requirements: FR-024 · Branch `feat/us-049-reopen-feedback`
+- Definition of Done: `tests/integration/test_feedback_reopen.py`; scenario 04 extended with a not-fixed round; STATE_MACHINE, ARCHITECTURE, USER_JOURNEY updated.
+
+### US-051 — As an operator whose application is approved, I want to download my licence certificate as a PDF, and as an officer I want to preview it before approving, so that the approval ends in a document the business can show.
+- Acceptance criteria: on Approve the backend renders a PDF certificate (fictional issuing unit, licence number `FEL-<year>-<n>`, business, UEN, premises, holder, valid one year in Singapore calendar dates, approving officer, decision date, application reference, verification code) inside the approval transaction, stores it under a server key on the uploads volume, records it in `licences` and audits `licence.issued`; the operator's approval notification names the licence; officers get a watermarked preview page while the application awaits a decision (nothing stored) and Download licence on the case after approval; the operator gets Download licence (PDF) in the outcome panel; owner or officer only, admin 403, 404 before approval; rejection issues nothing.
+- Priority: Nice-to-have · Day 3 (requested 19 Sep, beyond the brief) · Dependencies: US-031 · Requirements: FR-035 · Branch `feat/us-051-licence-certificate` (merged after the browser review)
+- Definition of Done: `tests/unit/test_licence_render.py`, `tests/integration/test_licence.py`; the Playwright journey covers preview and both downloads; STATE_MACHINE side effect, DOMAIN_MODEL, ARCHITECTURE, USER_JOURNEY, SCREEN_INVENTORY, SCOPE updated.
+
+## E4 — Admin Oversight & Monitoring (deferred: not started, cut per the Sprint 3 cut order)
 
 Not in the assessment brief; added as a product decision (SCOPE.md, S7). Read-only on applications.
 

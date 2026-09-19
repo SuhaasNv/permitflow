@@ -115,6 +115,8 @@ export function DocumentSlot({
         message: error instanceof AppError ? error.message : 'Try again in a moment.',
       })
     } finally {
+      // The dialog closes either way; a failure shows in the slot's own error state.
+      setConfirmDelete(false)
       setBusy(false)
     }
   }
@@ -138,8 +140,13 @@ export function DocumentSlot({
   }
 
   const live = doc?.verification?.status === 'running' || doc?.verification?.status === 'pending'
-  const stale = Boolean(doc && live && isCheckStale(doc.uploaded_at))
-  const canRerun = Boolean(doc?.verification && slot.editable && (RERUNNABLE.has(doc.verification.status) || stale))
+  const stale = Boolean(doc?.verification && live && isCheckStale(doc.verification.requested_at))
+  const canRerun = Boolean(
+    doc?.verification &&
+    slot.editable &&
+    doc.verification.error_reason !== 'daily_limit_reached' &&
+    (RERUNNABLE.has(doc.verification.status) || stale),
+  )
 
   const download = async () => {
     if (!doc) return
@@ -235,7 +242,7 @@ export function DocumentSlot({
       {!doc && state.phase !== 'uploading' && slot.editable ? (
         <div className="px-4 pb-4 sm:px-5">
           <DropZone
-            label={`Drop your ${slot.label.toLowerCase()} here, or`}
+            label={`Drop your ${slot.label} file here, or`}
             onFile={start}
             onExtraFiles={(n) =>
               toast.push({
@@ -291,7 +298,7 @@ export function DocumentSlot({
         onCancel={() => setConfirmDelete(false)}
       >
         <p>
-          {doc?.original_filename} will be removed from this application. You can upload another {slot.label.toLowerCase()} afterwards.
+          {doc?.original_filename} will be removed from this application. You can upload another {slot.label} afterwards.
         </p>
       </Dialog>
     </section>

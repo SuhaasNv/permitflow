@@ -10,7 +10,7 @@ Rendered on the "Design system" artboard of the prototype. Values become Tailwin
 | `surface` | `#FFFFFF` | cards, tables, forms |
 | `surface-2` | `#F9FAFB` | table header, card footer, read-only fields |
 | `line` / `line-strong` | `#D9DEE5` / `#AEB6C2` | borders / input borders |
-| `text` / `text-2` / `text-3` | `#1B2430` / `#465060` / `#66717F` | primary / secondary / metadata |
+| `text` / `text-2` / `text-3` | `#1B2430` / `#465060` / `#616C7A` | primary / secondary / metadata (`text-3` was `#66717F` until US-057: 4.34:1 on `surface-3` failed AA) |
 | `primary` / `primary-hover` | `#A8192A` / `#8A1422` | brand, primary action, attention |
 | `primary-soft` / `primary-line` | `#FBEDEE` / `#EFB8BE` | active nav, primary badge |
 | `success` / soft / line | `#067647` / `#ECFDF3` / `#A6E9C4` | verified, resolved, approved, complete |
@@ -20,16 +20,16 @@ Rendered on the "Design system" artboard of the prototype. Values become Tailwin
 | `neutral` / soft / line | `#475467` / `#F2F4F7` / `#D0D5DD` | draft, unchanged, unavailable |
 | `focus` | `#175CD3` | 2 px focus ring, 2 px offset |
 
-Contrast: all `text*`, `success`, `warning`, `error`, `info`, `primary` ≥ 4.5:1 on white and on their soft backgrounds.
+Contrast: all `text*`, `success`, `warning`, `error`, `info`, `primary` ≥ 4.5:1 on every surface token, computed rather than assumed (table in `../reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`); the lowest pairing is `text-3` on `surface-3` at 4.68:1. A skip link (`.pf-skip-link`) precedes every page's header.
 
 ## Type scale (Public Sans for UI; Instrument Serif for display; IBM Plex Mono for identifiers)
 
-Three families, each with one job: Public Sans carries every control, label and body line; Instrument Serif (regular only, tight leading) is reserved for display moments that address the person rather than the task (landing hero, sign-in, dashboard greeting, "Application submitted"); IBM Plex Mono marks identifiers and ordinal numbers (`01`, references, counts).
+Three families (all SIL Open Font Licence, served from our own origin as woff2 latin and latin-ext subsets, `frontend/public/fonts`, US-057), each with one job: Public Sans carries every control, label and body line; Instrument Serif (regular only, tight leading) is reserved for display moments that address the person rather than the task (landing hero, sign-in, dashboard greeting, "Application submitted"); IBM Plex Mono marks identifiers and ordinal numbers (`01`, references, counts).
 
 | Style | Size / line | Weight | Use |
 |-------|-------------|--------|-----|
 | Display serif | 44 to 72 / 1.02 | 400, Instrument Serif | landing hero; 34 to 40 for landing section titles |
-| Greeting serif | 36 to 42 / 1.05 | 400, Instrument Serif | dashboard greeting, sign-in title, submitted title |
+| Greeting serif | 36 to 42 / 1.05 | 400, Instrument Serif | dashboard greeting (first name in `primary`, matching the landing hero accent), sign-in title, submitted title |
 | Page title | 28 / 36, tracking -0.015em | 600 | one per screen |
 | Form section title | 22 / 28 | 600 | section form header |
 | Section heading | 17 / 24 | 600 | review summaries, side panels |
@@ -47,6 +47,7 @@ Three families, each with one job: Public Sans carries every control, label and 
 - Spacing scale: 4, 8, 12, 16, 20, 24, 32, 40. Page padding 24×32; card padding 20; card header 14×20; table cell 14×16.
 - Radius: 4 (tags), 6 (controls, small cards), 10 (containers), 12 (badges pill).
 - Elevation: `shadow-1` (1 px hairline) only on secondary buttons; panels are one bordered white surface (`.pf-surface`) with no shadow; `shadow-2` for toasts; `shadow-3` for dialogs. Never a card inside a card: hierarchy comes from rules (`divide-y`), whitespace and type.
+- Scrolling: `overscroll-behavior: none` on `html`, so trackpad and touch rubber-banding never shows the canvas past the page edges.
 - Layout: masthead 28; top bar 56 (sticky, blurred); side nav 232, collapsed 64 (width animates 220 ms); bottom tab bar 64 on phones; content column max 1360 with 16 / 32 / 40 px gutters; officer feedback rail 400.
 
 ## Motion
@@ -59,7 +60,7 @@ Badge = dot + label, 24 px (28 px "lg" in status bars). Labels are the role-spec
 
 | Internal | Officer badge | Operator badge | Colour |
 |----------|---------------|----------------|--------|
-| draft |: | Draft | neutral |
+| draft | Draft (never in the queue) | Draft | neutral |
 | application_received | Application Received | Submitted | info |
 | under_review | Under Review | Under Review | info |
 | pending_pre_site_resubmission | Pending Pre-Site Resubmission | Pending Pre-Site Resubmission | warning |
@@ -72,6 +73,7 @@ Badge = dot + label, 24 px (28 px "lg" in status bars). Labels are the role-spec
 | pending_approval | Route to Approval | Pending Approval | info |
 | approved | Approved | Approved | success |
 | rejected | Rejected | Rejected | error |
+| withdrawn | Withdrawn | Withdrawn | neutral |
 
 ## Tags (facts and markers) vs badges (state)
 

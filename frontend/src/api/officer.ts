@@ -109,6 +109,8 @@ export interface FeedbackItem {
   released_to_operator_at: string | null
   addressed_in_revision: number | null
   resolved_at: string | null
+  /** The calling officer can undo their own withdraw or resolve for a short while (US-039). */
+  can_undo: boolean
 }
 
 export interface FeedbackTemplate {
@@ -154,6 +156,8 @@ export interface OfficerApplication {
   feedback_locked_reason: string | null
   actions: OfficerAction[]
   decision_note: string | null
+  withdrawal_reason: string | null
+  licence: import('./applications').LicenceView | null
   version: number
   created_at: string
   updated_at: string
@@ -215,6 +219,14 @@ export interface Compare {
 
 export function compareRevisions(id: string, from: number, to: number): Promise<Compare> {
   return request<Compare>(`/applications/${id}/compare?from=${from}&to=${to}`)
+}
+
+export function reopenFeedback(id: string, feedbackId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/feedback/${feedbackId}/reopen`, { method: 'POST' })
+}
+
+export function restoreFeedback(id: string, feedbackId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/feedback/${feedbackId}/restore`, { method: 'POST' })
 }
 
 export function resolveFeedback(id: string, feedbackId: string): Promise<OfficerApplication> {

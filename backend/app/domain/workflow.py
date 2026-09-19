@@ -70,6 +70,20 @@ _REJECT_SOURCES = (
     S.PENDING_APPROVAL,
 )
 
+# Every post-submission, non-terminal state: the operator may withdraw at any point before a decision.
+_WITHDRAW_SOURCES = (
+    S.APPLICATION_RECEIVED,
+    S.UNDER_REVIEW,
+    S.PENDING_PRE_SITE_RESUBMISSION,
+    S.PRE_SITE_RESUBMITTED,
+    S.SITE_VISIT_SCHEDULED,
+    S.SITE_VISIT_DONE,
+    S.AWAITING_POST_SITE_CLARIFICATION,
+    S.PENDING_POST_SITE_RESUBMISSION,
+    S.POST_SITE_CLARIFICATION_RESUBMITTED,
+    S.PENDING_APPROVAL,
+)
+
 TRANSITIONS: tuple[Transition, ...] = (
     Transition(S.DRAFT, S.APPLICATION_RECEIVED, Actor.OPERATOR, _needs_complete, "Submit"),
     Transition(S.APPLICATION_RECEIVED, S.UNDER_REVIEW, Actor.OFFICER, None, "Start review"),
@@ -82,7 +96,11 @@ TRANSITIONS: tuple[Transition, ...] = (
         "Request resubmission",
     ),
     Transition(
-        S.UNDER_REVIEW, S.SITE_VISIT_SCHEDULED, Actor.OFFICER, _needs_no_open_feedback, "Schedule site visit"
+        S.UNDER_REVIEW,
+        S.SITE_VISIT_SCHEDULED,
+        Actor.OFFICER,
+        _needs_no_open_feedback,
+        "Mark site visit scheduled",
     ),
     Transition(
         S.PENDING_PRE_SITE_RESUBMISSION,
@@ -124,9 +142,17 @@ TRANSITIONS: tuple[Transition, ...] = (
         S.POST_SITE_CLARIFICATION_RESUBMITTED, S.PENDING_APPROVAL, Actor.OFFICER, None, "Route to approval"
     ),
     Transition(S.PENDING_APPROVAL, S.APPROVED, Actor.OFFICER, None, "Approve"),
-) + tuple(Transition(src, S.REJECTED, Actor.OFFICER, _needs_note, "Reject") for src in _REJECT_SOURCES)
+    # An officer who notices something at the decision step can go back instead of rejecting.
+    Transition(S.PENDING_APPROVAL, S.UNDER_REVIEW, Actor.OFFICER, None, "Return to review"),
+)
+TRANSITIONS += tuple(
+    Transition(src, S.REJECTED, Actor.OFFICER, _needs_note, "Reject") for src in _REJECT_SOURCES
+)
+TRANSITIONS += tuple(
+    Transition(src, S.WITHDRAWN, Actor.OPERATOR, None, "Withdraw") for src in _WITHDRAW_SOURCES
+)
 
-TERMINAL: frozenset[S] = frozenset({S.APPROVED, S.REJECTED})
+TERMINAL: frozenset[S] = frozenset({S.APPROVED, S.REJECTED, S.WITHDRAWN})
 
 _INDEX: dict[tuple[S, S], Transition] = {(t.source, t.target): t for t in TRANSITIONS}
 
@@ -181,3 +207,8 @@ def transition(status: S, target: S, actor: Actor, ctx: TransitionContext) -> S:
 
 def is_terminal(status: S) -> bool:
     return status in TERMINAL
+
+
+def can_withdraw(status: S) -> bool:
+    """True when the owner may withdraw from this state (US-038)."""
+    return status in _WITHDRAW_SOURCES

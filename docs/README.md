@@ -16,8 +16,8 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `architecture/SOLUTIONING.md` | written | Options and choices for every significant engineering problem |
 | `architecture/ARCHITECTURE.md` | written | Layers, modules, API surface, request flows, boundaries |
 | `architecture/DOMAIN_MODEL.md` | written | Entities, verification vocabulary, issue codes, invariants |
-| `architecture/STATE_MACHINE.md` | written | 12 states + draft, labels, transitions, guards, feedback rules |
-| `architecture/decisions/ADR-001 … ADR-009` | written | Architecture decision records |
+| `architecture/STATE_MACHINE.md` | written | 12 states + draft + withdrawn, labels, transitions (incl. Return to review), guards, feedback rules |
+| `architecture/decisions/README.md` + `ADR-001` to `ADR-012` | written (index with "chose X over Y because Z" per ADR; 003, 006, 007, 009, 011 amended as built; 010, 011 and 012 added 19 Sep) | Architecture decision records |
 | `architecture/permitflow-architecture.drawio` / `.png` | written | Overall architecture diagram |
 | `architecture/diagrams/uc1-use-case`, `uc2-use-case`, `e4-admin-use-case` (`.drawio` / `.png`) | written | UML use case diagrams per epic |
 | `architecture/diagrams/sequences/*.mmd` / `.png` | written | Sequence diagrams UC1-A, UC1-B, UC2-A, UC2-B (Mermaid) |
@@ -41,14 +41,15 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Security
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `security/THREAT_MODEL.md` | written | Threats T1–T19, planned controls, validation, production gaps |
+| `security/THREAT_MODEL.md` | written | Threats T1–T20, planned controls, validation, production gaps |
 
 ## AI
 | Document | Status | Purpose |
 |----------|--------|---------|
 | `ai/AI_VERIFICATION_DESIGN.md` | written | Pipeline, prompt contract, output schema, rules, failure handling |
-| `ai/AI_EVALUATION.md` | to be written (Day 3) | Evaluation set and results against mock and OpenAI |
-| `../AI_USAGE.md` | to be written (Day 3) | How AI tools were used to build PermitFlow |
+| `ai/AI_EVALUATION.md` | written (19 Sep) | Evaluation set and results against mock and OpenAI |
+| `ai/AI_ASSURANCE.md` | written (19 Sep) | One page: the four layers, the AI gate and the live evaluation, fairness, tools chosen and not |
+| `../AI_USAGE.md` | written (19 Sep) | How AI tools were used: tools and models, the workflow they worked inside, the standing instructions, the prompts grouped by the decision they carry, verification, what was discarded |
 
 ## Planning
 | Document | Status | Purpose |
@@ -62,16 +63,21 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Quality, operations, reviews (produced during implementation)
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `testing/TEST_STRATEGY.md` | to be written (Day 3) | Layers, what each layer protects, how to run |
-| `uat/UAT_PLAN.md` | to be written (Day 3) | Acceptance scenarios and results on the deployed URL |
+| `testing/TEST_STRATEGY.md` | written (19 Sep) | Layers, what each layer protects, how to run |
+| `uat/UAT_PLAN.md` | written (19 Sep) | Twelve acceptance scenarios, environments and accounts, the record of every run (local, development, CI; production after v0.3.0) |
 | `operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
 | `operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |
 | `reviews/EDGE_CASE_REVIEW.md` | written (Sprint 2) | Three devil's-advocate reviews: every finding, its fix or its plan |
-| `reviews/PRODUCTION_READINESS_REVIEW.md` | to be written (Day 3) | Honest gap list with severity |
-| `reviews/ASSESSMENT_TRACEABILITY.md` | to be written (Day 3) | Brief requirement → implementation → test → evidence |
-| `reviews/FINAL_REVIEW.md` | to be written (Day 3) | What we built, tradeoffs, what AI got wrong |
-| `../CHANGELOG.md` | written (Sprint 1 closed; Sprint 2 in progress) | Milestones, sprint closes with Shipped / Slipped / Retro |
-| `../README.md` | written (grows per story) | Setup, demo accounts, security, AI verification, tests, layout, branching |
+| `reviews/BUG_HUNT_REVIEW.md` | written (19 Sep) | Three parallel bug hunts (backend, frontend, seams): 45 findings, what was fixed and what was kept; run-through findings R1 to R5 |
+| `reviews/LAYOUT_AUDIT.md` | written (19 Sep) | Layout audit at 390, 820, 1024, 1280 and 1440; findings tracked as US-043 and US-044 |
+| `reviews/PRODUCTION_READINESS_REVIEW.md` | written (19 Sep) | Twenty gaps with severity, what is in place, what production would need; go/no-go |
+| `reviews/ASSESSMENT_TRACEABILITY.md` | written (19 Sep) | The brief decoded; every deliverable and acceptance criterion → implementation → test → evidence |
+| `reviews/FINAL_REVIEW.md` | written (19 Sep) | What was built, the decisions to defend, trade-offs, what the AI got wrong, what to show in the debrief |
+| `reviews/ISSUES_AND_MITIGATIONS.md` | written (19 Sep) | Every issue found across the reviews and run-throughs, its risk, mitigation and evidence; what was kept as a decision |
+| `security/SECURITY_REVIEW.md` | written (19 Sep) | The owner's hardening checklist and four abuse scenarios, before and after US-058, with tests and what production adds |
+| `reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` | written (19 Sep) | The owner's legal, privacy and accessibility checklist answered item by item with evidence; laws considered; risks flagged; contrast computation (US-057) |
+| `../CHANGELOG.md` | written (Sprints 1 and 2 closed; Sprint 3 in progress) | Milestones, sprint closes with Shipped / Slipped / Retro |
+| `../README.md` | written | What it is, stack and why, hosts, setup, demo accounts, security, tests, CI, deployment, AI verification, AI Usage, What I would do next |
 
 ## Review history
 - 18 Sep 2026 — UI/UX design phase: two independent design-critique passes on the prototype (pass 1 scored 6.6/10 with 11 rendering bugs and 15 fixes; all applied; pass 2 results recorded in `design/UI_DESIGN.md`). Scope changes from the phase: public landing page (M1, FR-031), admin user management (S7, FR-030, US-073, T19), upload validation and hash-based duplicate detection made explicit (M3, SEC-005).

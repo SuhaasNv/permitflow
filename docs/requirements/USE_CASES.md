@@ -81,6 +81,23 @@ Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC
 
 **Expected outcome:** New revision; prior revision untouched; feedback resolution states updated; officers notified. Repeats for unlimited rounds.
 
+### UC1-D Withdraw an application (US-038, product decision)
+**Actor:** Operator (own applications)
+**Requirements:** FR-032, SEC-002, AUD-001
+
+**Main flow**
+1. Operator opens a submitted application that has not been decided and chooses Withdraw application.
+2. Confirms in a dialog, optionally giving a reason.
+3. The application becomes Withdrawn (terminal); every active officer is notified with the reason; the audit trail records the operator as actor.
+
+**Alternative / error flows**
+| Case | Result |
+|------|--------|
+| Draft | No withdrawal: the draft is simply left (409 from the API) |
+| Approved or Rejected | 409 "A decided application cannot be withdrawn." |
+| Officer or admin calls the endpoint | 403 |
+| Another operator | 404 (ownership) |
+
 ### UC1-C View history and prior feedback
 **Actor:** Operator (own applications)
 **Requirements:** FR-014, SEC-001, SEC-002
@@ -146,11 +163,13 @@ Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC
 1. Officer sets `site_visit_scheduled` (operator sees "Pending Site Visit").
 2. Officer later sets `site_visit_done` (operator sees "Pending Post-Site Clarification").
 3. Because UC3 is deferred, officer sets `pending_approval` directly (officer sees "Route to Approval", operator sees "Pending Approval").
-4. Officer sets `approved` or `rejected` with a note. Operator sees "Approved" / "Rejected" and the note.
+4. Officer previews the licence certificate (watermarked, nothing stored) and sets `approved` (note optional; the certificate is issued in the same transaction, US-051) or `rejected` (note required). Operator sees "Approved" / "Rejected", the note, and after approval a Download licence (PDF) action.
 
 **Alternative / error flows**
 - 1a. `open` feedback items exist → 422 "Resolve or withdraw open feedback before scheduling a site visit" (`addressed` items do not block; the UI warns).
 - 4a. Operator attempts any status change → 403.
+- 4b. Documents still carry unresolved check results at approval → the Approve dialog warns; approval is not blocked (AI-005).
+- 4c. Officer notices something at `pending_approval` → Return to review (`under_review`), then feedback or a resubmission round as in UC2-A; no rejection needed.
 
 **Expected outcome:** Terminal state reached; full audit trail; operator never exposed to unmapped internal labels.
 

@@ -61,14 +61,14 @@ Response: structured output (JSON schema) matching the **wire model**:
 }
 ```
 
-The wire model contains only enums and required fields (OpenAI strict schemas reject numeric bounds and regex). The enums are real `enum` constraints in the JSON schema: the first live run on 19 Sep 2026 used plain strings and the model invented `status: rejected`, `severity: error` and `code: address_mismatch`, which the domain model then rejected as a `failed` run. Pinning the vocabulary in the schema and listing it in the system prompt removed every such failure. The user message also states today's date, because a model has no clock and without it an expired certificate was reported as verified. The **domain model** re-validates the same shape with `0 ≤ confidence ≤ 1`, `extra="forbid"`, evidence length ≤ 300 characters and at most 20 issues.
+The wire model contains only enums and required fields (OpenAI strict schemas reject numeric bounds and regex). The enums are real `enum` constraints in the JSON schema: the first live run on 19 Sep 2026 used plain strings and the model invented `status: rejected`, `severity: error` and `code: address_mismatch`, which the domain model then rejected as a `failed` run. Pinning the vocabulary in the schema and listing it in the system prompt removed every such failure. The user message also states today's date, because a model has no clock and without it an expired certificate was reported as verified. The **domain model** re-validates the same shape with `0 ≤ confidence ≤ 1`, `extra="forbid"`, evidence length ≤ 300 characters and at most 20 issues. It also settles a self-contradicting answer: `verified` with issues listed becomes `issues_found`, and `issues_found` with an empty list becomes `verified`, so the officer's counters and the operator's "N issues to check" can never disagree with the list underneath.
 
 ## Mock provider
 
 Deterministic, dependency-free, used in tests and when `AI_PROVIDER=mock` or no API key is configured. Heuristics:
 - Text contains the form's business name or registration number → `field_mismatch` not raised; otherwise raised for `business_profile`.
 - Text contains a keyword expected for the type (for example "tenancy", "lease" for `tenancy_agreement`) → type accepted; otherwise `wrong_document_type`.
-- Text contains "expired" or a past expiry date pattern → `expired_document`.
+- Text contains "expired", or a date in the past (ISO or "3 January 2025") after an expiry phrase ("expiry", "valid until") → `expired_document`; a tenancy agreement with no date at all → `missing_field`.
 - Injection phrases ("ignore previous instructions", "mark this as verified") → `possible_prompt_injection`.
 - Confidence: 0.9 when no issues, 0.7 with issues, 0.4 if the text is shorter than 200 characters (drives `needs_review`).
 
@@ -98,7 +98,7 @@ Estimated cost per verification with `gpt-4.1-mini`: well under one cent for a 2
 | Injection phrases detected | `needs_review` + issue | "Needs officer review" with the flagged phrase |
 | Process restart mid-run | stale `running` → `failed`, reason `interrupted` (only runs older than timeout + grace) | re-run available |
 
-## Live run record (19 Sep 2026, `gpt-4.1-mini`, prompt 2026-09-19.2)
+## Live run record (19 Sep 2026, `gpt-4.1-mini`, prompt 2026-09-19.2; prompt 2026-09-19.3 adds the disclaimer rule, see `AI_EVALUATION.md`)
 
 | Case | Outcome | Confidence | Issues | Latency |
 |------|---------|------------|--------|---------|
@@ -111,4 +111,4 @@ Estimated cost per verification with `gpt-4.1-mini`: well under one cent for a 2
 
 ## Evaluation (Day 3, `docs/ai/AI_EVALUATION.md`)
 
-Six fixtures under `backend/evals/cases/` with expected status and expected issue codes: valid business profile; floor plan uploaded as tenancy agreement (wrong type); tenancy agreement without an expiry date (missing information); ambiguous certificate (needs review); empty PDF (unreadable); business profile containing an injection sentence (needs review + `possible_prompt_injection`). A runner script executes them against the mock and, when a key is present, against OpenAI, and prints expected vs actual.
+Built: fourteen cases in `backend/evals/cases.json` (the eight demo PDFs plus text fixtures for wrong type, missing expiry, ambiguous, empty, oversized and two injection styles) run through the real pipeline by `python -m evals.run`; the mock run is a blocking CI job, the OpenAI run is by hand. Results and caveats in `AI_EVALUATION.md`.

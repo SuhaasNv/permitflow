@@ -7,6 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.applications import LicenceView
+
 
 class QueueItemOut(BaseModel):
     id: uuid.UUID
@@ -118,6 +120,8 @@ class FeedbackOut(BaseModel):
     released_to_operator_at: datetime | None
     addressed_in_revision: int | None
     resolved_at: datetime | None
+    # True while the calling officer can undo their own withdraw or resolve (US-039).
+    can_undo: bool = False
 
 
 class FeedbackIn(BaseModel):
@@ -165,6 +169,9 @@ class OfficerApplicationOut(BaseModel):
     feedback_locked_reason: str | None
     actions: list[ActionOut]
     decision_note: str | None
+    # Operator's reason when they withdrew (US-038).
+    withdrawal_reason: str | None
+    licence: LicenceView | None = None
     version: int
     created_at: datetime
     updated_at: datetime

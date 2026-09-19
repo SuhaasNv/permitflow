@@ -62,6 +62,8 @@ Rules:
 | auth | users | `authenticate(email, password) -> Token`, `current_user()` |
 | applications | applications | `create`, `get_for(user, id)`, `list_for(user)`, `update_draft(user, id, section, data)`, `transition(officer, id, target, note, expected_version)` |
 | revisions | application_revisions | `submit(operator, id)`, `resubmit(operator, id)`, `list(id)`, `compare(id, from_no, to_no)` |
+| licence | licences, audit_events | `issue(app, officer)` from the approval transaction; `preview`; `open_for_download` (US-051) |
+| withdrawal | applications, audit_events, notifications | `withdraw(operator, id, reason)` (US-038) |
 | documents | documents | `upload(user, id, type, file)`, `replace`, `download`, `list` |
 | verification | verification_runs | `enqueue(document_id)`, `run_verification(document_id)`, `latest(document_id)`, `rerun` |
 | feedback | feedback | `create(officer, id, target, message, template_key)`, `resolve`, `withdraw`, `list`, `templates()` |
@@ -101,6 +103,19 @@ run_verification(run_id):   # plain sync function; FastAPI runs it in the thread
 Client: GET /applications/{id} polls every 2 s while any document is pending/running.
 ```
 
+### Withdrawal (US-038)
+```
+POST /applications/{id}/withdraw  { reason? }
+  api: auth → operator role → ownership
+  WithdrawalService.withdraw:
+    SELECT application FOR UPDATE
+    domain.workflow.transition(status, withdrawn, OPERATOR) → 409 for draft, decided or already withdrawn
+    status = withdrawn; withdrawal_reason; version += 1
+    audit status.changed (actor = operator, trigger = operator)
+    notify every active officer (title "<ref>: Withdrawn", body carries the reason)
+  commit → 200 operator view (can_withdraw = false, withdrawal_reason)
+```
+
 ### Resubmission
 ```
 POST /applications/{id}/resubmit
@@ -120,7 +135,7 @@ POST /applications/{id}/resubmit
 
 ## API surface (v1)
 
-All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string, "details"?: object } }`.
+All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string, "details"?: object } }`. Every route can answer `429 rate_limited` with a `Retry-After` header (per-client sliding-minute limits, US-058; `/health` exempt); every answer carries the security headers listed in `docs/security/SECURITY_REVIEW.md` item 7.
 
 | Method | Path | Role | Purpose |
 |--------|------|------|---------|
@@ -129,17 +144,21 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /form-schema | any | sections/fields definition |
 | GET | /officer/feedback-templates | officer | comment templates from `domain/feedback_templates.py` (key, title, suggested target, message); the officer edits before sending (built, US-024) |
 | GET | /applications | operator | own applications |
-| POST | /applications | operator | create draft |
+| POST | /applications | operator | create draft; `409 conflict` with `details.code = draft_limit` once the operator holds `MAX_DRAFTS_PER_USER` open drafts (US-058) |
 | GET | /applications/{id} | operator (own) | operator view: sections, documents + verification, released feedback (all rounds, no author), `resubmit` readiness (changed and untouched flagged targets), editability from open released feedback, `needs_operator_action` (built) |
 | PATCH | /applications/{id}/sections/{key} | operator (own) | update a section of the working copy (checked against editability) |
 | POST | /applications/{id}/submit | operator (own) | draft → application_received |
 | POST | /applications/{id}/resubmit | operator (own) | pending_pre_site_resubmission → pre_site_resubmitted |
+| POST | /officer/applications/{id}/feedback/{fid}/reopen | officer | addressed → open with the same text, draft until the next round; audited `feedback.reopened` (built, US-049) |
+| POST | /officer/applications/{id}/feedback/{fid}/restore | officer | undo the caller's own withdraw or resolve within 15 s; audited `feedback.restored` (built, US-039) |
+| DELETE | /applications/{id} | operator (own) | delete a draft outright with files, runs and audit events; 409 once submitted (built, US-045) |
+| GET | /applications/{id}/licence | owner or officer | the issued certificate as PDF; 404 before approval (built, US-051) |
+| GET | /officer/applications/{id}/licence/preview | officer | watermarked certificate while pending approval; nothing stored (built, US-051) |
+| POST | /applications/{id}/withdraw | operator (own) | any post-submission non-terminal → withdrawn, optional reason, officers notified (built, US-038) |
 | POST | /applications/{id}/documents | operator (own) | upload / replace by type |
 | DELETE | /applications/{id}/documents/{doc_id} | operator (own) | remove a document while in `draft` only |
-| GET | /applications/{id}/documents/{doc_id}/download | owner, officer or admin | file; the document must belong to `{id}` |
+| GET | /applications/{id}/documents/{doc_id}/download | owner or officer (admin until US-072: 403) | file; the document must belong to `{id}` |
 | POST | /applications/{id}/documents/{doc_id}/verify | owner or officer | re-run verification (only when the latest run is terminal); 202 |
-| GET | /applications/{id}/revisions | owner, officer or admin | list revisions |
-| GET | /applications/{id}/revisions/{n} | owner, officer or admin | snapshot |
 | GET | /applications/{id}/compare?from=n&to=m | owner or officer (admin with US-072) | field-level form diff and document add/remove/replace from `domain/diff.py`; 404 for unknown revisions (built, US-027) |
 | GET | /officer/applications | officer | queue: every non-draft application with applicant, internal status + officer label, server-derived next action and whose turn it is, revision count, open feedback count, document-check attention and checking counts, first submission and last activity; plus turn counts (built, US-020) |
 | GET | /officer/applications/{id} | officer | case view: current revision's sections, current documents with full verification detail (confidence, evidence, model), revision history, available transitions with guard reasons, `version` (built, US-021; feedback and audit lists join with US-023 and US-029) |
@@ -149,13 +168,13 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /officer/applications/{id}/feedback/{fid}/withdraw | officer | open → withdrawn; 409 unless `under_review` and open; `{fid}` must belong to `{id}`; audit `feedback.withdrawn` (built, US-023) |
 | POST | /officer/applications/{id}/documents/{doc_id}/verify | officer | re-run the AI check; same rules and audit as the operator re-run; returns the officer view (built, US-022) |
 | GET | /officer/applications/{id}/audit | officer | append-only audit trail with actor name and role, plain-language summary (`domain/audit_labels.py`) and payload, chronological (built, US-029) |
-| GET | /admin/overview | admin | counts by status, idle applications, today's submissions |
-| GET | /admin/ai-health | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
-| GET | /admin/audit-feed | admin | latest 50 audit events across applications |
-| GET | /admin/users | admin | user directory |
-| POST | /admin/users | admin | create user `{full_name, email, role}`; audit `user.created` |
-| PATCH | /admin/users/{id} | admin | change `role` and/or `is_active`; audit `user.role_changed` / `user.deactivated` / `user.reactivated`; 409 when it would remove the last active admin |
-| GET | /admin/applications/{id} | admin | officer view, read-only (mutations 403) |
+| GET | /admin/overview (planned, US-070) | admin | counts by status, idle applications, today's submissions |
+| GET | /admin/ai-health (planned, US-070) | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
+| GET | /admin/audit-feed (planned, US-071) | admin | latest 50 audit events across applications |
+| GET | /admin/users (planned, US-073) | admin | user directory |
+| POST | /admin/users (planned, US-073) | admin | create user `{full_name, email, role}`; audit `user.created` |
+| PATCH | /admin/users/{id} (planned, US-073) | admin | change `role` and/or `is_active`; audit `user.role_changed` / `user.deactivated` / `user.reactivated`; 409 when it would remove the last active admin |
+| GET | /admin/applications/{id} (planned, US-072) | admin | officer view, read-only (mutations 403) |
 | GET | /notifications | any | own notifications (newest first, 50) plus `unread_count` (built, US-025) |
 | POST | /notifications/{id}/read | any | mark read; another user's id is 404 (built, US-025) |
 | POST | /notifications/read-all | any | mark every own notification read (built, US-025) |
@@ -167,7 +186,7 @@ All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail":
 
 ```
 frontend/src
-  api/            generated OpenAPI types + thin fetch client (auth header, error mapping)
+  api/            hand-written types mirroring app/schemas + thin fetch client (auth header, error mapping)
   app/            router, providers (QueryClient, Auth), layout shell
   features/
     auth/         login page, useAuth
@@ -186,7 +205,7 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 
 - API: a global exception handler maps domain exceptions (`NotFound`, `Forbidden`, `InvalidTransition`, `ValidationFailed`, `VersionConflict`) to the standard error body; unexpected exceptions → 500 with a request id and no stack trace.
 - Verification task: catches everything, records failure, never propagates.
-- Frontend: route-level error boundary; query errors rendered by `ErrorState` with retry; mutation errors shown inline and preserve input.
+- Frontend: query errors rendered by `ErrorPanel` with the request id and Retry; mutation errors shown inline as an `Alert` and preserve input; 429 shows the server message and queries never retry a 4xx; an unknown route renders `NotFoundPanel`. There is no React error boundary for render crashes (recorded as a gap in the US-058 review).
 
 ## Authorization boundaries
 
@@ -206,4 +225,4 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 ## Deployment
 
 - Local: `docker compose up db` (PostgreSQL only; the API and the frontend run natively with `uvicorn` and `vite`) or `docker compose --profile full up` to also run the API container. A local database is kept because the test suite truncates tables between tests and because a reviewer must be able to run the system from a clean clone without any hosted credentials (NFR-001).
-- Railway, two environments: `development` deploys from the `dev` branch and `production` from `main` (see `docs/operations/BRANCHING.md`). Each has its own PostgreSQL and its own variables. Per environment: `backend` service from `backend/Dockerfile` with a volume at `/data/uploads`, `frontend` static service built from `frontend/` with `VITE_API_URL`. See `docs/operations/OPERATIONS.md`.
+- Railway, two environments (`development` from `dev`, `production` from `main`), each with its own Postgres, uploads volume, secrets and domains; both tiers run as GHCR images built once in CI (frontend: nginx with the API URL injected at start), deployed by `deploy.yml` behind health gates and, for production, a reviewer approval. Shape, secrets, seeding and rollback: `docs/operations/OPERATIONS.md`.

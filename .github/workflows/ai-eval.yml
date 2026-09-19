@@ -1,0 +1,116 @@
+# Live evaluation of the AI verification against the real model (US-054).
+#
+# ci.yml already gates every push with the golden set on the mock provider: that proves the
+# pipeline (extraction, injection heuristic, wire schema, post-processing) and the prompt plumbing.
+# This workflow proves the model: the same 14 cases through OpenAI, temperature 0, prompt version
+# stamped in the result, blocking at 14/14, then the fairness check (21 name-swapped runs, US-056). It runs nightly, by hand, and whenever the AI module or
+# the golden set changes on dev or main. Never on pull requests from forks: it needs the API key.
+
+name: AI evaluation (live)
+
+on:
+  workflow_dispatch:
+    inputs:
+      fail_under:
+        description: Minimum pass rate (0 to 1)
+        default: "1.0"
+  schedule:
+    - cron: "0 20 * * *" # 04:00 Singapore, daily
+  push:
+    branches: [main, dev]
+    paths:
+      - backend/app/infra/ai/**
+      - backend/app/domain/verification_rules.py
+      - backend/app/infra/extraction/**
+      - backend/evals/**
+      - .github/workflows/ai-eval.yml
+
+concurrency:
+  group: ai-eval
+  cancel-in-progress: false
+
+# `shell: bash` gives `-o pipefail`: a failing command behind `| tee` fails the step.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  live:
+    name: Live model
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    env:
+      APP_ENV: test
+      AI_PROVIDER: openai
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # Optional (US-055): when set, the run is also recorded as a LangSmith experiment on the golden dataset.
+      LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+      LANGSMITH_ENDPOINT: ${{ vars.LANGSMITH_ENDPOINT || 'https://api.smith.langchain.com' }}
+      LANGSMITH_PROJECT: permitflow-eval
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Refuse to run without the key
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::OPENAI_API_KEY is not set as a repository secret; nothing was evaluated"
+            exit 1
+          fi
+      - name: Golden set and adversarial cases through the real pipeline (OpenAI, blocking)
+        run: |
+          FLAGS=""
+          if [ -n "$LANGSMITH_API_KEY" ]; then FLAGS="--langsmith"; fi
+          uv run python -m evals.run --provider openai --json /tmp/ai-eval-live.json $FLAGS \
+            --fail-under "${{ github.event.inputs.fail_under || '1.0' }}" | tee /tmp/ai-eval-live.txt
+      - name: Fairness against the live model (name-swap invariance, blocking)
+        run: uv run python -m evals.fairness --provider openai --fail --json /tmp/fairness-live.json | tee /tmp/fairness-live.txt
+      - name: Publish the verdict
+        if: always()
+        run: |
+          {
+            echo "## AI evaluation, live model"
+            if [ -f /tmp/ai-eval-live.json ]; then
+              uv run python - <<'PY'
+          import json
+          r = json.load(open("/tmp/ai-eval-live.json"))
+          print(f"provider **{r['provider']}**, model `{r['model']}`, prompt `{r['prompt_version']}`, "
+                f"pass rate **{r['pass_rate']:.0%}** ({r['passed']}/{r['counted']})")
+          print()
+          print("| case | group | expected | actual | codes | ms | result |")
+          print("|---|---|---|---|---|---|---|")
+          for o in r["outcomes"]:
+              mark = "pass" if o["passed"] else "FAIL"
+              print(f"| {o['id']} | {o['group']} | {o['expected']} | {o['actual']} | {', '.join(o['codes'])} | {o['ms']} | {mark} |")
+          PY
+            else
+              echo "No result file: the run failed before the harness reported."
+            fi
+            if [ -f /tmp/fairness-live.json ]; then
+              uv run python - <<'PY'
+          import json
+          r = json.load(open("/tmp/fairness-live.json"))
+          print()
+          print(f"Fairness: **{r['runs'] - r['differing']}/{r['runs']}** name-swapped runs match their baseline")
+          for row in r["rows"]:
+              if not row["same_as_baseline"]:
+                  print(f"- DIFFERS: {row['scenario']}, {row['contact_name']}: {row['status']} {', '.join(row['codes'])}")
+          PY
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-evaluation-live-${{ github.run_number }}
+          path: |
+            /tmp/ai-eval-live.json
+            /tmp/ai-eval-live.txt
+            /tmp/fairness-live.json
+            /tmp/fairness-live.txt
+          retention-days: 90

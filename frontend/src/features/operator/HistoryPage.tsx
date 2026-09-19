@@ -34,7 +34,7 @@ export function HistoryPage() {
   }
   if (app.isError) {
     if (app.error instanceof AppError && app.error.status === 404)
-      return <NotFoundPanel backTo="/app/dashboard" backLabel="Back to my applications" />
+      return <NotFoundPanel backTo="/app/applications" backLabel="Back to my applications" />
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   if (schema.isError) return <ErrorPanel error={schema.error} onRetry={() => void schema.refetch()} />
@@ -46,7 +46,7 @@ export function HistoryPage() {
   return (
     <>
       <ApplicationHeader view={view} crumb="History" />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex flex-col gap-6">
           <section className="pf-surface overflow-hidden" aria-labelledby="rev-title">
             <div className="border-b border-line px-5 py-4 sm:px-7">
@@ -107,7 +107,7 @@ export function HistoryPage() {
                     .map((s) => (
                       <div key={s.key} className="px-5 py-4 sm:px-7">
                         <h3 className="mb-2 text-[15px] font-semibold">{s.title}</h3>
-                        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[200px_minmax(0,1fr)_minmax(0,1fr)]">
+                        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[200px_minmax(0,1fr)_minmax(0,1fr)]">
                           {s.fields.map((f) => {
                             const def = fieldDef(s.key, f.key)
                             return (
@@ -161,7 +161,7 @@ export function HistoryPage() {
             its state, so nothing is lost between rounds.
           </p>
           <p className="mt-3">
-            <Link to={`/app/applications/${id}`} className="font-semibold">
+            <Link to={`/app/applications/${id}`} className="inline-block py-2 font-semibold sm:py-0">
               Back to the application
             </Link>
           </p>

@@ -28,7 +28,7 @@ sequenceDiagram
     alt another round needed
         Ofc->>UI: add new feedback, Request resubmission (see UC2-A)
     else no open feedback
-        Ofc->>UI: Schedule site visit
+        Ofc->>UI: Mark site visit scheduled (status only)
         UI->>API: POST /officer/applications/{id}/transition {target: site_visit_scheduled}
         API->>WF: transition(under_review → site_visit_scheduled, officer, ctx{open_feedback = 0})
         API->>DB: status, audit, notification ("Pending Site Visit")
