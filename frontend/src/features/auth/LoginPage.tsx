@@ -60,7 +60,7 @@ export function LoginPage() {
 
   return (
     <div className="grid min-h-screen bg-surface lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <section className="flex flex-col px-6 py-8 sm:px-12 lg:px-20 lg:py-10">
+      <main id="main" className="flex flex-col px-6 py-8 sm:px-12 lg:px-20 lg:py-10">
         <div>
           <Logo />
         </div>
@@ -146,13 +146,20 @@ export function LoginPage() {
             </Button>
           </form>
         </div>
-        <div className="text-[13px] text-text-3">
+        <div className="flex flex-col gap-2 text-[13px] text-text-3">
+          <p>
+            Demonstration only: accounts are shared and their passwords are published. Use the fictional demonstration documents, never real
+            personal data. See the <Link to="/privacy">privacy policy</Link>.
+          </p>
           <Link to="/" className="text-text-2 no-underline hover:text-text">
             About PermitFlow
           </Link>
         </div>
-      </section>
-      <section className="relative hidden flex-col justify-between overflow-hidden bg-ink px-16 py-14 text-white lg:flex xl:px-24">
+      </main>
+      <aside
+        aria-label="About the licence"
+        className="relative hidden flex-col justify-between overflow-hidden bg-ink px-16 py-14 text-white lg:flex xl:px-24"
+      >
         <div
           className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full border border-white/[0.06]"
           aria-hidden="true"
@@ -176,7 +183,7 @@ export function LoginPage() {
           </dl>
         </div>
         <p className="text-[13px] text-[#8d96a3]">Automatic checks are advisory. Every decision is made by a licensing officer.</p>
-      </section>
+      </aside>
     </div>
   )
 }

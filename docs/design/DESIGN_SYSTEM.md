@@ -10,7 +10,7 @@ Rendered on the "Design system" artboard of the prototype. Values become Tailwin
 | `surface` | `#FFFFFF` | cards, tables, forms |
 | `surface-2` | `#F9FAFB` | table header, card footer, read-only fields |
 | `line` / `line-strong` | `#D9DEE5` / `#AEB6C2` | borders / input borders |
-| `text` / `text-2` / `text-3` | `#1B2430` / `#465060` / `#66717F` | primary / secondary / metadata |
+| `text` / `text-2` / `text-3` | `#1B2430` / `#465060` / `#616C7A` | primary / secondary / metadata (`text-3` was `#66717F` until US-057: 4.34:1 on `surface-3` failed AA) |
 | `primary` / `primary-hover` | `#A8192A` / `#8A1422` | brand, primary action, attention |
 | `primary-soft` / `primary-line` | `#FBEDEE` / `#EFB8BE` | active nav, primary badge |
 | `success` / soft / line | `#067647` / `#ECFDF3` / `#A6E9C4` | verified, resolved, approved, complete |
@@ -20,11 +20,11 @@ Rendered on the "Design system" artboard of the prototype. Values become Tailwin
 | `neutral` / soft / line | `#475467` / `#F2F4F7` / `#D0D5DD` | draft, unchanged, unavailable |
 | `focus` | `#175CD3` | 2 px focus ring, 2 px offset |
 
-Contrast: all `text*`, `success`, `warning`, `error`, `info`, `primary` ≥ 4.5:1 on white and on their soft backgrounds.
+Contrast: all `text*`, `success`, `warning`, `error`, `info`, `primary` ≥ 4.5:1 on every surface token, computed rather than assumed (table in `../reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`); the lowest pairing is `text-3` on `surface-3` at 4.68:1. A skip link (`.pf-skip-link`) precedes every page's header.
 
 ## Type scale (Public Sans for UI; Instrument Serif for display; IBM Plex Mono for identifiers)
 
-Three families, each with one job: Public Sans carries every control, label and body line; Instrument Serif (regular only, tight leading) is reserved for display moments that address the person rather than the task (landing hero, sign-in, dashboard greeting, "Application submitted"); IBM Plex Mono marks identifiers and ordinal numbers (`01`, references, counts).
+Three families (all SIL Open Font Licence, served from our own origin as woff2 latin and latin-ext subsets, `frontend/public/fonts`, US-057), each with one job: Public Sans carries every control, label and body line; Instrument Serif (regular only, tight leading) is reserved for display moments that address the person rather than the task (landing hero, sign-in, dashboard greeting, "Application submitted"); IBM Plex Mono marks identifiers and ordinal numbers (`01`, references, counts).
 
 | Style | Size / line | Weight | Use |
 |-------|-------------|--------|-----|

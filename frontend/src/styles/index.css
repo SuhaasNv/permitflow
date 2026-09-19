@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './fonts.css';
 
 /* Design tokens: docs/design/DESIGN_SYSTEM.md */
 @theme {
@@ -14,7 +15,7 @@
   --color-line-strong: #aeb6c2;
   --color-text: #1b2430;
   --color-text-2: #465060;
-  --color-text-3: #66717f;
+  --color-text-3: #616c7a; /* 4.68:1 on surface-3, the lowest pairing; was #66717f at 4.34 (US-057) */
   --color-ink: #1b2430;
 
   --color-primary: #a8192a;
@@ -146,6 +147,25 @@
     animation-delay: 200ms;
   }
   /* Editorial surface: one bordered white panel, no shadow stacking. */
+  /* Skip link (WCAG 2.4.1, US-057): visually hidden until it receives keyboard focus, then pinned top left. */
+  .pf-skip-link {
+    position: absolute;
+    left: 16px;
+    top: -100px;
+    z-index: 100;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: var(--color-ink);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .pf-skip-link:focus-visible {
+    top: 12px;
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
   .pf-surface {
     background: var(--color-surface);
     border: 1px solid var(--color-line);

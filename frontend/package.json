@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "preview": "vite preview",
     "e2e": "playwright test",
+    "e2e:a11y": "playwright test e2e/a11y.spec.ts",
     "e2e:ui": "playwright test --ui"
   },
   "dependencies": {
@@ -25,6 +26,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.58.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
