@@ -129,3 +129,43 @@ def test_reconfirming_declarations_counts_as_the_change(client: TestClient, db: 
     compare = client.get(f"/api/v1/applications/{app_id}/compare?from=1&to=2", headers=op).json()
     decl = next(s for s in compare["sections"] if s["key"] == "declarations")
     assert decl["changed"] is True and decl["fields"][0]["label"] == "Confirmed on"
+
+
+def test_five_resubmission_rounds_keep_every_revision_and_comment(client: TestClient, db: Session) -> None:
+    """The brief asks for unlimited rounds with nothing lost. Five rounds: each one a new feedback item on the
+    premises section, a change, a resubmission; every revision and every round's comment stays visible."""
+    app_id, op, off, _ = under_review(client, db)
+    for round_no in range(1, 6):
+        add_feedback(
+            client,
+            off,
+            app_id,
+            target_type="section",
+            section_key="premises",
+            message=f"Round {round_no} comment.",
+        )
+        transition(client, off, app_id, "pending_pre_site_resubmission")
+        premises = dict(VALID_PREMISES)
+        premises["address_line_1"] = f"10 Jalan Besar #01-{20 + round_no}"
+        r = client.patch(f"/api/v1/applications/{app_id}/sections/premises", headers=op, json=premises)
+        assert r.status_code == 200, r.text
+        r = client.post(f"/api/v1/applications/{app_id}/resubmit", headers=op)
+        assert r.status_code == 200, r.text
+        assert r.json()["revision_count"] == round_no + 1
+        transition(client, off, app_id, "under_review")
+
+    view = client.get(f"/api/v1/applications/{app_id}", headers=op).json()
+    assert [rev["number"] for rev in view["revisions"]] == [1, 2, 3, 4, 5, 6]
+    assert sorted(f["message"] for f in view["feedback"]) == [f"Round {n} comment." for n in range(1, 6)]
+    assert all(f["resolution"] == "addressed" for f in view["feedback"])
+
+    case = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    assert case["current_revision_number"] == 6 and len(case["revisions"]) == 6
+    compare = client.get(f"/api/v1/applications/{app_id}/compare?from=1&to=6", headers=off).json()
+    assert (
+        compare["from_revision"] == 1
+        and compare["to_revision"] == 6
+        and compare["changed_section_count"] == 1
+    )
+    events = [e.event_type for e in db.scalars(select(AuditEvent).where(AuditEvent.application_id == app_id))]
+    assert events.count("revision.submitted") == 6 and events.count("feedback.addressed") == 5

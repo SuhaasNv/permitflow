@@ -6,6 +6,7 @@ import { vi } from 'vitest'
 import * as api from '@/api/applications'
 import type { ApplicationView } from '@/api/applications'
 import { AppProviders } from '@/app/providers'
+import { respondingView } from '@/test/fixtures'
 import { ApplicationPage } from './ApplicationPage'
 
 const submitted: ApplicationView = {
@@ -136,5 +137,21 @@ describe('ApplicationPage outcome (US-051)', () => {
     expect(screen.getByRole('button', { name: 'Download licence (PDF)' })).toBeInTheDocument()
     expect(screen.getByText(/Licence FEL-2026-000005/)).toBeInTheDocument()
     expect(screen.queryByText(/Officer's note:/)).not.toBeInTheDocument()
+  })
+})
+
+describe('ApplicationPage feedback placement (UC1: officer comments at the top)', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  it('renders the feedback notice above the application sections, with each item linked to its target', async () => {
+    vi.spyOn(api, 'getApplication').mockResolvedValue(respondingView({ id: 'a1' }))
+    renderPage()
+    const notice = await screen.findByRole('region', { name: /asked for 1 change/i })
+    const sections = screen.getByRole('region', { name: /^application$/i })
+    // DOM order is reading order: the notice must come before the sections and the documents.
+    expect(notice.compareDocumentPosition(sections) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText('The floor area does not match the tenancy agreement.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Edit section' })).toHaveAttribute('href', '/app/applications/a1/form/premises')
+    expect(screen.getByText('Only the flagged parts are open for editing. Everything else is kept as submitted.')).toBeInTheDocument()
   })
 })

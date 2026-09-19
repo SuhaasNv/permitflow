@@ -22,7 +22,7 @@ The shipped system is a complete, tested vertical slice of use cases 1 and 2 wit
 | 10 | Notifications | In-app only; email mocked | Medium | Notification rows in the same transaction, bell with unread count | Email/SMS adapter with delivery status and retries |
 | 11 | Audit | Append-only table in the same database | Medium | No update or delete path in code; readable by officers; same transaction as the change | Tamper-evident store (hash chain or WORM), export, admin access audited per view |
 | 12 | Concurrency | Single replica, one region | Low | Row locks and `version` protect correctness | Two replicas behind Railway's balancer once the AI checks move to a worker |
-| 13 | Delivery | Migrations run on container start; no staging copy of production data | Medium | Health gate fails the deploy; rollback by `sha-` tag | Migration rehearsal against a staging clone, blue/green or canary |
+| 13 | Delivery | Migrations run on container start; no staging copy of production data; the migration compatibility rule (add nullable, drop one release later) is reviewed by hand, not enforced | Medium | Health gate fails the deploy; rollback by `sha-` tag | Migration rehearsal against a staging clone, blue/green or canary |
 | 14 | Backups | Railway's managed Postgres backups only; no file backup or restore drill | High | Separate volumes per environment | Scheduled backups for database and files, tested restore, retention policy |
 | 15 | Observability | Structured logs with request ids; Railway metrics | Medium | 503 on pool timeout, error envelope with request id | Centralised logs, tracing, alerting on health and error rate, dashboards (admin epic US-070 to US-072 not built) |
 | 16 | Supply chain | No image scan or SBOM | Low | gitleaks, pip-audit, bandit (medium) and npm audit (high) all blocking; the image job waits for them; pinned dependencies (`uv.lock`, `package-lock.json`) (US-058) | Semgrep (PR-blocking) and CodeQL on `main`, Trivy on the GHCR images with an SBOM |
@@ -38,7 +38,7 @@ The shipped system is a complete, tested vertical slice of use cases 1 and 2 wit
 - Authorization: role per router, ownership as 404, sub-resource checks, authorization cases in every router's test file (wrong role, wrong owner, wrong state), with `POST /notifications/read-all` covered by ownership in the query rather than a cross-user test.
 - Integrity: state machine as data (588 tested combinations), row locks with an optimistic version, immutable revisions, audit rows in the same transaction, licence issued in the approval transaction.
 - Input handling: error envelope everywhere, Pydantic 422 with field details, upload allowlist and magic bytes, `Content-Length` pre-check, 10 MB.
-- Tests: 748 backend (real PostgreSQL, migrations from scratch), 152 vitest, 8 Playwright specs (journey, six scenarios, accessibility gate) in CI against the full stack; coverage thresholds enforced (backend 80, frontend 80 statements).
+- Tests: 753 backend test cases (real PostgreSQL, migrations from scratch), 152 vitest, 8 Playwright specs (journey, six scenarios, accessibility gate) in CI against the full stack; coverage thresholds enforced (backend 80, frontend 80 statements).
 - Delivery: images built once, GHCR tags with `sha-`, two environments that share nothing, production behind a required reviewer, health gates after the rollout, rollback by tag.
 - Docs: every document in `docs/README.md` describes what exists; reviews record every finding and its outcome.
 

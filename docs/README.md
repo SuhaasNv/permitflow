@@ -53,7 +53,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Planning
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-073 (US-059 is the debrief material), 1:1 with Notion |
+| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-074 (US-059 the debrief material, US-074 the post-release review), 1:1 with Notion |
 | `05-planning/SPRINTS.md` | written | Three one-day sprints, sprint DoD, close ritual, cut order |
 | `05-planning/KANBAN.md` | written | Flow, WIP limits, story-to-day mapping |
 | `05-planning/notion/*.png` | written (19 Sep) | The Notion board after the release: the workspace page, the Epics table, the Stories table |
@@ -68,9 +68,9 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `09-operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
 | `09-operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |
 | `11-reviews/EDGE_CASE_REVIEW.md` | written (Sprint 2) | Three devil's-advocate reviews: every finding, its fix or its plan |
-| `11-reviews/BUG_HUNT_REVIEW.md` | written (19 Sep) | Three parallel bug hunts (backend, frontend, seams): 45 findings, what was fixed and what was kept; run-through findings R1 to R5 |
+| `11-reviews/BUG_HUNT_REVIEW.md` | written (19 Sep) | Three parallel bug hunts (backend, frontend, seams): 39 findings (36 fixed, 3 kept as decisions); browser run-through findings R1 to R12 |
 | `11-reviews/LAYOUT_AUDIT.md` | written (19 Sep) | Layout audit at 390, 820, 1024, 1280 and 1440; findings tracked as US-043 and US-044 |
-| `11-reviews/PRODUCTION_READINESS_REVIEW.md` | written (19 Sep) | Twenty gaps with severity, what is in place, what production would need; go/no-go |
+| `11-reviews/PRODUCTION_READINESS_REVIEW.md` | written (19 Sep) | Twenty-two gaps with severity, what is in place, what production would need; go/no-go |
 | `11-reviews/ASSESSMENT_TRACEABILITY.md` | written (19 Sep) | The brief decoded; every deliverable and acceptance criterion → implementation → test → evidence |
 | `11-reviews/FINAL_REVIEW.md` | written (19 Sep) | What was built, the decisions to defend, trade-offs, what the AI got wrong, what to show in the debrief |
 | `11-reviews/ISSUES_AND_MITIGATIONS.md` | written (19 Sep) | Every issue found across the reviews and run-throughs, its risk, mitigation and evidence; what was kept as a decision |

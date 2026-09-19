@@ -161,7 +161,7 @@ frontend/src
     auth/         login page, useAuth
     operator/     dashboard, application form (sections, uploads, progress), application detail, resubmission
     officer/      queue, review page (sections, documents, AI results, feedback panel, transition actions), compare view, audit
-    admin/        operations dashboard (status counts, idle, AI health, audit feed), users (add, change role, deactivate)
+    admin/        OverviewPage placeholder only; the admin screens (US-070 to US-073) are v0.4.0
     landing/      public landing page
     shared/       StatusBadge, FeedbackList, DocumentCard, RevisionCompare, EmptyState, ErrorState, Skeleton
   lib/            zod-from-schema builder, formatting, constants
