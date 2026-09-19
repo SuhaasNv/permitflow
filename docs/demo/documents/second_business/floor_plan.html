@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed Layout Plan: Serangoon Spice House Pte. Ltd., 52 Serangoon Garden Way #01-05</title>
+<style>
+/* Shared print stylesheet for the PermitFlow demo documents.
+   Injected into every template at {{BASE_CSS}} by generate.mjs. */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.45;
+  color: #111;
+  background: #fff;
+  -webkit-print-color-adjust: exact;
+}
+
+h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; margin: 0; font-weight: 600; }
+h1 { font-size: 19pt; line-height: 1.2; letter-spacing: 0.01em; }
+h2 { font-size: 12.5pt; margin: 16pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid #222; }
+h3 { font-size: 11pt; margin: 10pt 0 4pt; }
+p  { margin: 0 0 6pt; }
+
+table { border-collapse: collapse; width: 100%; font-size: 9.5pt; page-break-inside: auto; }
+tr    { page-break-inside: avoid; }
+th, td { border: 1px solid #9a9a9a; padding: 4pt 6pt; text-align: left; vertical-align: top; }
+th { background: #eef0f2; font-weight: 600; }
+table.kv td:first-child { width: 34%; background: #f6f7f8; font-weight: 600; }
+td.num, th.num { text-align: right; }
+
+.mono  { font-family: "SF Mono", Menlo, Consolas, "Courier New", monospace; }
+.small { font-size: 8.5pt; color: #444; }
+.caps  { text-transform: uppercase; letter-spacing: 0.06em; }
+.right { text-align: right; }
+.muted { color: #555; }
+
+.masthead {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  border-bottom: 3px double #222; padding-bottom: 10pt; margin-bottom: 14pt;
+}
+.masthead .left { display: flex; align-items: center; gap: 10pt; }
+.crest {
+  width: 46pt; height: 46pt; flex: 0 0 46pt;
+  border: 2px solid #222; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: Georgia, serif; font-weight: 700; font-size: 13pt; letter-spacing: 0.04em;
+}
+.agency { font-family: Georgia, serif; font-size: 13.5pt; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.15; }
+.agency small { display: block; font-size: 8.5pt; font-weight: 400; letter-spacing: 0.01em; text-transform: none; color: #444; margin-top: 2pt; }
+.docmeta { text-align: right; font-size: 9pt; color: #333; }
+.docmeta div { margin-bottom: 2pt; }
+.docmeta .doctype { font-family: Georgia, serif; font-size: 11pt; font-weight: 700; color: #111; }
+
+.notice {
+  border: 1px solid #bbb; background: #fafafa; padding: 6pt 8pt; font-size: 8.5pt; color: #333; margin: 8pt 0;
+}
+.disclaimer { font-size: 7.5pt; color: #555; border-top: 1px solid #bbb; padding-top: 5pt; margin-top: 18pt; }
+
+.stamp {
+  display: inline-block; border: 2px solid #8a1c1c; color: #8a1c1c;
+  padding: 3pt 8pt; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 8.5pt;
+  transform: rotate(-3deg);
+}
+
+.sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28pt; margin-top: 22pt; }
+.sig { page-break-inside: avoid; }
+.sig .script {
+  font-family: "Snell Roundhand", "Apple Chancery", "Brush Script MT", cursive;
+  font-size: 17pt; color: #1a2a5a; height: 26pt; line-height: 26pt; padding-left: 6pt;
+}
+.sig .line { border-top: 1px solid #222; padding-top: 4pt; font-size: 9.5pt; }
+.sig .name { font-weight: 600; }
+
+.page-break { page-break-after: always; }
+.avoid-break { page-break-inside: avoid; }
+
+.titleblock { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0; border: 1px solid #222; margin: 8pt 0 8pt; font-size: 8.5pt; }
+.titleblock div { padding: 3pt 6pt; border-right: 1px solid #222; }
+.titleblock div:last-child { border-right: 0; }
+.titleblock .k { display: block; font-size: 7pt; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+.plan { display: block; width: 154mm; height: 192mm; margin: 0 auto; }
+svg text { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #111; }
+.legend td:first-child { width: 14%; text-align: center; }
+.p2 table { font-size: 8pt; }
+.p2 th, .p2 td { padding: 2pt 5pt; }
+.p2 h2 { margin: 8pt 0 3pt; font-size: 11pt; }
+.p2 .masthead { padding-bottom: 6pt; margin-bottom: 6pt; }
+.p2 .two { display: grid; grid-template-columns: 1.15fr 1fr; gap: 12pt; align-items: start; }
+.legend svg { height: 12px; width: 40px; }
+.p2 .sig-grid { margin-top: 8pt; }
+.p2 .sig .script { height: 20pt; line-height: 20pt; }
+.p2 .disclaimer { margin-top: 6pt; }
+.p2 .kv td { padding: 1.5pt 5pt; }
+.legend svg { display: block; margin: 0 auto; }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="left">
+    <div class="crest">LO</div>
+    <div class="agency">Lim &amp; Ong Design Studio
+      <small>Interior layout and fit-out consultants (fictional practice)</small>
+    </div>
+  </div>
+  <div class="docmeta">
+    <div class="doctype">Layout Plan, Ground Floor</div>
+    <div>Drawing no. <span class="mono">LOD-2025-114 / A-01</span></div>
+    <div>Revision B, 20 October 2025</div>
+    <div>Scale 1:50 at A4</div>
+  </div>
+</div>
+
+<h1>Proposed Layout Plan: Food Establishment</h1>
+<p style="margin:2pt 0 0"><strong>Serangoon Spice House Pte. Ltd.</strong> (UEN 202411223K)</p>
+<p>52 Serangoon Garden Way #01-05, Singapore 555949. Ground floor unit of a shophouse. Total floor area 48 sqm.</p>
+
+<div class="titleblock">
+  <div><span class="k">Client</span>Serangoon Spice House Pte. Ltd.</div>
+  <div><span class="k">Premises</span>52 Serangoon Garden Way #01-05, S 555949</div>
+  <div><span class="k">Use</span>Cafe: kaya toast, eggs, kopi and teh</div>
+  <div><span class="k">Seating</span>24 seats (6 tables of 4)</div>
+</div>
+
+<svg class="plan" viewBox="0 0 7700 9600" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floor plan of the premises">
+  <defs>
+    <g id="t4">
+      <rect x="-350" y="-350" width="700" height="700" fill="#f7f3e8" stroke="#333" stroke-width="25"/>
+      <rect x="-175" y="-750" width="350" height="350" rx="60" fill="#fff" stroke="#333" stroke-width="20"/>
+      <rect x="-175" y="400"  width="350" height="350" rx="60" fill="#fff" stroke="#333" stroke-width="20"/>
+      <rect x="-750" y="-175" width="350" height="350" rx="60" fill="#fff" stroke="#333" stroke-width="20"/>
+      <rect x="400"  y="-175" width="350" height="350" rx="60" fill="#fff" stroke="#333" stroke-width="20"/>
+    </g>
+    <marker id="tick" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
+      <path d="M0 4 L4 0" stroke="#333" stroke-width="0.8"/>
+    </marker>
+  </defs>
+
+  <!-- zone fills -->
+  <rect x="900"  y="900"  width="3500" height="3000" fill="#fbf1ea"/>
+  <rect x="4400" y="900"  width="2500" height="1600" fill="#e9f2fb"/>
+  <rect x="4400" y="2500" width="1500" height="1400" fill="#eef7ee"/>
+  <rect x="5900" y="2500" width="1000" height="1400" fill="#f4f0e6"/>
+  <rect x="900"  y="3900" width="4000" height="1000" fill="#f6f6f6"/>
+  <rect x="4900" y="3900" width="2000" height="1000" fill="#ffffff"/>
+  <rect x="900"  y="4900" width="6000" height="4000" fill="#ffffff"/>
+
+  <!-- external walls -->
+  <rect x="900" y="900" width="6000" height="8000" fill="none" stroke="#111" stroke-width="150"/>
+
+  <!-- internal walls (with openings) -->
+  <g stroke="#111" stroke-width="80" stroke-linecap="butt">
+    <line x1="900"  y1="3900" x2="1500" y2="3900"/>
+    <line x1="2500" y1="3900" x2="4700" y2="3900"/>
+    <line x1="5500" y1="3900" x2="6100" y2="3900"/>
+    <line x1="6700" y1="3900" x2="6900" y2="3900"/>
+    <line x1="4400" y1="900"  x2="4400" y2="1300"/>
+    <line x1="4400" y1="2100" x2="4400" y2="3900"/>
+    <line x1="4400" y1="2500" x2="6900" y2="2500"/>
+    <line x1="5900" y1="2500" x2="5900" y2="3900"/>
+  </g>
+  <line x1="4900" y1="3900" x2="4900" y2="4900" stroke="#777" stroke-width="20" stroke-dasharray="120 80"/>
+
+  <!-- doors -->
+  <g fill="none" stroke="#333" stroke-width="25">
+    <line x1="4700" y1="3900" x2="4700" y2="4700"/>
+    <path d="M 4700 4700 A 800 800 0 0 0 5500 3900" stroke-dasharray="60 60"/>
+    <line x1="6100" y1="3900" x2="6100" y2="4500"/>
+    <path d="M 6100 4500 A 600 600 0 0 0 6700 3900" stroke-dasharray="60 60"/>
+  </g>
+  <!-- front entrance -->
+  <rect x="3400" y="8820" width="1000" height="160" fill="#fff"/>
+  <line x1="3400" y1="8900" x2="3400" y2="7900" stroke="#333" stroke-width="30"/>
+  <path d="M 3400 7900 A 1000 1000 0 0 1 4400 8900" fill="none" stroke="#333" stroke-width="25" stroke-dasharray="60 60"/>
+  <!-- shopfront glazing -->
+  <rect x="975" y="8845" width="2425" height="110" fill="#dbe7f3" stroke="#111" stroke-width="18"/>
+  <rect x="4400" y="8845" width="2425" height="110" fill="#dbe7f3" stroke="#111" stroke-width="18"/>
+
+  <!-- kitchen fixtures -->
+  <g fill="#f3f3f3" stroke="#333" stroke-width="22">
+    <rect x="1000" y="960"  width="1250" height="600"/>
+    <rect x="2350" y="960"  width="650"  height="600"/>
+    <rect x="3100" y="960"  width="1200" height="600"/>
+    <rect x="960"  y="1700" width="600"  height="1400"/>
+    <rect x="960"  y="3300" width="450"  height="450"/>
+    <rect x="3700" y="1700" width="600"  height="800"/>
+    <rect x="3700" y="2650" width="600"  height="800"/>
+    <!-- dish-washing fixtures -->
+    <rect x="4500" y="960"  width="1400" height="520"/>
+    <rect x="6000" y="960"  width="800"  height="520"/>
+    <rect x="4500" y="1900" width="1000" height="500"/>
+    <!-- toilet -->
+    <rect x="4550" y="2600" width="400"  height="550" rx="120"/>
+    <rect x="5400" y="2600" width="400"  height="350" rx="80"/>
+    <!-- store -->
+    <rect x="6000" y="2600" width="800"  height="700"/>
+    <!-- counter -->
+    <rect x="1000" y="4350" width="3800" height="500"/>
+  </g>
+  <!-- sink bowls -->
+  <g fill="#fff" stroke="#333" stroke-width="18">
+    <rect x="4600" y="1040" width="560" height="360" rx="60"/>
+    <rect x="5240" y="1040" width="560" height="360" rx="60"/>
+    <circle cx="1185" cy="3525" r="140"/>
+  </g>
+
+  <!-- fixture labels -->
+  <g font-size="105" text-anchor="middle">
+    <text x="1625" y="1290" font-size="95">TOAST GRILL / HOTPLATE</text>
+    <text x="2675" y="1290" font-size="95">EGG BOILER</text>
+    <text x="3700" y="1290">TANDOOR &amp; GRILL</text>
+    <text transform="translate(1290 2400) rotate(-90)">PREP TABLE</text>
+    <text x="1480" y="3560" font-size="95" text-anchor="start">HWB</text>
+    <text x="4000" y="2130">CHILLER</text>
+    <text x="4000" y="3020" font-size="95">BREAD /</text>
+    <text x="4000" y="3140" font-size="95">KAYA STN</text>
+    <text x="5200" y="1660">DOUBLE-BOWL SINK</text>
+    <text x="6400" y="1660" font-size="95">DRYING RACK</text>
+    <text x="5000" y="2190">DISH RETURN</text>
+    <text x="4750" y="3320" font-size="90">WC</text>
+    <text x="5600" y="3150" font-size="90">BASIN</text>
+    <text x="6400" y="2980" font-size="95">SHELVING</text>
+    <text x="2900" y="4640">SERVICE COUNTER / CASHIER</text>
+    <text x="2000" y="4080" font-size="90">KITCHEN PASS</text>
+    <text x="2100" y="9120" font-size="100">SHOPFRONT GLAZING</text>
+    <text x="5650" y="9120" font-size="100">SHOPFRONT GLAZING</text>
+    <text x="3900" y="9180" font-size="100" font-weight="700">ENTRANCE</text>
+    <text x="5900" y="4560" font-size="100">PASSAGE</text>
+  </g>
+
+  <!-- zone labels -->
+  <g font-size="150" font-weight="700" text-anchor="middle">
+    <text x="2650" y="2350">KITCHEN</text>
+    <text x="6200" y="2120" font-size="120">DISH-WASHING</text>
+    <text x="5150" y="3560" font-size="120">TOILET</text>
+    <text x="6400" y="2800" font-size="105">DRY STORE</text>
+    <text x="3900" y="7050">SEATING AREA</text>
+  </g>
+  <g font-size="115" text-anchor="middle" fill="#333">
+    <text x="2650" y="2520">10.5 sqm</text>
+    <text x="6200" y="2280" font-size="105">4.0 sqm</text>
+    <text x="5150" y="3720" font-size="100">2.1 sqm</text>
+    <text x="6400" y="3600" font-size="95">1.4 sqm</text>
+    <text x="5900" y="4720" font-size="95">2.0 sqm</text>
+    <text x="2900" y="4260" font-size="95">SERVICE COUNTER 4.0 sqm</text>
+    <text x="3900" y="7200">24.0 sqm, 24 seats</text>
+  </g>
+
+  <!-- tables (6 tables of 4 seats) -->
+  <use href="#t4" x="2000" y="5700"/>
+  <use href="#t4" x="2000" y="6875"/>
+  <use href="#t4" x="2000" y="8050"/>
+  <use href="#t4" x="5800" y="5700"/>
+  <use href="#t4" x="5800" y="6875"/>
+  <use href="#t4" x="5800" y="8050"/>
+  <g font-size="100" text-anchor="middle" fill="#333">
+    <text x="2000" y="5735">T1</text><text x="2000" y="6910">T2</text><text x="2000" y="8085">T3</text>
+    <text x="5800" y="5735">T4</text><text x="5800" y="6910">T5</text><text x="5800" y="8085">T6</text>
+  </g>
+
+  <!-- dimension lines -->
+  <g stroke="#333" stroke-width="12" fill="none">
+    <line x1="900" y1="450" x2="6900" y2="450" marker-start="url(#tick)" marker-end="url(#tick)"/>
+    <line x1="900" y1="380" x2="900" y2="520"/><line x1="6900" y1="380" x2="6900" y2="520"/>
+    <line x1="900" y1="700" x2="4400" y2="700"/><line x1="4400" y1="700" x2="6900" y2="700"/>
+    <line x1="900" y1="630" x2="900" y2="770"/><line x1="4400" y1="630" x2="4400" y2="770"/><line x1="6900" y1="630" x2="6900" y2="770"/>
+    <line x1="450" y1="900" x2="450" y2="8900"/>
+    <line x1="380" y1="900" x2="520" y2="900"/><line x1="380" y1="8900" x2="520" y2="8900"/>
+    <line x1="7200" y1="900" x2="7200" y2="3900"/><line x1="7200" y1="3900" x2="7200" y2="4900"/><line x1="7200" y1="4900" x2="7200" y2="8900"/>
+    <line x1="7130" y1="900" x2="7270" y2="900"/><line x1="7130" y1="3900" x2="7270" y2="3900"/>
+    <line x1="7130" y1="4900" x2="7270" y2="4900"/><line x1="7130" y1="8900" x2="7270" y2="8900"/>
+  </g>
+  <g font-size="115" text-anchor="middle" fill="#111">
+    <text x="3900" y="400">6 000</text>
+    <text x="2650" y="650">3 500</text>
+    <text x="5650" y="650">2 500</text>
+    <text transform="translate(380 4900) rotate(-90)">8 000</text>
+    <text transform="translate(7420 2400) rotate(-90)">3 000</text>
+    <text transform="translate(7420 4400) rotate(-90)" font-size="100">1 000</text>
+    <text transform="translate(7420 6900) rotate(-90)">4 000</text>
+  </g>
+
+  <!-- scale bar -->
+  <g transform="translate(900 9300)">
+    <rect x="0"    y="0" width="500" height="80" fill="#111"/>
+    <rect x="500"  y="0" width="500" height="80" fill="#fff" stroke="#111" stroke-width="12"/>
+    <rect x="1000" y="0" width="500" height="80" fill="#111"/>
+    <rect x="1500" y="0" width="500" height="80" fill="#fff" stroke="#111" stroke-width="12"/>
+    <g font-size="100" text-anchor="middle">
+      <text x="0" y="230">0</text><text x="500" y="230">0.5</text><text x="1000" y="230">1</text>
+      <text x="1500" y="230">1.5</text><text x="2000" y="230">2 m</text>
+    </g>
+    <text x="2350" y="70" font-size="100">SCALE 1:50 (A4)</text>
+  </g>
+
+  <!-- north arrow -->
+  <g transform="translate(7380 9420)">
+    <circle cx="0" cy="0" r="220" fill="none" stroke="#111" stroke-width="18"/>
+    <path d="M0 -190 L90 60 L0 10 L-90 60 Z" fill="#111"/>
+    <text x="0" y="-260" font-size="120" font-weight="700" text-anchor="middle">N</text>
+  </g>
+  <text x="6900" y="9500" font-size="100" text-anchor="end">Serangoon Garden Way frontage: south</text>
+</svg>
+
+<div class="page-break"></div>
+
+<div class="p2">
+<div class="masthead">
+  <div class="left">
+    <div class="crest">LO</div>
+    <div class="agency">Lim &amp; Ong Design Studio
+      <small>Interior layout and fit-out consultants (fictional practice)</small>
+    </div>
+  </div>
+  <div class="docmeta">
+    <div class="doctype">Layout Plan, Schedules and Notes</div>
+    <div>Drawing no. <span class="mono">LOD-2025-114 / A-02</span></div>
+    <div>Revision B, 20 October 2025</div>
+  </div>
+</div>
+
+<h2 style="margin-top:0">1. Area schedule</h2>
+<table>
+  <tr><th>Ref</th><th>Zone</th><th>Dimensions (m)</th><th class="num">Area (sqm)</th><th>Remarks</th></tr>
+  <tr><td>K</td><td>Kitchen</td><td>3.50 x 3.00</td><td class="num">10.5</td><td>Toast grill and hotplate, egg boiler, kopi and teh brewing, prep table, chiller, hand-wash basin</td></tr>
+  <tr><td>D</td><td>Dish-washing</td><td>2.50 x 1.60</td><td class="num">4.0</td><td>Double-bowl sink, drying rack, dish return shelf; separated from food preparation</td></tr>
+  <tr><td>T</td><td>Toilet</td><td>1.50 x 1.40</td><td class="num">2.1</td><td>Staff and customer use; WC and basin; door opens to passage, not to kitchen</td></tr>
+  <tr><td>S</td><td>Dry store</td><td>1.00 x 1.40</td><td class="num">1.4</td><td>Shelving for packaged goods, 150 mm off floor</td></tr>
+  <tr><td>C</td><td>Service counter</td><td>4.00 x 1.00</td><td class="num">4.0</td><td>Cashier, order pick-up, display of packaged kaya</td></tr>
+  <tr><td>P</td><td>Passage</td><td>2.00 x 1.00</td><td class="num">2.0</td><td>Access to toilet and store</td></tr>
+  <tr><td>A</td><td>Seating area</td><td>6.00 x 4.00</td><td class="num">24.0</td><td>6 tables of 4 seats (T1 to T6), entrance and shopfront glazing</td></tr>
+  <tr><th colspan="3">Total floor area</th><th class="num">48.0</th><th>Internal, wall to wall</th></tr>
+</table>
+
+<div class="two">
+<div>
+<h2>2. Legend</h2>
+<table class="legend">
+  <tr><th>Symbol</th><th>Meaning</th></tr>
+  <tr><td><svg width="60" height="14" viewBox="0 0 60 14"><rect x="2" y="4" width="56" height="6" fill="#111"/></svg></td><td>External wall (brick, existing)</td></tr>
+  <tr><td><svg width="60" height="14" viewBox="0 0 60 14"><rect x="2" y="5" width="56" height="3" fill="#111"/></svg></td><td>Internal partition (new, moisture-resistant board on steel studs)</td></tr>
+  <tr><td><svg width="60" height="14" viewBox="0 0 60 14"><rect x="2" y="4" width="56" height="5" fill="#dbe7f3" stroke="#111"/></svg></td><td>Shopfront glazing</td></tr>
+  <tr><td><svg width="60" height="20" viewBox="0 0 60 20"><path d="M10 18 L10 2 A16 16 0 0 1 26 18" fill="none" stroke="#333" stroke-dasharray="2 2"/><line x1="10" y1="2" x2="10" y2="18" stroke="#333" stroke-width="1.5"/></svg></td><td>Door with swing</td></tr>
+  <tr><td><svg width="60" height="16" viewBox="0 0 60 16"><rect x="12" y="2" width="36" height="12" fill="#f3f3f3" stroke="#333"/></svg></td><td>Fixed equipment or furniture (labelled on plan)</td></tr>
+  <tr><td><svg width="60" height="24" viewBox="0 0 60 24"><rect x="22" y="6" width="16" height="12" fill="#f7f3e8" stroke="#333"/><rect x="26" y="0" width="8" height="5" fill="#fff" stroke="#333"/><rect x="26" y="19" width="8" height="5" fill="#fff" stroke="#333"/><rect x="14" y="8" width="6" height="8" fill="#fff" stroke="#333"/><rect x="40" y="8" width="6" height="8" fill="#fff" stroke="#333"/></svg></td><td>Table with 4 seats</td></tr>
+  <tr><td><strong>HWB</strong></td><td>Hand-wash basin (hands-free tap, soap and paper towel dispenser)</td></tr>
+</table>
+</div>
+<div>
+<h2>3. Seating schedule</h2>
+<table>
+  <tr><th>Table</th><th>Type</th><th class="num">Seats</th><th>Location</th></tr>
+  <tr><td>T1, T2, T3</td><td>Square table 700 x 700 mm, 4 chairs</td><td class="num">12</td><td>West side of seating area</td></tr>
+  <tr><td>T4, T5, T6</td><td>Square table 700 x 700 mm, 4 chairs</td><td class="num">12</td><td>East side of seating area</td></tr>
+  <tr><th colspan="2">Total seating capacity</th><th class="num">24</th><th>No standing area proposed</th></tr>
+</table>
+
+
+
+</div>
+</div>
+
+<h2>4. Notes</h2>
+<table class="kv">
+  <tr><td>Business</td><td>Serangoon Spice House Pte. Ltd., UEN 202411223K</td></tr>
+  <tr><td>Menu</td><td>Kaya toast, soft-boiled eggs, kopi and teh. No deep frying proposed.</td></tr>
+  <tr><td>Operating hours</td><td>Monday to Sunday, 7:00 am to 9:00 pm</td></tr>
+  <tr><td>Staff</td><td>4 food handlers on the roster; maximum 3 on shift at any time</td></tr>
+  <tr><td>Ventilation</td><td>Kitchen exhaust hood over toast grill and hotplate, ducted to rear; grease filter cleaned weekly</td></tr>
+  <tr><td>Waste</td><td>Covered bins in kitchen and dish-washing; grease trap under dish-washing sink; refuse to rear bin point</td></tr>
+  <tr><td>Finishes</td><td>Kitchen and dish-washing: non-slip tiles, tiled walls to 1.8 m, coved skirting; seating: vinyl plank</td></tr>
+  <tr><td>Pest proofing</td><td>Fly screens to rear opening; door sweeps to entrance and rear door</td></tr>
+</table>
+
+<div class="sig-grid">
+  <div class="sig">
+    <div class="script">R. Lim</div>
+    <div class="line"><span class="name">Rachel Lim</span><br>Prepared by, Lim &amp; Ong Design Studio (fictional)<br>20 October 2025</div>
+  </div>
+  <div class="sig">
+    <div class="script">Priya Raghavan</div>
+    <div class="line"><span class="name">Priya Raghavan</span><br>Accepted for Serangoon Spice House Pte. Ltd., Director<br>22 October 2025</div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  Fictional document produced for a software demonstration. Not issued by any authority. The design practice, the persons
+  and the drawing references in this document are invented. The plan is illustrative and is not a survey of any real premises.
+</div>
+</div>
+
+</body>
+</html>

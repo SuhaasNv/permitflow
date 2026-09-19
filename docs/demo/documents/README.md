@@ -18,6 +18,7 @@ All four are real PDFs with selectable text (rendered from HTML by Chromium, not
 | Folder | Use it for | Result the AI check should give |
 |--------|-----------|---------------------------------|
 | `clean/` | The "happy path" demo: submit, AI verifies, officer approves | All four documents consistent with the application |
+| `second_business/` | The production example: a second, unrelated restaurant (Serangoon Spice House Pte. Ltd., UEN 202411223K, 52 Serangoon Garden Way #01-05, contact Priya Raghavan), clean set, so the record left on https://permitflow.space is not the same business as every test fixture | All four documents consistent with that application; the form values to enter are in the table below |
 | `with_issues/` | The "feedback round" demo: AI flags problems, officer requests changes, operator resubmits with the clean versions | Three findings: wrong UEN in the business profile, wrong unit number in the tenancy agreement, expired food hygiene certificate. The floor plan is fine. See `with_issues/NOTES.md` for the exact planted values and where they appear |
 
 A typical demo: upload `with_issues/` first, walk through the findings, then replace the three flagged files with their `clean/` counterparts and show the application passing.
@@ -65,3 +66,17 @@ Every document is fictional and says so in its footer and body: "Fictional docum
 | with_issues | Issues found (UEN mismatch) | Verified | Issues found (address mismatch) | Issues found (expired) |
 
 Quirk worth knowing before a demo: on the expired certificate the model also reported the "fictional document" disclaimer as possible prompt injection text. It is a false positive of the model, not of the platform's own injection heuristic, and it shows the "advisory only" stance well: the officer decides.
+
+## Second business: form values
+
+| Section | Field | Value |
+|---|---|---|
+| Business | Business name | Serangoon Spice House Pte. Ltd. |
+| Business | UEN | 202411223K |
+| Business | Contact | Priya Raghavan, priya@serangoonspice.sg, +65 9876 5432 |
+| Premises | Address | 52 Serangoon Garden Way #01-05, Singapore 555949 |
+| Premises | Floor area, type | 48 sqm, shophouse |
+| Premises | Tenancy expiry | 2027-10-31 |
+| Operations | Cuisine | South Indian meals, tandoor dishes and teh tarik |
+| Operations | Seating, hours, handlers | 24, Mon-Sun 7am-9pm, 4 |
+
