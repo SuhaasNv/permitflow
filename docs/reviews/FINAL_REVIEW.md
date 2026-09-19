@@ -16,12 +16,12 @@ By the numbers: 748 backend tests on a real PostgreSQL, 152 frontend tests, 8 Pl
 4. **Immutable revisions and a read-time diff.** Every submission is a snapshot; the compare view is computed, never stored; nothing is lost between rounds by construction.
 5. **AI advisory by construction.** The verifier writes only to `verification_runs`; the workflow has no AI actor; injection is handled by a deterministic rule before the verdict is read; the output passes two strict schemas; the provider sits behind an interface with a mock used in tests and CI. The Approve dialog warns about unresolved findings but never blocks: the officer decides.
 6. **Same-transaction audit, notifications and licence.** A status change, its audit row, the operator's notification and (on approval) the certificate either all happen or none do.
-7. **Build once, gate on a person.** CI builds two images, Railway pulls by tag, `dev` deploys automatically, `main` waits for the owner's approval, the deploy job waits for the rollout and checks health.
+7. **Build once, gate on a person.** CI builds two images, Railway pulls by tag, `dev` deploys automatically, production is deployed by hand from `main` and pauses for the owner's approval (the automatic `workflow_run` path is rejected by the branch policy; OPERATIONS.md), the deploy job waits for the rollout and checks health.
 
 ## Trade-offs I made knowingly
 
 - Background tasks instead of a queue (ADR-004): a restart marks running checks failed and re-run recovers; a worker is the first infrastructure change for production.
-- Local-disk files on a volume instead of object storage; in-process login limiter; JWT in `sessionStorage`; no CSP: all accepted for a demo, all listed with severity in the readiness review.
+- Local-disk files on a volume instead of object storage; an in-process limiter on every request; JWT in `sessionStorage`; a CSP that still allows inline styles: all accepted for a demo, all listed with severity in the readiness review.
 - A 14-case AI evaluation set and a 21-run name-swap fairness check, run on the mock in a six-stage gate on every push and against the live model nightly and on AI changes, with LangSmith tracing and an experiment per run: enough to catch a broken prompt and to show a history, not a benchmark; promptfoo red-teaming and Project Moonshot recorded as next steps rather than half-built.
 - Hand-written frontend API types instead of OpenAPI codegen: they stayed small; drift is caught by the integration and end-to-end suites.
 - Nice-to-have features on the last day (certificate, landing hero, search) before the closing documents: the assessor review called this out fairly; the documents were then written in one pass, and the features are marked beyond the brief. In a real team I would have held them behind the release.
@@ -29,6 +29,17 @@ By the numbers: 748 backend tests on a real PostgreSQL, 152 frontend tests, 8 Pl
 ## What the AI got wrong, briefly
 
 The first live verifier run invented enum values and missed an expired certificate (pinned schema, date in the prompt). It proposed scope it should not have (a story for "accepting" AI findings, a full red band) and once offered a workflow option the state machine did not allow. The first certificate layout overflowed; two prompt wordings were rejected by the harness; a scratch file was swept into a commit; Notion notes carried the wrong day; two CI runs failed on a lint the AI had not run locally. Every one is in `AI_USAGE.md` with what was done about it. The design of the system was mine; the AI produced the code and the documents against that design, and every piece was tested before it counted.
+
+## Questions the repository invites, and where the answer is
+
+1. Why is the automatic production deploy not used? `docs/operations/OPERATIONS.md`, deployment step 5: `workflow_run` jobs run on the default branch and the production environment admits only `main`; deployed by hand behind the same approval.
+2. Public demonstration credentials with a live model key: what caps the bill? `docs/security/SECURITY_REVIEW.md` attack 3 and `backend/app/services/quotas.py`: 60 runs per applicant and 1,000 per platform per day.
+3. Which parts did you write yourself, and which would you not defend line by line? `AI_USAGE.md` section 2 (who did what) and the last paragraph of section 6.
+4. Why 14 states when the brief lists 12? `SCOPE.md` M10, assumption 14 and C5: `draft` before submission, `withdrawn` for the operator's exit (US-038).
+5. Why can an operator not fix a mistake in an unflagged section? `SCOPE.md` assumption 13: the 403 keeps the officer's review scope honest; the officer can flag the section on request.
+6. How do you know the AI never changes a status? `backend/app/services/verification.py` writes only `VerificationRun` rows; `domain/workflow.py` has no AI actor; `tests/unit/test_layering.py` and the transition tests cover it; there is no single test named for it, which is a fair criticism.
+7. What happens to a check that is running when you deploy? `backend/app/main.py` marks stale runs failed on start (ADR-004); the operator sees "Check did not complete" with a re-run.
+8. Seventy stories in three days as one person: how much did you review? Every diff before a commit, 129 commits since v0.2.0; the sprint retro in `CHANGELOG.md` says where that cost the admin epic.
 
 ## What I would show in the debrief
 
