@@ -50,31 +50,31 @@ Standing instructions from the two files, paraphrased, in the order the project 
 - CI/CD trade-off: "Go with the cut, GHCR is fine": one CI build of two images pushed to GHCR, Railway pulls; promptfoo, LangSmith and SAST tooling recorded under "what I would do next" rather than built.
 - Deployment safety: "Production should be approved by a person": GitHub environment with a required reviewer, `main` only, health gates after the rollout.
 - Product: "What if the user can download the certificate: render it on approval, let the officer preview it, let the operator download it" (US-051, marked beyond the brief in `SCOPE.md`).
-- Last day: "Check Notion and all the user stories and every .md; everything should be consistent", then "rate our application like Xtremax would, a strict guy, and tell me what can be improved."
+- Last day: "Check Notion and all the user stories and every .md; everything should be consistent", then "rate our application the way the assessors would, strictly, and tell me what can be improved."
 
 
-### Verbatim prompts from the sessions
+### Prompts from the sessions
 
-Typed as they were, slang included; the AI worked from these plus the standing files. A few of many:
+The instructions that shaped the build, edited for readability (chat shorthand removed, intent kept). Each is followed by what it produced.
 
-- "Are you checking with Notion... merging strategies... branching strategies?" (early Sprint 2; the answer became `docs/operations/BRANCHING.md` and the story-per-branch rule)
-- "explicitly test each workflow separately" (US-042, one Playwright spec per workflow)
-- "deploy an agent that takes care of orientation, layouts" (the layout audit, US-043)
-- "Bro, I don't want you to add this. Don't create different user stories because you are just increasing the scope." (a proposed "accept AI finding" story, dropped)
-- "yeah go with the cut, ghcr is fine bro, so its two images?" (ADR-011)
-- "push it and go with the certificate bro and test in that branch dont merge it to dev yet please" (US-051 stayed on its branch until I had reviewed it in the browser)
-- "yes push it, dont start with day 3 yet. i want you to deploy a bug fixer agents" (US-050, three parallel bug hunts)
-- "what if the user can download the certification... on spot render a certificate... officer preview... user can download" (US-051)
-- "make sure these are mentioned in the architecture md files and all the diagrams too" (docs in the same change, every time)
-- "can you do a run through with claude in chrome for me with the actual documents you have created please." (first persona run-through; found R1 and R2)
-- "keep it, do the label fix bro" (after the AI offered to revert a feature to "tighten scope": kept, one-line fix instead)
-- "reject it, and then proceed with a soft option" (approval warning instead of a hard gate, keeping the advisory principle)
-- "go with 1 and 2 bro" (Return to review and the prompt fix; items 3 to 5 of the scope list deliberately left)
-- "now check the notion for me please and all the user stories and everything verify everything and all the .mds we have everything should be like consistent please."
-- "deploy an agent to rate our application and the output and the standards we are following like how xtremax will rate me. a strict guy, and tell me what can be improved" and "one more sub agent to check for any other bugs or something."
-- "i need the issues found and what are the mitigations too, because i think xtremax can ask right" (this repository's `docs/reviews/ISSUES_AND_MITIGATIONS.md`)
-- "what if the user or the company asks, on how you are evaluating its output is legit, like langsmith, or what on how we evaluating, i want you to explain our ci of ai please. or can we have a separate ci ai?" (US-054 live evaluation workflow, then US-055 LangSmith tracing and US-056 the six-stage AI gate with the fairness check; `docs/ai/AI_ASSURANCE.md`)
-- The legal and accessibility brief, quoted in full because the AI's first move was to audit the code and cut the list down before building anything: "Hey Claude, I do not want my vibe-coded website to get sued, so please: Add a privacy policy page, a terms and conditions page, and a cookie policy. Check if I need cookie consent and add a refund policy and form consent. Only connect necessary data. Check analytics tracking. Check third-party embeds. Make the site accessible. Add alt text. Check color contrast and make forms keyboard-friendly. Use clear button labels. Remove fake reviews. Remove unsupported claims. Add business details and check copyright on images. Check applicable local laws and flag any other risks, and make no mistakes. And also, you can create a user story for this.md regarding this, and you can put this in some .md so that the reviewer can know that he knows stuff." The audit found no cookies, no analytics, no embeds, no images and no reviews, so five items became "not applicable, and here is why"; the real work was the policies (written from the code, PDPA framing), the two in-app notices, self-hosting the fonts (the one third-party call), an axe gate on 22 screen states that found four landmark and contrast defects, and `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` (US-057). I chose "name plus GitHub, no email" and "self-host fonts" when asked.
+- "Keep Notion in step with the work, and define the merging and branching strategy." (early Sprint 2; the answer became `docs/operations/BRANCHING.md` and the story-per-branch rule)
+- "Explicitly test each workflow separately." (US-042, one Playwright spec per workflow)
+- "Deploy an agent that takes care of orientation and layouts." (the layout audit, US-043)
+- "I don't want you to add this. Don't create different user stories, because you are just increasing the scope." (a proposed "accept AI finding" story, dropped)
+- "Take the cut: build the images once in CI and push them to GHCR." (ADR-011)
+- "Push it and go with the certificate, and test it in that branch. Don't merge it to dev yet." (US-051 stayed on its branch until I had reviewed it in the browser)
+- "Yes, push it. Don't start with Day 3 yet. I want you to deploy bug-fixer agents." (US-050, three parallel bug hunts)
+- "What if the user can download the certificate: render a certificate on approval, let the officer preview it, and let the user download it." (US-051)
+- "Make sure these are mentioned in the architecture documents and all the diagrams too." (docs in the same change, every time)
+- "Can you do a run-through with Claude in Chrome for me with the actual documents you have created?" (first persona run-through; found R1 and R2)
+- "Keep the feature and fix its label instead of reverting it." (after the AI offered to revert a feature to tighten scope: kept, one-line fix instead)
+- "Reject this application, then add a warning on approval rather than a hard block." (approval warning instead of a hard gate, keeping the advisory principle)
+- "Add Return to review and fix the prompt; leave the other three scope items." (items 3 to 5 of the scope list deliberately left)
+- "Now check Notion for me, and all the user stories, and verify everything; all the documents should be consistent."
+- "Deploy an agent to review the application, its output and the standards we follow as a strict assessor would, and report what can be improved." and "One more sub-agent to check for any other bugs."
+- "Record every issue found and its mitigation." (`docs/reviews/ISSUES_AND_MITIGATIONS.md`)
+- "Build a separate AI evaluation pipeline against the real model, add LangSmith tracing, and move the AI checks into a gate of their own with a fairness check." (US-054, US-055, US-056; `docs/ai/AI_ASSURANCE.md`)
+- The legal and accessibility brief, in full because the AI's first move was to audit the code and cut the list down before building anything: "I do not want the website to expose me legally, so please: add a privacy policy page, a terms and conditions page, and a cookie policy. Check if I need cookie consent, and add a refund policy and form consent. Only connect necessary data. Check analytics tracking. Check third-party embeds. Make the site accessible. Add alt text. Check colour contrast and make forms keyboard-friendly. Use clear button labels. Remove fake reviews. Remove unsupported claims. Add business details and check copyright on images. Check applicable local laws and flag any other risks, and make no mistakes. Create a user story for this, and put it in a document so that the reviewer can see it." The audit found no cookies, no analytics, no embeds, no images and no reviews, so five items became "not applicable, and here is why"; the real work was the policies (written from the code, PDPA framing), the two in-app notices, self-hosting the fonts (the one third-party call), an axe gate on 22 screen states that found four landmark and contrast defects, and `docs/reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` (US-057). I chose "name plus GitHub, no email" and "self-host fonts" when asked.
 
 ## 5. How output was reviewed, validated and corrected
 
