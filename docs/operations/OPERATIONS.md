@@ -97,7 +97,7 @@ The GitHub `production` environment only accepts deployments from `main`. Develo
 | GitHub environment secret (`development`, `production`) | `RAILWAY_TOKEN` | a Railway **project token** scoped to that one environment (Project settings, Tokens); created by the owner in the dashboard |
 | GitHub repository variable | `RAILWAY_PROJECT_ID` | which project to redeploy |
 | GitHub repository secret | `OPENAI_API_KEY` | the live AI evaluation (`ai-eval.yml`); a key of its own, so it can be rotated apart from the runtime key (`gh secret set OPENAI_API_KEY`) |
-| GitHub repository secret and variable (optional) | `LANGSMITH_API_KEY`, `LANGSMITH_ENDPOINT` | when present, `ai-eval.yml` also records each run as a LangSmith experiment (US-055) |
+| GitHub repository secret and variable (optional) | `LANGSMITH_API_KEY`, `LANGSMITH_ENDPOINT` | when present, `ai-eval.yml` also records each run as a LangSmith experiment (US-055); the secret is set, the endpoint is the US default |
 | GitHub environment variables | `BACKEND_URL`, `FRONTEND_URL` | the post-deploy gates |
 
 `postgresql://` URLs from Railway are accepted as-is: settings add the `+psycopg` driver.
