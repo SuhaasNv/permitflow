@@ -1,6 +1,6 @@
 # PermitFlow
 
-![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](debrief/video/permitflow-launch-poster.jpg)
+![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/debrief/video/permitflow-launch-poster.jpg)
 
 A regulatory licensing platform built for a 3-day full-stack assessment. Business operators apply for a Food Establishment Licence through a guided form with checked uploads; licensing officers review the submission, leave feedback tied to a specific section or document, and request a resubmission in which only the flagged parts reopen; every status change, feedback round and decision is audited; approval issues a licence certificate the business can download. An advisory AI verifier reads each uploaded document and compares it with the form before anyone submits; it never decides anything.
 
@@ -10,7 +10,7 @@ A regulatory licensing platform built for a 3-day full-stack assessment. Busines
 
 **Stack, in one paragraph** (`docs/architecture/decisions/ADR-009-stack-and-delivery-pipeline.md`): FastAPI + SQLAlchemy 2 + Alembic + Pydantic v2 on PostgreSQL 16 for the backend, because Pydantic validates both the HTTP boundary and the AI provider's output with one vocabulary, and PostgreSQL gives row locks, UUIDs and JSONB for immutable revision snapshots. React 19 + TypeScript strict + Vite + Tailwind + TanStack Query + React Hook Form + Zod for the frontend, because polling a verification status and validating a sectioned form inline are what those libraries are for. pytest on a real database, vitest, Playwright; GitHub Actions; Docker images to GHCR; Railway with two environments. A modular monolith (`api → services → domain / repositories → models`, `domain/` pure Python) with an explicit state-machine table, same-transaction audit rows and an AI module behind a provider interface (`docs/architecture/`).
 
-Everything else you might look for: `CHANGELOG.md` (what shipped when), `docs/README.md` (index of every document), `AI_USAGE.md` (full account of how AI tools were used), `docs/reviews/ISSUES_AND_MITIGATIONS.md` (what went wrong and what we did about it), `debrief/` (the pitch deck, the technical deck, the launch video and the narrated walkthrough).
+Everything else you might look for: `CHANGELOG.md` (what shipped when), `docs/README.md` (index of every document), `AI_USAGE.md` (full account of how AI tools were used), `docs/reviews/ISSUES_AND_MITIGATIONS.md` (what went wrong and what we did about it), `docs/debrief/` (the pitch deck, the technical deck, the launch video and the narrated walkthrough).
 
 Contents: Run locally · Demo accounts · Security · Tests and checks · Environment variables · Project layout · Branching and deployment · CI · AI verification · AI Usage · What I would do next.
 
@@ -82,8 +82,7 @@ See `.env.example`; every runtime variable is documented there and in `docs/oper
 ```
 backend/   FastAPI + SQLAlchemy 2 + Alembic (api → services → domain / repositories → models)
 frontend/  React + TypeScript + Vite + Tailwind + TanStack Query + React Hook Form + Zod
-docs/      requirements, architecture, ADRs, design system and prototype, planning, security, operations
-debrief/   pitch deck, technical deck, launch video and narrated walkthrough (videos in Git LFS)
+docs/      requirements, architecture, ADRs, design system and prototype, planning, security, operations, debrief material (decks and videos, videos in Git LFS)
 ```
 
 ## Branching and deployment

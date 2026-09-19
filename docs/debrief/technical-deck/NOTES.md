@@ -7,7 +7,7 @@ Fifteen slides, PowerPoint only, same design language as the pitch deck (tokens,
 - `PermitFlow-technical.pptx`: the deck to present, brand fonts referenced (Public Sans, Instrument Serif, IBM Plex Mono; TTFs in `../pitch-deck/fonts/`).
 - `PermitFlow-technical-safe-fonts.pptx`: same deck with Arial, Cambria and Courier New written in, for a machine where fonts cannot be installed.
 - `PermitFlow-technical-handout.pdf` and `slides/slide-01.png` to `slide-15.png`: final state of every slide, rendered from the safe-font deck.
-- The generator and the animation script stay in the workshop folder (`notes/pitch/technical/deck/build/`, git-ignored). The diagrams are in the repository at `docs/architecture/diagrams/views/` (solution architecture, deployment, CI/CD); they were generated with ChatGPT from `DIAGRAM_PROMPTS.md` in this folder and rated against the code before use.
+- The generator and the animation script stay in the workshop folder (`notes/pitch/technical/deck/build/`, git-ignored). The diagrams are in the repository at `../../architecture/diagrams/views/` (solution architecture, deployment, CI/CD); they were generated with ChatGPT from `DIAGRAM_PROMPTS.md` in this folder and rated against the code before use.
 
 ## Order and clicks
 
