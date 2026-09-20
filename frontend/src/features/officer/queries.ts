@@ -195,7 +195,7 @@ export function useReadChecklist(id: string, enabled: boolean) {
 export function useSaveChecklist(id: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: ChecklistSaveInput) => saveChecklist(id, body),
+    mutationFn: ({ keepalive, ...body }: ChecklistSaveInput & { keepalive?: boolean }) => saveChecklist(id, body, keepalive === true),
     onSuccess: (checklist: Checklist) => {
       qc.setQueryData(officerKeys.checklist(id), checklist)
       void qc.invalidateQueries({ queryKey: officerKeys.case(id) })

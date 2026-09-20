@@ -52,6 +52,8 @@ export interface RequestOptions {
   body?: unknown
   formData?: FormData
   signal?: AbortSignal
+  /** Let the browser finish the request after the page is hidden or unloaded (a last autosave). */
+  keepalive?: boolean
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -72,6 +74,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       headers,
       body,
       signal: options.signal,
+      keepalive: options.keepalive,
     })
   } catch {
     throw new AppError(0, {
