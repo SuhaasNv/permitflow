@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
 
@@ -105,10 +105,92 @@ describe('clarification after the site visit, operator side (US-064)', () => {
     expect(within(items[0]!).getByRole('heading', { name: 'Floor trap in the food preparation area' })).toBeInTheDocument()
     expect(within(items[0]!).getByText('Please send a photo of the regraded floor.')).toBeInTheDocument()
     expect(within(items[0]!).getByText('Waiting for your response')).toBeInTheDocument()
-    expect(within(items[0]!).getByText('Answering arrives with the next update.')).toBeInTheDocument()
+    expect(within(items[0]!).getByLabelText(/Your answer/)).toBeInTheDocument()
     expect(within(items[1]!).getByText('Clarified')).toBeInTheDocument()
-    expect(within(items[1]!).queryByText('Answering arrives with the next update.')).not.toBeInTheDocument()
+    expect(within(items[1]!).queryByLabelText(/Your answer/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Unsatisfactory|Satisfactory/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send responses' })).toBeDisabled()
+  })
+
+  it('an answer saves on blur, files attach and remove, and the send needs every item answered (US-065)', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    vi.spyOn(api, 'getApplication').mockResolvedValue(afterVisit)
+    const onlyOpen: ClarificationView = { ...view, items: [view.items[0]!], resolved_count: 0 }
+    vi.spyOn(clarApi, 'getClarifications').mockResolvedValue(onlyOpen)
+    const answered: ClarificationView = {
+      ...onlyOpen,
+      can_send: true,
+      items: [
+        {
+          ...onlyOpen.items[0]!,
+          responses: [
+            { id: 'r1', round_no: 1, message: 'Regraded on 23 Sep.', created_at: '2026-09-25T01:00:00Z', sent_at: null, attachments: [] },
+          ],
+        },
+      ],
+    }
+    const respond = vi.spyOn(clarApi, 'respondToClarification').mockResolvedValue(answered)
+    const withFile: ClarificationView = {
+      ...answered,
+      items: [
+        {
+          ...answered.items[0]!,
+          responses: [
+            {
+              ...answered.items[0]!.responses[0]!,
+              attachments: [
+                {
+                  id: 'att1',
+                  original_filename: 'floor.jpg',
+                  content_type: 'image/jpeg',
+                  size_bytes: 2048,
+                  uploaded_at: '2026-09-25T01:01:00Z',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }
+    const attach = vi.spyOn(clarApi, 'attachToResponse').mockResolvedValue({ view: withFile, unchanged: false })
+    const remove = vi.spyOn(clarApi, 'removeAttachment').mockResolvedValue(answered)
+    const sendSpy = vi.spyOn(clarApi, 'sendClarifications').mockResolvedValue({
+      ...answered,
+      open_count: 0,
+      answered_count: 1,
+      can_respond: false,
+      can_send: false,
+      items: [
+        {
+          ...answered.items[0]!,
+          status: 'Sent',
+          can_respond: false,
+          responses: [{ ...answered.items[0]!.responses[0]!, sent_at: '2026-09-25T01:05:00Z' }],
+        },
+      ],
+    })
+    renderAt('/app/applications/a1/clarification')
+    const field = await screen.findByLabelText(/Your answer/)
+    expect(screen.getByRole('button', { name: 'Send responses' })).toBeDisabled()
+    expect(screen.getByText('Write your answer first; files can be attached once it is saved.')).toBeInTheDocument()
+    await userEvent.type(field, 'Regraded on 23 Sep.')
+    await userEvent.tab()
+    await waitFor(() => expect(respond).toHaveBeenCalledWith('a1', 'i1', 'Regraded on 23 Sep.'))
+    expect(await screen.findByRole('button', { name: 'Choose a file' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send responses' })).toBeEnabled()
+    const input = document.querySelector('input[type=file][multiple]') as HTMLInputElement
+    await userEvent.upload(input, new File(['x'], 'floor.jpg', { type: 'image/jpeg' }))
+    await waitFor(() => expect(attach).toHaveBeenCalledTimes(1))
+    expect(await screen.findByRole('button', { name: 'floor.jpg' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(remove).toHaveBeenCalledWith('a1', 'r1', 'att1'))
+    await userEvent.click(screen.getByRole('button', { name: 'Send responses' }))
+    await userEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Send your answers?' })).getByRole('button', { name: 'Send responses' }),
+    )
+    await waitFor(() => expect(sendSpy).toHaveBeenCalledWith('a1'))
+    expect(await screen.findByText('Sent')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Send responses' })).not.toBeInTheDocument()
   })
 
   it('with nothing released the page says so', async () => {

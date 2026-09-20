@@ -2,6 +2,11 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-065 The operator answers, attaches evidence and sends (21 Sep 2026, Sprint 5)
+
+- One answer per open question, rewritable until sent; up to three files per answer under the document rules (allowlist, magic bytes, 10 MB), an identical file reported as no change, removal until sent, downloads for the owner, officers and admins with the ownership chain checked at every hop (migration 0009). Send responses needs every open item answered (422 listing the keys), leaves out items withdrawn before the send, moves the case to Post-Site Clarification Resubmitted with the operator as actor, and tells every active officer.
+- `ClarificationPage`: an answer per item saved on blur, Take a photo (the camera on phones) and Choose a file, Remove, a sticky Send responses with the readiness line and a confirmation.
+
 ## US-064 The operator's view of the flagged items (21 Sep 2026, Sprint 5)
 
 - `GET /applications/{id}/clarifications` serves only the items with a released question, in operator words, from a model with no field for a result or an unflagged item; the application view carries the `clarification` block; a case in a post-site operator-turn state needs the operator only while an item is open. `ClarificationNotice` on the application page, `ClarificationPage` at `/app/applications/:id/clarification` (the officer's question first on each item; answering arrives with US-065), the empty state.

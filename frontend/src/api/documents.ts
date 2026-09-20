@@ -50,6 +50,10 @@ let tokenGetter: () => string | null = () => null
 export function setUploadTokenProvider(fn: () => string | null): void {
   tokenGetter = fn
 }
+/** The bearer for direct fetches outside the JSON client (downloads, US-065 attachments). */
+export function uploadToken(): string | null {
+  return tokenGetter()
+}
 
 /** XMLHttpRequest so the card can show real upload progress. */
 export function uploadDocument(
