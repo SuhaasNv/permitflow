@@ -145,6 +145,26 @@ def document_view(
     )
 
 
+_VISIT_EXPLANATIONS: dict[str, str] = {
+    SiteVisitStatus.PROPOSED.value: (
+        "The licensing officer proposed a site visit. Accept the date or propose another one."
+    ),
+    SiteVisitStatus.COUNTER_PROPOSED.value: (
+        "You proposed another date for the site visit. The licensing officer decides next."
+    ),
+    SiteVisitStatus.CONFIRMED.value: (
+        "Your site visit is confirmed. Nothing else is needed from you before the visit."
+    ),
+}
+
+
+def _explanation(status: ApplicationStatus, site_visit: SiteVisitOperatorView | None) -> str:
+    """The status sentence, made specific to the appointment while one is being arranged (US-084)."""
+    if status == ApplicationStatus.SITE_VISIT_SCHEDULED and site_visit is not None:
+        return _VISIT_EXPLANATIONS.get(site_visit.status, _EXPLANATIONS[status])
+    return _EXPLANATIONS[status]
+
+
 def operator_view(
     app: Application,
     *,
@@ -194,7 +214,7 @@ def operator_view(
         licence_title=LICENCE_TITLE,
         status_label=operator_label(app.status),
         status_tone=tone_for(app.status),
-        status_explanation=_EXPLANATIONS[app.status],
+        status_explanation=_explanation(app.status, site_visit),
         can_edit=bool(editable_sections or editable_document_types),
         can_submit=app.status == ApplicationStatus.DRAFT and comp.is_complete,
         sections=sections,

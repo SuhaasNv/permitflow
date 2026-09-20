@@ -58,9 +58,11 @@ def add_working_days(start: date, days: int) -> date:
     return d
 
 
-def reply_deadline(proposed_at: datetime) -> date:
-    """The Singapore date from which an unanswered proposal may be confirmed by the officer alone."""
-    return add_working_days(proposed_at.astimezone(SINGAPORE).date(), REPLY_WORKING_DAYS)
+def reply_deadline(proposed_at: datetime, visit_date: date | None = None) -> date:
+    """The Singapore date from which an unanswered proposal may be confirmed by the officer alone:
+    three working days after the proposal, never later than the visit itself."""
+    deadline = add_working_days(proposed_at.astimezone(SINGAPORE).date(), REPLY_WORKING_DAYS)
+    return min(deadline, visit_date) if visit_date else deadline
 
 
 def earliest_date(today: date, *, by_operator: bool) -> date:

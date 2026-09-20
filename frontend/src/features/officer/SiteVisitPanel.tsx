@@ -72,7 +72,7 @@ function DateForm({ title, submitLabel, reasonLabel, reasonRequired, busy, error
           max={bounds.max}
           value={date}
           error={show('date')}
-          help={show('date') ? undefined : 'A working day, from tomorrow.'}
+          help={show('date') ? undefined : 'Monday to Friday, from tomorrow.'}
           className="sm:w-[200px]"
           onChange={(e) => {
             setDate(e.target.value)
@@ -119,7 +119,8 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
   const [slot, setSlot] = useState<SiteVisitSlot>('morning')
   const [note, setNote] = useState('')
   const [dateError, setDateError] = useState<string | null>(null)
-  const [noteTouched, setNoteTouched] = useState(false)
+  // Fields edited since the last submit hide the server message for them until the next submit.
+  const [touched, setTouched] = useState<{ date: boolean; note: boolean }>({ date: false, note: false })
   const bounds = dateBounds()
   const serverErrors = fieldErrorsOf(propose.error)
   const conflict = propose.error instanceof AppError && propose.error.status === 409 ? propose.error.message : null
@@ -128,7 +129,7 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
     setSlot('morning')
     setNote('')
     setDateError(null)
-    setNoteTouched(false)
+    setTouched({ date: false, note: false })
     propose.reset()
   }
   const confirm = () => {
@@ -136,7 +137,7 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
       setDateError('Choose a date.')
       return
     }
-    setNoteTouched(false)
+    setTouched({ date: false, note: false })
     propose.mutate(
       { date, slot, note: note.trim() || null, expected_version: view.version },
       {
@@ -182,12 +183,13 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
           min={bounds.min}
           max={bounds.max}
           value={date}
-          error={dateError ?? serverErrors.date}
-          help={dateError || serverErrors.date ? undefined : 'A working day, from tomorrow.'}
+          error={dateError ?? (touched.date ? undefined : serverErrors.date)}
+          help={dateError || (!touched.date && serverErrors.date) ? undefined : 'Monday to Friday, from tomorrow.'}
           className="sm:w-[200px]"
           onChange={(e) => {
             setDate(e.target.value)
             setDateError(null)
+            setTouched((t) => ({ ...t, date: true }))
           }}
         />
         <SlotControl value={slot} onChange={setSlot} disabled={propose.isPending} />
@@ -195,11 +197,11 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
       <TextAreaField
         label="Note for the operator"
         value={note}
-        error={noteTouched ? undefined : serverErrors.note}
+        error={touched.note ? undefined : serverErrors.note}
         maxLength={500}
         onChange={(e) => {
           setNote(e.target.value)
-          setNoteTouched(true)
+          setTouched((t) => ({ ...t, note: true }))
         }}
         placeholder="What to have ready on the premises, who should be there."
       />

@@ -171,6 +171,19 @@
     border: 1px solid var(--color-line);
     border-radius: var(--radius-lg);
   }
+  /* A pane that scrolls on its own (the officer rail, the notifications list): thin thumb, no track,
+     visible only while the pointer is over it or a control inside has focus, in a reserved gutter so
+     it never sits on the cards. */
+  .pf-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    scrollbar-gutter: stable;
+    transition: scrollbar-color var(--dur-base) var(--ease-out);
+  }
+  .pf-scroll:hover,
+  .pf-scroll:focus-within {
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
   .pf-eyebrow {
     font-size: 12px;
     line-height: 16px;

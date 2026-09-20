@@ -74,20 +74,18 @@ describe('site visit appointment, operator side (US-084)', () => {
 
   it('shows the proposal in the operator words, then accepts through a confirmation', async () => {
     vi.spyOn(api, 'getApplication').mockResolvedValue(pendingVisit(visit()))
-    const accept = vi
-      .spyOn(visitApi, 'acceptSiteVisit')
-      .mockResolvedValue(
-        pendingVisit(
-          visit({
-            status: 'confirmed',
-            status_label: 'Confirmed',
-            can_accept: false,
-            can_counter: false,
-            can_reschedule: true,
-            reply_by: null,
-          }),
-        ),
-      )
+    const accept = vi.spyOn(visitApi, 'acceptSiteVisit').mockResolvedValue(
+      pendingVisit(
+        visit({
+          status: 'confirmed',
+          status_label: 'Confirmed',
+          can_accept: false,
+          can_counter: false,
+          can_reschedule: true,
+          reply_by: null,
+        }),
+      ),
+    )
     renderPage()
     expect(await screen.findByText('Waiting for your reply')).toBeInTheDocument()
     expect(screen.getByText(officerRound.when, { selector: 'p' })).toBeInTheDocument()
@@ -133,7 +131,7 @@ describe('site visit appointment, operator side (US-084)', () => {
     )
     renderPage()
     const form = await screen.findByRole('form', { name: 'Propose this date' })
-    expect(within(form).getByText('A working day, from 23 Sep 2026.')).toBeInTheDocument()
+    expect(within(form).getByText("Monday to Friday, 23 Sep 2026 or later (two working days' notice).")).toBeInTheDocument()
     await userEvent.click(within(form).getByRole('button', { name: 'Propose this date' }))
     expect(await within(form).findByText('Choose a date.')).toBeInTheDocument()
     expect(within(form).getByText('Say why, in a sentence the officer will read.')).toBeInTheDocument()

@@ -116,7 +116,7 @@ export function NotificationsBell({ role }: { role: Role }) {
           {items.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-text-3">Nothing yet. Status changes on your applications appear here.</p>
           ) : (
-            <ul className="max-h-[60vh] divide-y divide-line overflow-y-auto">
+            <ul className="pf-scroll max-h-[60vh] divide-y divide-line overflow-y-auto">
               {items.map((item) => (
                 <li key={item.id}>
                   <button

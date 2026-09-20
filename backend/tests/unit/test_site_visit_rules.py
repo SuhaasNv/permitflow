@@ -79,3 +79,10 @@ def test_audit_summaries_read_as_sentences() -> None:
     assert summarize("site_visit.rescheduled", {**base, "round": 3, "by": "operator"}) == (
         "Site visit reschedule asked by the operator: 2026-09-22, morning (round 3)"
     )
+
+
+def test_reply_deadline_never_falls_after_the_visit() -> None:
+    proposed = datetime(2026, 9, 20, 13, 0, tzinfo=UTC)  # Sunday in Singapore
+    assert reply_deadline(proposed) == date(2026, 9, 23)
+    assert reply_deadline(proposed, date(2026, 9, 22)) == date(2026, 9, 22)
+    assert reply_deadline(proposed, date(2026, 10, 2)) == date(2026, 9, 23)

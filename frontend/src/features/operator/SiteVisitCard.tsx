@@ -60,7 +60,7 @@ function DateForm({ earliest, submitLabel, busy, errors, onSubmit, onCancel }: D
           max={bounds.max}
           value={date}
           error={show('date')}
-          help={show('date') ? undefined : `A working day, from ${formatDate(earliest)}.`}
+          help={show('date') ? undefined : `Monday to Friday, ${formatDate(earliest)} or later (two working days' notice).`}
           className="sm:w-[200px]"
           onChange={(e) => {
             setDate(e.target.value)
@@ -132,8 +132,8 @@ export function SiteVisitCard({ view }: { view: ApplicationView }) {
           <>
             <p className="text-base font-semibold leading-6">You proposed {lastMine.when}</p>
             <p className="text-sm leading-5 text-text-2">
-              The licensing officer decides between your date and theirs ({visit.when}), or proposes a third one. You will be told here and
-              by notification.
+              The licensing officer decides between your date and {visit.when}, or proposes a third one. You will be told here and by
+              notification.
             </p>
           </>
         ) : (
@@ -145,6 +145,7 @@ export function SiteVisitCard({ view }: { view: ApplicationView }) {
                 : visit.status === 'confirmed'
                   ? 'Confirmed. An officer will visit the premises in this slot.'
                   : 'The visit has taken place.'}
+              {visit.status === 'proposed' && officerRound?.reason ? ` Reason: ${officerRound.reason}` : ''}
               {visit.note ? ` Note: ${visit.note}` : ''}
             </p>
           </>

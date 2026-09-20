@@ -113,7 +113,7 @@ function ReviewRail({
   const primary = view.actions.find((a) => a.enabled && !a.requires_note)
   const rest = view.actions.filter((a) => a !== primary)
   return (
-    <aside className="order-first flex flex-col gap-5 lg:order-none lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-104px)] lg:self-start lg:overflow-y-auto">
+    <aside className="pf-scroll order-first flex flex-col gap-5 lg:order-none lg:sticky lg:top-[88px] lg:-mr-3 lg:max-h-[calc(100vh-104px)] lg:self-start lg:overflow-y-auto lg:pb-1 lg:pr-3">
       {view.site_visit !== null || view.status === 'site_visit_scheduled' ? (
         // Keyed by case so a half-typed date on one case never reappears on the next.
         <SiteVisitPanel key={view.id} view={view} onPropose={onPropose} />

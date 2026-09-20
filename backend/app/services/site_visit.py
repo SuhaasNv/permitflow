@@ -79,7 +79,7 @@ class SiteVisitService:
             return None
         proposals = self.visits.proposals_for(visit.id)
         last_officer = next((p for p in reversed(proposals) if p.author_role == Role.OFFICER.value), None)
-        deadline = reply_deadline(last_officer.created_at) if last_officer else None
+        deadline = reply_deadline(last_officer.created_at, visit.date) if last_officer else None
         can_confirm = (
             visit.status == SiteVisitStatus.PROPOSED and deadline is not None and self.today() >= deadline
         )
@@ -118,7 +118,7 @@ class SiteVisitService:
             return None
         proposals = self.visits.proposals_for(visit.id)
         last_officer = next((p for p in reversed(proposals) if p.author_role == Role.OFFICER.value), None)
-        deadline = reply_deadline(last_officer.created_at) if last_officer else None
+        deadline = reply_deadline(last_officer.created_at, visit.date) if last_officer else None
         left = rounds_left(len(proposals))
         reschedulable = visit.status == SiteVisitStatus.CONFIRMED and visit.date > self.today() and left > 0
         return SiteVisitOperatorView(
@@ -302,7 +302,7 @@ class SiteVisitService:
         visit = self._current(app, SiteVisitStatus.PROPOSED, "Only a proposal the operator left unanswered.")
         proposals = self.visits.proposals_for(visit.id)
         last = proposals[-1]
-        deadline = reply_deadline(last.created_at)
+        deadline = reply_deadline(last.created_at, visit.date)
         if self.today() < deadline:
             raise Conflict(f"The operator has until {deadline.strftime('%-d %b %Y')} to reply.")
         now = self.now()

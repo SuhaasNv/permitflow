@@ -54,6 +54,7 @@ def test_propose_from_under_review_moves_the_case_and_asks_the_operator(
     # the operator sees the date in their own words and the case under Needs your response
     mine = _operator_view(client, op, app_id)
     assert mine["status_label"] == "Pending Site Visit"
+    assert mine["status_explanation"].startswith("The licensing officer proposed a site visit.")
     assert mine["site_visit"]["status_label"] == "Waiting for your reply"
     # the officer's name stays inside the office: the operator sees the role
     assert mine["site_visit"]["rounds"][0]["author_name"] == "Licensing officer"
@@ -140,6 +141,7 @@ def test_counter_proposal_then_officer_accepts_the_operators_date(client: TestCl
     assert events[-1].payload["how"] == "accepted_operator_date"
     mine = _operator_view(client, op, app_id)
     assert mine["site_visit"]["status_label"] == "Confirmed" and mine["site_visit"]["date"] == later
+    assert mine["status_explanation"].startswith("Your site visit is confirmed.")
 
 
 def test_officer_keeps_the_original_or_proposes_a_third_date(client: TestClient, db: Session) -> None:
