@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 
 import { buttonClasses } from '@/features/shared/Button'
@@ -14,6 +15,11 @@ function isSlug(value: string | undefined): value is PolicySlug {
 /** Public policy pages (US-057): privacy, terms, cookies. One layout, content from `content.ts`. */
 export function PolicyPage() {
   const slug = useLocation().pathname.replace(/^\//, '')
+  // The public routes sit outside the app shell's ScrollRestoration, so a footer link at the bottom of the
+  // landing page would otherwise open the policy still scrolled to the bottom.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [slug])
   if (!isSlug(slug)) return <Navigate to="/privacy" replace />
   const policy = POLICIES[slug]
   return (

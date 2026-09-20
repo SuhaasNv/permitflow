@@ -151,7 +151,7 @@ The brief asks how AI tools were used. Short version here; the full record with 
 
 Current version: **v0.3.0** (19 September 2026), the version running at https://permitflow.space. It brought the public address with two isolated environments, the licence certificate issued on approval, withdrawal and draft deletion, undo and reopen for officer feedback, search on both lists, phone-width layouts, the abuse limits, the nightly AI evaluation and the accessibility gate. Use cases 1 and 2 are complete; use case 3 is not built.
 
-Coming next, in order: **v0.4.0** introduces the admin panel (oversight of applications by status, the health of the automatic checks, an activity feed across cases, and user management with audited role changes). **v0.5.0** delivers use case 3: the officer completes the site-visit checklist on site from a tablet with draft save, flags the items that need clarification, and the operator answers only those items, round by round, with documents.
+Coming next: **v0.4.0** brings two epics. The admin panel: oversight of applications by status, the health of the automatic checks, an activity feed across cases, and user management with audited role changes. And use case 3: the officer completes the site-visit checklist on site from a tablet with draft save, flags the items that need clarification, and the operator answers only those items, round by round, with documents.
 
 Every release carries an entry in `RELEASE_NOTES.md`, written for the people who use the product; `CHANGELOG.md` is the engineering record behind it.
 

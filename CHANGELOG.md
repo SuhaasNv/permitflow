@@ -4,7 +4,8 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 
 ## Release notes introduced (20 Sep 2026)
 
-- `RELEASE_NOTES.md` at the root: an entry per version in the users' words (v0.1.0, v0.2.0, v0.3.0), the unreleased fixes on `dev`, and what comes next (v0.4.0 admin panel, v0.5.0 use case 3 with the officer's on-site checklist from a tablet). `BRANCHING.md` rule 5 makes the entry part of every release; the README carries the current version and the roadmap under "Release notes".
+- Policy pages (privacy, terms, cookies) open at the top: the public routes sit outside the app shell's `ScrollRestoration`, so a footer link at the bottom of the landing page kept the scroll position (reported by the owner, `PolicyPage.tsx`).
+- `RELEASE_NOTES.md` at the root: an entry per version in the users' words (v0.1.0, v0.2.0, v0.3.0), the unreleased fixes on `dev`, and what comes next (v0.4.0: the admin panel and use case 3 with the officer's on-site checklist from a tablet). `BRANCHING.md` rule 5 makes the entry part of every release; the README carries the current version and the roadmap under "Release notes".
 
 ## Final check (20 Sep 2026, before submission, US-075)
 
