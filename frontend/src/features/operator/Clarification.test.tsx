@@ -52,6 +52,7 @@ const view: ClarificationView = {
   round: 1,
   can_respond: true,
   can_send: false,
+  storage: { used_bytes: 3 * 1024 * 1024, budget_bytes: 150 * 1024 * 1024, remaining_bytes: 147 * 1024 * 1024 },
 }
 
 function renderAt(path: string) {
@@ -177,6 +178,8 @@ describe('clarification after the site visit, operator side (US-064)', () => {
     await userEvent.tab()
     await waitFor(() => expect(respond).toHaveBeenCalledWith('a1', 'i1', 'Regraded on 23 Sep.'))
     expect(await screen.findByRole('button', { name: 'Choose a file' })).toBeInTheDocument()
+    // the room left is stated beside the file picker (US-085)
+    expect(screen.getByTestId('storage-room')).toHaveTextContent("147 MB of the application's 150 MB storage room is left.")
     expect(screen.getByRole('button', { name: 'Send responses' })).toBeEnabled()
     const input = document.querySelector('input[type=file][multiple]') as HTMLInputElement
     await userEvent.upload(input, new File(['x'], 'floor.jpg', { type: 'image/jpeg' }))

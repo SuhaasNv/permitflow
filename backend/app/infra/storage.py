@@ -14,6 +14,7 @@ class FileStorage(Protocol):
     def open(self, key: str) -> Iterator[bytes]: ...
     def delete(self, key: str) -> None: ...
     def exists(self, key: str) -> bool: ...
+    def size(self, key: str) -> int: ...
 
 
 class LocalDiskStorage:
@@ -55,6 +56,10 @@ class LocalDiskStorage:
 
     def exists(self, key: str) -> bool:
         return self._path(key).exists()
+
+    def size(self, key: str) -> int:
+        path = self._path(key)
+        return path.stat().st_size if path.exists() else 0
 
 
 def new_storage_key(application_id: uuid.UUID, extension: str) -> str:

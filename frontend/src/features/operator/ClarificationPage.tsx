@@ -2,6 +2,7 @@ import { useIsMutating } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
+import type { StorageView } from '@/api/applications'
 import type { ClarificationItem } from '@/api/clarification'
 import { downloadAttachment } from '@/api/clarification'
 import { AppError } from '@/api/client'
@@ -11,6 +12,7 @@ import { Button, buttonClasses } from '@/features/shared/Button'
 import { TextAreaField } from '@/features/shared/Controls'
 import { Dialog } from '@/features/shared/Dialog'
 import { StatusBadge } from '@/features/shared/StatusBadge'
+import { StorageRoom } from '@/features/shared/StorageRoom'
 import type { Tone } from '@/features/shared/StatusBadge'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
 import { useToast } from '@/features/shared/Toast'
@@ -28,7 +30,7 @@ const TONE: Record<string, Tone> = {
 const ATTACHMENT_CAP = 3
 
 /** One item's answer: text saved on blur, files added through the camera or a picker, removable until sent. */
-function ItemAnswer({ appId, item }: { appId: string; item: ClarificationItem }) {
+function ItemAnswer({ appId, item, storage }: { appId: string; item: ClarificationItem; storage: StorageView | null }) {
   const respond = useRespond(appId)
   const attach = useAttach(appId)
   const remove = useRemoveAttachment(appId)
@@ -198,7 +200,8 @@ function ItemAnswer({ appId, item }: { appId: string; item: ClarificationItem })
                 Choose a file
               </Button>
               <span className="text-xs text-text-3">
-                {attachments.length} of {ATTACHMENT_CAP} files attached. PDF, PNG, JPG or TXT, up to 10 MB each.
+                {attachments.length} of {ATTACHMENT_CAP} files attached. PDF, PNG, JPG or TXT, up to 10 MB each; photos are stored without their
+                camera data. <StorageRoom storage={storage} />
               </span>
             </div>
           ) : null}
@@ -344,6 +347,7 @@ export function ClarificationPage() {
                     key={`${item.round_no}-${item.responses.find((r) => r.round_no === item.round_no)?.id ?? 'none'}`}
                     appId={id}
                     item={item}
+                    storage={view.storage}
                   />
                 </div>
               </li>

@@ -33,6 +33,7 @@ from app.services.operator_view import document_view, operator_view, summary
 from app.services.resubmission import ResubmissionService
 from app.services.site_visit import SiteVisitService
 from app.services.submission import SubmissionService
+from app.services.uploads import storage_usage, storage_view
 from app.services.verification import VerificationService, run_verification
 from app.services.withdrawal import WithdrawalService
 
@@ -59,6 +60,7 @@ def _view(service: ApplicationService, app: Application) -> ApplicationOperatorV
         site_visit=SiteVisitService(service.db).operator_view(app),
         open_clarifications=ChecklistService(service.db).facts(app).open_clarifications,
         clarification=ClarificationService(service.db).block(app),
+        storage=storage_view(storage_usage(service.db, app.id)),
     )
 
 

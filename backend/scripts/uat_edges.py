@@ -115,6 +115,17 @@ DOC_TYPES = ["business_profile", "floor_plan", "tenancy_agreement", "food_hygien
 TXT = b"Tenancy agreement business profile ACRA UEN floor plan kitchen food hygiene certificate. " * 3
 
 
+def tiny_png() -> bytes:
+    """A real 4 x 4 PNG: since US-085 an image the server cannot decode is refused at upload."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    out = BytesIO()
+    Image.new("RGB", (4, 4), (255, 255, 255)).save(out, "PNG")
+    return out.getvalue()
+
+
 def upload(h, app_id, dtype, name, content, mime="text/plain"):
     return req(
         h,
@@ -508,9 +519,16 @@ def run_checks() -> None:
     check("U13", "officer cannot download a draft's document (404)", r.status_code == 404, r.text)
     r = req(op, "GET", f"/applications/{aid}/documents/{uuid.uuid4()}/download")
     check("U14", "unknown document id is 404", r.status_code == 404, r.text)
-    r = upload(op, aid, "floor_plan", "photo.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, "image/png")
+    r = upload(op, aid, "floor_plan", "photo.png", tiny_png(), "image/png")
     check("U15", "PNG is accepted", r.status_code in (200, 201), r.text[:200])
     png_doc = r.json()["document"]
+    r = upload(op, aid, "floor_plan", "broken.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, "image/png")
+    check(
+        "U15b",
+        "a PNG the server cannot decode is refused as unreadable_image (US-085)",
+        r.status_code == 400 and r.json()["error"]["details"].get("reason") == "unreadable_image",
+        r.text[:200],
+    )
     v = wait_checks(op, aid)
     slot = next(s for s in v["document_slots"] if s["type"] == "floor_plan")
     ver = (slot["document"] or {}).get("verification") or {}

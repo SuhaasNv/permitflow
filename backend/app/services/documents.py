@@ -1,6 +1,5 @@
 """Document upload, replacement, download and deletion (FR-004, SEC-005)."""
 
-import hashlib
 import urllib.parse
 import uuid
 from collections.abc import Iterator
@@ -10,15 +9,8 @@ from typing import BinaryIO
 from sqlalchemy.orm import Session
 
 from app.core.errors import BadRequest, Forbidden, NotFound
-from app.core.settings import get_settings
 from app.domain.enums import ApplicationStatus, DocumentType
-from app.domain.uploads import (
-    UploadRejected,
-    canonical_content_type,
-    check_magic_bytes,
-    check_name_and_type,
-    too_large_message,
-)
+from app.domain.uploads import UploadRejected, canonical_content_type, check_name_and_type
 from app.infra.storage import FileStorage, get_storage, new_storage_key
 from app.models import Application, Document, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
@@ -26,8 +18,7 @@ from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.services.applications import ApplicationService
 from app.services.quotas import new_run
-
-CHUNK = 64 * 1024
+from app.services.uploads import receive, storage_usage
 
 
 @dataclass(frozen=True)
@@ -55,7 +46,6 @@ class DocumentService:
         content_type: str | None,
         stream: BinaryIO,
     ) -> UploadResult:
-        settings = get_settings()
         try:
             ext = check_name_and_type(filename, content_type)
         except UploadRejected as exc:
@@ -68,37 +58,11 @@ class DocumentService:
                 raise Forbidden("The licensing officer did not ask for a new copy of this document.")
             raise Forbidden("This document is not open for changes.")
 
-        # Stream to storage with a hard size cap; hash while streaming; check magic bytes on the first chunk.
+        # One pipeline for every upload (US-085): size cap, magic bytes, images without metadata, the
+        # application's storage budget; the digest is that of the stored bytes.
         key = new_storage_key(app.id, ext)
-        digest = hashlib.sha256()
-        size = 0
-        limit = settings.upload_max_bytes
-
-        def chunks() -> Iterator[bytes]:
-            nonlocal size
-            first = True
-            while chunk := stream.read(CHUNK):
-                if first:
-                    try:
-                        check_magic_bytes(ext, chunk[:16])
-                    except UploadRejected as exc:
-                        raise BadRequest(exc.message, details={"reason": exc.reason}) from exc
-                    first = False
-                size += len(chunk)
-                if size > limit:
-                    raise BadRequest(too_large_message(limit), details={"reason": "too_large"})
-                digest.update(chunk)
-                yield chunk
-            if first:
-                raise BadRequest("The file is empty.", details={"reason": "empty"})
-
-        try:
-            self.storage.put(key, chunks())
-        except BadRequest:
-            self.storage.delete(key)
-            raise
-
-        sha = digest.hexdigest()
+        received = receive(self.storage, key, ext, stream, storage_usage(self.db, app.id, self.storage))
+        sha, size = received.sha256, received.size_bytes
         previous = self.documents.current_of_type(app.id, document_type)
         if previous is not None and previous.sha256 == sha:
             # Identical re-upload: keep the existing document, report "no change" (SEC-005 duplicate rule).

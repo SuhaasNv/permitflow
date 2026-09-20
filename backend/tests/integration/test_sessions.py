@@ -120,7 +120,10 @@ def test_idle_session_ends_by_itself(client: TestClient, db: Session) -> None:
     with pytest.raises(SessionRevoked) as info:
         AuthService(db, clock=lambda: later).current_user(user.id, sid)
     assert info.value.details == {"reason": "idle", "at": later.isoformat()}
-    assert info.value.message == "Your session ended after 60 minutes without activity. Sign in again to continue."
+    assert (
+        info.value.message
+        == "Your session ended after 60 minutes without activity. Sign in again to continue."
+    )
     # Once idle, the account is free for the next device without a take-over.
     assert _sign_in(client, "off@example.sg", MAC).status_code == 200
 

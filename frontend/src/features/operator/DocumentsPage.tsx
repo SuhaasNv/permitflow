@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn'
 import { ApplicationHeader } from './ApplicationHeader'
 import { DocumentSlot } from './documents/DocumentSlot'
 import { FeedbackNotice } from './FeedbackNotice'
+import { StorageRoom } from '@/features/shared/StorageRoom'
 import { applicationKeys, useApplication } from './queries'
 
 export function DocumentsPage() {
@@ -137,7 +138,8 @@ export function DocumentsPage() {
             </p>
             <p className="mt-3 text-text-3">
               PDF, PNG, JPG or TXT, up to 10 MB each. PDF is recommended: the automatic check reads PDF and TXT, not images. Re-uploading an
-              identical file is detected and does not count as a change.
+              identical file is detected and does not count as a change. Photos are stored without their camera data (location, device, time).{' '}
+              <StorageRoom storage={view.storage} />
             </p>
             <p className="mt-3 text-text-3">
               This is a demonstration: upload only the fictional sample documents, never real identity or business records. Text from PDF

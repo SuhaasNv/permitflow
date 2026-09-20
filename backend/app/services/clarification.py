@@ -3,7 +3,6 @@ with a released request, in operator words (US-064); the responses, their attach
 moves the case (US-065). Every mutation locks the application row first (ADR-008); the officer's
 decisions live in US-066."""
 
-import hashlib
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -12,15 +11,12 @@ from typing import BinaryIO
 from sqlalchemy.orm import Session
 
 from app.core.errors import BadRequest, Conflict, NotFound, ValidationFailed
-from app.core.settings import get_settings
 from app.domain.checklist_schema import ITEM_BY_KEY, item_title
 from app.domain.enums import ApplicationStatus, ClarificationStatus, NotificationKind
 from app.domain.uploads import (
     UploadRejected,
     canonical_content_type,
-    check_magic_bytes,
     check_name_and_type,
-    too_large_message,
 )
 from app.domain.workflow import Actor
 from app.infra.storage import FileStorage, get_storage, new_storage_key
@@ -46,8 +42,9 @@ from app.schemas.clarification import (
     ClarificationThreadOut,
     ClarificationThreadRequestOut,
 )
-from app.services.documents import CHUNK, _display_name
+from app.services.documents import _display_name
 from app.services.notifications import NotificationService
+from app.services.uploads import receive, storage_usage, storage_view
 
 MAX_MESSAGE = 2000
 ATTACHMENT_CAP = 3
@@ -127,6 +124,7 @@ class ClarificationService:
             round=max((i.round_no for i in out), default=0),
             can_respond=operator_turn and open_count > 0,
             can_send=operator_turn and open_count > 0 and drafted_every_open,
+            storage=storage_view(storage_usage(self.db, app.id, self.storage)),
         )
 
     def block(self, app: Application) -> ClarificationBlock | None:
@@ -251,7 +249,6 @@ class ClarificationService:
     ) -> tuple[ClarificationOperatorView, bool]:
         """A file on a drafted answer: the document rules, three per answer, an identical file is
         no change."""
-        settings = get_settings()
         try:
             ext = check_name_and_type(filename, content_type)
         except UploadRejected as exc:
@@ -266,34 +263,8 @@ class ClarificationService:
                 f"Up to {ATTACHMENT_CAP} files per answer.", details={"reason": "attachment_cap"}
             )
         key = new_storage_key(app.id, ext)
-        digest = hashlib.sha256()
-        size = 0
-        limit = settings.upload_max_bytes
-
-        def chunks() -> Iterator[bytes]:
-            nonlocal size
-            first = True
-            while chunk := stream.read(CHUNK):
-                if first:
-                    try:
-                        check_magic_bytes(ext, chunk[:16])
-                    except UploadRejected as exc:
-                        raise BadRequest(exc.message, details={"reason": exc.reason}) from exc
-                    first = False
-                size += len(chunk)
-                if size > limit:
-                    raise BadRequest(too_large_message(limit), details={"reason": "too_large"})
-                digest.update(chunk)
-                yield chunk
-            if first:
-                raise BadRequest("The file is empty.", details={"reason": "empty"})
-
-        try:
-            self.storage.put(key, chunks())
-        except BadRequest:
-            self.storage.delete(key)
-            raise
-        sha = digest.hexdigest()
+        received = receive(self.storage, key, ext, stream, storage_usage(self.db, app.id, self.storage))
+        sha, size = received.sha256, received.size_bytes
         if any(a.sha256 == sha for a in existing):
             self.storage.delete(key)
             self.db.rollback()
