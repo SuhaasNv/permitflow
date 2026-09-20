@@ -7,6 +7,8 @@ export interface SaveIndicatorProps {
   saving: boolean
   /** Epoch ms of the last successful save in this session, or null if none yet. */
   savedAt: number | null
+  /** A save failed on the way and will be tried again (US-061). */
+  retrying?: boolean
   className?: string
 }
 
@@ -21,7 +23,7 @@ function relative(savedAt: number, now: number): string {
 }
 
 /** "Unsaved changes" / "Saving…" / "Saved just now" with a live relative time. Polite live region. */
-export function SaveIndicator({ dirty, saving, savedAt, className }: SaveIndicatorProps) {
+export function SaveIndicator({ dirty, saving, savedAt, retrying = false, className }: SaveIndicatorProps) {
   const [now, setNow] = useState(() => Date.now())
   // savedAt changes only on a successful save; "now" then starts from that instant.
   const clock = savedAt !== null && savedAt > now ? savedAt : now
@@ -32,10 +34,13 @@ export function SaveIndicator({ dirty, saving, savedAt, className }: SaveIndicat
   }, [savedAt])
 
   let text: string
-  let tone: 'muted' | 'saving' | 'saved' | 'dirty'
+  let tone: 'muted' | 'saving' | 'saved' | 'dirty' | 'retrying'
   if (saving) {
     text = 'Saving…'
     tone = 'saving'
+  } else if (retrying) {
+    text = 'Could not save, retrying'
+    tone = 'retrying'
   } else if (dirty) {
     text = 'Unsaved changes'
     tone = 'dirty'
@@ -73,8 +78,16 @@ export function SaveIndicator({ dirty, saving, savedAt, className }: SaveIndicat
           </svg>
         ) : tone === 'dirty' ? (
           <span className="h-[7px] w-[7px] rounded-full bg-warning" aria-hidden="true" />
+        ) : tone === 'retrying' ? (
+          <span className="h-[7px] w-[7px] rounded-full bg-error" aria-hidden="true" />
         ) : null}
-        <span className={cn(tone === 'saved' ? 'text-text-2' : tone === 'dirty' ? 'text-warning' : 'text-text-3')}>{text}</span>
+        <span
+          className={cn(
+            tone === 'saved' ? 'text-text-2' : tone === 'dirty' ? 'text-warning' : tone === 'retrying' ? 'text-error' : 'text-text-3',
+          )}
+        >
+          {text}
+        </span>
       </span>
     </span>
   )

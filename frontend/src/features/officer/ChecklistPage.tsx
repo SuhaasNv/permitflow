@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import type { Checklist, ChecklistItem, ChecklistItemInput, ChecklistResult } from '@/api/checklist'
@@ -33,6 +33,36 @@ function useMediaQuery(query: string): boolean {
     () => window.matchMedia(query).matches,
     () => false,
   )
+}
+
+/** True while the browser reports a connection; the page holds its entries until it returns (US-061). */
+function useOnline(): boolean {
+  return useSyncExternalStore(
+    (notify) => {
+      window.addEventListener('online', notify)
+      window.addEventListener('offline', notify)
+      return () => {
+        window.removeEventListener('online', notify)
+        window.removeEventListener('offline', notify)
+      }
+    },
+    () => navigator.onLine,
+    () => true,
+  )
+}
+
+/** Autosave waits this long after the last touch; a blur or Save draft goes at once. */
+export const AUTOSAVE_DELAY_MS = 1500
+/** A failed save is tried again after 3 s, then 6, 12 and 24 s, then every 30 s. */
+export function retryDelay(attempt: number): number {
+  return Math.min(3000 * 2 ** Math.max(0, attempt - 1), 30_000)
+}
+
+/** Their saved copy with my touched items on top: nothing typed here is thrown away (US-061). */
+export function mergeFindings(theirs: Findings, mine: Findings, touched: Iterable<string>): Findings {
+  const out = { ...theirs }
+  for (const key of touched) if (mine[key]) out[key] = mine[key]
+  return out
 }
 
 /** Local working copy of the item findings, keyed by item key. */
@@ -95,7 +125,8 @@ function ResultControl({
             type="button"
             aria-pressed={on}
             disabled={disabled}
-            onClick={() => onChange(r.value)}
+            // Pressing the selected result again clears it back to Not assessed.
+            onClick={() => onChange(on ? 'not_assessed' : r.value)}
             className={cn(
               'inline-flex h-11 items-center justify-center gap-2 rounded-md border px-3.5 text-sm',
               'transition-[border-color,background-color,color] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
@@ -114,8 +145,9 @@ function ResultControl({
 }
 
 /** S-30: the checklist as the officer fills it on site. Tablet first (820 portrait and 1024), one item after another,
- * a result per item, a comment when one is needed, a flag for the operator. The draft saves on Save draft (US-060);
- * autosave, retry and the offline banner arrive with US-061, the submit with US-063. */
+ * a result per item, a comment when one is needed, a flag for the operator. The draft autosaves 1.5 s after the last
+ * touch and on blur, retries with backoff when a save fails, holds its entries while offline, and merges another tab's
+ * save under the officer's own (US-061). The submit arrives with US-063. */
 export function ChecklistPage() {
   const { id = '' } = useParams()
   const app = useOfficerApplication(id)
@@ -128,14 +160,102 @@ export function ChecklistPage() {
   const [savedVersion, setSavedVersion] = useState<number | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [dirty, setDirty] = useState(false)
-  const [conflict, setConflict] = useState<Checklist | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [merged, setMerged] = useState<number | null>(null)
   const compact = useMediaQuery('(max-width: 1099px)')
+  const online = useOnline()
+  // The timers and the latest values they read: a scheduled save must send what is on screen now.
+  const timer = useRef<number | null>(null)
+  const attempt = useRef(0)
+  const touched = useRef<Set<string>>(new Set())
+  const latest = useRef<{ findings: Findings | null; version: number | null; dirty: boolean; saving: boolean }>({
+    findings: null,
+    version: null,
+    dirty: false,
+    saving: false,
+  })
 
   useEffect(() => guardUnload(), [])
-  useEffect(() => () => setUnsaved(false), [])
+  useEffect(
+    () => () => {
+      setUnsaved(false)
+      if (timer.current !== null) window.clearTimeout(timer.current)
+    },
+    [],
+  )
 
   const findings = useMemo(() => edits ?? (checklist.data ? findingsOf(checklist.data.items) : null), [edits, checklist.data])
   const summary = useMemo(() => (findings ? summarise(findings) : null), [findings])
+  const version = savedVersion ?? checklist.data?.version ?? null
+  const saving = save.isPending
+  // Mirrored after every commit so a timer fired later reads what is on screen, not a stale closure.
+  useEffect(() => {
+    latest.current = { findings, version, dirty, saving }
+  }, [findings, version, dirty, saving])
+
+  // Plain functions on purpose: a timer runs the flush of the render that scheduled it, and that flush
+  // reads everything that can change from `latest`, so it always sends what is on screen.
+  const schedule = (delay: number) => {
+    if (timer.current !== null) window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => {
+      timer.current = null
+      flush()
+    }, delay)
+  }
+  const flush = () => {
+    const now = latest.current
+    if (!now.findings || now.version === null || !now.dirty || now.saving) return
+    if (!navigator.onLine) return // the online event schedules the save
+    const sent = new Set(touched.current)
+    save.mutate(
+      { items: toInput(now.findings), version: now.version, save_id: crypto.randomUUID() },
+      {
+        onSuccess: (next) => {
+          setSavedVersion(next.version)
+          setSavedAt(Date.now())
+          setRetrying(false)
+          attempt.current = 0
+          for (const key of sent) touched.current.delete(key)
+          if (touched.current.size > 0) {
+            // Touched again while the save was in flight: still dirty, save once more.
+            schedule(AUTOSAVE_DELAY_MS)
+          } else {
+            setDirty(false)
+            setUnsaved(false)
+          }
+        },
+        onError: (e) => {
+          if (e instanceof AppError && e.status === 409 && e.code === 'version_conflict') {
+            const current = e.details?.current
+            if (current && typeof current === 'object') {
+              const theirs = current as Checklist
+              setEdits(mergeFindings(findingsOf(theirs.items), latest.current.findings ?? {}, touched.current))
+              setSavedVersion(theirs.version)
+              setMerged(touched.current.size)
+              schedule(0)
+            }
+            return
+          }
+          if (e instanceof AppError && (e.status === 409 || e.status === 422)) {
+            toast.push({ title: 'Could not save the checklist', body: e.message, tone: 'error' })
+            return
+          }
+          // Network or server trouble: keep the entries and try again with backoff.
+          attempt.current += 1
+          setRetrying(true)
+          schedule(retryDelay(attempt.current))
+        },
+      },
+    )
+  }
+
+  // Back online with unsaved entries: save at once.
+  const wasOnline = useRef(true)
+  useEffect(() => {
+    if (online && !wasOnline.current && latest.current.dirty) schedule(0)
+    wasOnline.current = online
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- schedule is a plain function reading refs
+  }, [online])
 
   if (checklist.isError) {
     const e = checklist.error
@@ -172,51 +292,14 @@ export function ChecklistPage() {
   const draft = checklist.data
   const sections = schema.data.sections
   const readOnly = draft.status === 'submitted'
-  // The version the next save is based on: the last one this page saved, else the one it loaded.
-  const baseVersion = savedVersion ?? draft.version
 
   const update = (key: string, patch: Partial<Findings[string]>) => {
     setEdits({ ...findings, [key]: { ...findings[key], ...patch } })
+    touched.current.add(key)
     setDirty(true)
     setUnsaved(true)
+    schedule(AUTOSAVE_DELAY_MS)
   }
-  const doSave = () => {
-    save.mutate(
-      { items: toInput(findings), version: baseVersion, save_id: crypto.randomUUID() },
-      {
-        onSuccess: (next) => {
-          setSavedVersion(next.version)
-          setSavedAt(Date.now())
-          setDirty(false)
-          setUnsaved(false)
-          setConflict(null)
-        },
-        onError: (e) => {
-          if (e instanceof AppError && e.status === 409 && e.code === 'version_conflict') {
-            const current = e.details?.current
-            if (current && typeof current === 'object') setConflict(current as Checklist)
-            return
-          }
-          toast.push({ title: 'Could not save the checklist', body: e.message, tone: 'error' })
-        },
-      },
-    )
-  }
-  const takeTheirs = () => {
-    if (!conflict) return
-    setEdits(findingsOf(conflict.items))
-    setSavedVersion(conflict.version)
-    setConflict(null)
-    setDirty(false)
-    setUnsaved(false)
-  }
-  const keepMine = () => {
-    if (!conflict) return
-    // The other tab's version becomes the base; the officer's working copy is saved over it.
-    setSavedVersion(conflict.version)
-    setConflict(null)
-  }
-
   const numbering = new Map(sections.flatMap((s) => s.items).map((i, idx) => [i.key, idx + 1]))
   return (
     <>
@@ -253,31 +336,33 @@ export function ChecklistPage() {
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          {!readOnly ? <SaveIndicator dirty={dirty} saving={save.isPending} savedAt={savedAt} /> : null}
+          {!readOnly ? <SaveIndicator dirty={dirty} saving={save.isPending} savedAt={savedAt} retrying={retrying} /> : null}
           <Link to={`/officer/applications/${id}`} className={buttonClasses('secondary', 'sm')}>
             Back to the case
           </Link>
         </div>
       </div>
 
-      {conflict ? (
+      {!online && !readOnly ? (
+        <div className="mb-5">
+          <Alert tone="warning" title="You are offline: changes will not save until you reconnect">
+            Keep this page open. Your entries stay here and are saved when the connection returns.
+          </Alert>
+        </div>
+      ) : null}
+      {merged !== null ? (
         <div className="mb-5">
           <Alert
-            tone="warning"
+            tone="info"
             title="Another tab or device saved this checklist"
             action={
-              <div className="flex gap-2">
-                <Button variant="secondary" size="sm" onClick={keepMine}>
-                  Keep my entries
-                </Button>
-                <Button variant="ghost" size="sm" onClick={takeTheirs}>
-                  Take theirs
-                </Button>
-              </div>
+              <Button variant="ghost" size="sm" onClick={() => setMerged(null)}>
+                Dismiss
+              </Button>
             }
           >
-            Your entries are still here. Keep them and press Save draft to write them over the other version, or take the other version and
-            lose your unsaved changes.
+            Their version was taken and your entries on {merged} {merged === 1 ? 'item were' : 'items were'} kept on top of it, then saved.
+            Check the items you did not touch.
           </Alert>
         </div>
       ) : null}
@@ -329,7 +414,13 @@ export function ChecklistPage() {
         </div>
       </div>
 
-      <div className="pf-surface px-5">
+      <div
+        className="pf-surface px-5"
+        onBlur={(e) => {
+          // Leaving the list saves at once; moving between fields inside it waits for the debounce.
+          if (!readOnly && latest.current.dirty && !e.currentTarget.contains(e.relatedTarget)) schedule(0)
+        }}
+      >
         {sections.map((s) => (
           <section key={s.key} id={`section-${s.key}`} className="scroll-mt-24" aria-labelledby={`section-${s.key}-title`}>
             <div className="pb-1 pt-5">
@@ -401,7 +492,7 @@ export function ChecklistPage() {
             <span className="text-[13px] text-text-2">{summary.remaining ?? 'Everything is assessed. Submit when you are ready.'}</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" loading={save.isPending} disabled={!dirty && savedAt !== null} onClick={doSave}>
+            <Button variant="secondary" loading={save.isPending} disabled={!dirty} onClick={() => schedule(0)}>
               Save draft
             </Button>
             <Button disabled title={summary.remaining ?? 'Submitting the checklist arrives with the next update.'}>

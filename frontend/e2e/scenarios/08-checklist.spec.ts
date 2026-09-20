@@ -27,8 +27,11 @@ test('checklist: open from the case, assess items, save the draft, see the summa
   await groups.nth(16).getByRole('button', { name: 'Not applicable' }).click()
   await expect(page.getByText('3 of 17 assessed, 1 flagged').first()).toBeVisible()
   await expect(page.getByText('Assess 14 more items to submit.')).toBeVisible()
-  await page.getByRole('button', { name: 'Save draft' }).click()
-  await expect(page.getByText('Saved just now')).toBeVisible()
+  // pressing the selected result again clears it; autosave fires 1.5 s after the last touch (US-061)
+  await groups.nth(16).getByRole('button', { name: 'Not applicable' }).click()
+  await expect(groups.nth(16).getByRole('button', { name: 'Not applicable' })).toHaveAttribute('aria-pressed', 'false')
+  await groups.nth(16).getByRole('button', { name: 'Not applicable' }).click()
+  await expect(page.getByText('Saved just now')).toBeVisible({ timeout: 5000 })
 
   // the draft survives a reload and the case summarises it
   await page.reload()

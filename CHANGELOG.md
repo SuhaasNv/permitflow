@@ -2,6 +2,11 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-061 Checklist autosave, retry, offline and merge (20 Sep 2026, Sprint 5)
+
+- The draft autosaves 1.5 s after the last touch and on leaving the list; Save draft goes at once. A failed save keeps the entries and retries with backoff (3, 6, 12, 24 s, then every 30 s) under "Could not save, retrying"; while offline a banner says so and the save goes the moment the connection returns; a stale version takes the other tab's copy with the officer's touched items kept on top and saves again, with a notice. Pressing a selected result again clears it. `SaveIndicator` gained the retrying tone.
+- Tests: vitest with fake timers for the debounce, the retry ladder, the offline round trip and the merge; `08-checklist.spec.ts` waits for the autosave.
+
 ## US-060 Checklist template, model and draft (20 Sep 2026, Sprint 5 started)
 
 - `GET /checklist-schema` (officers and admins): seventeen items in five sections, versioned in code, grounded in SFA's public Food Shop self-checklist and saying it is not an SFA document. `Checklist` and `ChecklistItem` (migration 0007): one per visit number, every item present from creation.
