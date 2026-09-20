@@ -1,5 +1,7 @@
 # PermitFlow
 
+*This branch (`dev`) carries work toward v0.4.0 (use case 3 and the admin panel, planned in `docs/05-planning/RELEASE_PLAN_V0_4_0.md`). The submitted release is tag `v0.3.0` on `main`, live at permitflow.space; the development copy of this branch runs at dev.permitflow.space.*
+
 ## Live: [permitflow.space](https://permitflow.space)
 
 ![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/14-debrief/video/permitflow-launch-poster.jpg)
