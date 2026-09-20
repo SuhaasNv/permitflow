@@ -76,6 +76,24 @@ def test_schemas_are_free_of_orm_and_io() -> None:
         assert not bad, f"{f.name} imports {bad}"
 
 
+def test_services_use_sqlalchemy_only_for_the_session() -> None:
+    """Services orchestrate through repositories: the only SQLAlchemy name a service may import is the
+    `Session` it passes on (the transaction boundary). Statements (`select`, `update`, `delete`, `text`)
+    belong in `repositories/`."""
+    for f in (APP / "services").glob("*.py"):
+        tree = ast.parse(f.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                assert not any(a.name.split(".")[0] == "sqlalchemy" for a in node.names), (
+                    f"{f.name} imports sqlalchemy as a module"
+                )
+            elif isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("sqlalchemy"):
+                names = {a.name for a in node.names}
+                assert node.module == "sqlalchemy.orm" and names <= {"Session"}, (
+                    f"{f.name} imports {sorted(names)} from {node.module}; only Session is allowed"
+                )
+
+
 def test_only_verification_service_uses_ai_providers() -> None:
     for f in APP.rglob("*.py"):
         if "infra/ai" in str(f) or f.name == "verification.py":
