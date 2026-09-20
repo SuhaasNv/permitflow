@@ -19,6 +19,7 @@ from app.domain.enums import VerificationStatus
 from app.models import VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.documents import DocumentRepository
+from app.repositories.users import UserRepository
 
 DAILY_LIMIT_REASON = "daily_limit_reached"
 
@@ -26,7 +27,12 @@ DAILY_LIMIT_REASON = "daily_limit_reached"
 def ensure_draft_capacity(db: Session, operator_id: uuid.UUID) -> None:
     """Refuse a new draft once the operator holds `MAX_DRAFTS_PER_USER` open ones (0 disables)."""
     limit = get_settings().max_drafts_per_user
-    if limit > 0 and ApplicationRepository(db).count_drafts(operator_id) >= limit:
+    if limit <= 0:
+        return
+    # Lock the operator's user row for the rest of the transaction, so the count and the insert that
+    # follows it are serialised per operator; a second create waits here and then sees the new draft.
+    UserRepository(db).lock(operator_id)
+    if ApplicationRepository(db).count_drafts(operator_id) >= limit:
         raise Conflict(
             f"You already have {limit} draft applications. Submit or delete one before starting another.",
             details={"code": "draft_limit", "limit": limit},

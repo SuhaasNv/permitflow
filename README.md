@@ -71,7 +71,7 @@ cd backend && uv run pytest --cov=app        # coverage, fails under 80 %
 cd frontend && npm run test:coverage         # coverage with every source file counted, thresholds in vite.config.ts
 ```
 
-756 backend test cases from 167 test functions (one function, the state-machine sweep, contributes 588 parametrised cases; 106 integration cases run on a real Postgres), 158 frontend tests, eight Playwright specs (the journey, six scenarios, the accessibility gate), plus an API-level edge-case run of 166 checks (`backend/scripts/uat_edges.py`, `docs/10-uat/UAT_PLAN.md`). Coverage on 20 Sep 2026: backend 95 % statements, frontend 81.2 % statements and 84.2 % lines, both measured over every source file and enforced in CI (`docs/08-testing/TEST_STRATEGY.md`, US-053).
+759 backend test cases from 170 test functions (one function, the state-machine sweep, contributes 588 parametrised cases; 108 integration cases run on a real Postgres), 158 frontend tests, eight Playwright specs (the journey, six scenarios, the accessibility gate), plus an API-level edge-case run of 166 checks (`backend/scripts/uat_edges.py`, `docs/10-uat/UAT_PLAN.md`). Coverage on 20 Sep 2026: backend 95 % statements, frontend 81.2 % statements and 84.2 % lines, both measured over every source file and enforced in CI (`docs/08-testing/TEST_STRATEGY.md`, US-053).
 
 Backend tests run against the real `permitflow_test` database: the Alembic migrations are applied from scratch at the start of the session and every table is truncated between tests. The AI provider is forced to `mock` in tests unless `TEST_LIVE_AI=1`.
 

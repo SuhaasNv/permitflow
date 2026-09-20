@@ -35,6 +35,7 @@ class OfficerQueueService:
         rows = self.applications.list_submitted()
         ids = [app.id for app, _ in rows]
         stats = self.revisions.stats_for(ids)
+        latest = self.revisions.latest_for(ids)
         open_counts = self.feedback.open_counts(ids)
         runs = self.documents.latest_runs_for_applications(ids)
 
@@ -43,8 +44,12 @@ class OfficerQueueService:
             action = next_action(app.status)
             count, first_submitted = stats.get(app.id, (0, None))
             app_runs = runs.get(app.id, [])
-            business = (app.draft_data.get("business") or {}).get("business_name")
-            premises = (app.draft_data.get("premises") or {}).get("address_line_1")
+            # The submitted form, never the working copy: during a resubmission round `draft_data` holds
+            # the operator's unsubmitted edits, which an officer must not see until they are submitted.
+            revision = latest.get(app.id)
+            form = revision.form_data if revision is not None else app.draft_data
+            business = (form.get("business") or {}).get("business_name")
+            premises = (form.get("premises") or {}).get("address_line_1")
             items.append(
                 QueueItemOut(
                     id=app.id,

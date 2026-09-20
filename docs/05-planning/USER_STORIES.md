@@ -98,6 +98,11 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: MVP · Day 3 (added 20 Sep, the night before submission) · Dependencies: US-074 · Requirements: FR-026, SEC-005, NFR-001, REL-001 · Branch `feat/us-075-final-check` (not merged into `dev` by the session; the owner merges after reading the diff)
 - Definition of Done: 756 backend and 158 frontend tests green, Playwright 12 of 12 locally, 166 of 166 edge checks; `CHANGELOG.md` "Final check (20 Sep 2026)" lists every change; `AI_USAGE.md` records the prompts of the session.
 
+### US-076 — As an officer, I want the review queue to show only what the applicant has submitted, so that an unsubmitted edit never reaches me before the applicant sends it.
+- Acceptance criteria: the queue's business name and premises address come from the latest submitted revision (the working copy only when no revision exists), verified by a test that edits the working copy after submission; the draft quota takes a row lock on the operator's user row before counting, verified by a test that proves a second transaction cannot take the row while the check is in progress; `LicenceService`, `DraftDeletionService` and the verification task issue no SQLAlchemy statements of their own (a `LicenceRepository` and three `DocumentRepository` methods), and the layering test fails on any SQLAlchemy import in `services/` other than `Session`; readiness row 23 and the issues register updated.
+- Priority: MVP · Day 3 (added 20 Sep after a cold review of the repository, which rated the queue defect as the one shipped defect worth fixing before submission) · Dependencies: US-075 · Requirements: FR-015, FR-012, SEC-010 · Branch `fix/us-076-review-defects`
+- Definition of Done: backend suite green with the three new tests (759 cases from 170 functions); `ruff`, `mypy --strict` clean; `ARCHITECTURE.md` states the services rule; `CHANGELOG.md` entry.
+
 ### US-008 — As a reviewer, I want clear documentation of scope, architecture, AI usage, testing and operations, so that every decision is explainable.
 - Acceptance criteria: README (setup, env vars, tests, AI usage, what I would do next), SCOPE.md, ADRs, threat model, test strategy, UAT plan, operations guide, production readiness review, assessment traceability, CHANGELOG.
 - Priority: MVP · Day 3 (continuous) · Dependencies: all

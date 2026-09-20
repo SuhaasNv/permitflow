@@ -8,7 +8,6 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, NotFound
@@ -19,6 +18,7 @@ from app.infra.storage import FileStorage, get_storage
 from app.models import Application, Licence, User
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
+from app.repositories.licences import LicenceRepository
 from app.repositories.revisions import RevisionRepository
 from app.repositories.users import UserRepository
 from app.schemas.applications import LicenceView
@@ -46,6 +46,7 @@ class LicenceService:
         self.applications = ApplicationRepository(db)
         self.revisions = RevisionRepository(db)
         self.users = UserRepository(db)
+        self.licences = LicenceRepository(db)
         self.audit = AuditRepository(db)
         self.storage = storage or get_storage()
 
@@ -58,7 +59,7 @@ class LicenceService:
         holder = self.users.get(app.operator_id)
         issued_at = datetime.now(UTC)
         issued_on = issued_at.astimezone(LOCAL_TZ).date()  # the year in the number is the Singapore year
-        sequence = int(self.db.scalar(text("SELECT nextval('licence_no_seq')")) or 0)
+        sequence = self.licences.next_sequence()
         data = build_licence_data(
             licence_no=licence_number(issued_on.year, sequence),
             reference_no=app.reference_no,
@@ -82,7 +83,7 @@ class LicenceService:
             stored_key=key,
             sha256=hashlib.sha256(pdf).hexdigest(),
         )
-        self.db.add(licence)
+        self.licences.add(licence)
         self.audit.record(
             application_id=app.id,
             actor_id=officer.id,
@@ -115,7 +116,7 @@ class LicenceService:
         return render_licence_pdf(data)
 
     def for_application(self, application_id: uuid.UUID) -> Licence | None:
-        return self.db.scalar(select(Licence).where(Licence.application_id == application_id))
+        return self.licences.for_application(application_id)
 
     def open_for_download(self, user: User, application_id: uuid.UUID) -> tuple[Licence, Iterator[bytes]]:
         """Owner or officer (SEC-002); admins wait for US-072 like document downloads."""

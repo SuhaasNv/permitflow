@@ -4,15 +4,15 @@ Submitted applications are never deleted (withdraw instead, US-038)."""
 
 import uuid
 
-from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict
 from app.domain.enums import ApplicationStatus
 from app.infra.storage import FileStorage, get_storage
-from app.models import Document, User, VerificationRun
+from app.models import User
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
+from app.repositories.documents import DocumentRepository
 
 
 class DraftDeletionService:
@@ -20,6 +20,7 @@ class DraftDeletionService:
         self.db = db
         self.applications = ApplicationRepository(db)
         self.audit = AuditRepository(db)
+        self.documents = DocumentRepository(db)
         self.storage = storage or get_storage()
 
     def delete(self, operator: User, application_id: uuid.UUID) -> str:
@@ -28,13 +29,7 @@ class DraftDeletionService:
         if app.status != ApplicationStatus.DRAFT:
             raise Conflict("Only a draft can be deleted. A submitted application can be withdrawn instead.")
         reference = app.reference_no
-        documents = list(self.db.scalars(select(Document).where(Document.application_id == app.id)))
-        keys = [d.stored_key for d in documents]
-        if documents:
-            self.db.execute(
-                delete(VerificationRun).where(VerificationRun.document_id.in_([d.id for d in documents]))
-            )
-            self.db.execute(delete(Document).where(Document.application_id == app.id))
+        keys = self.documents.purge_for_application(app.id)
         self.audit.purge_draft(app.id)
         self.db.delete(app)
         self.db.commit()

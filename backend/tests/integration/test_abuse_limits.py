@@ -12,11 +12,16 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.core import settings as settings_module
 from app.core.rate_limit import RequestLimiter
+from app.infra import db as dbmod
+from app.models import User
 from app.models.enums import Role
+from app.services.quotas import ensure_draft_capacity
 from tests.factories import DEFAULT_PASSWORD, login, make_user
 from tests.journeys import PDF, draft, upload
 
@@ -82,6 +87,27 @@ def test_an_operator_may_hold_a_bounded_number_of_drafts(
     assert client.delete(f"/api/v1/applications/{first}", headers=h).status_code == 204
     assert client.post("/api/v1/applications", headers=h).status_code == 201
     next(gen, None)
+
+
+def test_draft_quota_holds_the_operator_row_lock_until_the_transaction_ends(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The count and the insert that follows it are serialised per operator: while one transaction is
+    inside the quota check, a second one cannot take the same user row (readiness row 23, fixed US-076)."""
+    gen = _settings(monkeypatch, MAX_DRAFTS_PER_USER="2")
+    next(gen)
+    user = make_user(db, "op@example.sg", Role.OPERATOR)
+    ensure_draft_capacity(db, user.id)  # takes SELECT ... FOR UPDATE on the user row, no commit yet
+    other = dbmod.session_factory()()
+    try:
+        with pytest.raises(OperationalError):  # lock_not_available: the row is held by the first session
+            other.execute(select(User).where(User.id == user.id).with_for_update(nowait=True))
+        other.rollback()
+        db.rollback()
+        other.execute(select(User).where(User.id == user.id).with_for_update(nowait=True))  # free again
+        other.rollback()
+    finally:
+        other.close()
 
 
 def test_verification_runs_over_the_daily_quota_are_stored_unavailable(

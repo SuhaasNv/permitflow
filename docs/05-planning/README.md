@@ -4,7 +4,7 @@ How the three days were run. The Notion board ("PermitFlow, Xtremax Assessment")
 
 | Document | What it holds |
 |----------|---------------|
-| `USER_STORIES.md` | Every story US-000 to US-075, one to one with the board: same ids, titles, priority, sprint day and acceptance criteria; the branch names in the git history carry these ids |
+| `USER_STORIES.md` | Every story US-000 to US-076, one to one with the board: same ids, titles, priority, sprint day and acceptance criteria; the branch names in the git history carry these ids |
 | `SPRINTS.md` | The three one-day sprints (goals, planned stories), the sprint definition of done, the close ritual, the cut order; the board as it stood after the release |
 | `DELIVERY_PLAN.md` | The day-by-day plan as planned and as executed, risks and how they were handled |
 | `KANBAN.md` | The flow rules: columns, WIP limit, mid-day check, story-to-day mapping |
