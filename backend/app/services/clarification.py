@@ -10,6 +10,7 @@ from typing import BinaryIO
 
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.errors import BadRequest, Conflict, NotFound, ValidationFailed
 from app.domain.checklist_schema import ITEM_BY_KEY, item_title
 from app.domain.enums import ApplicationStatus, ClarificationStatus, NotificationKind
@@ -291,6 +292,7 @@ class ClarificationService:
         except Exception:
             self.storage.delete(key)
             raise
+        metrics.ATTACHMENT_BYTES.inc(size)
         return self.build(app), False
 
     def remove_attachment(
@@ -380,6 +382,7 @@ class ClarificationService:
         )
         self.db.commit()
         self.notifications.flush_sent()
+        metrics.CLARIFICATION_ROUNDS.labels("answered").inc()
         return self.build(app)
 
     def open_attachment(

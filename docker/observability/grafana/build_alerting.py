@@ -61,6 +61,9 @@ incidents = [
     incident("pf-rate-limiting", "PermitFlow rate limiting",
              'sum by (environment) (rate(permitflow_rate_limited_total[5m]))', "gt", 1, "10m", "info",
              "The per-client limiter is refusing more than one request a second."),
+    incident("pf-volume-filling", "PermitFlow upload volume filling",
+             'max by (environment) (permitflow_storage_bytes{kind="volume_used"}) / max by (environment) (permitflow_storage_bytes{kind="volume_total"})',
+             "gt", 0.8, "15m", "warning", "The upload volume is more than 80 % full; raise it before it fills (US-089)."),
 ]
 
 
@@ -77,8 +80,8 @@ def digest(env):
         ("F", f'sum(increase(permitflow_verification_runs_total{{{e}}}[1h])) or vector(0)'),
         ("G", cost),
         ("H", f'sum(permitflow_applications{{{e}}}) or vector(0)'),
-        ("I", f'sum(permitflow_applications{{{e}, status=~"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval"}}) or vector(0)'),
-        ("J", f'sum(permitflow_applications{{{e}, status=~"pending_pre_site_resubmission|pending_post_site_resubmission"}}) or vector(0)'),
+        ("I", f'sum(permitflow_applications{{{e}, status=~"application_received|under_review|pre_site_resubmitted|site_visit_scheduled|site_visit_done|post_site_clarification_resubmitted|pending_approval"}}) or vector(0)'),
+        ("J", f'sum(permitflow_applications{{{e}, status=~"pending_pre_site_resubmission|awaiting_post_site_clarification|pending_post_site_resubmission"}}) or vector(0)'),
     ]
     data = [query(r, x, 3600) for r, x in qs] + [reduce(r + "r", r) for r, _ in qs]
     # the environment exists when Prometheus has a target for it; otherwise the rule stays quiet (NoData -> OK)

@@ -69,6 +69,9 @@ class WorkflowService:
             raise
         acting = actor if actor is not None else actor_for_role(actor_user.role)
         metrics.TRANSITIONS.labels(app.status.value, acting.value if acting else "system").inc()
+        if app.status == ApplicationStatus.PENDING_POST_SITE_RESUBMISSION:
+            # Request another round released the drafted questions inside the transaction (US-089).
+            metrics.CLARIFICATION_ROUNDS.labels("released").inc()
         self.notifications.flush_sent()
         self.db.refresh(app)
         return app

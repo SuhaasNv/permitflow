@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-089 Use case 3 and storage on the dashboard (21 Sep 2026, Sprint 7)
+
+- Four new metric families (checklists submitted, clarification rounds released and answered, evidence bytes, storage by kind including the volume itself), a dashboard row generated from the script, an alert when the upload volume passes 80 %, and the Telegram `/queue` answer naming the post-site cases. The "whose turn" numbers on the dashboard, the hourly digest and the bot now follow the same rule as the administrator's overview.
+
 ## Admin epic: US-070, US-072, US-073 (21 Sep 2026, Sprint 7)
 
 - The administrator's three screens: an operations overview (every status with its count, whose turn, the ten longest-idle applications in Singapore calendar days, today's numbers, document-check health over 24 hours against the daily quota), an activity feed across every application and every user change with a keyset "Show older activity", and user management (change a role, deactivate, reactivate, and, at the owner's request, add an account from the page). An administrator opens any case through the officer's screens without a single control: the server sends no actions and refuses every mutation. The seed now creates the administrator (Priya Nair) and a spare officer (Lim Jun Hao); the three demonstration accounts are protected from any change. ADR-014 records the design.

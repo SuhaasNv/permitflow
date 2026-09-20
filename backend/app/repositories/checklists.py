@@ -97,16 +97,20 @@ class ChecklistRepository:
             out.setdefault(a.response_id, []).append(a)
         return out
 
-    def attachment_bytes(self, application_id: uuid.UUID) -> int:
-        """Clarification evidence the application holds on disk, across every visit and round (US-085)."""
-        stmt = (
-            select(func.coalesce(func.sum(ClarificationAttachment.size_bytes), 0))
-            .join(ClarificationResponse, ClarificationResponse.id == ClarificationAttachment.response_id)
-            .join(ClarificationRequest, ClarificationRequest.id == ClarificationResponse.request_id)
-            .join(ChecklistItem, ChecklistItem.id == ClarificationRequest.item_id)
-            .join(Checklist, Checklist.id == ChecklistItem.checklist_id)
-            .where(Checklist.application_id == application_id)
-        )
+    def attachment_bytes(self, application_id: uuid.UUID | None = None) -> int:
+        """Clarification evidence on disk, across every visit and round (US-085); one application, or
+        all of them for the storage gauge (US-089)."""
+        stmt = select(func.coalesce(func.sum(ClarificationAttachment.size_bytes), 0))
+        if application_id is not None:
+            stmt = (
+                stmt.join(
+                    ClarificationResponse, ClarificationResponse.id == ClarificationAttachment.response_id
+                )
+                .join(ClarificationRequest, ClarificationRequest.id == ClarificationResponse.request_id)
+                .join(ChecklistItem, ChecklistItem.id == ClarificationRequest.item_id)
+                .join(Checklist, Checklist.id == ChecklistItem.checklist_id)
+                .where(Checklist.application_id == application_id)
+            )
         return int(self.db.scalar(stmt) or 0)
 
     def item(self, item_id: uuid.UUID) -> ChecklistItem | None:

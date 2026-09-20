@@ -332,6 +332,60 @@ groups:
     noDataState: OK
     execErrState: Error
     isPaused: false
+  - uid: pf-volume-filling
+    title: PermitFlow upload volume filling
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: max by (environment) (permitflow_storage_bytes{kind="volume_used"}) / max by (environment) (permitflow_storage_bytes{kind="volume_total"})
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0.8
+          operator:
+            type: and
+          query:
+            params:
+            - B
+          reducer:
+            type: last
+            params: []
+          type: query
+    for: 15m
+    labels:
+      severity: warning
+      kind: incident
+    annotations:
+      summary: The upload volume is more than 80 % full; raise it before it fills (US-089).
+      value: '{{ printf "%.3g" $values.B.Value }}'
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
   - uid: pf-digest-development
     title: PermitFlow hourly digest (development)
     condition: C
@@ -409,7 +463,7 @@ groups:
       datasourceUid: prometheus
       model:
         refId: I
-        expr: sum(permitflow_applications{environment="development", status=~"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval"}) or vector(0)
+        expr: sum(permitflow_applications{environment="development", status=~"application_received|under_review|pre_site_resubmitted|site_visit_scheduled|site_visit_done|post_site_clarification_resubmitted|pending_approval"}) or vector(0)
         instant: true
         intervalMs: 15000
         maxDataPoints: 43200
@@ -420,7 +474,7 @@ groups:
       datasourceUid: prometheus
       model:
         refId: J
-        expr: sum(permitflow_applications{environment="development", status=~"pending_pre_site_resubmission|pending_post_site_resubmission"}) or vector(0)
+        expr: sum(permitflow_applications{environment="development", status=~"pending_pre_site_resubmission|awaiting_post_site_clarification|pending_post_site_resubmission"}) or vector(0)
         instant: true
         intervalMs: 15000
         maxDataPoints: 43200
@@ -631,7 +685,7 @@ groups:
       datasourceUid: prometheus
       model:
         refId: I
-        expr: sum(permitflow_applications{environment="production", status=~"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval"}) or vector(0)
+        expr: sum(permitflow_applications{environment="production", status=~"application_received|under_review|pre_site_resubmitted|site_visit_scheduled|site_visit_done|post_site_clarification_resubmitted|pending_approval"}) or vector(0)
         instant: true
         intervalMs: 15000
         maxDataPoints: 43200
@@ -642,7 +696,7 @@ groups:
       datasourceUid: prometheus
       model:
         refId: J
-        expr: sum(permitflow_applications{environment="production", status=~"pending_pre_site_resubmission|pending_post_site_resubmission"}) or vector(0)
+        expr: sum(permitflow_applications{environment="production", status=~"pending_pre_site_resubmission|awaiting_post_site_clarification|pending_post_site_resubmission"}) or vector(0)
         instant: true
         intervalMs: 15000
         maxDataPoints: 43200
@@ -853,7 +907,7 @@ groups:
       datasourceUid: prometheus
       model:
         refId: I
-        expr: sum(permitflow_applications{environment="local", status=~"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval"}) or vector(0)
+        expr: sum(permitflow_applications{environment="local", status=~"application_received|under_review|pre_site_resubmitted|site_visit_scheduled|site_visit_done|post_site_clarification_resubmitted|pending_approval"}) or vector(0)
         instant: true
         intervalMs: 15000
         maxDataPoints: 43200
@@ -864,7 +918,7 @@ groups:
       datasourceUid: prometheus
       model:
         refId: J
-        expr: sum(permitflow_applications{environment="local", status=~"pending_pre_site_resubmission|pending_post_site_resubmission"}) or vector(0)
+        expr: sum(permitflow_applications{environment="local", status=~"pending_pre_site_resubmission|awaiting_post_site_clarification|pending_post_site_resubmission"}) or vector(0)
         instant: true
         intervalMs: 15000
         maxDataPoints: 43200

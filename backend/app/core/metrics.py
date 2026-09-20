@@ -53,6 +53,23 @@ APPLICATIONS = Gauge(
 SESSIONS_ACTIVE = Gauge(
     "permitflow_sessions_active", "Accounts signed in right now (US-093), refreshed on every scrape."
 )
+# Use case 3 on the dashboard (US-089): the checklist and the rounds moving, and the volume filling.
+CHECKLISTS_SUBMITTED = Counter(
+    "permitflow_checklists_submitted_total", "Site visit checklists submitted (US-063)."
+)
+CLARIFICATION_ROUNDS = Counter(
+    "permitflow_clarification_rounds_total",
+    "Clarification rounds by event: released to the operator, answered by the operator.",
+    ["event"],
+)
+ATTACHMENT_BYTES = Counter(
+    "permitflow_attachment_bytes_total", "Bytes stored as clarification evidence (US-065)."
+)
+STORAGE_BYTES = Gauge(
+    "permitflow_storage_bytes",
+    "Bytes on the upload volume by kind (documents, attachments, volume_used, volume_total), per scrape.",
+    ["kind"],
+)
 
 
 def route_template(request: Request) -> str:

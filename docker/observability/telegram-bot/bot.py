@@ -86,8 +86,8 @@ def section_status(env: str) -> str:
     checks = prom(f'sum(increase(permitflow_verification_runs_total{{{e}}}[1h]))')
     spend = prom(cost_expr(e))
     apps = prom(f'sum(permitflow_applications{{{e}}})')
-    officer = prom(f'sum(permitflow_applications{{{e}, status=~"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval"}})')
-    operator = prom(f'sum(permitflow_applications{{{e}, status=~"pending_pre_site_resubmission|pending_post_site_resubmission"}})')
+    officer = prom(f'sum(permitflow_applications{{{e}, status=~"application_received|under_review|pre_site_resubmitted|site_visit_scheduled|site_visit_done|post_site_clarification_resubmitted|pending_approval"}})')
+    operator = prom(f'sum(permitflow_applications{{{e}, status=~"pending_pre_site_resubmission|awaiting_post_site_clarification|pending_post_site_resubmission"}})')
     quiet = not rpm  # no request in the last five minutes: latency and error share have no meaning
     traffic = ("Requests  <b>0</b> / min   ·   <i>quiet for five minutes</i>" if quiet else
                f"Requests  <b>{n(rpm)}</b> / min   ·   p99.5  <b>{n(p995)}</b> ms   ·   5xx  <b>{n((err or 0) * 100, '%.1f')} %</b>")
@@ -134,7 +134,11 @@ def queue(envs: list[str]) -> str:
         by = [(m.get("status"), v) for m, v in prom_series(f'permitflow_applications{{{e}}}') if v > 0]
         lines = "\n".join(f"{s}  <b>{v:.0f}</b>" for s, v in sorted(by, key=lambda x: -x[1])) or "no applications"
         moved = prom(f'sum(increase(permitflow_transitions_total{{{e}}}[1h]))')
-        parts.append(f"<b>{env.capitalize()}</b>\n{lines}\ntransitions in the last hour  <b>{n(moved, none='0')}</b>")
+        post_site = prom(f'sum(permitflow_applications{{{e}, status=~"site_visit_scheduled|site_visit_done|awaiting_post_site_clarification|pending_post_site_resubmission|post_site_clarification_resubmitted"}})')
+        checklists = prom(f'sum(increase(permitflow_checklists_submitted_total{{{e}}}[24h]))')
+        rounds = prom(f'sum(increase(permitflow_clarification_rounds_total{{{e}}}[24h]))')
+        parts.append(f"<b>{env.capitalize()}</b>\n{lines}\ntransitions in the last hour  <b>{n(moved, none='0')}</b>\n"
+                     f"post-site (visit to clarification)  <b>{n(post_site, none='0')}</b>   ·   checklists (24 h)  <b>{n(checklists, none='0')}</b>   ·   rounds (24 h)  <b>{n(rounds, none='0')}</b>")
     return f"<b>The queue</b>\n{RULE}\n" + f"\n{RULE}\n".join(parts) + f"\n{RULE}\nDashboard  {DASHBOARD}"
 
 

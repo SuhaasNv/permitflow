@@ -46,3 +46,11 @@ groups:
         labels: { severity: info }
         annotations:
           summary: "The per-client limiter is refusing more than one request a second"
+      - alert: PermitFlowVolumeFilling
+        expr: |
+          sum by (environment, instance) (permitflow_storage_bytes{kind="volume_used"})
+            / sum by (environment, instance) (permitflow_storage_bytes{kind="volume_total"}) > 0.8
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "The upload volume is more than 80 % full (US-089): raise it before it fills"

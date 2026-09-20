@@ -88,3 +88,45 @@ def test_layering_metrics_module_is_not_imported_by_domain() -> None:
 
     domain = Path(__file__).resolve().parents[2] / "app" / "domain"
     assert not any("metrics" in f.read_text() for f in domain.glob("*.py"))
+
+
+def test_use_case_3_counters_and_the_storage_gauge(client: TestClient, db: Session, token: str) -> None:
+    """US-089: a checklist submit, a released round, an answered round and the evidence bytes each move
+    their counter; the storage gauge reports the database sums and the volume."""
+    from tests.integration.test_clarification import _attach, _respond, _submitted
+    from tests.journeys import PDF
+
+    def scrape() -> str:
+        return client.get("/api/v1/metrics", headers={"Authorization": f"Bearer {token}"}).text
+
+    before = scrape()
+    submitted_before = _sample(before, "permitflow_checklists_submitted_total") or 0
+    released_before = _sample(before, "permitflow_clarification_rounds_total", event="released") or 0
+    answered_before = _sample(before, "permitflow_clarification_rounds_total", event="answered") or 0
+    bytes_before = _sample(before, "permitflow_attachment_bytes_total") or 0
+
+    app_id, op, off = _submitted(client, db)
+    after_submit = scrape()
+    assert _sample(after_submit, "permitflow_checklists_submitted_total") == submitted_before + 1
+    assert (
+        _sample(after_submit, "permitflow_clarification_rounds_total", event="released")
+        == released_before + 1
+    )
+
+    view = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    for item in view["items"]:
+        rid = _respond(client, op, app_id, item["item_id"], "Done.").json()
+        response_id = next(i for i in rid["items"] if i["item_id"] == item["item_id"])["responses"][0]["id"]
+        assert _attach(client, op, app_id, response_id, "proof.pdf", PDF).status_code == 201
+    assert client.post(f"/api/v1/applications/{app_id}/clarifications/send", headers=op).status_code == 200
+
+    body = scrape()
+    assert _sample(body, "permitflow_clarification_rounds_total", event="answered") == answered_before + 1
+    assert _sample(body, "permitflow_attachment_bytes_total") == bytes_before + len(PDF) * len(view["items"])
+    assert (_sample(body, "permitflow_storage_bytes", kind="attachments") or 0) >= len(PDF) * len(
+        view["items"]
+    )
+    assert (_sample(body, "permitflow_storage_bytes", kind="documents") or 0) > 0
+    assert (_sample(body, "permitflow_storage_bytes", kind="volume_total") or 0) > 0
+    assert (_sample(body, "permitflow_storage_bytes", kind="volume_used") or 0) > 0
+    assert _sample(body, "permitflow_sessions_active") is not None

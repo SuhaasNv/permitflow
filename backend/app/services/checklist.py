@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.errors import Conflict, NotFound, ValidationFailed, VersionConflict
 from app.domain.checklist_schema import (
     CHECKLIST_VERSION,
@@ -382,6 +383,9 @@ class ChecklistService:
         )
         self.db.commit()
         workflow.notifications.flush_sent()
+        metrics.CHECKLISTS_SUBMITTED.inc()
+        if flagged:
+            metrics.CLARIFICATION_ROUNDS.labels("released").inc()
         return self._out(row)
 
     # Helpers -------------------------------------------------------------------------------------

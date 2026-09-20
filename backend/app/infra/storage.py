@@ -1,6 +1,7 @@
 """File storage behind a small interface (SCOPE: local disk now, object storage later)."""
 
 import os
+import shutil
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -15,6 +16,7 @@ class FileStorage(Protocol):
     def delete(self, key: str) -> None: ...
     def exists(self, key: str) -> bool: ...
     def size(self, key: str) -> int: ...
+    def disk_usage(self) -> tuple[int, int]: ...
 
 
 class LocalDiskStorage:
@@ -60,6 +62,13 @@ class LocalDiskStorage:
     def size(self, key: str) -> int:
         path = self._path(key)
         return path.stat().st_size if path.exists() else 0
+
+    def disk_usage(self) -> tuple[int, int]:
+        """(used, total) bytes of the filesystem the uploads live on: the mounted volume on Railway, the
+        whole disk locally (US-089). Zero when the directory does not exist yet."""
+        self.root.mkdir(parents=True, exist_ok=True)
+        usage = shutil.disk_usage(self.root)
+        return usage.used, usage.total
 
 
 def new_storage_key(application_id: uuid.UUID, extension: str) -> str:
