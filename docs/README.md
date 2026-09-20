@@ -1,5 +1,7 @@
 # PermitFlow: Documentation Index
 
+Each numbered folder has its own `README.md` (what the folder is for, when it was written, one line per document, where to start); this file is the index across them.
+
 Status legend: **written** (solutioning phase, before code) · **to be written** (produced during or after implementation). Documents written before code describe the intended design; where the built system differs, the document was updated in the same change or the difference is recorded in the readiness review.
 
 ## Product and requirements
@@ -81,6 +83,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `../RELEASE_NOTES.md` | written (20 Sep) | What each version brings, in the users' words, newest first, with what comes next (v0.4.0: the admin panel and use case 3) |
 | `../CHANGELOG.md` | written (Sprints 1 to 3 closed; v0.3.0 released 19 Sep) | Milestones, sprint closes with Shipped / Slipped / Retro |
 | `../README.md` | written | What it is, stack and why, hosts, setup, demo accounts, security, tests, CI, deployment, AI verification, AI Usage, What I would do next |
+| `01-discovery/README.md` to `12-demo/README.md` | written (20 Sep) | A README per folder: purpose, document index, reading order, related folders |
 | `13-debrief/README.md` | written (19 Sep) | The pitch deck and the technical deck (pptx and handout PDF), the launch video, the narrated walkthrough and the technical video (videos in Git LFS) |
 
 ## Review history
