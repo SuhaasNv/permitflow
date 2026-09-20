@@ -12,7 +12,8 @@ User 1───* Application 1───* ApplicationRevision
                  ├───* Feedback  (targets a section_key or a document_type; raised_in_revision)
                  ├───* Notification (per user)
                  ├───* AuditEvent (append-only)
-                 └───1 Licence (one per approved application, US-051)
+                 ├───1 Licence (one per approved application, US-051)
+                 └───* SiteVisit 1───* SiteVisitProposal (the appointment and its rounds, US-084)
 ```
 
 ## Entities
@@ -182,6 +183,41 @@ The certificate issued by the approval transaction (US-051, ADR-010): one row pe
 | stored_key | str | server-generated key of the PDF |
 | sha256 | str | of the rendered PDF |
 
+### SiteVisit
+
+The appointment for the on-site inspection (US-084, FR-043). No new application status: it lives inside `site_visit_scheduled`, one row per visit number (`visit_no` 1 today; a second visit is not reachable through the workflow in v0.4.0). Every change is written with its audit row and notification in the same transaction.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | |
+| application_id | FK Application | unique with `visit_no` |
+| visit_no | int | 1-based per application |
+| status | enum `proposed`, `counter_proposed`, `confirmed`, `done` | `done` is set by the `site_visit_done` transition |
+| date | date | the date on the table (the officer's proposal, or the confirmed date while the operator asks to move it) |
+| slot | enum `morning` (09:00 to 12:00), `afternoon` (14:00 to 17:00) | Singapore time |
+| note | text, max 500 | the officer's note to the operator (what to have ready) |
+| proposed_by_id, confirmed_by_id | FK User, nullable | |
+| confirmed_at, done_at | datetime, nullable | |
+| created_at, updated_at | datetime | |
+
+Rules (`domain/site_visit.py`, pure): dates are Singapore calendar days, Monday to Friday (no public-holiday calendar, SCOPE assumption); the officer proposes at least one working day ahead, the operator at least two; at most 60 days out; a proposal the operator leaves unanswered may be confirmed by the officer after three working days, never later than the visit date; at most six proposals per visit (both sides together, reschedules included), after which only accept or keep remain.
+
+### SiteVisitProposal
+
+One row per round of the negotiation: the officer's proposal, the operator's counter, the officer's third date, either side's reschedule request.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | |
+| site_visit_id | FK SiteVisit | |
+| round_no | int | 1-based per visit, gap-free |
+| author_id | FK User | |
+| author_role | `officer` or `operator` | the operator view shows "Licensing officer" for officer rounds, never the name |
+| date, slot | | |
+| reason | text, max 500, nullable | required for a counter and a reschedule |
+| outcome | enum `pending`, `accepted`, `kept`, `declined`, `superseded` | set once, when the round is decided; earlier rounds keep their outcome after a reschedule |
+| created_at, decided_at | datetime | |
+
 ### CommentTemplate (static configuration, not a table)
 `{key, target_type, title, body}` defined in `domain/feedback_templates.py` and served by `GET /officer/feedback-templates` (officers only). Templates are data, not code, so they can move to a table later without API change.
 
@@ -209,6 +245,7 @@ Required document types: `business_profile`, `floor_plan`, `tenancy_agreement`, 
 | Feedback | own applications; read | all; create, resolve, withdraw | all; read |
 | Notification | own | own | own |
 | AuditEvent | none | all applications; read | all applications; read, cross-application feed |
+| SiteVisit, SiteVisitProposal | own application; accept, counter, reschedule | all; propose, decide, confirm, reschedule | all; read |
 | User | self | self | all; change role, deactivate/reactivate (planned, US-073) |
 
 ## Invariants (enforced in services and tested)
@@ -219,4 +256,6 @@ Required document types: `business_profile`, `floor_plan`, `tenancy_agreement`, 
 4. On resubmission, sections and document types without open feedback are identical to the previous revision (sections compared by value, documents by `sha256`).
 5. Status changes only via the workflow module and always produce a `status.changed` audit event.
 6. Every mutating service writes its audit event(s) in the same transaction.
-7. Operator API responses never contain internal status codes or audit events; they contain the operator label.
+7. Operator API responses never contain internal status codes or audit events; they contain the operator label. (The appointment's own state names, `proposed` to `done`, are served to both sides with a role-specific label; they are not application statuses.)
+8. `site_visit_done` is reachable only while the current visit is `confirmed`; the transition marks it `done` in the same transaction.
+9. A visit has at most six proposals; a proposal's `outcome` is written once.

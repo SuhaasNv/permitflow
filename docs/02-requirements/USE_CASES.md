@@ -197,8 +197,10 @@ Deferred at v0.3.0; designed and planned on 20 Sep 2026 (`docs/05-planning/RELEA
 4. Either side may reschedule a confirmed visit before its date, with a reason.
 5. Officer marks the site visit done once the visit is confirmed.
 **Alternate flows:**
-- 2a. No reply for three working days: the officer confirms alone; the operator was told this when the date was proposed.
-- 2b. A date in the past, on a non-working day, or fewer than two working days ahead for the operator: 422 naming the rule.
+- 2a. No reply for three working days (never later than the visit date itself): the officer confirms alone; the operator was told this when the date was proposed.
+- 2b. A date in the past, on a non-working day, more than 60 days out, or fewer than two working days ahead for the operator (one for the officer): 422 naming the rule.
+- 3a. Six proposals reached (both sides together, reschedules included): "Propose another date" is closed on both sides; the operator can still accept, the officer can still accept the operator's date or keep the one on the table.
+- 4a. The operator asks to move a confirmed visit: the confirmed date stays until the officer decides; keeping it keeps that date, not an earlier proposal.
 **Expected outcome:** one confirmed date and slot, every round on record, the checklist opened against that visit.
 
 ### UC3-A Capture the site visit checklist (US-060 to US-063)

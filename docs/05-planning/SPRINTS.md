@@ -162,6 +162,7 @@ The plan, its reviews and every design decision: `RELEASE_PLAN_V0_4_0.md`. All w
 | US-078 | Design pass for the v0.4.0 screens (half a day) | MVP |
 | US-079 | State machine and workflow service amendments; the four suites through the checklist stub; reconciliation of the documents | MVP |
 | US-082 | Limiter keyed on the real caller behind the edge (readiness row 25) | MVP |
+| US-084 | Site visit appointment (pulled forward from Sprint 5 on 20 Sep at the owner's request, built the same evening) | MVP |
 | chore | README notice on `dev`, working version `0.4.0-dev` (the default branch moved to `main` on 20 Sep) | MVP |
 
 **Exit criteria:** sprint DoD; the sweep green with the regenerated table; every pre-site Playwright scenario and the journey green; artboards reviewed by the owner.
@@ -172,7 +173,7 @@ The plan, its reviews and every design decision: `RELEASE_PLAN_V0_4_0.md`. All w
 
 | Story | Title (short) | Priority |
 |-------|---------------|----------|
-| US-084 | Site visit appointment: date and slot proposed by the officer, accepted or countered by the operator, confirmed, rescheduled; done only once confirmed (added 20 Sep, owner's product decision) | MVP |
+| US-084 | Site visit appointment (moved to Sprint 4, done there) | MVP |
 | US-090 | Singapore time for every new date; working-day rules tested around midnight (NFR-016) | MVP |
 | US-060 | Checklist schema, model (one per visit), migration, `POST` to create, capture screen at 820 and 1024 | MVP |
 | US-061 | Idempotent draft autosave, saved and retrying states, offline banner, conflict merge | MVP |
@@ -180,7 +181,7 @@ The plan, its reviews and every design decision: `RELEASE_PLAN_V0_4_0.md`. All w
 | US-063 | Submit: guards, findings frozen, the transition, release of the flagged items, one notification | MVP |
 | US-064 | Operator view of the flagged items (read-only until US-065), the `clarification` block, list wording | MVP |
 
-**Size:** a day and a half with US-084; if the second half-day is not there, US-064 moves to Sprint 6.
+**Size:** a day without US-084 (done in Sprint 4); if it runs over, US-064 moves to Sprint 6.
 
 **Between Sprint 5 and 6, `dev` shows:** the officer's whole capture and submit; the operator sees the flagged items and the officer's comments with "Answering arrives with the next update"; the officer keeps every exit (Route to approval when nothing is open, Reject) and the operator can withdraw.
 

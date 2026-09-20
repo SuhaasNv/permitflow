@@ -175,6 +175,40 @@ def transition(o, app_id, target, note=None, version=None):
     return req(o, "POST", f"/officer/applications/{app_id}/transition", json=body)
 
 
+def working_day(n: int) -> str:
+    """ISO date n working days ahead in Singapore (the appointment rules of US-084)."""
+    from app.domain.site_visit import add_working_days, today_in_singapore
+
+    return add_working_days(today_in_singapore(), n).isoformat()
+
+
+def weekend_ahead() -> str:
+    from datetime import date, timedelta
+
+    from app.domain.site_visit import today_in_singapore
+
+    d: date = today_in_singapore() + timedelta(days=1)
+    while d.weekday() < 5:
+        d += timedelta(days=1)
+    return d.isoformat()
+
+
+def propose(o, app_id, date, slot="morning", note=None):
+    v = officer_view(o, app_id)["version"]
+    body = {"date": date, "slot": slot, "expected_version": v}
+    if note is not None:
+        body["note"] = note
+    return req(o, "POST", f"/officer/applications/{app_id}/site-visit", json=body)
+
+
+def arrange_visit(o, p, app_id):
+    """Propose and accept so Mark site visit done is allowed (the guard of US-084)."""
+    r = propose(o, app_id, working_day(3))
+    assert r.status_code == 200, r.text
+    r = req(p, "POST", f"/applications/{app_id}/site-visit/accept")
+    assert r.status_code == 200, r.text
+
+
 def operator_view_clean(v: dict) -> tuple[bool, str]:
     """No internal status code or officer-only label anywhere in an operator payload."""
     text = json.dumps(v)
@@ -866,7 +900,84 @@ def run_checks() -> None:
     )
     r = req(op, "POST", f"/applications/{aid}/resubmit")
     check("O33", "operator resubmit while a site visit is pending is 409", r.status_code == 409, r.text)
+
+    # ---------- Site visit appointment (US-084) ----------
     r = transition(off, aid, "site_visit_done")
+    check("SV1", "Mark site visit done before a confirmed date is 409 (guard)", r.status_code == 409, r.text)
+    v = officer_view(off, aid)
+    done = next(a for a in v["actions"] if a["target"] == "site_visit_done")
+    check("SV2", "the guard reason is served on the action", not done["enabled"] and "Confirm the visit date" in (done["reason"] or ""), json.dumps(done))
+    r = req(op, "POST", f"/officer/applications/{aid}/site-visit", json={"date": working_day(3), "slot": "morning", "expected_version": v["version"]})
+    check("SV3", "operator on the officer propose route is 403", r.status_code == 403, r.text)
+    r = propose(off, aid, weekend_ahead())
+    check("SV4", "a weekend date is 422 naming the rule", r.status_code == 422 and "Monday to Friday" in r.json()["error"]["details"]["fields"]["date"], r.text)
+    r = propose(off, aid, "2020-01-06")
+    check("SV5", "a past date is 422", r.status_code == 422 and "date" in r.json()["error"]["details"]["fields"], r.text)
+    r = propose(off, aid, working_day(3), slot="evening")
+    check("SV6", "an unknown slot is 422 on the slot field", r.status_code == 422 and "slot" in r.json()["error"]["details"]["fields"], r.text)
+    far = working_day(50)
+    r = propose(off, aid, far)
+    check("SV7", "more than 60 days out is 422", r.status_code == 422 and "60" in r.json()["error"]["details"]["fields"]["date"], r.text)
+    r = propose(off, aid, working_day(3), note="x" * 501)
+    check("SV8", "a 501-character note is 422", r.status_code == 422, r.text[:200])
+    r = propose(off, aid, working_day(3), slot="afternoon", note="Have the pest control contract ready.")
+    check("SV9", "a valid proposal on a case scheduled through the API opens the visit", r.status_code == 200 and r.json()["site_visit"]["status"] == "proposed" and r.json()["site_visit"]["status_label"] == "Waiting for the operator", r.text[:300])
+    r = propose(off, aid, working_day(4))
+    check("SV10", "a second proposal while one is open is 409", r.status_code == 409, r.text)
+    r = req(op2, "POST", f"/applications/{aid}/site-visit/accept")
+    check("SV11", "another operator accepting is 404", r.status_code == 404, r.text)
+    r = req(off, "POST", f"/applications/{aid}/site-visit/accept")
+    check("SV12", "an officer on the operator accept route is 403", r.status_code == 403, r.text)
+    v = req(op, "GET", f"/applications/{aid}").json()
+    sv = v["site_visit"]
+    ok, note = operator_view_clean(v)
+    check("SV13", "operator view: own label, reply-by date, the officer's note, the earliest date, no officer name", ok and sv["status_label"] == "Waiting for your reply" and sv["reply_by"] and sv["note"] and sv["earliest_date"] == working_day(2) and all(r_["author_name"] == "Licensing officer" for r_ in sv["rounds"] if r_["author_role"] == "officer") and v["needs_operator_action"] and "Waiting for the operator" not in json.dumps(v), note + json.dumps(sv)[:200])
+    r = req(op, "POST", f"/applications/{aid}/site-visit/counter", json={"date": working_day(1), "slot": "morning", "reason": "Too soon."})
+    check("SV14", "a counter one working day ahead is 422 (two needed)", r.status_code == 422 and "2 working days" in r.json()["error"]["details"]["fields"]["date"], r.text)
+    r = req(op, "POST", f"/applications/{aid}/site-visit/counter", json={"date": working_day(4), "slot": "morning"})
+    check("SV15", "a counter without a reason is 422 on the reason field", r.status_code == 422 and "reason" in r.json()["error"]["details"]["fields"], r.text)
+    r = req(op, "POST", f"/applications/{aid}/site-visit/reschedule", json={"date": working_day(4), "slot": "morning", "reason": "Not yet."})
+    check("SV16", "reschedule before the visit is confirmed is 409", r.status_code == 409, r.text)
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/confirm")
+    check("SV17", "confirm without a reply before the deadline is 409 naming the date", r.status_code == 409 and "until" in r.json()["error"]["message"], r.text)
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "accept_operator"})
+    check("SV18", "deciding when no counter exists is 409", r.status_code == 409, r.text)
+    counter_date = working_day(5)
+    r = req(op, "POST", f"/applications/{aid}/site-visit/counter", json={"date": counter_date, "slot": "afternoon", "reason": "The shop is closed that morning."})
+    check("SV19", "a valid counter waits on the officer; the operator can no longer accept", r.status_code == 200 and r.json()["site_visit"]["status_label"] == "Waiting for the officer" and r.json()["site_visit"]["can_accept"] is False, r.text[:300])
+    r = req(op, "POST", f"/applications/{aid}/site-visit/accept")
+    check("SV20", "accept after countering is 409", r.status_code == 409, r.text)
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "flip_coin"})
+    check("SV21", "an unknown decision is 422", r.status_code == 422, r.text)
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "propose"})
+    check("SV22", "a third date without a date is 422", r.status_code == 422, r.text)
+    row = next(i for i in req(off, "GET", "/officer/applications").json()["items"] if i["id"] == aid)
+    check("SV23", "the queue says Decide the visit date and it is the officer's turn", row["next_action"] == "Decide the visit date" and row["officer_turn"], json.dumps(row)[:200])
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "keep_original"})
+    sv = r.json().get("site_visit", {})
+    check("SV24", "keep original confirms the officer's date", r.status_code == 200 and sv.get("status") == "confirmed" and sv.get("slot") == "afternoon" and sv.get("date") == working_day(3), r.text[:300])
+    r = req(op, "POST", f"/applications/{aid}/site-visit/reschedule", json={"date": working_day(8), "slot": "morning"})
+    check("SV25", "a reschedule without a reason is 422", r.status_code == 422, r.text)
+    r = req(op, "POST", f"/applications/{aid}/site-visit/reschedule", json={"date": working_day(8), "slot": "morning", "reason": "Renovation that week."})
+    sv = r.json().get("site_visit", {})
+    check("SV26", "the operator's reschedule keeps the confirmed date until the officer decides", r.status_code == 200 and sv.get("status_label") == "Waiting for the officer" and sv.get("date") == working_day(3), r.text[:300])
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "accept_operator"})
+    sv = r.json().get("site_visit", {})
+    check("SV27", "accepting the operator's new date confirms it", r.status_code == 200 and sv.get("status") == "confirmed" and sv.get("date") == working_day(8), r.text[:300])
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/reschedule", json={"date": working_day(9), "slot": "afternoon", "reason": "Inspector on leave."})
+    check("SV28", "the officer's reschedule becomes a proposal the operator answers", r.status_code == 200 and r.json()["site_visit"]["status"] == "proposed", r.text[:300])
+    r = req(op, "POST", f"/applications/{aid}/site-visit/accept")
+    check("SV29", "the operator accepts the moved date", r.status_code == 200 and r.json()["site_visit"]["status_label"] == "Confirmed", r.text[:300])
+    v = req(op, "GET", f"/applications/{aid}").json()
+    check("SV30", "operator history: every round with its outcome, rounds counted", len(v["site_visit"]["rounds"]) == 4 and [x["outcome"] for x in v["site_visit"]["rounds"]] == ["kept", "declined", "accepted", "accepted"], json.dumps([x["outcome"] for x in v["site_visit"]["rounds"]]))
+    trail = req(off, "GET", f"/officer/applications/{aid}/audit").json()["events"]
+    kinds = [e["event_type"] for e in trail if e["event_type"].startswith("site_visit.")]
+    check("SV31", "every round is an audit event in order", kinds == ["site_visit.proposed", "site_visit.counter_proposed", "site_visit.confirmed", "site_visit.rescheduled", "site_visit.confirmed", "site_visit.rescheduled", "site_visit.confirmed"], json.dumps(kinds))
+    check("SV32", "audit summaries read as sentences", all(not e["summary"].startswith("site_visit.") for e in trail if e["event_type"].startswith("site_visit.")), json.dumps([e["summary"] for e in trail if e["event_type"].startswith("site_visit.")])[:300])
+    r = transition(off, aid, "site_visit_done")
+    check("SV33", "Mark site visit done once confirmed; the visit is done", r.status_code == 200 and r.json()["site_visit"]["status"] == "done", r.text[:300])
+    r = req(op, "POST", f"/applications/{aid}/site-visit/reschedule", json={"date": working_day(9), "slot": "morning", "reason": "Late."})
+    check("SV34", "reschedule after the visit is done is 409", r.status_code == 409, r.text)
     r = transition(off, aid, "pending_approval")
     check("O34", "Route to approval", r.status_code == 200, r.text[:200])
     v = req(op, "GET", f"/applications/{aid}").json()
@@ -891,6 +1002,18 @@ def run_checks() -> None:
         r.text,
     )
     transition(off, aid, "site_visit_scheduled")
+    # the round cap: six proposals per visit, then only accept or keep
+    r = propose(off, aid, working_day(3))
+    check("SV35", "a second visit opens after Return to review (visit 2)", r.status_code == 200 and r.json()["site_visit"]["visit_no"] == 2, r.text[:300])
+    for n in (4, 6):
+        req(op, "POST", f"/applications/{aid}/site-visit/counter", json={"date": working_day(n + 1), "slot": "morning", "reason": "Closed."})
+        req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "propose", "date": working_day(n + 2), "slot": "morning"})
+    r = req(op, "POST", f"/applications/{aid}/site-visit/counter", json={"date": working_day(12), "slot": "morning", "reason": "Still closed."})
+    check("SV36", "the sixth proposal is the last one allowed", r.status_code == 200 and r.json()["site_visit"]["rounds_left"] == 0 and r.json()["site_visit"]["can_counter"] is False, r.text[:300])
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "propose", "date": working_day(14), "slot": "morning"})
+    check("SV37", "a seventh proposal is 409 Round limit reached", r.status_code == 409 and "Round limit" in r.json()["error"]["message"], r.text)
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "accept_operator"})
+    check("SV38", "at the cap the officer can still accept the operator's date", r.status_code == 200 and r.json()["site_visit"]["status"] == "confirmed" and r.json()["site_visit"]["can_reschedule"] is False, r.text[:300])
     transition(off, aid, "site_visit_done")
     transition(off, aid, "pending_approval")
     r = req(off, "GET", f"/officer/applications/{aid}/licence/preview")
