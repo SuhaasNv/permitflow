@@ -14,6 +14,7 @@ import type { Tone } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { useConfirmSiteVisitWithoutReply, useDecideSiteVisit, useProposeSiteVisit, useRescheduleSiteVisitAsOfficer } from './queries'
+import { useReadOnly } from './readOnly'
 
 const TONE: Record<string, Tone> = { proposed: 'neutral', counter_proposed: 'warning', confirmed: 'success', done: 'success' }
 
@@ -216,6 +217,7 @@ export interface SiteVisitPanelProps {
 
 /** S-34: the appointment in the review rail. Decide a counter-proposal, confirm after silence, reschedule, see every round. */
 export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
+  const readOnly = useReadOnly()
   const visit = view.site_visit
   const decide = useDecideSiteVisit(view.id)
   const confirm = useConfirmSiteVisitWithoutReply(view.id)
@@ -248,9 +250,9 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
         {!visit ? (
           <>
             <p className="text-[13px] leading-[19px] text-text-2">
-              No date has been proposed yet. The operator is waiting to hear from you.
+              No date has been proposed yet. The operator is waiting to hear from {readOnly ? 'the officer' : 'you'}.
             </p>
-            <Button onClick={onPropose}>Propose a visit date</Button>
+            {!readOnly ? <Button onClick={onPropose}>Propose a visit date</Button> : null}
           </>
         ) : (
           <>
@@ -275,7 +277,7 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
               <p className="text-[13px] leading-[19px] text-text-3">Visit {visit.visit_no} for this application.</p>
             ) : null}
 
-            {visit.status === 'counter_proposed' && visit.counter && form === null ? (
+            {visit.status === 'counter_proposed' && visit.counter && form === null && !readOnly ? (
               <div className="flex flex-col gap-2">
                 <Button loading={decide.isPending} disabled={busy} onClick={() => settle('accept_operator')}>
                   Accept {shortWhen(visit.counter.when)}
@@ -296,7 +298,7 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
                 ) : null}
               </div>
             ) : null}
-            {visit.status === 'proposed' ? (
+            {visit.status === 'proposed' && !readOnly ? (
               <div className="flex flex-col gap-1">
                 <Button
                   variant={visit.can_confirm_without_reply ? 'primary' : 'ghost'}
@@ -322,7 +324,7 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
                 ) : null}
               </div>
             ) : null}
-            {visit.status === 'confirmed' && form === null ? (
+            {visit.status === 'confirmed' && form === null && !readOnly ? (
               <div className="flex flex-col gap-1">
                 <Button
                   variant="secondary"

@@ -148,7 +148,8 @@ def test_download_handles_non_latin_filename_and_missing_file(client: TestClient
     assert r.status_code == 404
 
 
-def test_admin_cannot_download_documents(client: TestClient, db: Session) -> None:
+def test_admin_cannot_download_a_drafts_documents(client: TestClient, db: Session) -> None:
+    """Since US-072 an administrator downloads what an officer can; a draft is visible to neither (404)."""
     make_user(db, "op@example.sg", Role.OPERATOR)
     make_user(db, "adm@example.sg", Role.ADMIN)
     h = login(client, "op@example.sg")
@@ -157,7 +158,7 @@ def test_admin_cannot_download_documents(client: TestClient, db: Session) -> Non
     r = client.get(
         f"/api/v1/applications/{app_id}/documents/{doc_id}/download", headers=login(client, "adm@example.sg")
     )
-    assert r.status_code == 403
+    assert r.status_code == 404
 
 
 def test_nan_in_a_number_field_is_422_not_500(client: TestClient, db: Session) -> None:

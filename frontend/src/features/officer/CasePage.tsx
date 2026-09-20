@@ -25,6 +25,7 @@ import { ChecklistCard } from './ChecklistCard'
 import { ClarificationRail } from './ClarificationRail'
 import { ProposeVisitDialog, SiteVisitPanel } from './SiteVisitPanel'
 import { useOfficerApplication, useRerunCheck, useTransition } from './queries'
+import { useReadOnly } from './readOnly'
 
 interface ActionCopy {
   title: string
@@ -116,6 +117,7 @@ function ReviewRail({
   busy: boolean
 }) {
   const toast = useToast()
+  const readOnly = useReadOnly()
   const s = view.verification_summary
   const primary = view.actions.find((a) => a.enabled && !a.requires_note)
   const rest = view.actions.filter((a) => a !== primary)
@@ -136,9 +138,11 @@ function ReviewRail({
           <p className="mt-1 text-[13px] leading-[19px] text-text-2">
             {view.status === 'withdrawn'
               ? 'The operator withdrew this application. Nothing further can happen to it.'
-              : view.actions.length === 0
-                ? 'No further action is available for this application.'
-                : 'Every status change is recorded with your name in the audit trail.'}
+              : readOnly
+                ? 'Every action on this case stays with the licensing officer; you are reading it.'
+                : view.actions.length === 0
+                  ? 'No further action is available for this application.'
+                  : 'Every status change is recorded with your name in the audit trail.'}
           </p>
         </div>
         {view.licence ? (
@@ -221,12 +225,12 @@ function ReviewRail({
           <Stat label="Documents" value={s.total} />
           <Stat label="Verified" value={s.verified} tone="success" />
           <Stat label="Issues found" value={s.issues_found} tone="warning" />
-          <Stat label="Need your review" value={s.needs_review} tone="warning" />
+          <Stat label={readOnly ? 'Need officer review' : 'Need your review'} value={s.needs_review} tone="warning" />
           {s.checking > 0 ? <Stat label="Still checking" value={s.checking} tone="info" /> : null}
           {s.other > 0 ? <Stat label="Not checked" value={s.other} tone="warning" /> : null}
         </dl>
         <p className="border-t border-line px-5 py-3 text-xs leading-[18px] text-text-3">
-          Checks compare each document with the submitted form. They are advisory: the decision is yours.
+          Checks compare each document with the submitted form. They are advisory: the decision is {readOnly ? "the officer's" : 'yours'}.
         </p>
       </section>
 
@@ -256,6 +260,7 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: 'su
 /** Officer case review workspace (S-21): submission on the left, review rail on the right. */
 export function OfficerCasePage() {
   const { id = '' } = useParams()
+  const readOnly = useReadOnly()
   const app = useOfficerApplication(id)
   const schema = useFormSchema()
   const transition = useTransition(id)
@@ -279,7 +284,11 @@ export function OfficerCasePage() {
   // A failed background refetch keeps the cached view (and any unsaved work); only a first load can fail the page.
   if (app.isError && app.data === undefined) {
     if (app.error instanceof AppError && app.error.status === 404)
-      return <NotFoundPanel backTo="/officer/queue" backLabel="Back to the queue" />
+      return readOnly ? (
+        <NotFoundPanel backTo="/admin/overview" backLabel="Back to the overview" />
+      ) : (
+        <NotFoundPanel backTo="/officer/queue" backLabel="Back to the queue" />
+      )
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   if (schema.isError) return <ErrorPanel error={schema.error} onRetry={() => void schema.refetch()} />
@@ -327,7 +336,18 @@ export function OfficerCasePage() {
 
   return (
     <>
-      <Breadcrumb items={[{ label: 'Review queue', to: '/officer/queue' }, { label: view.reference_no }]} />
+      <Breadcrumb
+        items={[
+          readOnly ? { label: 'Overview', to: '/admin/overview' } : { label: 'Review queue', to: '/officer/queue' },
+          { label: view.reference_no },
+        ]}
+      />
+      {readOnly ? (
+        <Alert tone="neutral" title="Read-only" className="mb-5">
+          Administrators can read every case as the officer sees it, but cannot act on one: no status change, no feedback, no checklist, no
+          clarification. Every action stays with the licensing officer.
+        </Alert>
+      ) : null}
       <div className="mb-6">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <span className="font-mono text-[13px] font-medium tracking-[0.02em] text-text-2">{view.reference_no}</span>
@@ -517,8 +537,9 @@ export function OfficerCasePage() {
                   {d.verification ? (
                     <div className="mt-4 rounded-md border border-line bg-surface-2 px-4 py-3.5">
                       <CheckResult verification={d.verification} />
-                      {(d.verification.status !== 'pending' && d.verification.status !== 'running') ||
-                      isCheckStale(d.verification.requested_at) ? (
+                      {!readOnly &&
+                      ((d.verification.status !== 'pending' && d.verification.status !== 'running') ||
+                        isCheckStale(d.verification.requested_at)) ? (
                         <div className="mt-3 flex justify-end border-t border-line pt-2.5">
                           <Button
                             variant="ghost"
@@ -570,8 +591,8 @@ export function OfficerCasePage() {
               ))}
             </ol>
             <p className="border-t border-line px-5 py-3 text-xs text-text-3 sm:px-7">
-              <Link to="/officer/queue" className="inline-block py-2 text-text-2 sm:py-0">
-                Back to the queue
+              <Link to={readOnly ? '/admin/overview' : '/officer/queue'} className="inline-block py-2 text-text-2 sm:py-0">
+                {readOnly ? 'Back to the overview' : 'Back to the queue'}
               </Link>
             </p>
           </section>

@@ -1,7 +1,9 @@
 import uuid
+from collections.abc import Iterable
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.models import AuditEvent
@@ -35,6 +37,44 @@ class AuditRepository:
             .order_by(AuditEvent.created_at.asc(), AuditEvent.id.asc())
         )
         return list(self.db.scalars(stmt))
+
+    def feed(self, *, limit: int, before: tuple[datetime, uuid.UUID] | None = None) -> list[AuditEvent]:
+        """The newest events across every application and every user change, keyset-paged on
+        (created_at, id) so a page deep in the history costs the same as the first (US-072)."""
+        stmt = select(AuditEvent)
+        if before is not None:
+            stmt = stmt.where(tuple_(AuditEvent.created_at, AuditEvent.id) < before)
+        stmt = stmt.order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc()).limit(limit)
+        return list(self.db.scalars(stmt))
+
+    def last_activity(self, application_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, datetime]:
+        """The newest event per application (the idle list, US-070)."""
+        ids = list(application_ids)
+        if not ids:
+            return {}
+        stmt = (
+            select(AuditEvent.application_id, func.max(AuditEvent.created_at))
+            .where(AuditEvent.application_id.in_(ids))
+            .group_by(AuditEvent.application_id)
+        )
+        return {row[0]: row[1] for row in self.db.execute(stmt) if row[0] is not None}
+
+    def count_since(self, event_type: str, since: datetime, until: datetime) -> int:
+        stmt = select(func.count()).where(
+            AuditEvent.event_type == event_type,
+            AuditEvent.created_at >= since,
+            AuditEvent.created_at < until,
+        )
+        return int(self.db.scalar(stmt) or 0)
+
+    def transitions_since(self, since: datetime, until: datetime) -> list[dict[str, Any]]:
+        """The `status.changed` payloads in a window (today's submissions and resubmissions)."""
+        stmt = select(AuditEvent.payload).where(
+            AuditEvent.event_type == "status.changed",
+            AuditEvent.created_at >= since,
+            AuditEvent.created_at < until,
+        )
+        return [dict(p) for p in self.db.scalars(stmt)]
 
     def purge_draft(self, application_id: uuid.UUID) -> None:
         """Remove the events of a draft that is being deleted outright (US-045). A draft was never submitted,

@@ -70,7 +70,9 @@ def test_licence_is_owner_or_officer_only_and_rejection_issues_none(client: Test
     make_user(db, "other@example.sg", Role.OPERATOR)
     make_user(db, "admin@example.sg", Role.ADMIN)
     assert _licence(client, login(client, "other@example.sg"), app_id) == 404
-    assert _licence(client, login(client, "admin@example.sg"), app_id) == 403
+    # an administrator reads the certificate (US-072) but never previews one (officer-only)
+    assert _licence(client, login(client, "admin@example.sg"), app_id) == 200
+    assert _preview(client, login(client, "admin@example.sg"), app_id) == 403
     assert _preview(client, op, app_id) == 403
 
 

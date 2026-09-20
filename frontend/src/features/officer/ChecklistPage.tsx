@@ -17,6 +17,7 @@ import { cn } from '@/lib/cn'
 import { formatDateTime } from '@/lib/format'
 import { guardUnload, setUnsaved } from '@/lib/unsaved'
 import { useChecklist, useChecklistSchema, useOfficerApplication, useSaveChecklist, useSubmitChecklist } from './queries'
+import { useReadOnly } from './readOnly'
 
 const RESULTS: { value: ChecklistResult; label: string; on: string }[] = [
   { value: 'satisfactory', label: 'Satisfactory', on: 'border-success-line bg-success-soft text-success' },
@@ -215,9 +216,11 @@ function ResultControl({
  * save under the officer's own (US-061). The submit arrives with US-063. */
 export function ChecklistPage() {
   const { id = '' } = useParams()
+  const adminView = useReadOnly()
+  const casePath = adminView ? `/admin/applications/${id}` : `/officer/applications/${id}`
   const app = useOfficerApplication(id)
   const schema = useChecklistSchema()
-  const checklist = useChecklist(id)
+  const checklist = useChecklist(id, adminView)
   const save = useSaveChecklist(id)
   const submit = useSubmitChecklist(id)
   const navigate = useNavigate()
@@ -376,7 +379,17 @@ export function ChecklistPage() {
 
   if (checklist.isError) {
     const e = checklist.error
-    if (e instanceof AppError && e.status === 404) return <NotFoundPanel backTo="/officer/queue" backLabel="Back to the queue" />
+    if (e instanceof AppError && e.status === 404)
+      return adminView ? (
+        <NotFoundPanel
+          backTo={casePath}
+          backLabel="Back to the case"
+          title="No checklist yet"
+          description="The officer has not opened the checklist for this visit."
+        />
+      ) : (
+        <NotFoundPanel backTo="/officer/queue" backLabel="Back to the queue" />
+      )
     if (e instanceof AppError && e.status === 409)
       return (
         <div className="mx-auto max-w-[640px]">
@@ -384,7 +397,7 @@ export function ChecklistPage() {
             tone="warning"
             title="The checklist opens once a site visit is scheduled"
             action={
-              <Link to={`/officer/applications/${id}`} className={buttonClasses('secondary', 'sm')}>
+              <Link to={casePath} className={buttonClasses('secondary', 'sm')}>
                 Back to the case
               </Link>
             }
@@ -408,7 +421,7 @@ export function ChecklistPage() {
   const view = app.data
   const draft = checklist.data
   const sections = schema.data.sections
-  const readOnly = draft.status === 'submitted'
+  const readOnly = draft.status === 'submitted' || adminView
 
   const doSubmit = () => {
     submit.mutate(undefined, {
@@ -568,18 +581,22 @@ export function ChecklistPage() {
               {view.business_name ?? 'Business name not entered'}
               {view.premises_summary ? `, ${view.premises_summary}` : ''}. Visit {draft.visit_no}
               {view.site_visit ? `, ${view.site_visit.when}` : ''}.
-              {readOnly ? ' The findings are final.' : ' Fill the checklist on site; press Save draft as you go.'}
+              {draft.status === 'submitted'
+                ? ' The findings are final.'
+                : adminView
+                  ? ' The officer is still filling it in; this is the draft as last saved.'
+                  : ' Fill the checklist on site; press Save draft as you go.'}
             </span>
           </div>
           <div className="mt-2 text-[13px] text-text-3">
-            {readOnly
+            {draft.status === 'submitted'
               ? `Submitted by ${draft.submitted_by ?? ''} on ${draft.submitted_at ? formatDateTime(draft.submitted_at) : ''}`
               : `Draft, not submitted${draft.version > 1 && draft.updated_at ? ` · last saved ${formatDateTime(draft.updated_at)}` : ''}`}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">
           {!readOnly ? <SaveIndicator dirty={dirty} saving={save.isPending} savedAt={savedAt} retrying={retrying} /> : null}
-          <Link to={`/officer/applications/${id}`} className={buttonClasses('secondary', 'sm')}>
+          <Link to={casePath} className={buttonClasses('secondary', 'sm')}>
             Back to the case
           </Link>
         </div>

@@ -18,6 +18,7 @@ import {
   useRestoreFeedback,
   useWithdrawFeedback,
 } from './queries'
+import { useReadOnly } from './readOnly'
 
 const UNDO_MS = 10_000
 
@@ -37,15 +38,18 @@ export interface Target {
 
 /** Feedback rail: existing items by round, then the composer (template, target, message). */
 export function FeedbackPanel({ view, targets }: { view: OfficerApplication; targets: Target[] }) {
-  const templates = useFeedbackTemplates()
+  const readOnly = useReadOnly()
+  const templates = useFeedbackTemplates(!readOnly)
   const create = useCreateFeedback(view.id)
   const withdraw = useWithdrawFeedback(view.id)
   const resolve = useResolveFeedback(view.id)
   const restore = useRestoreFeedback(view.id)
   const reopen = useReopenFeedback(view.id)
-  const canResolve = ['under_review', 'pre_site_resubmitted', 'site_visit_scheduled', 'site_visit_done', 'pending_approval'].includes(
-    view.status,
-  )
+  const canResolve =
+    !readOnly &&
+    ['under_review', 'pre_site_resubmitted', 'site_visit_scheduled', 'site_visit_done', 'pending_approval'].includes(view.status)
+  // An administrator never edits: the composer and the item controls stay off whatever the status.
+  const editable = view.feedback_editable && !readOnly
   const toast = useToast()
   const [composingRequested, setComposing] = useState(false)
   const [target, setTarget] = useState('')
@@ -54,7 +58,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   // The case can stop being editable under the officer (status moved, operator withdrew): the composer is derived closed.
-  const composing = composingRequested && view.feedback_editable
+  const composing = composingRequested && editable
 
   /** Undo for 10 s (the server accepts a little longer). */
   const offerUndo = (title: string, body: string, feedbackId: string) => {
@@ -150,9 +154,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
             .sort((a, b) => b[0] - a[0])
             .map(([round, items]) => (
               <div key={round} className="px-5 py-3">
-                <div className="pf-eyebrow mb-2">
-                  Raised against Revision {round}
-                </div>
+                <div className="pf-eyebrow mb-2">Raised against Revision {round}</div>
                 <ul className="pf-stagger flex flex-col gap-2.5">
                   {items.map((f) => (
                     <li
@@ -210,7 +212,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                           </button>
                         ) : null}
                         {/* Not fixed (US-049): the operator's change did not settle it; reopen for the next round. */}
-                        {f.resolution === 'addressed' && view.feedback_editable ? (
+                        {f.resolution === 'addressed' && editable ? (
                           <button
                             type="button"
                             className="whitespace-nowrap py-1 font-semibold text-warning hover:underline"
@@ -226,7 +228,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                             Not fixed
                           </button>
                         ) : null}
-                        {f.resolution === 'open' && view.feedback_editable ? (
+                        {f.resolution === 'open' && editable ? (
                           <button
                             type="button"
                             className="whitespace-nowrap py-1 font-semibold text-text-2 hover:text-text"
@@ -251,7 +253,9 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
       )}
 
       <div className="border-t border-line px-5 py-4">
-        {!view.feedback_editable ? (
+        {readOnly ? (
+          <p className="text-[13px] leading-[19px] text-text-3">Feedback is written by the licensing officer.</p>
+        ) : !view.feedback_editable ? (
           <p className="text-[13px] leading-[19px] text-text-3">{view.feedback_locked_reason}</p>
         ) : !composing ? (
           <Button variant="secondary" onClick={() => setComposing(true)} className="w-full">

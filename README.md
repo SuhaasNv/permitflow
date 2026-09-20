@@ -41,14 +41,16 @@ Local quotas: an operator may hold 20 open drafts and run 60 AI checks a day (th
 
 ## Demo accounts
 
-`backend/scripts/seed.py` creates two accounts (idempotent); sample documents, clean and with planted issues, are in `docs/12-demo/documents/`. The same accounts exist in every environment, and the password is shared on purpose: this is a demonstration, the sign-in page and the privacy policy say so, and no real personal data should be entered.
+`backend/scripts/seed.py` creates four accounts (idempotent); sample documents, clean and with planted issues, are in `docs/12-demo/documents/`. The same accounts exist in every environment, and the password is shared on purpose: this is a demonstration, the sign-in page and the privacy policy say so, and no real personal data should be entered.
 
 | Role | Email | Password |
 |------|-------|----------|
 | Operator (Tan Wei Ling) | operator@permitflow.example.sg | `PermitFlow!2026` |
 | Licensing officer (Rahim bin Abdullah) | officer@permitflow.example.sg | `PermitFlow!2026` |
+| Administrator (Priya Nair) | admin@permitflow.example.sg | `PermitFlow!2026` |
+| Spare licensing officer (Lim Jun Hao, the account the admin scenario changes and restores) | officer2@permitflow.example.sg | `PermitFlow!2026` |
 
-No admin account yet (the admin epic is v0.4.0), no self-registration or password reset by design (`SCOPE.md`, Deferred). Sign-in attempts are limited to 20 a minute per client.
+The first three are protected: no administrator can change their role or deactivate them, so the demonstration always works. Administrators create further accounts from the Users page or with `backend/scripts/create_user.py`; there is no self-registration or password reset by design (`SCOPE.md`, Deferred). Sign-in attempts are limited to 20 a minute per client.
 
 ## Scope
 
@@ -82,7 +84,7 @@ cd frontend && npm test && npm run lint && npm run typecheck && npm run build
 cd frontend && npm run e2e          # Playwright against the running stack (backend :8000 with AI_PROVIDER=mock, Vite :3000)
 ```
 
-831 backend cases from 232 test functions on a real PostgreSQL (the state-machine sweep alone is 597), 209 frontend tests, eleven Playwright specs (the journey, nine scenarios, the accessibility gate), 245 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
+850 backend cases from 249 test functions on a real PostgreSQL (the state-machine sweep alone is 597), 222 frontend tests, twelve Playwright specs (the journey, ten scenarios, the accessibility gate), 246 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
 
 ## Environment variables
 

@@ -12,6 +12,7 @@ import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDateTime } from '@/lib/format'
 import { useReopenClarification, useResolveClarification, useWithdrawClarification } from './queries'
+import { useReadOnly } from './readOnly'
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
   open: { label: 'Open', tone: 'warning' },
@@ -28,6 +29,7 @@ const RESULT: Record<string, string> = {
 }
 
 function Thread({ view, thread, n }: { view: OfficerApplication; thread: ClarificationThread; n: number }) {
+  const readOnly = useReadOnly()
   const resolve = useResolveClarification(view.id)
   const reopen = useReopenClarification(view.id)
   const withdraw = useWithdrawClarification(view.id)
@@ -140,10 +142,10 @@ function Thread({ view, thread, n }: { view: OfficerApplication; thread: Clarifi
       </ol>
       {thread.pending_release ? (
         <Alert tone="neutral" title="Not sent yet">
-          The operator sees this when you request another round.
+          The operator sees this when {readOnly ? 'the officer requests' : 'you request'} another round.
         </Alert>
       ) : null}
-      {asking ? (
+      {readOnly ? null : asking ? (
         <form
           className="flex flex-col gap-3"
           aria-label="Still needs clarification"
@@ -257,7 +259,7 @@ export function ClarificationRail({ view }: { view: OfficerApplication }) {
         </p>
       </div>
       {c.items.length === 0 ? (
-        <p className="px-5 py-4 text-sm text-text-2">Nothing to clarify. Route to approval when you are ready.</p>
+        <p className="px-5 py-4 text-sm text-text-2">Nothing to clarify. The officer routes the case to approval when ready.</p>
       ) : (
         <ol className="px-5">
           {c.items.map((t, i) => (

@@ -1,11 +1,14 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { Outlet, createBrowserRouter } from 'react-router-dom'
 
 import { AppShell } from './AppShell'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { LandingPage } from '@/features/landing/LandingPage'
 import { PolicyPage } from '@/features/legal/PolicyPage'
 import { RequireRole } from '@/features/auth/RequireRole'
+import { AdminActivityPage } from '@/features/admin/ActivityPage'
 import { AdminOverviewPage } from '@/features/admin/OverviewPage'
+import { AdminUsersPage } from '@/features/admin/UsersPage'
+import { ReadOnlyProvider } from '@/features/officer/readOnly'
 import { OfficerQueuePage } from '@/features/officer/QueuePage'
 import { OfficerCasePage } from '@/features/officer/CasePage'
 import { ChecklistPage } from '@/features/officer/ChecklistPage'
@@ -69,7 +72,23 @@ export const router = createBrowserRouter([
     children: [
       {
         element: <AppShell />,
-        children: [{ path: '/admin/overview', element: <AdminOverviewPage /> }],
+        children: [
+          { path: '/admin/overview', element: <AdminOverviewPage /> },
+          { path: '/admin/activity', element: <AdminActivityPage /> },
+          { path: '/admin/users', element: <AdminUsersPage /> },
+          // The officer screens, read-only (US-072): the server sends no actions, the components render no controls.
+          {
+            element: (
+              <ReadOnlyProvider value={true}>
+                <Outlet />
+              </ReadOnlyProvider>
+            ),
+            children: [
+              { path: '/admin/applications/:id', element: <OfficerCasePage /> },
+              { path: '/admin/applications/:id/checklist', element: <ChecklistPage /> },
+            ],
+          },
+        ],
       },
     ],
   },

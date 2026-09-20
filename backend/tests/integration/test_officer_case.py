@@ -31,16 +31,13 @@ def test_officer_view_shows_revision_documents_and_actions(client: TestClient, d
     assert "version" in body
 
 
-def test_officer_view_is_officer_only_and_hides_drafts(client: TestClient, db: Session) -> None:
+def test_officer_view_is_officer_or_admin_and_hides_drafts(client: TestClient, db: Session) -> None:
     app_id, op, off = _submitted(client, db)
     make_user(db, "adm@example.sg", Role.ADMIN)
     assert client.get(f"/api/v1/officer/applications/{app_id}", headers=op).status_code == 403
-    assert (
-        client.get(
-            f"/api/v1/officer/applications/{app_id}", headers=login(client, "adm@example.sg")
-        ).status_code
-        == 403
-    )
+    # an administrator reads the case with no action offered (US-072)
+    r = client.get(f"/api/v1/officer/applications/{app_id}", headers=login(client, "adm@example.sg"))
+    assert r.status_code == 200 and r.json()["actions"] == []
     draft = client.post("/api/v1/applications", headers=op).json()["id"]
     assert client.get(f"/api/v1/officer/applications/{draft}", headers=off).status_code == 404
 

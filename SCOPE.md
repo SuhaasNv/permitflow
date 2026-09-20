@@ -134,7 +134,7 @@ Two epics in five one-day sprints on `dev`, deployed to the development environm
 | V17 | The per-client limiter keyed on the real caller behind the Railway edge (readiness row 25) | MUST |
 | V25 | One live session per account (US-093, NFR-019, built 21 Sep at the owner's request): a second sign-in is refused and names the other device, take-over from the sign-in page ends the other session, revocation on the next request, sign-out on the server, a 60-minute idle limit; continuity through the server-side draft | MUST |
 | V26 | Findings of the officer's own on the checklist (US-092, built 21 Sep at the owner's question): free under Other findings or a second finding on a template item, same result, comment and flag, removable while a draft; the draft is also sent when the tab goes to the background | SHOULD |
-| V7 to V10 | The admin panel (S7 as tightened, plus protected demonstration accounts) | Committed, first in the cut order |
+| V7 to V10 | The admin panel (S7 as tightened, plus protected demonstration accounts and account creation from the page at the owner's request; built 21 Sep 2026: US-070, US-072, US-073) | Committed |
 | V16, V18, V23 | Post-site states on the dashboard, the officer `phase` fields, thumbnails in the clarification thread | SHOULD |
 | Parked for v0.5.0 | Photo evidence per checklist item, reason chips, undo for clarification actions, a late flag after submit, a check on attachments, an offline mirror of the draft, CSV export of the activity feed, officer assignment | |
 

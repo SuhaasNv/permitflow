@@ -47,7 +47,7 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 
 ## Seeding
 
-`cd backend && uv run python scripts/seed.py` creates the demo operator (`operator@permitflow.example.sg`) and officer (`officer@permitflow.example.sg`) if they do not exist. `SEED_PASSWORD` sets their password (default `PermitFlow!2026`). The public demonstration keeps that password on purpose (README, privacy policy); any deployment that is not a demonstration must set its own value and reset it on a schedule.
+`cd backend && uv run python scripts/seed.py` creates the demo operator (`operator@permitflow.example.sg`), officer (`officer@permitflow.example.sg`), administrator (`admin@permitflow.example.sg`, US-073) and the unprotected spare officer (`officer2@permitflow.example.sg`) if they do not exist, and marks the first three protected. `scripts/create_user.py --email ... --name ... --role officer` creates any other account (password from `CREATE_USER_PASSWORD` or a prompt, never an argument); the Users page does the same for a signed-in administrator. `SEED_PASSWORD` sets their password (default `PermitFlow!2026`). The public demonstration keeps that password on purpose (README, privacy policy); any deployment that is not a demonstration must set its own value and reset it on a schedule.
 
 ## Uploads
 
@@ -121,7 +121,7 @@ The GitHub `production` environment only accepts deployments from `main`. Develo
 
 ### Seeding
 
-The database starts empty. `scripts/seed.py` creates the two demo accounts only (idempotent). It is not part of a deploy on purpose, a deploy must never touch data; run it once per environment: `railway ssh --environment development --service backend -- .venv/bin/python scripts/seed.py` (and `--environment production` for production). Development was seeded on 19 Sep 2026; production on 19 Sep 2026 after the v0.3.0 deploy. Accounts and password in every environment: `operator@permitflow.example.sg` and `officer@permitflow.example.sg`, password `PermitFlow!2026` (the `SEED_PASSWORD` default; deliberately public for the demonstration, see the privacy policy). To change it, set `SEED_PASSWORD` and re-run the seed: existing accounts keep their password (the script is create-only), so a rotation is a new seed plus a manual update, or a reset of the environment.
+The database starts empty. `scripts/seed.py` creates the four demo accounts only (idempotent; the administrator and the spare officer since US-073, 21 Sep 2026: re-run it once per environment when v0.4.0 deploys). It is not part of a deploy on purpose, a deploy must never touch data; run it once per environment: `railway ssh --environment development --service backend -- .venv/bin/python scripts/seed.py` (and `--environment production` for production). Development was seeded on 19 Sep 2026; production on 19 Sep 2026 after the v0.3.0 deploy. Accounts and password in every environment: `operator@permitflow.example.sg` and `officer@permitflow.example.sg`, password `PermitFlow!2026` (the `SEED_PASSWORD` default; deliberately public for the demonstration, see the privacy policy). To change it, set `SEED_PASSWORD` and re-run the seed: existing accounts keep their password (the script is create-only), so a rotation is a new seed plus a manual update, or a reset of the environment.
 
 ### Custom domain (US-052)
 

@@ -113,6 +113,13 @@ class DocumentRepository:
         self.db.add(doc)
         return doc
 
+    def runs_since(self, since: datetime, until: datetime) -> list[VerificationRun]:
+        """Every run created in a window (the admin health block, US-070)."""
+        stmt = select(VerificationRun).where(
+            VerificationRun.created_at >= since, VerificationRun.created_at < until
+        )
+        return list(self.db.scalars(stmt))
+
     def count_runs_since(
         self, since: datetime, operator_id: uuid.UUID | None = None, *, exclude_reason: str | None = None
     ) -> int:

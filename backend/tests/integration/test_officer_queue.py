@@ -38,14 +38,15 @@ def test_queue_lists_submitted_applications_only(client: TestClient, db: Session
     assert body["waiting_on_operator_count"] == 0 and body["decided_count"] == 0
 
 
-def test_queue_is_officer_only(client: TestClient, db: Session) -> None:
+def test_queue_is_officer_or_admin(client: TestClient, db: Session) -> None:
     make_user(db, "op@example.sg", Role.OPERATOR)
     make_user(db, "adm@example.sg", Role.ADMIN)
     assert (
         client.get("/api/v1/officer/applications", headers=login(client, "op@example.sg")).status_code == 403
     )
+    # an administrator reads the queue (US-072)
     assert (
-        client.get("/api/v1/officer/applications", headers=login(client, "adm@example.sg")).status_code == 403
+        client.get("/api/v1/officer/applications", headers=login(client, "adm@example.sg")).status_code == 200
     )
     assert client.get("/api/v1/officer/applications").status_code == 401
 
