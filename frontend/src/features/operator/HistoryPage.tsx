@@ -11,13 +11,14 @@ import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/sh
 import { formatDateTime } from '@/lib/format'
 import { ApplicationHeader } from './ApplicationHeader'
 import { FeedbackNotice } from './FeedbackNotice'
-import { useApplication, useFormSchema } from './queries'
+import { useApplication, useClarifications, useFormSchema } from './queries'
 
 /** Operator history (S-16, US-019): every revision, every released feedback item by round, and what changed between revisions. */
 export function HistoryPage() {
   const { id = '' } = useParams()
   const app = useApplication(id)
   const schema = useFormSchema()
+  const clar = useClarifications(id, app.data?.clarification != null)
   const [pair, setPair] = useState<[number, number] | null>(null)
   const compare = useQuery({
     queryKey: ['my-compare', id, pair],
@@ -156,6 +157,68 @@ export function HistoryPage() {
           ) : (
             <p className="text-sm text-text-3">No feedback from the licensing office yet.</p>
           )}
+
+          {clar.data && clar.data.items.length > 0 ? (
+            <section className="pf-surface overflow-hidden" aria-labelledby="clar-history-title">
+              <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4 sm:px-7">
+                <h2 id="clar-history-title" className="text-[13px] font-semibold uppercase tracking-[0.06em] text-text-3">
+                  Clarification after the site visit
+                </h2>
+                <span className="text-xs text-text-3">
+                  Visit {clar.data.visit_no} · round {clar.data.round} · {clar.data.items.length}{' '}
+                  {clar.data.items.length === 1 ? 'item' : 'items'}
+                </span>
+              </div>
+              <ol className="divide-y divide-line">
+                {clar.data.items.map((item) => (
+                  <li key={item.item_id} className="px-5 py-4 sm:px-7">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-[15px] font-semibold">{item.title}</h3>
+                      <StatusBadge
+                        label={item.status}
+                        tone={
+                          item.status === 'Clarified'
+                            ? 'success'
+                            : item.status === 'Sent'
+                              ? 'info'
+                              : item.status === 'Waiting for your response'
+                                ? 'warning'
+                                : 'neutral'
+                        }
+                      />
+                    </div>
+                    <ol className="mt-3 flex flex-col gap-2 text-sm">
+                      {item.requests.map((q) => {
+                        const answer = item.responses.find((r) => r.round_no === q.round_no)
+                        return (
+                          <li key={q.id} className="flex flex-col gap-1 border-l-2 border-line pl-3">
+                            <span>
+                              <span className="font-semibold">The officer asked</span> <span className="text-text-2">{q.message}</span>
+                            </span>
+                            <span className="text-xs text-text-3">
+                              Round {q.round_no} · {formatDateTime(q.released_at)}
+                            </span>
+                            {answer ? (
+                              <>
+                                <span>
+                                  <span className="font-semibold">You answered</span>{' '}
+                                  <span className="whitespace-pre-wrap text-text-2">{answer.message}</span>
+                                </span>
+                                <span className="text-xs text-text-3">
+                                  {answer.sent_at ? `Sent ${formatDateTime(answer.sent_at)}` : 'Draft, never sent'}
+                                  {answer.attachments.length ? ` · ${answer.attachments.map((a) => a.original_filename).join(', ')}` : ''}
+                                </span>
+                              </>
+                            ) : null}
+                          </li>
+                        )
+                      })}
+                    </ol>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ) : null}
 
           {view.site_visit ? (
             <section className="pf-surface overflow-hidden" aria-labelledby="visit-history-title">

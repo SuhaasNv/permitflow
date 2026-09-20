@@ -92,13 +92,11 @@ test('checklist: open from the case, assess items, save the draft, see the summa
   await page.getByLabel(/Your answer/).fill('Regraded on 23 Sep; water now runs to the trap. Photo attached.')
   await page.getByLabel(/Your answer/).blur()
   await expect(page.getByRole('button', { name: 'Choose a file' })).toBeVisible()
-  await page
-    .locator('input[type=file][multiple]')
-    .setInputFiles({
-      name: 'floor-trap.txt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('Photo description: floor regraded, water runs to the trap.'),
-    })
+  await page.locator('input[type=file][multiple]').setInputFiles({
+    name: 'floor-trap.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Photo description: floor regraded, water runs to the trap.'),
+  })
   await expect(page.getByRole('button', { name: 'floor-trap.txt' })).toBeVisible()
   await expect(page.getByText('1 of 3 files attached.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Send responses' })).toBeEnabled()
@@ -118,4 +116,56 @@ test('checklist: open from the case, assess items, save the draft, see the summa
   await expect(status(page)).toHaveText('Post-Site Clarification Resubmitted')
   await page.getByRole('button', { name: /Notifications/ }).click()
   await expect(page.getByRole('dialog', { name: 'Notifications' })).toContainText('The operator answered the clarification request')
+  await page.keyboard.press('Escape')
+
+  // ---- round 2: the officer asks again, requests another round; the operator answers; clarified; approval (US-066) ----
+  const rail = page.locator('section:has(#clarification-title)')
+  await expect(rail).toContainText('Round 1, your turn')
+  await expect(rail).toContainText('Regraded on 23 Sep; water now runs to the trap. Photo attached.')
+  await expect(rail.getByRole('button', { name: /floor-trap.txt/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Route to approval' })).toBeDisabled()
+  await rail.getByRole('button', { name: 'Still needs clarification' }).click()
+  await rail.getByLabel(/What is still unclear/).fill('Please attach a photo of the drainage test.')
+  await rail.getByRole('button', { name: 'Draft the question' }).click()
+  await expect(rail).toContainText('Not sent yet')
+  await expect(page.getByRole('button', { name: 'Request another round' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Request another round' }).click()
+  await page.locator('dialog[open]').getByRole('button', { name: 'Request another round' }).click()
+  await expect(status(page)).toHaveText('Awaiting Post-Site Resubmission')
+  await expect(rail).toContainText('Round 2, waiting on operator')
+  await signOut(page)
+
+  await signIn(page, OPERATOR)
+  await page.goto(app.url)
+  await expect(status(page)).toHaveText('Pending Post-Site Resubmission')
+  await page.getByRole('link', { name: 'Respond to clarification (1 item)' }).click()
+  await expect(page.getByText('Round 2: 1 of 1 item needs your response')).toBeVisible()
+  await expect(page.getByText('Please attach a photo of the drainage test.')).toBeVisible()
+  await page.getByLabel(/Your answer/).fill('Drainage test done; water clears in 20 seconds.')
+  await page.getByLabel(/Your answer/).blur()
+  await expect(page.getByRole('button', { name: 'Send responses' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Send responses' }).click()
+  await page.locator('dialog[open]').getByRole('button', { name: 'Send responses' }).click()
+  await expect(page.getByText('Round 2: every item is answered')).toBeVisible()
+  await page.getByRole('link', { name: 'Back to the application' }).click()
+  await page.getByRole('link', { name: 'History' }).click()
+  await expect(page.locator('section:has(#clar-history-title)')).toContainText('round 2')
+  await expect(page.locator('section:has(#clar-history-title)')).toContainText('Drainage test done')
+  await signOut(page)
+
+  await signIn(page, OFFICER)
+  await openCase(page, app.reference)
+  await expect(rail).toContainText('Round 2, your turn')
+  await expect(rail).toContainText('Drainage test done; water clears in 20 seconds.')
+  await rail.getByRole('button', { name: 'Mark clarified' }).click()
+  await expect(rail).toContainText('0 open · 0 answered · 1 clarified')
+  await expect(page.getByRole('button', { name: 'Route to approval' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Route to approval' }).click()
+  await page.locator('dialog[open]').getByRole('button', { name: 'Route to approval' }).click()
+  await expect(status(page)).toHaveText('Route to Approval')
+  const finalTrail = await auditSummaries(page)
+  expect(finalTrail.some((t) => t.startsWith('Item floor_trap_graded still needs clarification'))).toBe(true)
+  expect(finalTrail.some((t) => t.startsWith('Question on floor_trap_graded sent to the operator (round 2)'))).toBe(true)
+  expect(finalTrail).toContain('Item floor_trap_graded marked clarified')
+  expect(finalTrail).toContain('Status: Post-Site Clarification Resubmitted → Route to Approval')
 })

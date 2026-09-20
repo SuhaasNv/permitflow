@@ -122,6 +122,20 @@ class WorkflowService:
         if resolved == ApplicationStatus.SITE_VISIT_DONE:
             # The confirmed appointment is over (US-084); the guard made sure one exists.
             SiteVisitService(self.db).mark_done(app, datetime.now(UTC))
+        released_count = 0
+        if resolved == ApplicationStatus.PENDING_POST_SITE_RESUBMISSION:
+            # Request another round (US-066): the drafted questions reach the operator now.
+            from app.services.clarification import ClarificationService  # noqa: PLC0415
+
+            released_count = ClarificationService(self.db).release_next_round(
+                app, actor_user, datetime.now(UTC)
+            )
+            if operator_body is None:
+                word = "item" if released_count == 1 else "items"
+                operator_body = (
+                    f"The licensing officer needs more information on {released_count} {word} after "
+                    "your answers. Open the application to respond."
+                )
         # A note is stored only with a decision and ignored for other targets (TransitionIn says so).
         note = note if resolved in (ApplicationStatus.APPROVED, ApplicationStatus.REJECTED) else None
         if note is not None:

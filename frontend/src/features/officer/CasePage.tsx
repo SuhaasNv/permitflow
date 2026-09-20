@@ -22,6 +22,7 @@ import { ComparePanel } from './ComparePanel'
 import { FeedbackPanel } from './FeedbackPanel'
 import type { Target } from './FeedbackPanel'
 import { ChecklistCard } from './ChecklistCard'
+import { ClarificationRail } from './ClarificationRail'
 import { ProposeVisitDialog, SiteVisitPanel } from './SiteVisitPanel'
 import { useOfficerApplication, useRerunCheck, useTransition } from './queries'
 
@@ -49,6 +50,11 @@ const ACTION_COPY: Record<string, ActionCopy> = {
     confirm: 'Mark done',
   },
   pending_approval: { title: 'Route to approval?', body: 'The application is marked ready for a decision.', confirm: 'Route to approval' },
+  pending_post_site_resubmission: {
+    title: 'Request another round?',
+    body: 'Every question you drafted is sent to the operator now. They answer only those items and send the round back.',
+    confirm: 'Request another round',
+  },
   approved: { title: 'Approve this application?', body: 'This is final. The operator sees Approved and your note.', confirm: 'Approve' },
   rejected: {
     title: 'Reject this application?',
@@ -224,7 +230,7 @@ function ReviewRail({
         </p>
       </section>
 
-      <FeedbackPanel view={view} targets={targets} />
+      {view.clarification ? <ClarificationRail view={view} /> : <FeedbackPanel view={view} targets={targets} />}
     </aside>
   )
 }

@@ -71,6 +71,53 @@ class ClarificationAttachOut(BaseModel):
     unchanged: bool
 
 
+class ClarificationThreadRequestOut(BaseModel):
+    """A request as the officer sees it: released or still a draft of the next round (US-066)."""
+
+    id: uuid.UUID
+    round_no: int
+    message: str
+    author_name: str
+    created_at: datetime
+    released_at: datetime | None
+    withdrawn_at: datetime | None
+    response: ClarificationResponseOut | None
+
+
+class ClarificationThreadOut(BaseModel):
+    item_id: uuid.UUID
+    key: str
+    title: str
+    result: str
+    comment: str | None
+    # Internal state names for the officer: open, answered, resolved, withdrawn.
+    status: str
+    round_no: int
+    requests: list[ClarificationThreadRequestOut]
+    can_resolve: bool
+    can_reopen: bool
+    can_withdraw: bool
+    # An unreleased request of the next round waits for Request another round.
+    pending_release: bool
+
+
+class ClarificationOfficerView(BaseModel):
+    visit_no: int
+    round: int
+    open_count: int
+    answered_count: int
+    resolved_count: int
+    withdrawn_count: int
+    unreleased_count: int
+    # "Round 2, your turn" or "Round 2, waiting on operator" for the rail header.
+    turn: str
+    items: list[ClarificationThreadOut]
+
+
+class ClarificationReopenIn(BaseModel):
+    message: str = Field(max_length=2000)
+
+
 class ClarificationBlock(BaseModel):
     """The block on the operator's application view: what to show and whether to act."""
 
@@ -86,7 +133,11 @@ __all__ = [
     "ClarificationBlock",
     "ClarificationItemOut",
     "ClarificationOperatorView",
+    "ClarificationOfficerView",
+    "ClarificationReopenIn",
     "ClarificationRequestOut",
     "ClarificationResponseIn",
     "ClarificationResponseOut",
+    "ClarificationThreadOut",
+    "ClarificationThreadRequestOut",
 ]

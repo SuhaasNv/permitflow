@@ -12,7 +12,10 @@ import {
   resolveFeedback,
   reopenFeedback,
   restoreFeedback,
+  reopenClarification,
+  resolveClarification,
   transitionApplication,
+  withdrawClarification,
   withdrawFeedback,
 } from '@/api/officer'
 import type { Checklist, ChecklistSaveInput } from '@/api/checklist'
@@ -212,5 +215,31 @@ export function useSubmitChecklist(id: string) {
       void qc.invalidateQueries({ queryKey: officerKeys.queue })
       void qc.invalidateQueries({ queryKey: officerKeys.audit(id) })
     },
+  })
+}
+
+// Clarification rounds (US-066).
+
+export function useResolveClarification(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (itemId: string) => resolveClarification(id, itemId),
+    onSuccess: (view) => afterCaseChange(qc, id, view),
+  })
+}
+
+export function useReopenClarification(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ itemId, message }: { itemId: string; message: string }) => reopenClarification(id, itemId, message),
+    onSuccess: (view) => afterCaseChange(qc, id, view),
+  })
+}
+
+export function useWithdrawClarification(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (itemId: string) => withdrawClarification(id, itemId),
+    onSuccess: (view) => afterCaseChange(qc, id, view),
   })
 }

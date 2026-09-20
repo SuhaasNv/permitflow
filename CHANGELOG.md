@@ -2,6 +2,11 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-066 Clarification rounds (21 Sep 2026, Sprint 5)
+
+- The officer marks an answered item clarified, asks again (an unreleased question for the next round, shown as Not sent yet) or withdraws an open question; Request another round releases the drafts and tells the operator with the count; Route to approval waits for nothing open or answered; rounds are counted per item. The case carries every thread with the finding on top; the rail (S-31) replaces the feedback panel in the post-site states; the operator's history page lists the rounds. Audit labels for every clarification event.
+- Tests: two rounds end to end, five rounds losing nothing, a withdraw racing a send under the row lock, a rejection mid-round; the rail's vitest; scenario eight now runs from the visit to Route to Approval through two rounds.
+
 ## US-065 The operator answers, attaches evidence and sends (21 Sep 2026, Sprint 5)
 
 - One answer per open question, rewritable until sent; up to three files per answer under the document rules (allowlist, magic bytes, 10 MB), an identical file reported as no change, removal until sent, downloads for the owner, officers and admins with the ownership chain checked at every hop (migration 0009). Send responses needs every open item answered (422 listing the keys), leaves out items withdrawn before the send, moves the case to Post-Site Clarification Resubmitted with the operator as actor, and tells every active officer.

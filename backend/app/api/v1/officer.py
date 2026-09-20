@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Response, status
 
 from app.api.deps import DbSession, OfficerUser
 from app.domain.feedback_templates import TEMPLATES
+from app.schemas.clarification import ClarificationReopenIn
 from app.schemas.officer import (
     AuditTrailOut,
     FeedbackIn,
@@ -16,6 +17,7 @@ from app.schemas.officer import (
 )
 from app.schemas.site_visit import SiteVisitDecideIn, SiteVisitProposeIn, SiteVisitRescheduleIn
 from app.services.audit_trail import AuditTrailService
+from app.services.clarification import ClarificationService
 from app.services.feedback import FeedbackService
 from app.services.licence import LicenceService
 from app.services.officer_queue import OfficerQueueService
@@ -208,3 +210,40 @@ def reschedule_site_visit(
 def audit_trail(application_id: uuid.UUID, user: OfficerUser, db: DbSession) -> AuditTrailOut:
     """Append-only history of everything that happened to the application (FR-025, SEC-009)."""
     return AuditTrailService(db).for_application(user, application_id)
+
+
+# Clarification rounds (US-066): decide each answered item, then Request another round or Route to approval.
+
+
+@router.post(
+    "/applications/{application_id}/clarifications/{item_id}/resolve", response_model=OfficerApplicationOut
+)
+def resolve_clarification(
+    application_id: uuid.UUID, item_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    ClarificationService(db).resolve(user, application_id, item_id)
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
+    "/applications/{application_id}/clarifications/{item_id}/reopen", response_model=OfficerApplicationOut
+)
+def reopen_clarification(
+    application_id: uuid.UUID,
+    item_id: uuid.UUID,
+    body: ClarificationReopenIn,
+    user: OfficerUser,
+    db: DbSession,
+) -> OfficerApplicationOut:
+    ClarificationService(db).reopen(user, application_id, item_id, body.message)
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
+    "/applications/{application_id}/clarifications/{item_id}/withdraw", response_model=OfficerApplicationOut
+)
+def withdraw_clarification(
+    application_id: uuid.UUID, item_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    ClarificationService(db).withdraw(user, application_id, item_id)
+    return OfficerViewService(db).get(user, application_id)
