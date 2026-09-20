@@ -210,3 +210,20 @@ export async function acceptVisit(id: string) {
   const op = await login(OPERATOR)
   await call(op, `/applications/${id}/site-visit/accept`, { method: 'POST' })
 }
+
+/** Under review with a proposed visit the operator has not answered (Site Visit Scheduled, US-084). */
+export async function seedVisitProposed(): Promise<Seeded> {
+  const seeded = await seedUnderReview()
+  const off = await login(OFFICER)
+  const view = await call<{ version: number }>(off, `/officer/applications/${seeded.id}`)
+  await call(off, `/officer/applications/${seeded.id}/site-visit`, {
+    method: 'POST',
+    body: JSON.stringify({
+      date: workingDayAhead(3),
+      slot: 'afternoon',
+      note: 'Please have the pest control contract on the premises.',
+      expected_version: view.version,
+    }),
+  })
+  return seeded
+}
