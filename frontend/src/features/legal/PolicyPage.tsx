@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 
+import { homeFor, useAuth } from '@/features/auth/AuthContext'
 import { buttonClasses } from '@/features/shared/Button'
 import { Logo } from '@/features/shared/Logo'
 import { OPERATOR_URL, POLICIES } from './content'
@@ -15,6 +16,7 @@ function isSlug(value: string | undefined): value is PolicySlug {
 /** Public policy pages (US-057): privacy, terms, cookies. One layout, content from `content.ts`. */
 export function PolicyPage() {
   const slug = useLocation().pathname.replace(/^\//, '')
+  const { user } = useAuth()
   // The public routes sit outside the app shell's ScrollRestoration, so a footer link at the bottom of the
   // landing page would otherwise open the policy still scrolled to the bottom.
   useEffect(() => {
@@ -31,9 +33,16 @@ export function PolicyPage() {
         <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-5 sm:px-10">
           <Logo />
           <nav className="flex items-center gap-3 sm:gap-5" aria-label="Site">
-            <Link to="/login" className={buttonClasses('primary', 'sm', 'h-9 px-4')}>
-              Sign in
-            </Link>
+            {user ? (
+              // Reached from the app's footer while signed in: lead back into the app, not to the sign-in page.
+              <Link to={homeFor(user.role)} className={buttonClasses('secondary', 'sm', 'h-9 px-4')}>
+                {user.role === 'officer' ? 'Back to queue' : 'Back to dashboard'}
+              </Link>
+            ) : (
+              <Link to="/login" className={buttonClasses('primary', 'sm', 'h-9 px-4')}>
+                Sign in
+              </Link>
+            )}
           </nav>
         </div>
       </header>
