@@ -194,7 +194,7 @@ function ResultControl({
             // Pressing the selected result again clears it back to Not assessed.
             onClick={() => onChange(on ? 'not_assessed' : r.value)}
             className={cn(
-              'inline-flex h-11 items-center justify-center gap-2 rounded-md border px-3.5 text-sm',
+              'inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-md border px-3.5 text-sm',
               'transition-[border-color,background-color,color] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
               'focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(23,92,211,0.2)] disabled:cursor-not-allowed',
               compact && 'flex-1',
@@ -635,7 +635,7 @@ export function ChecklistPage() {
               key={s.key}
               href={`#section-${s.key}`}
               className={cn(
-                'inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[13px] font-medium no-underline transition-colors duration-[var(--dur-fast)]',
+                'inline-flex h-9 min-h-[44px] items-center gap-2 rounded-full border px-3 text-[13px] font-medium no-underline transition-colors duration-[var(--dur-fast)] xl:min-h-0',
                 complete ? 'border-success-line bg-success-soft text-success' : 'border-line-strong bg-surface text-text-2 hover:text-text',
               )}
             >

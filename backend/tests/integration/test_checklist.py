@@ -301,7 +301,10 @@ def test_nothing_flagged_moves_on_and_a_second_visit_gets_its_own_checklist(
     view = transition(client, off, app_id, "pending_approval")
     assert view["status"] == "pending_approval"
     transition(client, off, app_id, "under_review")
-    assert client.post(URL.format(app_id), headers=off).status_code == 409  # not in a site-visit state
+    # not in a site-visit state: the submitted checklist is still returned (readable from any state,
+    # found by the accessibility gate of US-088) and nothing new is created
+    back = client.post(URL.format(app_id), headers=off)
+    assert back.status_code == 200 and back.json()["status"] == "submitted" and back.json()["visit_no"] == 1
     arrange_visit(client, off, op, app_id)  # visit 2
     r = client.post(URL.format(app_id), headers=off)
     assert r.status_code == 201, r.text
