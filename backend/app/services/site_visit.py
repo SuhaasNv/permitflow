@@ -20,10 +20,12 @@ from app.domain.enums import (
     SiteVisitStatus,
 )
 from app.domain.site_visit import (
+    ROUND_LIMIT_REASON,
     date_problem,
     earliest_date,
     format_visit,
     reply_deadline,
+    rounds_left,
     short_visit,
     today_in_singapore,
 )
@@ -81,6 +83,8 @@ class SiteVisitService:
         can_confirm = (
             visit.status == SiteVisitStatus.PROPOSED and deadline is not None and self.today() >= deadline
         )
+        left = rounds_left(len(proposals))
+        reschedulable = visit.status == SiteVisitStatus.CONFIRMED and visit.date > self.today() and left > 0
         return SiteVisitOut(
             visit_no=visit.visit_no,
             status=visit.status.value,
@@ -102,7 +106,9 @@ class SiteVisitService:
             ),
             original=self._original(proposals),
             counter=self._pending_counter(visit, proposals),
-            can_reschedule=visit.status == SiteVisitStatus.CONFIRMED and visit.date > self.today(),
+            can_reschedule=reschedulable,
+            rounds_left=left,
+            round_limit_reason=ROUND_LIMIT_REASON if left == 0 else None,
             rounds=[self._proposal_out(p) for p in proposals],
         )
 
@@ -113,6 +119,8 @@ class SiteVisitService:
         proposals = self.visits.proposals_for(visit.id)
         last_officer = next((p for p in reversed(proposals) if p.author_role == Role.OFFICER.value), None)
         deadline = reply_deadline(last_officer.created_at) if last_officer else None
+        left = rounds_left(len(proposals))
+        reschedulable = visit.status == SiteVisitStatus.CONFIRMED and visit.date > self.today() and left > 0
         return SiteVisitOperatorView(
             visit_no=visit.visit_no,
             status=visit.status.value,
@@ -123,9 +131,11 @@ class SiteVisitService:
             note=visit.note,
             reply_by=deadline if visit.status == SiteVisitStatus.PROPOSED else None,
             can_accept=visit.status == SiteVisitStatus.PROPOSED,
-            can_counter=visit.status == SiteVisitStatus.PROPOSED,
-            can_reschedule=visit.status == SiteVisitStatus.CONFIRMED and visit.date > self.today(),
+            can_counter=visit.status == SiteVisitStatus.PROPOSED and left > 0,
+            can_reschedule=reschedulable,
             earliest_date=earliest_date(self.today(), by_operator=True),
+            rounds_left=left,
+            round_limit_reason=ROUND_LIMIT_REASON if left == 0 else None,
             rounds=[self._proposal_out(p) for p in proposals],
         )
 
@@ -252,6 +262,7 @@ class SiteVisitService:
             problem = date_problem(visit_date, self.today(), by_operator=False)
             if problem:
                 raise ValidationFailed("Some fields need attention.", details={"fields": {"date": problem}})
+            self._check_rounds(proposals)
             self._settle(counter, SiteVisitProposalOutcome.DECLINED, now)
             self._settle(original, SiteVisitProposalOutcome.SUPERSEDED, now)
             visit.status = SiteVisitStatus.PROPOSED
@@ -316,6 +327,7 @@ class SiteVisitService:
         if visit.date <= self.today():
             raise Conflict("The visit date has arrived; it can no longer be rescheduled.")
         proposals = self.visits.proposals_for(visit.id)
+        self._check_rounds(proposals)
         now = self.now()
         role = Role.OPERATOR if by_operator else Role.OFFICER
         visit.status = SiteVisitStatus.COUNTER_PROPOSED if by_operator else SiteVisitStatus.PROPOSED
@@ -381,6 +393,7 @@ class SiteVisitService:
         app = self.applications.get_for(operator, application_id, for_update=True)
         visit = self._current(app, SiteVisitStatus.PROPOSED, "There is no proposal waiting for your reply.")
         proposals = self.visits.proposals_for(visit.id)
+        self._check_rounds(proposals)
         now = self.now()
         visit.status = SiteVisitStatus.COUNTER_PROPOSED
         visit.updated_at = now
@@ -422,6 +435,11 @@ class SiteVisitService:
         if visit.status != expected:
             raise Conflict(message)
         return visit
+
+    @staticmethod
+    def _check_rounds(proposals: list[SiteVisitProposal]) -> None:
+        if rounds_left(len(proposals)) == 0:
+            raise Conflict(ROUND_LIMIT_REASON)
 
     @staticmethod
     def _slot(slot: str) -> SiteVisitSlot:

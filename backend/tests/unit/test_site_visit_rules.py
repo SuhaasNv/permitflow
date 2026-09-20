@@ -53,3 +53,10 @@ def test_wording() -> None:
         == "Tuesday 22 September 2026, morning (09:00 to 12:00)"
     )
     assert short_visit(date(2026, 9, 24), SiteVisitSlot.AFTERNOON) == "Thu 24 Sep, afternoon"
+
+
+def test_round_cap_counts_both_sides() -> None:
+    from app.domain.site_visit import MAX_ROUNDS, rounds_left
+
+    assert MAX_ROUNDS == 6
+    assert rounds_left(0) == 6 and rounds_left(5) == 1 and rounds_left(6) == 0 and rounds_left(9) == 0

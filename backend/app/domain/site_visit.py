@@ -28,6 +28,14 @@ OFFICER_MIN_WORKING_DAYS_AHEAD = 1
 MAX_DAYS_AHEAD = 60
 # A proposal the operator leaves unanswered can be confirmed by the officer after this many working days.
 REPLY_WORKING_DAYS = 3
+# Proposals per visit, both sides together, reschedules included. At the cap only the closing moves remain:
+# the operator accepts, the officer accepts the operator's date or keeps the original.
+MAX_ROUNDS = 6
+ROUND_LIMIT_REASON = "Round limit reached: accept or keep a date."
+
+
+def rounds_left(proposal_count: int) -> int:
+    return max(0, MAX_ROUNDS - proposal_count)
 
 
 def today_in_singapore(now: datetime | None = None) -> date:

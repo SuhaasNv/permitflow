@@ -35,6 +35,9 @@ class SiteVisitOut(BaseModel):
     original: SiteVisitProposalOut | None
     counter: SiteVisitProposalOut | None
     can_reschedule: bool
+    # Proposals both sides may still add to this visit; at zero only accept or keep remain.
+    rounds_left: int
+    round_limit_reason: str | None
     rounds: list[SiteVisitProposalOut]
 
 
@@ -53,6 +56,8 @@ class SiteVisitOperatorView(BaseModel):
     can_counter: bool
     can_reschedule: bool
     earliest_date: dt.date
+    rounds_left: int
+    round_limit_reason: str | None
     rounds: list[SiteVisitProposalOut]
 
 

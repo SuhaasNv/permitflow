@@ -317,3 +317,55 @@ def test_authorization_and_ownership(client: TestClient, db: Session) -> None:
     mine = _operator_view(client, op, app_id)
     text = str(mine["site_visit"])
     assert "Waiting for the operator" not in text and "site_visit_scheduled" not in text
+
+
+def test_six_rounds_then_only_the_closing_moves_remain(client: TestClient, db: Session) -> None:
+    """Round cap (MAX_ROUNDS = 6): the ping-pong ends; the operator can still accept, the officer can
+    still accept or keep, and the reschedule of a confirmed visit is closed too."""
+    app_id, op, off, _ = under_review(client, db)
+    propose_visit(client, off, app_id)  # round 1
+    for i in range(2, 6, 2):  # rounds 2+3 and 4+5: operator counters, officer proposes a third date
+        r = client.post(
+            f"/api/v1/applications/{app_id}/site-visit/counter",
+            headers=op,
+            json={"date": next_working_day(4 + i), "slot": "afternoon", "reason": "Closed that day."},
+        )
+        assert r.status_code == 200, r.text
+        r = client.post(
+            f"/api/v1/officer/applications/{app_id}/site-visit/decide",
+            headers=off,
+            json={"action": "propose", "date": next_working_day(5 + i), "slot": "morning"},
+        )
+        assert r.status_code == 200, r.text
+    view = _operator_view(client, op, app_id)["site_visit"]
+    assert len(view["rounds"]) == 5 and view["rounds_left"] == 1 and view["can_counter"] is True
+    r = client.post(  # round 6: the last one anybody may add
+        f"/api/v1/applications/{app_id}/site-visit/counter",
+        headers=op,
+        json={"date": next_working_day(12), "slot": "afternoon", "reason": "Still closed."},
+    )
+    assert r.status_code == 200, r.text
+    officer = _officer_view(client, off, app_id)["site_visit"]
+    assert officer["rounds_left"] == 0 and "Round limit" in officer["round_limit_reason"]
+    r = client.post(
+        f"/api/v1/officer/applications/{app_id}/site-visit/decide",
+        headers=off,
+        json={"action": "propose", "date": next_working_day(14), "slot": "morning"},
+    )
+    assert r.status_code == 409 and "Round limit" in r.json()["error"]["message"]
+    r = client.post(
+        f"/api/v1/officer/applications/{app_id}/site-visit/decide",
+        headers=off,
+        json={"action": "keep_original"},
+    )
+    assert r.status_code == 200, r.text
+    visit = r.json()["site_visit"]
+    assert visit["status"] == "confirmed" and visit["can_reschedule"] is False
+    mine = _operator_view(client, op, app_id)["site_visit"]
+    assert mine["status_label"] == "Confirmed" and mine["can_reschedule"] is False
+    r = client.post(
+        f"/api/v1/applications/{app_id}/site-visit/reschedule",
+        headers=op,
+        json={"date": next_working_day(14), "slot": "morning", "reason": "One more time."},
+    )
+    assert r.status_code == 409 and "Round limit" in r.json()["error"]["message"]
