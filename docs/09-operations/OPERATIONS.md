@@ -78,7 +78,7 @@ One Railway project (`permitflow`), two environments that share nothing:
 | | development | production |
 |---|---|---|
 | Deploys from | `dev` | `main` (release tags `v0.<sprint>.0`) |
-| Images | `ghcr.io/suhaasnv/permitflow-backend:dev`, `...-frontend:dev` (moving tags, every merge) | pinned `sha-<release commit>` (`sha-38df991` for v0.3.0); the `:v0.3.0` tag names the same image |
+| Images | `ghcr.io/suhaasnv/permitflow-backend:dev`, `...-frontend:dev` (moving tags, every merge) | pinned `sha-<commit>`: `sha-2226d11` since 20 Sep 2026 (v0.3.0 plus the post-release fixes recorded in `CHANGELOG.md`, deployed at the owner's decision without a new version; the git tag `v0.3.0` and the `:v0.3.0` images still name the 19 Sep build `38df991`) |
 | Frontend | https://dev.permitflow.space (US-052; Railway host https://frontend-development-afe2.up.railway.app) | https://permitflow.space (also `www`; Railway host https://frontend-production-2d8b.up.railway.app) |
 | API | https://api.dev.permitflow.space/api/v1 (US-052; Railway host https://backend-development-4e04.up.railway.app/api/v1) | https://api.permitflow.space/api/v1 (Railway host https://backend-production-19cd.up.railway.app/api/v1) |
 | State (19 Sep 2026) | live: deployed on every merge to `dev`, seeded | live since v0.3.0 (19 Sep, 17:00 SGT): images `ghcr.io/suhaasnv/permitflow-{backend,frontend}:main` attached, first deployment committed from the Railway staging area, then the approved `deploy.yml` run redeployed with the health gates; seeded once; production UAT recorded in `docs/10-uat/UAT_PLAN.md`; reset after the UAT and left with one example application (Serangoon Spice House, Application Received) |
