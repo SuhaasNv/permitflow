@@ -196,6 +196,57 @@ describe('clarification after the site visit, operator side (US-064)', () => {
     expect(screen.queryByRole('button', { name: 'Send responses' })).not.toBeInTheDocument()
   })
 
+  it('keeps an answer through a lost connection and saves it on the retry (US-087)', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const { AppError } = await import('@/api/client')
+    const { retryDelay } = await import('@/lib/connection')
+    vi.spyOn(api, 'getApplication').mockResolvedValue(afterVisit)
+    const onlyOpen: ClarificationView = { ...view, items: [view.items[0]!], resolved_count: 0 }
+    vi.spyOn(clarApi, 'getClarifications').mockResolvedValue(onlyOpen)
+    const answered: ClarificationView = {
+      ...onlyOpen,
+      items: [
+        {
+          ...onlyOpen.items[0]!,
+          responses: [{ id: 'r1', round_no: 1, message: 'Regraded on 23 Sep.', created_at: '2026-09-25T01:00:00Z', sent_at: null, attachments: [] }],
+        },
+      ],
+    }
+    const respond = vi
+      .spyOn(clarApi, 'respondToClarification')
+      .mockRejectedValueOnce(new AppError(0, { code: 'network_error', message: 'Could not reach the server.' }))
+      .mockResolvedValueOnce(answered)
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    renderAt('/app/applications/a1/clarification')
+    const field = await screen.findByLabelText(/Your answer/)
+    await userEvent.type(field, 'Regraded on 23 Sep.')
+    await userEvent.tab()
+    await waitFor(() => expect(respond).toHaveBeenCalledTimes(1))
+    // the text stays, the help line says a retry is coming, no error toast
+    expect(field).toHaveValue('Regraded on 23 Sep.')
+    expect(await screen.findByText('Could not save your answer yet; trying again. Your text stays here.')).toBeInTheDocument()
+    expect(screen.queryByText('Could not save your answer')).not.toBeInTheDocument()
+    await vi.advanceTimersByTimeAsync(retryDelay(1) + 20)
+    await waitFor(() => expect(respond).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('Saved. Sent with the round when you press Send responses.')).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('shows the offline notice while the browser is offline and clears it when back (US-087)', async () => {
+    const { act } = await import('@testing-library/react')
+    vi.spyOn(api, 'getApplication').mockResolvedValue(afterVisit)
+    vi.spyOn(clarApi, 'getClarifications').mockResolvedValue(view)
+    renderAt('/app/applications/a1/clarification')
+    await screen.findAllByLabelText(/Your answer/)
+    const onLine = vi.spyOn(navigator, 'onLine', 'get')
+    onLine.mockReturnValue(false)
+    act(() => window.dispatchEvent(new Event('offline')))
+    expect(await screen.findByText('You are offline: answers and files wait here until you reconnect')).toBeInTheDocument()
+    onLine.mockReturnValue(true)
+    act(() => window.dispatchEvent(new Event('online')))
+    await waitFor(() => expect(screen.queryByText('You are offline: answers and files wait here until you reconnect')).not.toBeInTheDocument())
+  })
+
   it('with nothing released the page says so', async () => {
     vi.spyOn(api, 'getApplication').mockResolvedValue(applicationView({ id: 'a1' }))
     vi.spyOn(clarApi, 'getClarifications').mockResolvedValue({

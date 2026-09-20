@@ -16,6 +16,7 @@ import { StorageRoom } from '@/features/shared/StorageRoom'
 import type { Tone } from '@/features/shared/StatusBadge'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
 import { useToast } from '@/features/shared/Toast'
+import { isTransient, retryDelay, tabHidden, useOnline } from '@/lib/connection'
 import { formatBytes, formatDateTime } from '@/lib/format'
 import { ApplicationHeader } from './ApplicationHeader'
 import { useApplication, useAttach, useClarifications, useRemoveAttachment, useRespond, useSendClarifications } from './queries'
@@ -39,9 +40,24 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
   const latest = item.responses.find((r) => r.round_no === item.round_no) ?? null
   const [text, setText] = useState(latest?.message ?? '')
   const [fileError, setFileError] = useState<string | null>(null)
+  // A save or an upload that failed on the network waits for its next try (US-087): the attempt count
+  // sets the backoff, the timer is cleared on unmount, and nothing typed is thrown away.
+  const [retrying, setRetrying] = useState<'save' | 'upload' | null>(null)
+  const [progress, setProgress] = useState<{ name: string; fraction: number } | null>(null)
+  const attempt = useRef(0)
+  const timer = useRef<number | null>(null)
   const saved = useRef(latest?.message ?? '')
+  const textRef = useRef(text)
+  textRef.current = text
   const fileInput = useRef<HTMLInputElement>(null)
   const cameraInput = useRef<HTMLInputElement>(null)
+  const online = useOnline()
+  useEffect(
+    () => () => {
+      if (timer.current !== null) window.clearTimeout(timer.current)
+    },
+    [],
+  )
   useEffect(() => {
     // Another tab or a refetch changed the saved answer: follow it unless the operator is mid-edit here.
     const next = latest?.message ?? ''
@@ -50,13 +66,37 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
     // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the server copy only
   }, [latest?.message])
 
+  const later = (kind: 'save' | 'upload', run: () => void) => {
+    attempt.current += 1
+    setRetrying(kind)
+    if (timer.current !== null) window.clearTimeout(timer.current)
+    // No timer while the tab is hidden or offline: the visibility or online change tries again.
+    if (tabHidden() || !navigator.onLine) {
+      timer.current = null
+      return
+    }
+    timer.current = window.setTimeout(() => {
+      timer.current = null
+      run()
+    }, retryDelay(attempt.current))
+  }
+
   const saveText = () => {
-    const value = text.trim()
+    const value = textRef.current.trim()
     if (!value || value === saved.current) return
     respond.mutate(
       { itemId: item.item_id, message: value },
       {
+        onSuccess: () => {
+          attempt.current = 0
+          setRetrying(null)
+        },
         onError: (e) => {
+          if (isTransient(e)) {
+            later('save', saveText)
+            return
+          }
+          setRetrying(null)
           const fields = e instanceof AppError && e.status === 422 ? e.details?.fields : null
           const msg =
             fields && typeof fields === 'object' && 'message' in fields ? String((fields as Record<string, unknown>).message) : e.message
@@ -65,6 +105,17 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
       },
     )
   }
+
+  // Back online, or back in front, with an answer still unsaved: try at once.
+  useEffect(() => {
+    const again = () => {
+      if (retrying === 'save' && !tabHidden() && navigator.onLine && timer.current === null) saveText()
+    }
+    if (online) again()
+    document.addEventListener('visibilitychange', again)
+    return () => document.removeEventListener('visibilitychange', again)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reads the latest text through the ref
+  }, [online, retrying])
   const addFiles = (files: FileList | null) => {
     if (!files || !latest) return
     setFileError(null)
@@ -79,16 +130,32 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
         setFileError(problem)
         continue
       }
-      attach.mutate(
-        { responseId: latest.id, file },
-        {
-          onSuccess: (r) => {
-            if (r.unchanged) toast.push({ title: 'No change', body: `${file.name} is already attached.`, tone: 'info' })
-          },
-          onError: (e) => setFileError(e.message),
-        },
-      )
+      sendFile(latest.id, file)
     }
+  }
+  const sendFile = (responseId: string, file: File) => {
+    setProgress({ name: file.name, fraction: 0 })
+    attach.mutate(
+      { responseId, file, onProgress: (fraction) => setProgress({ name: file.name, fraction }) },
+      {
+        onSuccess: (r) => {
+          attempt.current = 0
+          setRetrying(null)
+          setProgress(null)
+          if (r.unchanged) toast.push({ title: 'No change', body: `${file.name} is already attached.`, tone: 'info' })
+        },
+        onError: (e) => {
+          setProgress(null)
+          // The server keeps one copy of an identical file, so sending it again on a lost connection is safe.
+          if (isTransient(e)) {
+            later('upload', () => sendFile(responseId, file))
+            return
+          }
+          setRetrying(null)
+          setFileError(e.message)
+        },
+      },
+    )
   }
   const attachments = latest?.attachments ?? []
   const sent = latest?.sent_at != null
@@ -106,7 +173,17 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
           onChange={(e) => setText(e.target.value)}
           onBlur={saveText}
           help={
-            respond.isPending ? 'Saving your answer…' : latest ? 'Saved. Sent with the round when you press Send responses.' : undefined
+            // The query client pauses a save started offline and resumes it online; a save that failed on the
+            // network waits for its retry. Both read the same way to the operator.
+            !online && (respond.isPending || retrying === 'save')
+              ? 'You are offline; your answer is kept here and saved when the connection returns.'
+              : respond.isPending
+                ? 'Saving your answer…'
+                : retrying === 'save'
+                  ? 'Could not save your answer yet; trying again. Your text stays here.'
+                  : latest
+                    ? 'Saved. Sent with the round when you press Send responses.'
+                    : undefined
           }
         />
       ) : latest ? (
@@ -200,10 +277,29 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
                 Choose a file
               </Button>
               <span className="text-xs text-text-3">
-                {attachments.length} of {ATTACHMENT_CAP} files attached. PDF, PNG, JPG or TXT, up to 10 MB each; photos are stored without their
-                camera data. <StorageRoom storage={storage} />
+                {attachments.length} of {ATTACHMENT_CAP} files attached. PDF, PNG, JPG or TXT, up to 10 MB each; photos are stored without
+                their camera data. <StorageRoom storage={storage} />
               </span>
             </div>
+          ) : null}
+          {progress ? (
+            <div className="flex flex-col gap-1" role="status" aria-live="polite">
+              <div className="flex justify-between text-xs text-text-3">
+                <span className="truncate">Uploading {progress.name}</span>
+                <span className="tabular-nums">{Math.round(progress.fraction * 100)} %</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3" aria-hidden="true">
+                <div
+                  className="h-1.5 rounded-full bg-info transition-[width] duration-200"
+                  style={{ width: `${progress.fraction * 100}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
+          {retrying === 'upload' ? (
+            <p role="status" className="text-[13px] text-text-2">
+              {online ? 'The upload did not get through; trying again.' : 'You are offline; the file is sent when the connection returns.'}
+            </p>
           ) : null}
           {fileError ? (
             <p role="alert" className="text-[13px] font-medium text-error">
@@ -224,6 +320,7 @@ export function ClarificationPage() {
   const app = useApplication(id)
   const clar = useClarifications(id)
   const send = useSendClarifications(id)
+  const online = useOnline()
   const toast = useToast()
   const [confirming, setConfirming] = useState(false)
   // An answer or a file still on its way to the server: the send waits so nothing typed is left behind.
@@ -280,6 +377,13 @@ export function ClarificationPage() {
           </Link>
         }
       />
+      {!online && c.can_respond ? (
+        <div className="mb-5">
+          <Alert tone="warning" title="You are offline: answers and files wait here until you reconnect">
+            Keep typing; what you write is saved to the office the moment the connection returns.
+          </Alert>
+        </div>
+      ) : null}
       {c.items.length === 0 ? (
         <section className="pf-surface px-5 py-8 text-center" aria-labelledby="clar-empty">
           <h2 id="clar-empty" className="text-[17px] font-semibold">

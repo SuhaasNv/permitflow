@@ -14,6 +14,7 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
 import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
+import { retryDelay, tabHidden, useOnline } from '@/lib/connection'
 import { formatDateTime } from '@/lib/format'
 import { guardUnload, setUnsaved } from '@/lib/unsaved'
 import { useChecklist, useChecklistSchema, useOfficerApplication, useSaveChecklist, useSubmitChecklist } from './queries'
@@ -38,28 +39,9 @@ function useMediaQuery(query: string): boolean {
   )
 }
 
-/** True while the browser reports a connection; the page holds its entries until it returns (US-061). */
-function useOnline(): boolean {
-  return useSyncExternalStore(
-    (notify) => {
-      window.addEventListener('online', notify)
-      window.addEventListener('offline', notify)
-      return () => {
-        window.removeEventListener('online', notify)
-        window.removeEventListener('offline', notify)
-      }
-    },
-    () => navigator.onLine,
-    () => true,
-  )
-}
-
 /** Autosave waits this long after the last touch; a blur or Save draft goes at once. */
 export const AUTOSAVE_DELAY_MS = 1500
-/** A failed save is tried again after 3 s, then 6, 12 and 24 s, then every 30 s. */
-export function retryDelay(attempt: number): number {
-  return Math.min(3000 * 2 ** Math.max(0, attempt - 1), 30_000)
-}
+export { retryDelay }
 
 /** Their saved copy with my touched items on top: nothing typed here is thrown away (US-061). */
 export function mergeFindings(theirs: Findings, mine: Findings, touched: Iterable<string>): Findings {
@@ -341,10 +323,11 @@ export function ChecklistPage() {
             void checklist.refetch()
             return
           }
-          // Network or server trouble: keep the entries and try again with backoff.
+          // Network or server trouble: keep the entries and try again with backoff, unless the tab is
+          // hidden (the keepalive save already went; the next visibility change tries again).
           attempt.current += 1
           setRetrying(true)
-          schedule(retryDelay(attempt.current))
+          if (!tabHidden()) schedule(retryDelay(attempt.current))
         },
       },
     )
@@ -358,6 +341,9 @@ export function ChecklistPage() {
         if (timer.current !== null) window.clearTimeout(timer.current)
         timer.current = null
         flush(true)
+      } else if (document.visibilityState === 'visible' && dirtyRef.current && timer.current === null) {
+        // Back in front with entries still unsaved (the keepalive save failed): try again now.
+        schedule(0)
       }
     }
     document.addEventListener('visibilitychange', onHide)

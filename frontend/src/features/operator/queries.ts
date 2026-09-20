@@ -180,7 +180,8 @@ export function useAttach(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationKey: ['clarification', id],
-    mutationFn: ({ responseId, file }: { responseId: string; file: File }) => attachToResponse(id, responseId, file),
+    mutationFn: ({ responseId, file, onProgress }: { responseId: string; file: File; onProgress?: (fraction: number) => void }) =>
+      attachToResponse(id, responseId, file, onProgress),
     onSuccess: (result) => afterClarificationChange(qc, id, result.view),
   })
 }

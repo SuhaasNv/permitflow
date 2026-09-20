@@ -96,7 +96,7 @@ cd frontend && npm run e2e          # Playwright against the running stack (back
 
 `main` is production, `dev` is integration, one branch per story merged with `--no-ff`; `main` is protected and receives only pull requests from `dev` with seven green checks (`docs/09-operations/BRANCHING.md`).
 
-`ci.yml` runs seven blocking jobs on every push and pull request: backend, frontend, end to end with the accessibility gate, secret scan, the six-stage AI gate (`ai-gate.yml`, on the mock provider), dependency and code audit, images. `ai-eval.yml` runs the same golden and fairness sets against the real model nightly and on changes to the AI path. Images are built once and pushed to GHCR; a merge to `dev` deploys the development environment automatically; production is pinned to a release image and deployed by hand behind the owner's approval, with health gates after every rollout. Environments, secrets, migrations and rollback by layer: `docs/09-operations/OPERATIONS.md`.
+`ci.yml` runs seven blocking jobs on every push and pull request: backend, frontend (with a 250 KB bundle budget), end to end with the accessibility gate, secret scan, the six-stage AI gate (`ai-gate.yml`, on the mock provider), dependency and code audit, images. `ai-eval.yml` runs the same golden and fairness sets against the real model nightly and on changes to the AI path. Images are built once and pushed to GHCR; a merge to `dev` deploys the development environment automatically; production is pinned to a release image and deployed by hand behind the owner's approval, with health gates after every rollout. Environments, secrets, migrations and rollback by layer: `docs/09-operations/OPERATIONS.md`.
 
 ## Observability
 
