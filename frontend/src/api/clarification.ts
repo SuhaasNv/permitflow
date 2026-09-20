@@ -1,6 +1,6 @@
 import type { StorageView } from './applications'
 import { API_URL, AppError, notifyUnauthorized, request } from './client'
-import { uploadToken } from './documents'
+import { uploadToken, uploadWithProgress } from './documents'
 
 export interface ClarificationRequest {
   id: string
@@ -77,10 +77,16 @@ export interface AttachResult {
 }
 
 /** A file on a drafted answer: the document rules, three per answer. Multipart through the shared client. */
-export function attachToResponse(id: string, responseId: string, file: File): Promise<AttachResult> {
+/** Evidence goes over XMLHttpRequest so the row can show real upload progress (US-087). */
+export function attachToResponse(
+  id: string,
+  responseId: string,
+  file: File,
+  onProgress: (fraction: number) => void = () => undefined,
+): Promise<AttachResult> {
   const formData = new FormData()
   formData.append('file', file)
-  return request<AttachResult>(`/applications/${id}/clarifications/responses/${responseId}/attachments`, { method: 'POST', formData })
+  return uploadWithProgress<AttachResult>(`/applications/${id}/clarifications/responses/${responseId}/attachments`, formData, onProgress)
 }
 
 export function removeAttachment(id: string, responseId: string, attachmentId: string): Promise<ClarificationView> {

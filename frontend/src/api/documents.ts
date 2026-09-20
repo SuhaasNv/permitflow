@@ -62,9 +62,17 @@ export function uploadDocument(
   file: File,
   onProgress: (fraction: number) => void,
 ): Promise<UploadResult> {
+  const form = new FormData()
+  form.append('document_type', documentType)
+  form.append('file', file)
+  return uploadWithProgress<UploadResult>(`/applications/${applicationId}/documents`, form, onProgress)
+}
+
+/** One multipart upload over XMLHttpRequest with a progress callback (documents and evidence, US-087). */
+export function uploadWithProgress<T>(path: string, form: FormData, onProgress: (fraction: number) => void): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', `${API_URL}/applications/${applicationId}/documents`)
+    xhr.open('POST', `${API_URL}${path}`)
     const token = tokenGetter()
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
     xhr.upload.onprogress = (e) => {
@@ -85,7 +93,7 @@ export function uploadDocument(
         parsed = null
       }
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(parsed as UploadResult)
+        resolve(parsed as T)
         return
       }
       if (xhr.status === 401) notifyUnauthorized()
@@ -102,9 +110,6 @@ export function uploadDocument(
         ),
       )
     }
-    const form = new FormData()
-    form.append('document_type', documentType)
-    form.append('file', file)
     xhr.send(form)
   })
 }

@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-087 A poor connection on site and on the phone (21 Sep 2026, Sprint 7)
+
+- The respond page keeps what the operator typed through a lost connection, says so within a second, retries the save and the upload with the same backoff as the checklist (1 s to 30 s, never while the tab is hidden), and shows a progress bar on every evidence upload. The checklist stops retrying while hidden and resumes when it comes back. A bundle size check in CI (215 KB gzipped against 250 KB) and a Playwright test with the connection cut and a Fast 4G paint budget.
+
 ## US-088 The accessibility gate over the new screens (21 Sep 2026, Sprint 7)
 
 - The gate now covers the checklist as a draft and as submitted, the respond page, the history with rounds, the appointment, the four admin screens and the add-account dialog at phone and desktop widths, measures every control on the checklist and the respond page against 44 px, and walks the checklist by keyboard. Two findings fixed on the way: controls were 37.5 px on touch widths (44 px below the desktop breakpoint now) and a submitted checklist could not be opened once the case moved past the visit.

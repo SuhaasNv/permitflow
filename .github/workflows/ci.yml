@@ -78,6 +78,8 @@ jobs:
           echo '### Frontend coverage (all source files counted)' >> "$GITHUB_STEP_SUMMARY"
           npx vitest run --coverage --coverage.reporter=text-summary 2>/dev/null | grep -E 'Statements|Branches|Functions|Lines' >> "$GITHUB_STEP_SUMMARY" || true
       - run: npm run build
+      - name: Bundle size (250 KB gzipped, US-087)
+        run: npm run size
 
   ai:
     name: AI gate
