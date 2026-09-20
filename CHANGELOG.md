@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Route lock test (20 Sep 2026, chore)
+
+- `tests/unit/test_routes_locked.py`: every mounted API route must carry a role guard, or be one of the three public routes (sign-in, health, the token-checked metrics scrape) or the five signed-in routes (me, form schema, notifications); a second test asserts no route lets an admin write until the admin epic. New routers in v0.4.0 fail it before review if they forget their guard. `SECURITY_REVIEW.md` row 2.
+
 ## US-082 Limiter keyed on the real caller behind the edge (20 Sep 2026, Sprint 4)
 
 - `client_key` reads the edge's own client header before `X-Forwarded-For` when the peer is a trusted proxy: `CLIENT_IP_HEADER`, default `X-Real-IP`, the header Railway documents for the connecting address (its edge instance is the last forwarded hop, which is what readiness row 25 found). Without a trusted proxy the socket address still wins, so a caller cannot pick a bucket with a forged header. Both limiters (every request, sign-in attempts) and the failed-login block use it. Tests: the edge case, the forged header, an older platform without the header, a multi-value header, two callers behind one edge in separate buckets. `.env.example`, `OPERATIONS.md`, `SECURITY_REVIEW.md` and readiness row 25 updated; the on-platform check with two callers runs once `dev` is deployed.
