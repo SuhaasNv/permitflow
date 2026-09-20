@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.clarification import ClarificationBlock
 from app.schemas.site_visit import SiteVisitOperatorView
 
 
@@ -153,6 +154,8 @@ class ApplicationOperatorView(BaseModel):
     withdrawal_reason: str | None = None
     # The site visit appointment (US-084): present once the officer proposed a date.
     site_visit: SiteVisitOperatorView | None = None
+    # The clarification rounds after the site visit (US-064): present once an item was released.
+    clarification: ClarificationBlock | None = None
     created_at: datetime
     updated_at: datetime
 

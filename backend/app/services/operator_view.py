@@ -20,6 +20,7 @@ from app.schemas.applications import (
     SectionView,
     VerificationView,
 )
+from app.schemas.clarification import ClarificationBlock
 from app.schemas.site_visit import SiteVisitOperatorView
 
 LICENCE_TITLE = "Food Establishment Licence"
@@ -60,7 +61,14 @@ _EXPLANATIONS: dict[ApplicationStatus, str] = {
 }
 
 
-def _needs_operator(status: ApplicationStatus) -> bool:
+def _needs_operator(status: ApplicationStatus, open_clarifications: int = 0) -> bool:
+    # In the post-site operator-turn states the operator has something to do only while an item is
+    # open (US-064): with nothing open the case is simply waiting on the office.
+    if status in (
+        ApplicationStatus.AWAITING_POST_SITE_CLARIFICATION,
+        ApplicationStatus.PENDING_POST_SITE_RESUBMISSION,
+    ):
+        return open_clarifications > 0
     action = next_action(status)
     return (
         status != ApplicationStatus.DRAFT
@@ -84,6 +92,7 @@ def summary(
     present_types: set[DocumentType] | None = None,
     revision_count: int = 0,
     visit_awaits_operator: bool = False,
+    open_clarifications: int = 0,
 ) -> ApplicationSummaryOut:
     comp = completeness_rules.compute(app.draft_data, _present_types(app, present_types))
     business = (app.draft_data.get("business") or {}).get("business_name")
@@ -98,7 +107,7 @@ def summary(
         premises_summary=premises if isinstance(premises, str) and premises else None,
         percent=comp.percent,
         revision_count=revision_count,
-        needs_operator_action=_needs_operator(app.status) or visit_awaits_operator,
+        needs_operator_action=_needs_operator(app.status, open_clarifications) or visit_awaits_operator,
         created_at=app.created_at,
         updated_at=app.updated_at,
     )
@@ -189,6 +198,7 @@ def operator_view(
     licence: LicenceView | None = None,
     site_visit: SiteVisitOperatorView | None = None,
     open_clarifications: int = 0,
+    clarification: ClarificationBlock | None = None,
 ) -> ApplicationOperatorView:
     documents = documents or []
     docs_by_type = {d.document_type: (d, r) for d, r in documents}
@@ -241,7 +251,7 @@ def operator_view(
             missing=list(comp.missing),
         ),
         revision_count=revision_count,
-        needs_operator_action=_needs_operator(app.status)
+        needs_operator_action=_needs_operator(app.status, open_clarifications)
         or (site_visit is not None and site_visit.status == SiteVisitStatus.PROPOSED.value),
         feedback=feedback or [],
         resubmit=resubmit,
@@ -256,6 +266,7 @@ def operator_view(
         withdrawal_reason=app.withdrawal_reason if app.status == ApplicationStatus.WITHDRAWN else None,
         licence=licence,
         site_visit=site_visit,
+        clarification=clarification,
         created_at=app.created_at,
         updated_at=app.updated_at,
     )
