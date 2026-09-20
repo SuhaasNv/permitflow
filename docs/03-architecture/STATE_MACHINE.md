@@ -29,23 +29,23 @@ Visibility rule: the operator API never returns the internal code; it returns `s
 
 ## Transitions
 
-Guards are evaluated by the service with a `TransitionContext` (`open_feedback_count`, `has_changes_to_flagged_targets`, `is_complete`) so the machine itself stays pure. `open_feedback_count` counts items with resolution `open` only; `addressed` items do not block a site visit (the officer is expected to resolve them, and the UI warns, but the workflow does not force it).
+Guards are evaluated by the service with a `TransitionContext` (`open_feedback_count`, `has_changes_to_flagged_targets`, `is_complete`, `has_note`) so the machine itself stays pure. `open_feedback_count` counts items with resolution `open` only; `addressed` items do not block a site visit (the officer is expected to resolve them, and the UI warns, but the workflow does not force it).
 
 | From | To | Allowed actor | Guard | Trigger in MVP |
 |------|----|---------------|-------|----------------|
 | `draft` | `application_received` | operator (owner) | `is_complete` (all required sections valid, all required documents present) | Operator clicks Submit |
 | `application_received` | `under_review` | officer | none | Officer clicks Start review |
-| `application_received` | `rejected` | officer | none (note required) | Officer clicks Reject (e.g. duplicate or ineligible submission) |
+| `application_received` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject (e.g. duplicate or ineligible submission) |
 | `pre_site_resubmitted` | `under_review` | officer | none | Officer clicks Start review |
-| `pre_site_resubmitted` | `rejected` | officer | none (note required) | Officer clicks Reject |
+| `pre_site_resubmitted` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `under_review` | `pending_pre_site_resubmission` | officer | `open_feedback_count ≥ 1` | Officer clicks Request resubmission |
 | `under_review` | `site_visit_scheduled` | officer | `open_feedback_count = 0` | Officer clicks Mark site visit scheduled (status only: no appointment is booked, UC3 deferred) |
-| `under_review` | `rejected` | officer | none (note required) | Officer clicks Reject |
-| `pending_pre_site_resubmission` | `rejected` | officer | none (note required) | Officer clicks Reject (abandoned or unsalvageable application; prevents stuck cases) |
+| `under_review` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
+| `pending_pre_site_resubmission` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject (abandoned or unsalvageable application; prevents stuck cases) |
 | `pending_pre_site_resubmission` | `pre_site_resubmitted` | operator (owner) | `has_changes_to_flagged_targets` | Operator clicks Resubmit |
 | `site_visit_scheduled` | `site_visit_done` | officer | none | Officer clicks Mark site visit done |
-| `site_visit_scheduled` | `rejected` | officer | none (note required) | Officer clicks Reject |
-| `site_visit_done` | `rejected` | officer | none (note required) | Officer clicks Reject |
+| `site_visit_scheduled` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
+| `site_visit_done` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `site_visit_done` | `awaiting_post_site_clarification` | system | checklist submitted (UC3) | Not reachable in MVP (UC3 deferred); transition exists and is tested |
 | `site_visit_done` | `pending_approval` | officer | none | Officer clicks Route to approval (MVP assumption: no checklist) |
 | `awaiting_post_site_clarification` | `pending_post_site_resubmission` | officer | none | UC3 (deferred) |
@@ -54,7 +54,7 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `post_site_clarification_resubmitted` | `awaiting_post_site_clarification` | officer | none | UC3 (deferred) |
 | `post_site_clarification_resubmitted` | `pending_approval` | officer | none | UC3 (deferred) |
 | `pending_approval` | `approved` | officer | none (note optional) | Officer clicks Approve; side effect: the licence certificate is issued in the same transaction (`licence.issued`, US-051) |
-| `pending_approval` | `rejected` | officer | none (note required) | Officer clicks Reject |
+| `pending_approval` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `pending_approval` | `under_review` | officer | none | Officer clicks Return to review (US-031 follow-up, 19 Sep 2026): something noticed at the decision step is handled with feedback or a resubmission instead of a rejection |
 | any post-submission, non-terminal state | `withdrawn` | operator (owner) | none (reason optional) | Operator clicks Withdraw application (US-038); `POST /applications/{id}/withdraw` |
 
@@ -122,7 +122,7 @@ Terminal states: `approved`, `rejected`, `withdrawn`.
 | `→ pre_site_resubmitted` | create Revision N+1; mark feedback whose target changed as `addressed` (audit `feedback.addressed`); audit `revision.submitted`, `status.changed`; notify all officers (kind `resubmitted`) |
 | `→ pending_pre_site_resubmission` | set `released_to_operator_at` on every `open` feedback item (audit `feedback.released`); audit `status.changed`; notify operator |
 | any officer transition | audit `status.changed`; notify operator `status_changed` with the operator label |
-| `→ approved` / `→ rejected` | store `decision_note`; audit `decision.recorded` |
+| `→ approved` / `→ rejected` | store `decision_note` (the `status.changed` audit payload carries `has_note`); on approval, issue the licence and audit `licence.issued` (ADR-010) |
 
 ## Built (Sprint 2)
 

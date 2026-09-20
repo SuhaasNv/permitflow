@@ -120,7 +120,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         // Only a definite rejection ends the session; a network blip keeps the token for a retry.
-        if (!cancelled && error instanceof AppError && (error.status === 401 || error.status === 403)) signOut()
+        if (!cancelled && error instanceof AppError && (error.status === 401 || error.status === 403)) {
+          setEndedReason('unauthorized')
+          signOut()
+        }
       })
       .finally(() => {
         if (!cancelled) setReady(true)

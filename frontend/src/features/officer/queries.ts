@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import type { FeedbackInput } from '@/api/officer'
+import type { FeedbackInput, OfficerApplication } from '@/api/officer'
 import {
   compareRevisions,
   createFeedback,
@@ -15,6 +15,7 @@ import {
   transitionApplication,
   withdrawFeedback,
 } from '@/api/officer'
+import { isCheckStale } from '@/features/operator/queries'
 
 export const officerKeys = {
   queue: ['officer', 'queue'] as const,
@@ -34,13 +35,22 @@ export function useQueue() {
   return useQuery({ queryKey: officerKeys.queue, queryFn: getQueue, refetchInterval: 30_000 })
 }
 
-/** Polls every 2 s while any document check is still running, so the officer sees results land. */
+/** True while a check is pending or running and younger than the staleness window (same rule as the operator side). */
+export function hasLiveCheck(view: OfficerApplication, now: number = Date.now()): boolean {
+  return view.documents.some((d) => {
+    const v = d.verification
+    return v !== null && (v.status === 'pending' || v.status === 'running') && !isCheckStale(v.requested_at, now)
+  })
+}
+
+/** Polls every 2 s while any document check is still running, so the officer sees results land; stops after
+ * CHECK_STALE_MS so a check stuck in the backend cannot keep the tab polling forever. */
 export function useOfficerApplication(id: string) {
   return useQuery({
     queryKey: officerKeys.case(id),
     queryFn: () => getOfficerApplication(id),
     refetchOnWindowFocus: true,
-    refetchInterval: (query) => (query.state.data && query.state.data.verification_summary.checking > 0 ? 2000 : false),
+    refetchInterval: (query) => (query.state.data && hasLiveCheck(query.state.data) ? 2000 : false),
   })
 }
 

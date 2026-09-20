@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Application, Document, VerificationRun
@@ -65,10 +65,18 @@ class DocumentRepository:
         self.db.add(doc)
         return doc
 
-    def count_runs_since(self, since: datetime, operator_id: uuid.UUID | None = None) -> int:
+    def count_runs_since(
+        self, since: datetime, operator_id: uuid.UUID | None = None, *, exclude_reason: str | None = None
+    ) -> int:
         """Verification runs requested since `since`, for one applicant's documents or for everyone
-        (US-058 quotas: the cost ceiling is counted in the database, so it holds across restarts)."""
+        (US-058 quotas: the cost ceiling is counted in the database, so it holds across restarts).
+        Runs stored with `exclude_reason` (the quota refusals themselves) are not counted, otherwise a
+        refused attempt would extend the applicant's lock-out by another day."""
         stmt = select(func.count()).select_from(VerificationRun).where(VerificationRun.created_at >= since)
+        if exclude_reason is not None:
+            stmt = stmt.where(
+                or_(VerificationRun.error_reason.is_(None), VerificationRun.error_reason != exclude_reason)
+            )
         if operator_id is not None:
             stmt = (
                 stmt.join(Document, Document.id == VerificationRun.document_id)

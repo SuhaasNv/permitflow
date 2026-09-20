@@ -11,7 +11,8 @@ User 1───* Application 1───* ApplicationRevision
                  ├───* Document 1───* VerificationRun
                  ├───* Feedback  (targets a section_key or a document_type; raised_in_revision)
                  ├───* Notification (per user)
-                 └───* AuditEvent (append-only)
+                 ├───* AuditEvent (append-only)
+                 └───1 Licence (one per approved application, US-051)
 ```
 
 ## Entities
@@ -27,7 +28,7 @@ User 1───* Application 1───* ApplicationRevision
 | is_active | bool | inactive users cannot authenticate; set by an admin (deactivate/reactivate) |
 | created_at | datetime | |
 
-Ownership: a user owns their notifications. Operators own the applications they create. Admins create users, change roles and deactivate/reactivate; the service refuses a change that would leave no active admin. User changes are audit events with `application_id = null` (`user.created`, `user.role_changed`, `user.deactivated`, `user.reactivated`).
+Ownership: a user owns their notifications. Operators own the applications they create. Planned for the admin epic (US-073, v0.4.0, not built): admins change roles and deactivate/reactivate users, the service refuses a change that would leave no active admin, and user changes become audit events with `application_id = null` (`user.role_changed`, `user.deactivated`, `user.reactivated`).
 
 ### Application
 The aggregate root. Holds current status and the editable working copy of form data.
@@ -41,9 +42,7 @@ The aggregate root. Holds current status and the editable working copy of form d
 | draft_data | JSON | working copy edited by the operator between submissions; copied into a revision on submit |
 | current_revision_id | FK ApplicationRevision, nullable | latest submitted revision |
 | decision_note | text, nullable | officer note shown to the operator on approval/rejection |
-| feedback.previous_resolution | enum, nullable | resolution before the last withdraw or resolve, cleared on undo (US-039) |
 | draft_data.declarations.confirmed_at | stamped string | set by the server when the declarations are saved while responding to feedback; the diff reports it as "Confirmed on" so a re-confirmation counts as the change (US-041 follow-up) |
-| licences (table) | one per approved application | `licence_no` (`FEL-<year>-<n>`, sequence `licence_no_seq`), `revision_number`, `issued_by`, `issued_at`, `valid_from`, `valid_to` (Singapore calendar dates, one year), `verification_code`, `stored_key`, `sha256`; written by the approval transaction (US-051) |
 | withdrawal_reason | text, nullable | operator's reason when they withdrew (US-038); served to officers and, once withdrawn, to the owner |
 | version | int | optimistic concurrency token (REL-007) |
 | created_at, updated_at | datetime | |
@@ -64,7 +63,7 @@ Immutable snapshot created at each submission.
 | submitted_by | FK User | |
 | submitted_at | datetime | |
 
-Rules: never updated or deleted. Diff between two revisions is a pure function (`revisions/diff.py`).
+Rules: never updated or deleted. Diff between two revisions is a pure function (`domain/diff.py`).
 
 ### Document
 An uploaded file for one document type. Replacement creates a new row that supersedes the old one, so historical revisions keep their references.
@@ -134,12 +133,13 @@ An officer's contextual comment tied to a form section or a document type, raise
 | template_key | str, nullable | which comment template was used, if any |
 | message | text | |
 | resolution | enum `open` \| `addressed` \| `resolved` \| `withdrawn` | |
+| previous_resolution | enum, nullable | resolution before the last withdraw, resolve or reopen, cleared on undo (US-039) |
 | addressed_in_revision_id | FK ApplicationRevision, nullable | set automatically on resubmission when the target changed |
 | resolved_by | FK User, nullable | officer |
 | resolved_at | datetime, nullable | |
 | created_at | datetime | |
 
-Lifecycle: `open` → `addressed` (system, on resubmission when the target changed: section compared by value, document by `sha256`) → `resolved` (officer). Officer may `withdraw` an open item, or reopen an addressed item by creating a new item (history preserved; we do not flip addressed back to open). Create and withdraw are allowed only while the application is `under_review` (see STATE_MACHINE.md, feedback lifecycle rules).
+Lifecycle: `open` → `addressed` (system, on resubmission when the target changed: section compared by value, document by `sha256`) → `resolved` (officer). Officer may `withdraw` an open item, or mark an addressed item as not fixed (`addressed` → `open`, audited `feedback.reopened`, US-049; the item leaves the operator's view until the next request for resubmission releases it again). Create, withdraw and reopen are allowed only while the application is `under_review` (see STATE_MACHINE.md, feedback lifecycle rules).
 
 ### Notification
 | Field | Type | Notes |
@@ -161,12 +161,29 @@ Append-only.
 | id | UUID | |
 | application_id | FK Application, nullable | null for user-management events |
 | actor_id | FK User, nullable | null for system events |
-| event_type | str | `application.created`, `revision.submitted`, `status.changed`, `feedback.created`, `feedback.released`, `feedback.addressed`, `feedback.resolved`, `feedback.withdrawn`, `document.uploaded`, `document.replaced`, `document.deleted`, `verification.completed`, `decision.recorded`, `user.created`, `user.role_changed`, `user.deactivated`, `user.reactivated` |
+| event_type | str | `application.created`, `section.updated`, `document.uploaded`, `document.replaced`, `document.deleted`, `verification.requested`, `verification.completed`, `revision.submitted`, `status.changed`, `feedback.created`, `feedback.released`, `feedback.addressed`, `feedback.resolved`, `feedback.withdrawn`, `feedback.reopened`, `feedback.restored`, `licence.issued` (planned with the admin epic: `user.role_changed`, `user.deactivated`, `user.reactivated`) |
 | payload | JSON | event-specific data (from/to status, revision number, feedback id, document type, verification status) |
 | created_at | datetime | |
 
+### Licence
+
+The certificate issued by the approval transaction (US-051, ADR-010): one row per approved application, rendered to a PDF on the uploads volume and served through `GET /applications/{id}/licence` (owner or officer).
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | |
+| application_id | FK Application, unique | |
+| licence_no | str, unique | `FEL-<year>-<n>`, `n` from the sequence `licence_no_seq`; the year is the Singapore calendar year of issue |
+| revision_number | int | the revision the licence was issued against |
+| issued_by | FK User | the approving officer |
+| issued_at | datetime | |
+| valid_from, valid_to | date | Singapore calendar dates, one year |
+| verification_code | str | printed on the certificate for a future public verification page |
+| stored_key | str | server-generated key of the PDF |
+| sha256 | str | of the rendered PDF |
+
 ### CommentTemplate (static configuration, not a table)
-`{key, target_type, title, body}` defined in `feedback/templates.py` and served by `GET /feedback-templates`. Templates are data, not code, so they can move to a table later without API change.
+`{key, target_type, title, body}` defined in `domain/feedback_templates.py` and served by `GET /officer/feedback-templates` (officers only). Templates are data, not code, so they can move to a table later without API change.
 
 ## Form definition (Food Establishment Licence)
 
@@ -192,7 +209,7 @@ Required document types: `business_profile`, `floor_plan`, `tenancy_agreement`, 
 | Feedback | own applications; read | all; create, resolve, withdraw | all; read |
 | Notification | own | own | own |
 | AuditEvent | none | all applications; read | all applications; read, cross-application feed |
-| User | self | self | all; create, change role, deactivate/reactivate |
+| User | self | self | all; change role, deactivate/reactivate (planned, US-073) |
 
 ## Invariants (enforced in services and tested)
 

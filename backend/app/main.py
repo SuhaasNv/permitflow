@@ -3,6 +3,7 @@
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -17,6 +18,7 @@ from app.core.errors import AppError
 from app.core.logging import configure_logging, request_logging_middleware
 from app.core.rate_limit import RequestLimiter
 from app.core.settings import get_settings
+from app.domain.uploads import too_large_message
 
 logger = logging.getLogger("permitflow")
 
@@ -42,13 +44,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 _INTERNAL_MESSAGE = "Something went wrong. Quote the request id when reporting it."
+# Multipart framing plus the document_type field: anything beyond the file itself (upload gate below).
+_MULTIPART_OVERHEAD = 16 * 1024
 
 
-def _error_response(request: Request, status: int, code: str, message: str) -> JSONResponse:
+def _error_response(
+    request: Request, status: int, code: str, message: str, *, details: dict[str, Any] | None = None
+) -> JSONResponse:
     request_id = getattr(request.state, "request_id", None)
     return JSONResponse(
         status_code=status,
-        content={"error": {"code": code, "message": message, "details": {"request_id": request_id}}},
+        content={
+            "error": {
+                "code": code,
+                "message": message,
+                "details": {**(details or {}), "request_id": request_id},
+            }
+        },
     )
 
 
@@ -97,6 +109,26 @@ def create_app() -> FastAPI:
             )
             response.headers["Retry-After"] = str(retry_after)
             return response
+        return await call_next(request)
+
+    # An oversized upload is refused from its Content-Length here, before FastAPI reads the multipart body
+    # (T4): a route dependency would run only after the form was parsed and spooled to disk.
+    upload_limit = settings.upload_max_bytes + _MULTIPART_OVERHEAD
+
+    @app.middleware("http")
+    async def reject_oversized_upload(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        if request.method == "POST" and request.url.path.endswith("/documents"):
+            raw = request.headers.get("content-length")
+            if raw and raw.isdigit() and int(raw) > upload_limit:
+                return _error_response(
+                    request,
+                    400,
+                    "bad_request",
+                    too_large_message(settings.upload_max_bytes),
+                    details={"reason": "too_large"},
+                )
         return await call_next(request)
 
     app.add_middleware(

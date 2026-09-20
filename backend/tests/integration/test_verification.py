@@ -152,3 +152,23 @@ def test_rerun_only_when_terminal_and_by_owner_or_officer(client: TestClient, db
     db.refresh(pending)
     assert pending.status == VerificationStatus.VERIFIED
     run_verification(pending.id)  # not pending any more: no-op
+
+
+def test_operator_view_collapses_provider_reasons_but_keeps_file_reasons(
+    client: TestClient, db: Session, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    """Provider and infrastructure codes describe our configuration, not the operator's document: the
+    operator view says `unavailable`; a reason about their own file (an image) passes through."""
+    from app.services import verification as module
+
+    monkeypatch.setattr(module, "get_provider", lambda: None)
+    make_user(db, "op@example.sg", Role.OPERATOR)
+    h = login(client, "op@example.sg")
+    app_id = _draft_with_business(client, h)
+    _upload(client, h, app_id, "business_profile", "profile.txt", PROFILE_TXT, "text/plain")
+    _upload(client, h, app_id, "floor_plan", "plan.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 50, "image/png")
+    slots = {
+        s["type"]: s for s in client.get(f"/api/v1/applications/{app_id}", headers=h).json()["document_slots"]
+    }
+    assert slots["business_profile"]["document"]["verification"]["error_reason"] == "unavailable"
+    assert slots["floor_plan"]["document"]["verification"]["error_reason"] == "image_not_supported"

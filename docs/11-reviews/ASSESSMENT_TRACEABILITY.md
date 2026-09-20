@@ -1,6 +1,6 @@
 # Assessment traceability
 
-Every line of the brief that can be checked, against where it is implemented, where it is tested, and where the evidence lives. Written 19 Sep 2026 against `dev` before the v0.3.0 release. Status: **Met**, **Partly**, **Deferred** (deliberately, in `SCOPE.md`) or **Beyond** (built beyond the brief).
+Every line of the brief that can be checked, against where it is implemented, where it is tested, and where the evidence lives. Written 19 Sep 2026 against `dev` before the v0.3.0 release (rows marked 20 Sep were added by the review fixes after it). Status: **Met**, **Partly**, **Deferred** (deliberately, in `SCOPE.md`) or **Beyond** (built beyond the brief).
 
 ## What the brief asks for (decoded)
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { DocumentSlotView, OperatorFeedback } from '@/api/applications'
 import { AppError } from '@/api/client'
@@ -11,7 +11,7 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDateTime } from '@/lib/format'
-import { isCheckStale } from '../queries'
+import { CHECK_STALE_MS, isCheckStale } from '../queries'
 import { DropZone } from './DropZone'
 import { VerificationBlock } from './VerificationBlock'
 
@@ -115,8 +115,6 @@ export function DocumentSlot({
         message: error instanceof AppError ? error.message : 'Try again in a moment.',
       })
     } finally {
-      // The dialog closes either way; a failure shows in the slot's own error state.
-      setConfirmDelete(false)
       setBusy(false)
     }
   }
@@ -140,7 +138,17 @@ export function DocumentSlot({
   }
 
   const live = doc?.verification?.status === 'running' || doc?.verification?.status === 'pending'
-  const stale = Boolean(doc?.verification && live && isCheckStale(doc.verification.requested_at))
+  const requestedAt = doc?.verification?.requested_at
+  const stale = Boolean(requestedAt && live && isCheckStale(requestedAt))
+  // Polling stops at the staleness window and identical polls do not re-render, so the "taking longer
+  // than expected" state needs its own wake-up at the moment the window closes.
+  const [, wake] = useState(0)
+  useEffect(() => {
+    if (!live || stale || !requestedAt) return
+    const remaining = Math.max(0, new Date(requestedAt).getTime() + CHECK_STALE_MS - Date.now())
+    const timer = setTimeout(() => wake((n) => n + 1), remaining + 50)
+    return () => clearTimeout(timer)
+  }, [live, stale, requestedAt])
   const canRerun = Boolean(
     doc?.verification &&
     slot.editable &&

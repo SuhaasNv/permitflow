@@ -53,7 +53,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Planning
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-074 (US-059 the debrief material, US-074 the post-release review), 1:1 with Notion |
+| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-075 (US-059 the debrief material, US-074 the post-release review, US-075 the final check before submission), 1:1 with Notion |
 | `05-planning/SPRINTS.md` | written | Three one-day sprints, sprint DoD, close ritual, cut order |
 | `05-planning/KANBAN.md` | written | Flow, WIP limits, story-to-day mapping |
 | `05-planning/notion/*.png` | written (19 Sep) | The Notion board after the release: the workspace page, the Epics table, the Stories table |
@@ -80,7 +80,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` | written (19 Sep) | The owner's legal, privacy and accessibility checklist answered item by item with evidence; laws considered; risks flagged; contrast computation (US-057) |
 | `../CHANGELOG.md` | written (Sprints 1 to 3 closed; v0.3.0 released 19 Sep) | Milestones, sprint closes with Shipped / Slipped / Retro |
 | `../README.md` | written | What it is, stack and why, hosts, setup, demo accounts, security, tests, CI, deployment, AI verification, AI Usage, What I would do next |
-| `13-debrief/README.md` | written (19 Sep) | The pitch deck and the technical deck (pptx and handout PDF), the launch video and the narrated walkthrough (videos in Git LFS) |
+| `13-debrief/README.md` | written (19 Sep) | The pitch deck and the technical deck (pptx and handout PDF), the launch video, the narrated walkthrough and the technical video (videos in Git LFS) |
 
 ## Review history
 - 18 Sep 2026: UI/UX design phase: two independent design-critique passes on the prototype (pass 1 scored 6.6/10 with 11 rendering bugs and 15 fixes; all applied; pass 2 results recorded in `04-design/UI_DESIGN.md`). Scope changes from the phase: public landing page (M1, FR-031), admin user management (S7, FR-030, US-073, T19), upload validation and hash-based duplicate detection made explicit (M3, SEC-005).

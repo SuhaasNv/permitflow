@@ -127,6 +127,7 @@ def test_officer_can_rerun_a_check_and_sees_it_pending(client: TestClient, db: S
     assert body["status"] == "application_received"
     doc = next(d for d in body["documents"] if d["id"] == doc_id)
     assert doc["verification"]["status"] in ("pending", "running", "verified", "issues_found")
+    assert doc["verification"]["requested_at"]  # the client stops polling a check older than its window
     # A second request while the first is still queued is refused; operators cannot use the officer route.
     again = client.post(f"/api/v1/officer/applications/{app_id}/documents/{doc_id}/verify", headers=off)
     assert again.status_code in (202, 409)

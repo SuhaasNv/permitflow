@@ -71,7 +71,7 @@ cd backend && uv run pytest --cov=app        # coverage, fails under 80 %
 cd frontend && npm run test:coverage         # coverage with every source file counted, thresholds in vite.config.ts
 ```
 
-753 backend test cases from 164 test functions (one function, the state-machine sweep, contributes 588 parametrised cases; 103 integration cases run on a real Postgres), 153 frontend tests, eight Playwright specs (the journey, six scenarios, the accessibility gate). Coverage on 19 Sep 2026: backend 96 % statements, frontend 80.6 % statements and 83.9 % lines, both measured over every source file and enforced in CI (`docs/08-testing/TEST_STRATEGY.md`, US-053).
+756 backend test cases from 167 test functions (one function, the state-machine sweep, contributes 588 parametrised cases; 106 integration cases run on a real Postgres), 158 frontend tests, eight Playwright specs (the journey, six scenarios, the accessibility gate), plus an API-level edge-case run of 166 checks (`backend/scripts/uat_edges.py`, `docs/10-uat/UAT_PLAN.md`). Coverage on 20 Sep 2026: backend 95 % statements, frontend 81.2 % statements and 84.2 % lines, both measured over every source file and enforced in CI (`docs/08-testing/TEST_STRATEGY.md`, US-053).
 
 Backend tests run against the real `permitflow_test` database: the Alembic migrations are applied from scratch at the start of the session and every table is truncated between tests. The AI provider is forced to `mock` in tests unless `TEST_LIVE_AI=1`.
 
@@ -87,7 +87,7 @@ Layers and what each protects: `docs/08-testing/TEST_STRATEGY.md`.
 
 ## Environment variables
 
-See `.env.example`; every runtime variable is documented there and in `docs/09-operations/OPERATIONS.md` (`SEED_PASSWORD` is read by the seed script only). `JWT_SECRET` is required in every environment, tests included (the suite signs with a random secret per run); the frontend reads the API URL from `VITE_API_URL` in `frontend/.env` and defaults to http://localhost:8000. The frontend needs no `.env` locally: it defaults to `http://localhost:8000/api/v1`.
+See `.env.example`; every runtime variable is documented there and in `docs/09-operations/OPERATIONS.md` (`SEED_PASSWORD` is read by the seed script only). `JWT_SECRET` is required in every environment, tests included (the suite signs with a random secret per run); the frontend reads the API URL from `VITE_API_URL` in `frontend/.env` (in the container, from `API_URL` at start) and needs no `.env` locally: it defaults to `http://localhost:8000/api/v1`. Two test-only switches are not runtime variables and live with the test docs: `TEST_LIVE_AI` (`docs/09-operations/OPERATIONS.md`) and `E2E_API_URL` (`docs/08-testing/TEST_STRATEGY.md`).
 
 ## Project layout
 
