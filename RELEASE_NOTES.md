@@ -14,8 +14,6 @@ Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for 
 
 *Use case 3, the site visit.* After a visit is scheduled, the officer opens the inspection checklist on site from a tablet, fills it item by item with comments, saves it as a draft between rooms and finishes it later, and marks the items that need clarification. Submitting the checklist moves the case to Pending Post-Site Clarification on its own. The operator then sees only the flagged items with the officer's comment on each, answers them one by one and attaches supporting documents; several rounds per item are supported and every exchange is kept with its timestamps. The three post-site statuses and their transitions already exist and are tested; the checklist model, the officer's tablet screen and the operator's targeted-response screen are the work. Stories US-060 to US-066.
 
-**Unreleased, on `dev` since 20 September 2026 (will ship as v0.3.1, or with v0.4.0):** a refused action tells the operator where the application is in their own words; a check stuck past three minutes offers Re-run on its own; a failed background refresh no longer replaces the page or drops unsaved work; oversized uploads are refused before the file is read; a refused check no longer counts against the daily allowance; provider problems are reported to operators as "unavailable" rather than as technical codes; the release process is pinned and protected (release images only from a tag, production on a fixed image, main behind a pull request with required checks).
-
 ---
 
 ## v0.3.0, 19 September 2026: production
