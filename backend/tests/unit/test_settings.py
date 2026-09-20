@@ -21,7 +21,7 @@ def test_tokens_are_never_signed_with_a_fallback_secret(monkeypatch: pytest.Monk
     get_settings.cache_clear()
     try:
         with pytest.raises(RuntimeError):
-            security.create_access_token(uuid.uuid4(), "operator")
+            security.create_access_token(uuid.uuid4(), "operator", uuid.uuid4())
     finally:
         get_settings.cache_clear()
 

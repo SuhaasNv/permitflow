@@ -10,13 +10,45 @@ import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
 import { Field } from '@/features/shared/Field'
 import { Logo } from '@/features/shared/Logo'
+import { formatDateTime } from '@/lib/format'
 import { homeFor, useAuth } from './AuthContext'
+import type { EndedReason } from './AuthContext'
 
 const schema = z.object({
   email: z.string().trim().min(1, 'Enter your email address.').email('Enter a valid email address, like name@company.sg.'),
   password: z.string().min(1, 'Enter your password.'),
 })
 type FormValues = z.infer<typeof schema>
+
+/** Another device holds this account's session (409 `session_active`, US-093). */
+interface OtherDevice {
+  device: string
+  lastSeenAt: string | null
+}
+
+function otherDeviceFrom(error: AppError): OtherDevice {
+  const device = error.details?.device
+  const lastSeenAt = error.details?.last_seen_at
+  return {
+    device: typeof device === 'string' && device ? device : 'another device',
+    lastSeenAt: typeof lastSeenAt === 'string' ? lastSeenAt : null,
+  }
+}
+
+function endedCopy(reason: EndedReason, at: string | null, message: string | null): string {
+  switch (reason) {
+    case 'expired':
+      return 'Your session ended after 8 hours. Sign in again to continue where you left off.'
+    case 'taken_over':
+      return `Your session ended: this account signed in on another device${at ? ` at ${formatDateTime(at)}` : ''}. Sign in again to continue where you left off.`
+    case 'idle':
+      return message ?? 'Your session ended after a period without activity. Sign in again to continue where you left off.'
+    case 'signed_out':
+      return 'You signed out. Sign in again to continue.'
+    default:
+      return 'Your session is no longer valid. Sign in again to continue.'
+  }
+}
 
 const POINTS: [string, string][] = [
   ['Guided application', 'Four short sections with validation as you go. Drafts are saved on the server.'],
@@ -25,10 +57,12 @@ const POINTS: [string, string][] = [
 ]
 
 export function LoginPage() {
-  const { user, ready, signIn, endedReason } = useAuth()
+  const { user, ready, signIn, endedReason, endedAt, endedMessage } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [otherDevice, setOtherDevice] = useState<OtherDevice | null>(null)
+  const [takingOver, setTakingOver] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -37,10 +71,11 @@ export function LoginPage() {
 
   if (ready && user) return <Navigate to={homeFor(user.role)} replace />
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  const attempt = async (values: FormValues, takeOver: boolean) => {
     setServerError(null)
     try {
-      const response = await login(values.email, values.password)
+      const response = await login(values.email, values.password, takeOver)
+      setOtherDevice(null)
       signIn(response)
       const from = (location.state as { from?: string } | null)?.from
       const home = homeFor(response.user.role)
@@ -48,16 +83,33 @@ export function LoginPage() {
       // Only return to a path inside this role's own area; a stale path from another role lands on home.
       navigate(from && from.startsWith(`/${area}/`) ? from : home, { replace: true })
     } catch (error) {
-      if (error instanceof AppError && error.status === 429) {
+      if (error instanceof AppError && error.status === 409 && error.code === 'session_active') {
+        // Another device holds this account (US-093): offer to sign it out, with the password kept in the form.
+        setOtherDevice(otherDeviceFrom(error))
+      } else if (error instanceof AppError && error.status === 429) {
         // Two limits share the status: failed attempts, or too many sign-ins from this network (US-058).
+        setOtherDevice(null)
         setServerError(error.message || 'Too many attempts. Sign-in is paused for a minute.')
       } else if (error instanceof AppError && error.status === 401) {
+        setOtherDevice(null)
         setServerError('Email or password is incorrect.')
       } else {
+        setOtherDevice(null)
         setServerError(error instanceof Error ? error.message : 'Could not sign in. Try again.')
       }
     }
-  })
+  }
+
+  const onSubmit = form.handleSubmit((values) => attempt(values, false))
+
+  const takeOver = async () => {
+    setTakingOver(true)
+    try {
+      await attempt(form.getValues(), true)
+    } finally {
+      setTakingOver(false)
+    }
+  }
 
   return (
     <div className="grid min-h-screen bg-surface lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -69,19 +121,37 @@ export function LoginPage() {
           <h1 className="font-display text-[40px] leading-[1.05] tracking-[-0.01em]">Sign in</h1>
           <p className="mb-8 mt-3 text-[15px] leading-[22px] text-text-2">Sign in with the account the licensing office issued you (the demo accounts are listed in the README).</p>
           <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
-            {endedReason && !serverError ? (
+            {endedReason && !serverError && !otherDevice ? (
               <Alert tone="info">
-                <span>
-                  {endedReason === 'expired'
-                    ? 'Your session ended after 8 hours. Sign in again to continue where you left off.'
-                    : 'Your session is no longer valid. Sign in again to continue.'}
-                </span>
+                <span>{endedCopy(endedReason, endedAt, endedMessage)}</span>
               </Alert>
             ) : null}
             {serverError ? (
               <Alert tone="error">
                 <span>{serverError}</span>
               </Alert>
+            ) : null}
+            {otherDevice ? (
+              <div
+                role="status"
+                className="pf-enter-fast flex flex-col gap-3 rounded-md border border-warning-line bg-warning-soft px-4 py-3 text-sm leading-5 text-text"
+              >
+                <p className="font-medium">
+                  This account is signed in on {otherDevice.device}
+                  {otherDevice.lastSeenAt ? `, last active ${formatDateTime(otherDevice.lastSeenAt)}` : ''}.
+                </p>
+                <p className="text-text-2">
+                  Sign out the other device and continue here? Your work there is saved as you go; anything typed in the last second or so may be lost.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" loading={takingOver} onClick={takeOver}>
+                    Sign out the other device and continue
+                  </Button>
+                  <Button type="button" size="sm" variant="secondary" disabled={takingOver} onClick={() => setOtherDevice(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
             ) : null}
             <Field
               label="Email address"
@@ -142,7 +212,8 @@ export function LoginPage() {
               }
               {...form.register('password')}
             />
-            <Button type="submit" size="lg" loading={form.formState.isSubmitting} className="mt-1">
+            {/* One red action per screen: while the other device's block is up, the take-over is that action. */}
+            <Button type="submit" size="lg" variant={otherDevice ? 'secondary' : 'primary'} loading={form.formState.isSubmitting} className="mt-1">
               Sign in
             </Button>
           </form>

@@ -33,12 +33,18 @@ export const OPERATIONS = {
 
 // ---- UI helpers ----
 
+/** Signs in through the page. One live session per account (US-093): when the API seeding above signed
+ * in as the same person, the page offers to sign that session out, and the helper accepts. */
 export async function signIn(page: Page, email: string) {
   await page.goto('/login')
   await page.getByLabel(/Email address/).fill(email)
   await page.getByLabel(/^Password/).fill(PASSWORD)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  const takeOver = page.getByRole('button', { name: 'Sign out the other device and continue' })
+  const signedIn = page.getByRole('button', { name: 'Sign out', exact: true })
+  await expect(takeOver.or(signedIn)).toBeVisible()
+  if (await takeOver.isVisible()) await takeOver.click()
+  await expect(signedIn).toBeVisible()
 }
 
 export async function signOut(page: Page) {
@@ -97,7 +103,8 @@ async function login(email: string): Promise<Headers> {
   const r = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: PASSWORD }),
+    // Seeding takes the account over: the scenario signs in through the page afterwards and does the same.
+    body: JSON.stringify({ email, password: PASSWORD, take_over: true }),
   })
   if (!r.ok) throw new Error(`login ${email}: ${r.status}`)
   const body = (await r.json()) as { access_token?: string; token?: string }

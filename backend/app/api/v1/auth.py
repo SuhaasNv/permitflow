@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response, status
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.errors import RateLimited, Unauthorized
 from app.core.rate_limit import FailedLoginLimiter, client_key
 from app.core.settings import get_settings
+from app.domain.device_label import device_label
 from app.schemas.auth import LoginRequest, TokenOut, UserOut
 from app.services.auth import AuthService
 
@@ -21,7 +22,12 @@ def login(payload: LoginRequest, request: Request, db: DbSession) -> TokenOut:
     if login_limiter.is_blocked(key):
         raise RateLimited("Too many failed attempts. Try again in a minute.")
     try:
-        token = AuthService(db).authenticate(payload.email, payload.password)
+        token = AuthService(db).authenticate(
+            payload.email,
+            payload.password,
+            device=device_label(request.headers.get("user-agent")),
+            take_over=payload.take_over,
+        )
     except Unauthorized:
         login_limiter.record_failure(key)
         raise
@@ -36,3 +42,10 @@ def login(payload: LoginRequest, request: Request, db: DbSession) -> TokenOut:
 @router.get("/me", response_model=UserOut)
 def me(user: CurrentUser) -> UserOut:
     return UserOut.model_validate(user)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(request: Request, user: CurrentUser, db: DbSession) -> Response:
+    """Ends this sign-in on the server (US-093): the token stops working on its next use."""
+    AuthService(db).sign_out(user, request.state.session_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -23,6 +23,8 @@ function authState(role: 'operator' | 'officer', expiresInMs: number, signOut = 
     expiresAt: new Date(Date.now() + expiresInMs).toISOString(),
     ready: true,
     endedReason: null,
+    endedAt: null,
+    endedMessage: null,
     signIn: vi.fn(),
     signOut,
   }

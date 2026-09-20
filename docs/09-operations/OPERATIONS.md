@@ -15,6 +15,7 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `TEST_DATABASE_URL` | local `permitflow_test` | pytest, CI | Truncated between tests. |
 | `JWT_SECRET` | empty | backend | Required (at least 16 random characters) in every environment, tests included; the `.env.example` placeholder is refused; the app does not start without it. |
 | `JWT_EXPIRES_MINUTES` | `480` | backend | 8 hours. |
+| `SESSION_IDLE_MINUTES` | `60` | backend | US-093: one live session per account; a session with no request for this long ends by itself, so a device left signed in never locks the account. The sign-in page quotes the number from the server's message. |
 | `CORS_ORIGINS` | `http://localhost:3000` | backend | Comma separated allowlist. |
 | `UPLOAD_DIR` | `./data/uploads` | backend | Local disk storage; Railway volume at `/data/uploads`. |
 | `UPLOAD_MAX_BYTES` | `10485760` | backend | 10 MB. |
@@ -107,7 +108,7 @@ The GitHub `production` environment only accepts deployments from `main`. Develo
 
 | Where | Name | Purpose |
 |---|---|---|
-| Railway backend service (per environment) | `APP_ENV`, `DATABASE_URL` (`${{Postgres.DATABASE_URL}}`), `JWT_SECRET` (distinct per environment), `JWT_EXPIRES_MINUTES`, `CORS_ORIGINS` (that environment's frontend URL), `UPLOAD_DIR=/data/uploads`, `TRUSTED_PROXIES=*` (the Railway edge is the only peer), `CLIENT_IP_HEADER` (default `X-Real-IP`, the header Railway documents for the client address), `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `LANGSMITH_API_KEY`, `LANGSMITH_ENDPOINT`, `LANGSMITH_PROJECT`, `LANGSMITH_HIDE_INPUTS` (optional, tracing), `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `PORT=8000` | runtime configuration |
+| Railway backend service (per environment) | `APP_ENV`, `DATABASE_URL` (`${{Postgres.DATABASE_URL}}`), `JWT_SECRET` (distinct per environment), `JWT_EXPIRES_MINUTES`, `SESSION_IDLE_MINUTES` (optional), `CORS_ORIGINS` (that environment's frontend URL), `UPLOAD_DIR=/data/uploads`, `TRUSTED_PROXIES=*` (the Railway edge is the only peer), `CLIENT_IP_HEADER` (default `X-Real-IP`, the header Railway documents for the client address), `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `LANGSMITH_API_KEY`, `LANGSMITH_ENDPOINT`, `LANGSMITH_PROJECT`, `LANGSMITH_HIDE_INPUTS` (optional, tracing), `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `PORT=8000` | runtime configuration |
 | Railway frontend service (per environment) | `PORT=8080`, `API_URL` | written into `config.js` at start |
 | GitHub environment secret (`development`, `production`) | `RAILWAY_TOKEN` | a Railway **project token** scoped to that one environment (Project settings, Tokens); created by the owner in the dashboard |
 | GitHub repository variable | `RAILWAY_PROJECT_ID` | which project to redeploy |

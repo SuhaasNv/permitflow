@@ -40,6 +40,7 @@ All names carry the `permitflow_` prefix. Labels are route templates and enum va
 | `permitflow_quota_refusals_total` | counter | `quota` (drafts, ai_runs_per_user, ai_runs_per_day) | `services/quotas.py` |
 | `permitflow_transitions_total` | counter | `target` (the new status), `actor` (operator, officer) | the four services that commit a status change: `workflow.py`, `submission.py`, `resubmission.py`, `withdrawal.py`, after the commit |
 | `permitflow_applications` | gauge | `status` | refreshed on each scrape |
+| `permitflow_sessions_active` | gauge | none | accounts signed in right now (US-093: not revoked, not idle, token unexpired); refreshed on each scrape; a dashboard row comes with US-089 |
 | `permitflow_openai_tokens_total` | counter | `model`, `kind` (prompt, cached, completion) | `infra/ai/openai_provider.py` from the `usage` OpenAI returns on every call |
 
 Tests: `backend/tests/integration/test_metrics.py` (off without a token, 401 with a wrong one, the families present after a round, the scrape not counted), plus assertions in `test_openai_provider_paths.py` (tokens counted) and `test_rate_limit.py` (exemption).

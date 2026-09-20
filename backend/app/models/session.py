@@ -1,0 +1,29 @@
+"""One row per sign-in (US-093). An account holds one live session at a time: the next sign-in either
+answers 409 or, with `take_over`, revokes this row. Every authenticated request reads it by id."""
+
+import uuid
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import Base, TimestampMixin, new_id
+
+
+class UserSession(TimestampMixin, Base):
+    __tablename__ = "user_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_id)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    # "Safari on iPad": derived from the User-Agent at sign-in; the header itself is never stored.
+    device_label: Mapped[str] = mapped_column(String(60), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # The token's own expiry, copied so a scrape can count live sessions without decoding tokens.
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # taken_over | signed_out | idle
+    revoked_reason: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+    @property
+    def is_revoked(self) -> bool:
+        return self.revoked_at is not None

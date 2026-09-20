@@ -63,6 +63,10 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
             return f"Licence {p.get('licence_no', '')} issued, valid to {p.get('valid_to', '')}"
         case "feedback.restored":
             return f"Feedback on {p.get('target', '')} restored to {p.get('to', '')} (undo)"
+        case "user.session_taken_over":
+            return f"Signed in on {p.get('to_device', '')}; the session on {p.get('from_device', '')} ended"
+        case "user.signed_out":
+            return f"Signed out on {p.get('device', '')}"
         case "site_visit.proposed":
             return f"Site visit proposed: {_visit(p)} (round {p.get('round', '')})"
         case "site_visit.counter_proposed":

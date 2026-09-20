@@ -72,7 +72,7 @@ docs/      01-discovery … 14-debrief, one README per folder; docs/README.md is
 
 ## Security
 
-Argon2 password hashes; short-lived JWTs re-checked against the user row on every request; no fallback secret (the app refuses to start without a real `JWT_SECRET`). Authorization is server-side on every route (role per router, ownership as 404, sub-resource checks), with an authorization test per application-scoped endpoint. Uploads: allowlist, 10 MB, magic-byte check, server-generated keys, served only through authorised endpoints. Abuse limits: 240 requests a minute per client, sign-in limits, 20 open drafts, 60 AI checks a day per applicant and 1,000 per platform, counted in the database. Security headers and CSP on both tiers; gitleaks, pip-audit, bandit and npm audit block the build. Threats and controls: `docs/06-security/THREAT_MODEL.md`; the hardening checklist with a test per item: `docs/06-security/SECURITY_REVIEW.md`; privacy, legal and accessibility: `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.
+Argon2 password hashes; short-lived JWTs re-checked against the user row and the sign-in's session row on every request, one live session per account with a take-over from the sign-in page and a 60-minute idle limit (US-093); no fallback secret (the app refuses to start without a real `JWT_SECRET`). Authorization is server-side on every route (role per router, ownership as 404, sub-resource checks), with an authorization test per application-scoped endpoint. Uploads: allowlist, 10 MB, magic-byte check, server-generated keys, served only through authorised endpoints. Abuse limits: 240 requests a minute per client, sign-in limits, 20 open drafts, 60 AI checks a day per applicant and 1,000 per platform, counted in the database. Security headers and CSP on both tiers; gitleaks, pip-audit, bandit and npm audit block the build. Threats and controls: `docs/06-security/THREAT_MODEL.md`; the hardening checklist with a test per item: `docs/06-security/SECURITY_REVIEW.md`; privacy, legal and accessibility: `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.
 
 ## Tests
 
@@ -82,7 +82,7 @@ cd frontend && npm test && npm run lint && npm run typecheck && npm run build
 cd frontend && npm run e2e          # Playwright against the running stack (backend :8000 with AI_PROVIDER=mock, Vite :3000)
 ```
 
-798 backend cases from 208 test functions on a real PostgreSQL (the state-machine sweep alone is 597), 194 frontend tests, ten Playwright specs (the journey, eight scenarios, the accessibility gate), 233 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
+831 backend cases from 232 test functions on a real PostgreSQL (the state-machine sweep alone is 597), 209 frontend tests, eleven Playwright specs (the journey, nine scenarios, the accessibility gate), 245 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
 
 ## Environment variables
 

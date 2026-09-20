@@ -76,7 +76,7 @@ def envelope_ok(r: httpx.Response) -> bool:
 
 
 def login(email: str) -> dict[str, str]:
-    r = client.post("/auth/login", json={"email": email, "password": PW})
+    r = client.post("/auth/login", json={"email": email, "password": PW, "take_over": True})
     assert r.status_code == 200, r.text
     return {"Authorization": "Bearer " + r.json()["access_token"]}
 
@@ -215,7 +215,9 @@ CHECKLIST = "/officer/applications/{}/checklist"
 def clean_items():  # type: ignore[no-untyped-def]
     from app.domain.checklist_schema import ITEM_KEYS
 
-    return [{"key": k, "result": "satisfactory", "comment": None, "needs_clarification": False} for k in ITEM_KEYS]
+    return [
+        {"key": k, "result": "satisfactory", "comment": None, "needs_clarification": False} for k in ITEM_KEYS
+    ]
 
 
 def fresh_case_to_site_visit_done(op, off) -> str:  # type: ignore[no-untyped-def]
@@ -256,7 +258,8 @@ def ensure_second_operator() -> None:
 
     with session_factory()() as db:
         repo = UserRepository(db)
-        if repo.get_by_email(OPERATOR2) is None:
+        user = repo.get_by_email(OPERATOR2)
+        if user is None:
             repo.add(
                 User(
                     email=OPERATOR2,
@@ -265,18 +268,21 @@ def ensure_second_operator() -> None:
                     password_hash=hash_password(PW),
                 )
             )
-            db.commit()
+        else:
+            user.is_active = True
+        db.commit()
 
 
-def remove_second_operator() -> None:
-    """Prune the account the run created: its drafts are gone by then, so the row can go too."""
+def retire_second_operator() -> None:
+    """Deactivate the account the run used. It is not deleted: its sign-ins left session rows and
+    user-level audit events (US-093), and audit rows are never deleted. Inactive, it cannot sign in."""
     from app.infra.db import session_factory
     from app.repositories.users import UserRepository
 
     with session_factory()() as db:
         user = UserRepository(db).get_by_email(OPERATOR2)
         if user is not None:
-            db.delete(user)
+            user.is_active = False
             db.commit()
 
 
@@ -285,7 +291,7 @@ def main() -> None:
     try:
         run_checks()
     finally:
-        remove_second_operator()
+        retire_second_operator()
 
 
 def run_checks() -> None:
@@ -1187,65 +1193,177 @@ def run_checks() -> None:
 
     # ---------- Site visit checklist (US-060 to US-063) ----------
     r = transition(off, aid, "pending_approval")
-    check("CK1", "no route from Site Visit Done straight to approval: the checklist is the way", r.status_code == 409, r.text)
+    check(
+        "CK1",
+        "no route from Site Visit Done straight to approval: the checklist is the way",
+        r.status_code == 409,
+        r.text,
+    )
     r = req(op, "GET", "/checklist-schema")
     check("CK2", "operator cannot read the checklist template (403)", r.status_code == 403, r.text)
     r = req(off, "GET", "/checklist-schema")
-    check("CK3", "the template is versioned with 17 items in 5 sections", r.status_code == 200 and r.json()["version"] == 1 and r.json()["item_count"] == 17 and len(r.json()["sections"]) == 5, r.text[:200])
+    check(
+        "CK3",
+        "the template is versioned with 17 items in 5 sections",
+        r.status_code == 200
+        and r.json()["version"] == 1
+        and r.json()["item_count"] == 17
+        and len(r.json()["sections"]) == 5,
+        r.text[:200],
+    )
     r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
     check("CK4", "submit before the checklist exists is 404", r.status_code == 404, r.text)
     r = req(off, "PUT", CHECKLIST.format(aid), json={"items": clean_items(), "version": 1})
     check("CK5", "save before the checklist exists is 404", r.status_code == 404, r.text)
     r = req(off, "POST", CHECKLIST.format(aid))
-    check("CK6", "first open creates the draft (201) with every item not assessed", r.status_code == 201 and all(i["result"] == "not_assessed" for i in r.json()["items"]) and r.json()["version"] == 1, r.text[:200])
+    check(
+        "CK6",
+        "first open creates the draft (201) with every item not assessed",
+        r.status_code == 201
+        and all(i["result"] == "not_assessed" for i in r.json()["items"])
+        and r.json()["version"] == 1,
+        r.text[:200],
+    )
     cl = r.json()
     r = req(off, "POST", CHECKLIST.format(aid))
-    check("CK7", "second open returns the same draft (200)", r.status_code == 200 and r.json()["id"] == cl["id"], r.text[:200])
+    check(
+        "CK7",
+        "second open returns the same draft (200)",
+        r.status_code == 200 and r.json()["id"] == cl["id"],
+        r.text[:200],
+    )
     r = req(op, "POST", CHECKLIST.format(aid))
     check("CK8", "operator on the checklist routes is 403", r.status_code == 403, r.text)
     r = req(op2, "GET", CHECKLIST.format(aid))
     check("CK9", "another operator on the checklist route is 403 (role first)", r.status_code == 403, r.text)
     r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
-    check("CK10", "submit with nothing assessed is 422 listing every item", r.status_code == 422 and len(r.json()["error"]["details"]["items"]) == 17, r.text[:200])
-    bad = clean_items() + [{"key": "gold_taps", "result": "satisfactory", "comment": None, "needs_clarification": False}]
+    check(
+        "CK10",
+        "submit with nothing assessed is 422 listing every item",
+        r.status_code == 422 and len(r.json()["error"]["details"]["items"]) == 17,
+        r.text[:200],
+    )
+    bad = clean_items() + [
+        {"key": "gold_taps", "result": "satisfactory", "comment": None, "needs_clarification": False}
+    ]
     r = req(off, "PUT", CHECKLIST.format(aid), json={"items": bad, "version": cl["version"]})
-    check("CK11", "an item not on the template is 422 on its key", r.status_code == 422 and "gold_taps" in r.json()["error"]["details"]["fields"], r.text[:200])
+    check(
+        "CK11",
+        "an item not on the template is 422 on its key",
+        r.status_code == 422 and "gold_taps" in r.json()["error"]["details"]["fields"],
+        r.text[:200],
+    )
     r = req(off, "PUT", CHECKLIST.format(aid), json={"items": clean_items()[:3], "version": cl["version"]})
-    check("CK12", "a partial item list is 422 naming the count missing", r.status_code == 422 and "14 missing" in r.json()["error"]["details"]["fields"]["items"], r.text[:200])
+    check(
+        "CK12",
+        "a partial item list is 422 naming the count missing",
+        r.status_code == 422 and "14 missing" in r.json()["error"]["details"]["fields"]["items"],
+        r.text[:200],
+    )
     items = clean_items()
-    items[1] = {"key": "floor_trap_graded", "result": "unsatisfactory", "comment": None, "needs_clarification": False}
+    items[1] = {
+        "key": "floor_trap_graded",
+        "result": "unsatisfactory",
+        "comment": None,
+        "needs_clarification": False,
+    }
     items[2] = {"key": "coved_edges", "result": "satisfactory", "comment": None, "needs_clarification": True}
     items[8] = {"key": "make_up_air", "result": "not_assessed", "comment": None, "needs_clarification": False}
     r = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": cl["version"]})
-    check("CK13", "a draft may hold unassessed and uncommented items; the counts say what is left", r.status_code == 200 and r.json()["version"] == 2 and r.json()["counts"]["assessed"] == 16 and r.json()["counts"]["missing_comments"] == 2 and r.json()["remaining"] == "Assess 1 more item and add 2 comments to submit.", r.text[:300])
+    check(
+        "CK13",
+        "a draft may hold unassessed and uncommented items; the counts say what is left",
+        r.status_code == 200
+        and r.json()["version"] == 2
+        and r.json()["counts"]["assessed"] == 16
+        and r.json()["counts"]["missing_comments"] == 2
+        and r.json()["remaining"] == "Assess 1 more item and add 2 comments to submit.",
+        r.text[:300],
+    )
     r = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": 1})
-    check("CK14", "a stale version is 409 version_conflict carrying the current content", r.status_code == 409 and r.json()["error"]["code"] == "version_conflict" and r.json()["error"]["details"]["current"]["version"] == 2, r.text[:200])
+    check(
+        "CK14",
+        "a stale version is 409 version_conflict carrying the current content",
+        r.status_code == 409
+        and r.json()["error"]["code"] == "version_conflict"
+        and r.json()["error"]["details"]["current"]["version"] == 2,
+        r.text[:200],
+    )
     r = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": 2, "save_id": "uat-1"})
     r2 = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": 2, "save_id": "uat-1"})
-    check("CK15", "a replayed save id answers 200 with the state instead of a conflict", r.status_code == 200 and r2.status_code == 200 and r2.json()["version"] == r.json()["version"] == 3, r2.text[:200])
+    check(
+        "CK15",
+        "a replayed save id answers 200 with the state instead of a conflict",
+        r.status_code == 200 and r2.status_code == 200 and r2.json()["version"] == r.json()["version"] == 3,
+        r2.text[:200],
+    )
     r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
-    check("CK16", "submit with an unassessed and two uncommented items is 422 naming the three keys", r.status_code == 422 and set(r.json()["error"]["details"]["items"]) == {"floor_trap_graded", "coved_edges", "make_up_air"}, r.text[:300])
+    check(
+        "CK16",
+        "submit with an unassessed and two uncommented items is 422 naming the three keys",
+        r.status_code == 422
+        and set(r.json()["error"]["details"]["items"]) == {"floor_trap_graded", "coved_edges", "make_up_air"},
+        r.text[:300],
+    )
     items[1]["comment"] = "Floor slopes away from the trap."
     items[2]["comment"] = "Please confirm the coving work."
     items[8]["result"] = "satisfactory"
     r = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": 3})
-    check("CK17", "the completed draft saves; nothing remains before submit", r.status_code == 200 and r.json()["remaining"] is None, r.text[:200])
+    check(
+        "CK17",
+        "the completed draft saves; nothing remains before submit",
+        r.status_code == 200 and r.json()["remaining"] is None,
+        r.text[:200],
+    )
     row = next(i for i in req(off, "GET", "/officer/applications").json()["items"] if i["id"] == aid)
-    check("CK18", "the queue says Continue the checklist", row["next_action"] == "Continue the checklist", json.dumps(row)[:200])
+    check(
+        "CK18",
+        "the queue says Continue the checklist",
+        row["next_action"] == "Continue the checklist",
+        json.dumps(row)[:200],
+    )
     r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
-    check("CK19", "submit freezes the findings, opens round 1 for the flagged item and moves the case", r.status_code == 200 and r.json()["status"] == "submitted" and next(i for i in r.json()["items"] if i["key"] == "coved_edges")["clarification_status"] == "open", r.text[:300])
+    check(
+        "CK19",
+        "submit freezes the findings, opens round 1 for the flagged item and moves the case",
+        r.status_code == 200
+        and r.json()["status"] == "submitted"
+        and next(i for i in r.json()["items"] if i["key"] == "coved_edges")["clarification_status"] == "open",
+        r.text[:300],
+    )
     v = officer_view(off, aid)
-    check("CK20", "the case is Awaiting Post-Site Clarification with the checklist summary submitted", v["status"] == "awaiting_post_site_clarification" and v["checklist"]["status"] == "submitted" and v["site_visit"]["status"] == "done", json.dumps(v["checklist"])[:200])
+    check(
+        "CK20",
+        "the case is Awaiting Post-Site Clarification with the checklist summary submitted",
+        v["status"] == "awaiting_post_site_clarification"
+        and v["checklist"]["status"] == "submitted"
+        and v["site_visit"]["status"] == "done",
+        json.dumps(v["checklist"])[:200],
+    )
     r = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": 5})
     check("CK21", "a save after submit is 409 (findings frozen)", r.status_code == 409, r.text)
     r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
     check("CK22", "a second submit is 409", r.status_code == 409, r.text)
     mine = req(op, "GET", f"/applications/{aid}").json()
     ok, note = operator_view_clean(mine)
-    check("CK23", "operator sees Pending Post-Site Clarification with the count, never a result or a checklist", ok and mine["status_label"] == "Pending Post-Site Clarification" and "1 item" in mine["status_explanation"] and "checklist" not in mine and "unsatisfactory" not in json.dumps(mine), mine["status_explanation"] + note)
+    check(
+        "CK23",
+        "operator sees Pending Post-Site Clarification with the count, never a result or a checklist",
+        ok
+        and mine["status_label"] == "Pending Post-Site Clarification"
+        and "1 item" in mine["status_explanation"]
+        and "checklist" not in mine
+        and "unsatisfactory" not in json.dumps(mine),
+        mine["status_explanation"] + note,
+    )
     trail = req(off, "GET", f"/officer/applications/{aid}/audit").json()["events"]
     kinds = [e["event_type"] for e in trail][-2:]
-    check("CK24", "audit order: checklist.submitted then the system hop (the visit was already done here)", kinds == ["checklist.submitted", "status.changed"] and trail[-1]["payload"]["trigger"] == "system", json.dumps(kinds))
+    check(
+        "CK24",
+        "audit order: checklist.submitted then the system hop (the visit was already done here)",
+        kinds == ["checklist.submitted", "status.changed"] and trail[-1]["payload"]["trigger"] == "system",
+        json.dumps(kinds),
+    )
     r = transition(off, aid, "pending_approval")
     check("CK25", "Route to approval waits while an item is open (409)", r.status_code == 409, r.text)
     # answering the open item is US-065; for the walk below the flagged item is not needed: reject-free
@@ -1255,9 +1373,19 @@ def run_checks() -> None:
     r = req(off, "POST", CHECKLIST.format(aid))
     req(off, "PUT", CHECKLIST.format(aid), json={"items": clean_items(), "version": r.json()["version"]})
     r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
-    check("CK26", "a clean checklist submits with nothing flagged", r.status_code == 200 and r.json()["counts"]["flagged"] == 0, r.text[:200])
+    check(
+        "CK26",
+        "a clean checklist submits with nothing flagged",
+        r.status_code == 200 and r.json()["counts"]["flagged"] == 0,
+        r.text[:200],
+    )
     mine = req(op, "GET", f"/applications/{aid}").json()
-    check("CK27", "with nothing flagged the operator is told nothing is needed", mine["status_explanation"].startswith("The site visit is recorded"), mine["status_explanation"])
+    check(
+        "CK27",
+        "with nothing flagged the operator is told nothing is needed",
+        mine["status_explanation"].startswith("The site visit is recorded"),
+        mine["status_explanation"],
+    )
     r = transition(off, aid, "pending_approval")
     check("O34", "Route to approval", r.status_code == 200, r.text[:200])
     v = req(op, "GET", f"/applications/{aid}").json()
@@ -1340,10 +1468,21 @@ def run_checks() -> None:
     )
     transition(off, aid, "site_visit_done")
     r = req(off, "POST", CHECKLIST.format(aid))
-    check("CK28", "a second visit gets its own checklist (visit 2)", r.status_code == 201 and r.json()["visit_no"] == 2, r.text[:200])
+    check(
+        "CK28",
+        "a second visit gets its own checklist (visit 2)",
+        r.status_code == 201 and r.json()["visit_no"] == 2,
+        r.text[:200],
+    )
     req(off, "PUT", CHECKLIST.format(aid), json={"items": clean_items(), "version": r.json()["version"]})
     r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
-    check("CK29", "visit 2 submits clean; visit 1 stays readable", r.status_code == 200 and req(off, "GET", CHECKLIST.format(aid) + "?visit=1").json()["status"] == "submitted", r.text[:200])
+    check(
+        "CK29",
+        "visit 2 submits clean; visit 1 stays readable",
+        r.status_code == 200
+        and req(off, "GET", CHECKLIST.format(aid) + "?visit=1").json()["status"] == "submitted",
+        r.text[:200],
+    )
     transition(off, aid, "pending_approval")
     r = req(off, "GET", f"/officer/applications/{aid}/licence/preview")
     check(
@@ -1558,6 +1697,85 @@ def run_checks() -> None:
         "OpenAPI docs reachable in development (not in production; checked in OPERATIONS)",
         r.status_code in (200, 404),
         str(r.status_code),
+    )
+
+    # ---------- One live session per account (US-093) ----------
+    # The second operator is free to use here: every earlier group signed in once and took over.
+    ipad_ua = {
+        "User-Agent": "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 Version/17.4 Mobile/15E148 Safari/604.1"
+    }
+    mac_ua = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36"
+    }
+    r = client.post(
+        "/auth/login", json={"email": OPERATOR2, "password": PW, "take_over": True}, headers=ipad_ua
+    )
+    check("SE1", "sign-in with a take-over is 200", r.status_code == 200, r.text[:120])
+    ipad = {"Authorization": "Bearer " + r.json()["access_token"]}
+    r = client.post("/auth/login", json={"email": OPERATOR2, "password": PW}, headers=mac_ua)
+    err = r.json().get("error", {}) if r.status_code == 409 else {}
+    check(
+        "SE2",
+        "a second sign-in is 409 session_active naming the iPad and its last activity",
+        r.status_code == 409
+        and err.get("code") == "session_active"
+        and err.get("details", {}).get("device") == "Safari on iPad"
+        and bool(err.get("details", {}).get("last_seen_at")),
+        r.text[:200],
+    )
+    check(
+        "SE3",
+        "the refused sign-in leaves the iPad working",
+        req(ipad, "GET", "/auth/me").status_code == 200,
+        "",
+    )
+    r = client.post(
+        "/auth/login", json={"email": OPERATOR2, "password": "wrong", "take_over": True}, headers=mac_ua
+    )
+    check(
+        "SE4",
+        "a wrong password with take_over is the generic 401",
+        r.status_code == 401 and r.json()["error"]["code"] == "unauthorized",
+        r.text[:120],
+    )
+    check("SE5", "and the iPad is untouched by it", req(ipad, "GET", "/auth/me").status_code == 200, "")
+    r = client.post(
+        "/auth/login", json={"email": OPERATOR2, "password": PW, "take_over": True}, headers=mac_ua
+    )
+    check("SE6", "the take-over signs the laptop in", r.status_code == 200, r.text[:120])
+    laptop = {"Authorization": "Bearer " + r.json()["access_token"]}
+    r = req(ipad, "GET", "/auth/me")
+    err = r.json().get("error", {}) if r.status_code == 401 else {}
+    check(
+        "SE7",
+        "the iPad's next request is 401 session_revoked, reason taken_over, with the time",
+        r.status_code == 401
+        and err.get("code") == "session_revoked"
+        and err.get("details", {}).get("reason") == "taken_over"
+        and bool(err.get("details", {}).get("at"))
+        and "another device" in err.get("message", ""),
+        r.text[:200],
+    )
+    check("SE8", "the laptop works", req(laptop, "GET", "/applications").status_code == 200, "")
+    r = req(laptop, "POST", "/auth/logout")
+    check("SE9", "sign-out is 204", r.status_code == 204, r.text[:120])
+    r = req(laptop, "GET", "/auth/me")
+    check(
+        "SE10",
+        "after sign-out the token is 401 session_revoked, reason signed_out",
+        r.status_code == 401 and r.json()["error"]["details"].get("reason") == "signed_out",
+        r.text[:200],
+    )
+    r = client.post("/auth/login", json={"email": OPERATOR2, "password": PW}, headers=ipad_ua)
+    check("SE11", "after sign-out a plain sign-in needs no take-over", r.status_code == 200, r.text[:120])
+    if r.status_code == 200:
+        req({"Authorization": "Bearer " + r.json()["access_token"]}, "POST", "/auth/logout")
+    r = client.post("/auth/logout")
+    check(
+        "SE12",
+        "sign-out without a token is 401 in the envelope",
+        r.status_code == 401 and envelope_ok(r),
+        r.text[:120],
     )
 
     # ---------- Summary ----------
