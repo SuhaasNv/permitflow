@@ -234,3 +234,17 @@ export async function seedVisitConfirmed(): Promise<Seeded> {
   await acceptVisit(seeded.id)
   return seeded
 }
+
+/** On the case page: open the checklist, mark every item satisfactory, wait for the autosave, submit (US-063). */
+export async function submitCleanChecklist(page: Page) {
+  await page.getByRole('link', { name: /Open checklist|Continue checklist/ }).click()
+  await expect(page.getByRole('heading', { name: 'Site visit checklist' })).toBeVisible()
+  const groups = page.getByRole('group', { name: 'Result' })
+  await expect(groups).toHaveCount(17)
+  for (let i = 0; i < 17; i += 1) await groups.nth(i).getByRole('button', { name: 'Satisfactory', exact: true }).click()
+  await expect(page.getByText('Saved just now')).toBeVisible({ timeout: 5000 })
+  await page.getByRole('button', { name: /Mark visit done and submit|Submit checklist/ }).click()
+  await expect(page.locator('dialog[open]')).toContainText('Nothing is flagged')
+  await page.locator('dialog[open]').getByRole('button', { name: 'Submit' }).click()
+  await expect(status(page)).toHaveText('Awaiting Post-Site Clarification')
+}

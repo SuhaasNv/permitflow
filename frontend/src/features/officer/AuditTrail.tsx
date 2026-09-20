@@ -16,6 +16,8 @@ const FAMILY: Record<string, { label: string; tone: string }> = {
   section: { label: 'Section', tone: 'bg-line-strong' },
   application: { label: 'Application', tone: 'bg-ink' },
   site_visit: { label: 'Site visit', tone: 'bg-info' },
+  checklist: { label: 'Checklist', tone: 'bg-success' },
+  clarification: { label: 'Clarification', tone: 'bg-warning' },
 }
 
 function family(type: string): string {

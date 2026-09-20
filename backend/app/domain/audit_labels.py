@@ -74,6 +74,15 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
                 f"Site visit reschedule asked by the {p.get('by', '')}: {_visit(p)} "
                 f"(round {p.get('round', '')})"
             )
+        case "checklist.created":
+            return f"Checklist opened for visit {p.get('visit_no', '')} ({p.get('items', '')} items)"
+        case "checklist.submitted":
+            flagged = len(p.get("flagged_keys") or [])
+            ok, bad, na = p.get("satisfactory", ""), p.get("unsatisfactory", ""), p.get("not_applicable", "")
+            return (
+                f"Checklist submitted for visit {p.get('visit_no', '')}: {ok} satisfactory, "
+                f"{bad} unsatisfactory, {na} not applicable, {flagged} flagged for clarification"
+            )
         case _:
             return event_type
 

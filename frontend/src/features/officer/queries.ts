@@ -16,7 +16,7 @@ import {
   withdrawFeedback,
 } from '@/api/officer'
 import type { Checklist, ChecklistSaveInput } from '@/api/checklist'
-import { getChecklist, getChecklistSchema, openChecklist, saveChecklist } from '@/api/checklist'
+import { getChecklist, getChecklistSchema, openChecklist, saveChecklist, submitChecklist } from '@/api/checklist'
 import type { DateInput, DecideInput, ProposeInput } from '@/api/siteVisit'
 import { confirmSiteVisitWithoutReply, decideSiteVisit, proposeSiteVisit, rescheduleSiteVisitAsOfficer } from '@/api/siteVisit'
 import { isCheckStale } from '@/features/operator/queries'
@@ -194,6 +194,20 @@ export function useSaveChecklist(id: string) {
       qc.setQueryData(officerKeys.checklist(id), checklist)
       void qc.invalidateQueries({ queryKey: officerKeys.case(id) })
       void qc.invalidateQueries({ queryKey: officerKeys.queue })
+    },
+  })
+}
+
+/** The submit changes the case status too: the case, the queue and the audit trail refetch. */
+export function useSubmitChecklist(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => submitChecklist(id),
+    onSuccess: (checklist: Checklist) => {
+      qc.setQueryData(officerKeys.checklist(id), checklist)
+      void qc.invalidateQueries({ queryKey: officerKeys.case(id) })
+      void qc.invalidateQueries({ queryKey: officerKeys.queue })
+      void qc.invalidateQueries({ queryKey: officerKeys.audit(id) })
     },
   })
 }

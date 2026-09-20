@@ -106,3 +106,8 @@ export function getChecklist(id: string, visit?: number): Promise<Checklist> {
 export function saveChecklist(id: string, body: ChecklistSaveInput): Promise<Checklist> {
   return request<Checklist>(`/officer/applications/${id}/checklist`, { method: 'PUT', body })
 }
+
+/** Freezes the findings and moves the case to Awaiting Post-Site Clarification (US-063). */
+export function submitChecklist(id: string): Promise<Checklist> {
+  return request<Checklist>(`/officer/applications/${id}/checklist/submit`, { method: 'POST' })
+}
