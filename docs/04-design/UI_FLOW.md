@@ -13,7 +13,8 @@ Operator (/app)
   /applications/:id/review (S-13)                        draft only
   /applications/:id/submitted (S-14)                     once, after submit
   /applications/:id (S-15)   status bar · feedback panel · sections · documents  (all post-submission states)
-  /applications/:id/history (S-16)   revisions · released feedback · timeline
+  /applications/:id/history (S-16)   revisions · released feedback · timeline · site visit (S-19, v0.4.0)
+  /applications/:id/clarification (S-18, v0.4.0)   only the flagged items · responses · attachments · send
   notifications panel (S-17) from the bell
 Officer (/officer)
   /queue (S-20)
@@ -21,9 +22,14 @@ Officer (/officer)
   /applications/:id (S-23)   same route, resubmission variant when revisions ≥ 2 (Changed markers)
   /applications/:id/compare?from&to (S-24)
   /applications/:id/history (S-25)   audit trail · revisions · status history
-  dialogs: request resubmission (S-22), reject (note), schedule site visit, approve
-Admin (/admin)
-  /overview (S-40)
+  /applications/:id/checklist (S-30, v0.4.0)   the inspection checklist, one per visit; read-only after submit
+  /applications/:id (S-31, v0.4.0)   same route, the clarification rail replaces the feedback rail in the post-site states
+  dialogs: request resubmission (S-22), reject (note), schedule site visit, approve; v0.4.0: submit checklist, still needs clarification, mark clarified, request another round
+Admin (/admin, v0.4.0)
+  /overview (S-40)   stat strip · applications by status · idle cases · check health · today
+  /activity (S-42)   audit events across every application and every user change
+  /users (S-41)      directory · change role · deactivate · reactivate
+  /applications/:id (S-43)   the officer's case page, read-only
 ```
 
 Navigation: top bar (brand, bell, user, sign out) + left side nav per role. Application screens use breadcrumbs (`My applications › PF-2026-000214 › Documents`) and tabs (`Application | History` for operators; `Submission | Documents | Feedback | History & audit` for officers).
@@ -89,3 +95,37 @@ Officer marks resolved             →  both roles: "Resolved" (green, message g
 ## Notifications (S-17)
 
 Kinds from the domain model only: `submitted` and `resubmitted` (to officers), `status_changed` (to the operator). Rendered as title (reference + event), one body line, timestamp; unread rows tinted; click opens the application. Verification outcomes are not notifications in the MVP (they are visible on the document card); the panel design leaves room for them if added later.
+
+## Officer flow: site visit and clarification (UC3-A, UC3-C, v0.4.0)
+
+| Step | Screen | State | What the user sees / does | Engineering hook |
+|------|--------|-------|---------------------------|------------------|
+| 0 | S-32, S-33, S-34 | under_review → site_visit_scheduled | The officer proposes a date and slot (S-32); the operator accepts or counters with a reason (S-33); the officer accepts, keeps or proposes again (S-34); either side may reschedule before the date; after three working days of silence the officer confirms alone; Mark site visit done waits for a confirmed visit (US-084) | `POST …/site-visit`, `…/site-visit/decide`, `…/site-visit/confirm`, `…/site-visit/reschedule`; operator `…/site-visit/accept`, `…/site-visit/counter` |
+| 1 | S-21 | site_visit_scheduled | Primary action "Open checklist"; the feedback rail is locked with the reason | `POST /officer/applications/{id}/checklist` (201 or 200) |
+| 2 | S-30 | site_visit_scheduled / site_visit_done | Fills each item: result, comment, flag; section picker; progress with counts; autosave with Saved hh:mm, retrying and the offline banner | `PUT …/checklist` with `version` and `save_id` (idempotent; 409 merged) |
+| 3 | S-30 | site_visit_done (hop recorded when needed) | Submit dialog lists the flagged items; findings freeze; the case moves on its own | `POST …/checklist/submit`; system transition; one operator notification |
+| 4 | S-31 | awaiting_post_site_clarification | Rail header "Round 1, waiting on operator"; every flagged item Open with the finding on top; Withdraw available; Route to approval disabled with the reason | `actions[]` from the server |
+| 5 | Bell, S-20 | post_site_clarification_resubmitted | "PF-…: The operator answered the clarification request"; row says Review responses | officer notification (active officers) |
+| 6 | S-31 | post_site_clarification_resubmitted | Per item: Mark clarified or Still needs clarification (message required; item shows "Not sent yet"); Request another round (n) once an item is open; Route to approval once nothing is open or answered | item endpoints; the two transitions with their guards |
+| 7 | S-21 | pending_approval | Preview licence, Approve or Reject, Return to review (a second visit gets its own checklist) | as today |
+
+## Operator flow: answer the flagged items (UC3-B, v0.4.0)
+
+| Step | Screen | State | What the user sees / does | Engineering hook |
+|------|--------|-------|---------------------------|------------------|
+| 1 | Bell, S-10 | awaiting_post_site_clarification | "PF-…: The licensing officer completed the site visit and needs more information on 3 items"; the card sits under Needs your response with "Respond to clarification (3 items)" | `clarification: { can_respond, open_count, round }` on the operator view |
+| 2 | S-15 | same | Status bar "Pending Post-Site Clarification"; the notice on top; the form and documents locked with the reason | operator view |
+| 3 | S-18 | same | Only the flagged items; the officer's comment first on each; response text; Take a photo or Choose a file (3 per item); readiness "Ready to send: n of m items answered"; Send responses disabled until every item is answered; the dialog lists the items | `GET /applications/{id}/clarifications`; responses and attachments endpoints; `POST …/clarifications/send` |
+| 4 | S-15 | post_site_clarification_resubmitted | Toast "Responses sent"; status bar "Post-Site Resubmitted: the licensing officer is reviewing your responses"; page read-only | transition with the guard |
+| 5 | S-18 | pending_post_site_resubmission | Only the reopened items, with the officer's new comment; round 2 | as step 3 |
+| 6 | S-19 | any | Site visit tab: every round of every item, per visit; "Draft, never sent" after Reject or Withdraw | `GET /applications/{id}/clarifications` (history) |
+
+## Admin flow (UC4-A, v0.4.0)
+
+| Step | Screen | What the user sees / does | Engineering hook |
+|------|--------|---------------------------|------------------|
+| 1 | S-40 | Stat strip, applications by status, idle cases, check health, today's counts against the platform quota | `GET /admin/overview` |
+| 2 | S-42 | Every audit event across applications, family filter, older pages by cursor, user rows without a case link | `GET /admin/audit-feed` |
+| 3 | S-43 | Any case as the officer sees it, with the read-only banner and no actions | officer GETs with `OfficerOrAdmin`; `actions[]` empty |
+| 4 | S-41 | Directory; Change role or Deactivate with a consequence dialog; own and protected rows disabled with the reason | `GET /admin/users`, `PATCH /admin/users/{id}` |
+
