@@ -132,8 +132,8 @@ export function SiteVisitCard({ view }: { view: ApplicationView }) {
           <>
             <p className="text-base font-semibold leading-6">You proposed {lastMine.when}</p>
             <p className="text-sm leading-5 text-text-2">
-              The licensing officer decides between your date and {visit.when}, or proposes a third one. You will be told here and by
-              notification.
+              The licensing officer decides between your date and {visit.when}
+              {visit.rounds_left > 0 ? ', or proposes a third one' : ''}. You will be told here and by notification.
             </p>
           </>
         ) : (
