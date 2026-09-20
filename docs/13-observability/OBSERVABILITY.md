@@ -108,7 +108,7 @@ Three services in the development environment, all from public images, no image 
 
 Each backend carries its own `METRICS_TOKEN`. `RAILWAY_RUN_UID=0` is needed because both images run as a non-root user and Railway mounts volumes owned by root (the first deploy failed with "permission denied" on `/prometheus`).
 
-The production backend's token is set; the production target is scraped from the same Prometheus. One instance for both environments is a demonstration choice: a real authority would run one per environment (or Grafana Cloud with the agent) so production numbers never sit next to development ones.
+The production backend's token is set and the endpoint has been live in production since 20 Sep 2026, 16:16 SGT (`sha-714a159`); both targets report `up` and the dashboard's `production` view carries data. One instance for both environments is a demonstration choice: a real authority would run one per environment (or Grafana Cloud with the agent) so production numbers never sit next to development ones.
 
 ## 8. Security
 

@@ -2,6 +2,11 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Production release of the observability endpoint (20 Sep 2026, 16:16 SGT)
+
+- Production pinned to `sha-714a159` (`main` after pull requests #9 and #10: the technical video v3, the policy-page fix, the observability endpoint). `/api/v1/metrics` answers 401 without the token in production; both Prometheus targets `up`; the dashboard's `production` view and the Telegram `/status` answer carry production numbers.
+- Agent-driven acceptance run on development the same afternoon (UAT record row of 20 Sep 15:39): every manual scenario passed through the API; one Medium finding recorded as readiness row 25 (the per-client limiter keys on the Railway edge instance rather than the caller).
+
 ## Policy pages while signed in (20 Sep 2026, fix)
 
 - The privacy, terms and cookies pages showed a "Sign in" button to a signed-in user, who landed back on the dashboard when clicking it. The header now reads the session: signed in, it offers "Back to dashboard" (operator) or "Back to queue" (officer); signed out, "Sign in" as before. Two vitest cases added (160 frontend tests).
