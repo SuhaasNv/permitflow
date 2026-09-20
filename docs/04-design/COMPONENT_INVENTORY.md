@@ -33,7 +33,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `KeyValueList` | 2-col definition list; muted variant for unchanged | read-only sections |
 | `Facts` | horizontal key facts row | S-21 |
 | `StatusBadge` | served label + tone; sizes; `live` pulses the dot while something is in progress | everywhere status shows |
-| `SaveIndicator` | dirty / saving / saved (relative time, refreshed every 5 s) | section form footer |
+| `SaveIndicator` | dirty / saving / saved (relative time, refreshed every 5 s); **v0.4.0:** retrying (amber, "Could not save, retrying") | section form footer, checklist status bar |
 | `Toast` (`ToastProvider`, `useToast`) | title, body, tone; bottom-right stack, four max, auto-dismiss 4.5 s (errors stay) | section saved, document uploaded / removed / unchanged |
 | `Alert` | tone icon, optional title, optional action slot | inline messages |
 | `QueueRow` (in `OfficerQueuePage`) | reference + revision, business + applicant, officer status badge, document-check state (checking / n to check / clear; "to check" counts issues, needs review, unreadable, failed and unavailable, the same set the case card shows as anything but Verified), last activity, next-action chip (ink when it is the officer's turn) | S-20 |
@@ -64,7 +64,7 @@ Components are extracted only where the prototype uses them in two or more place
 | `FeedbackPanel` / `FeedbackItem` | numbered, target tag, state badge, message, meta, context line; operator variant with "Go to" anchor; officer variant with Edit/Withdraw or Mark resolved/View change; rounds grouped | S-15, S-16, S-21, S-23, phone |
 | `InlineFeedbackNote` | officer comment repeated inside the flagged section/document | S-15 |
 | `FeedbackComposer` | target select (pre-filled from "Comment on …"), template select + chips, message; disabled with reason outside `under_review` | S-21, S-23 |
-| `TransitionActions` | renders every transition allowed for the role from the state machine table; disallowed ones disabled with tooltip; Reject always last, danger | S-21, S-23 |
+| `TransitionActions` | renders every transition allowed for the role from the state machine table; disallowed ones disabled with tooltip; Reject always last, drawn as a plain secondary (neutral since critique pass 1; the danger style is for the confirmation dialog) | S-21, S-23 |
 | `RevisionList` / `RevisionRow` | number, submitted at/by, changed summary, View / Compare | S-16, S-25 |
 | `RevisionDiff` | per section: field, old, new; Changed/Added/Replaced marks; unchanged rows recede; hide-unchanged toggle; documents table | S-24 |
 | `ChangedFieldValue` | new value highlighted + old value struck through | S-23 |
@@ -73,6 +73,28 @@ Components are extracted only where the prototype uses them in two or more place
 | `NotificationsBell` | bell with unread badge; popover with unread tint, title, body, relative time, Mark all as read; Escape and outside click close it; on phones the popover spans the header width below it | S-17 |
 | `AuditTrail` | event type (mono), plain summary, actor and role or System, time; family filter with `aria-pressed`; collapsed until opened | S-25, S-40 |
 | `PersonaPicker` | prototype/demo only: seeded accounts | S-00 |
+
+## v0.4.0 components (designed 20 Sep 2026, US-078; built in Sprints 5 to 7)
+
+Reuse first: every new screen is assembled from the rows above (`ReviewRail`'s single-primary pattern, `StatusBar`, `Stepper`'s section picker, `DropZone`, `FeedbackNotice`, `Timeline`, `Dialog` as a full-screen sheet on tablet, `StatStrip`, `AuditTrail`, `Table`, `SearchBox`, `Alert`, `StatusBadge` only for workflow status). New pieces:
+
+| Component | Responsibility | Used on |
+|-----------|----------------|---------|
+| `OfflineBanner` | warning `Alert` shown while `navigator.onLine` is false; listener removed on unmount | S-30 |
+| `ResultControl` | segmented result per checklist item: Satisfactory, Unsatisfactory, Not applicable; label plus dot, never colour alone; `aria-pressed`; 44 px targets; stretches to full width below 900 | S-30 |
+| `FlagToggle` | checkbox styled with a flag glyph, "Need further clarification"; stacked under the result control | S-30 |
+| `ChecklistItemRow` | mono ordinal, title, guidance, `ResultControl`, `FlagToggle`, comment field with the required-comment rule; read-only variant after submit | S-30, checklist read-only view |
+| `ChecklistProgress` | "n of 17 assessed, f flagged" plus "c comments missing", one bar | S-30 |
+| `StickyActionCard` | bottom-stuck card: one line of counts, one line of what is left, Save and leave plus the single primary from `actions[]` (disabled with reason) | S-30, S-18 |
+| `ClarificationRail` | header (round, whose turn, counts by state), items by round (current expanded, earlier folded), rail actions from `actions[]`; locked feedback rail sibling, not an extension of `FeedbackPanel` | S-31, S-43 (read-only) |
+| `ClarificationThread` | numbered item, result tag, state badge, the finding at the top, `Timeline` of requests, responses and decisions, `AttachmentRow`s, per-item actions; "Not sent yet" note on reopened items | S-31, S-19 |
+| `AttachmentRow` | thumbnail or file glyph, name, type and size, Open or Remove; camera capture and file choice buttons on the operator side with "n of 3 files attached" | S-18, S-19, S-31 |
+| `ClarificationRespondItem` | numbered item, the officer's comment as a quoted block, response field, attachments, Answered / Needs your answer badge (under the title on phones) | S-18 |
+| `ReadinessLine` | "Ready to send: n of m items answered" with a bar; the wording of the resubmission flow | S-18 |
+| `ReadOnlyBanner` | neutral `Alert` with a lock glyph: "Read-only: administrators cannot act on a case" | S-43 |
+| `StatusCountTable` | officer status, count (tabular), bar per row; drafts as one aggregate row | S-40 |
+| `ActivityFeed` | `AuditTrail` across applications with a case column (link or "no case") and a ghost "Show older activity" button | S-42 |
+| `UsersTable` | name and email, role, Active or Deactivated badge plus Protected tag, created, Change role and Deactivate or Reactivate with `title` reasons on the caller's own row and protected rows | S-41 |
 
 ## Motion tokens
 

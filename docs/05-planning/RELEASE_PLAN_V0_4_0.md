@@ -265,7 +265,7 @@ Error bodies stay `{ "error": { "code", "message", "details"? } }`; operators ne
 | S-41 | Admin users (`/admin/users`) | admin | `Table` and `SearchBox`; role filter; Change role and Deactivate dialogs; the caller's own row and protected rows show disabled controls with the reason in `title`, before any round trip |
 | S-43 | Admin read-only case (`/admin/applications/:id`) | admin | `OfficerCasePage` with `readOnly`: no composer, no rail actions, no item-level clarification controls, no Re-run, no preview link, "Back to the overview" instead of the queue; an `Alert` banner "Read-only: administrators cannot act on a case" |
 
-Every screen verified at 390, 1024 and 1280, the checklist also at 820; the bottom tab bar and the collapsible rail apply to the admin persona too. `DEFINITION_OF_DONE.md` is brought in line with these widths in the plan commit.
+Every screen verified at 390, 1024 and 1280, the checklist also at 820; the bottom tab bar and the collapsible rail apply to the admin persona too. `DEFINITION_OF_DONE.md` is brought in line with these widths in the plan commit. The artboards (prototype v0.4.0, `docs/04-design/README.md`) went through a critique pass on 20 Sep; `UI_DESIGN.md` pass 3 lists what changed (Reject neutral, chips neutral, no fact badges, the case actions under the rail header, one chronology, viewer-aware copy, phone targets).
 
 ### 4.9 Components to reuse (named in the US-078 brief so the new screens do not drift)
 
@@ -284,7 +284,7 @@ Dialogs follow the existing pattern (a question as the title, one or two plain c
 | Still needs clarification | Ask again on this item? | The operator's response did not settle it. Write what still needs fixing; the operator sees it when you request another round. (required field: Message for the operator) | Still needs clarification |
 | Mark clarified | Mark this item clarified? | This closes the item's clarification. It will not be included in the next round. | Mark clarified |
 | Request another round | Send these 2 items back to the operator? | The operator sees only these items with your new comments, and the case moves to Awaiting Post-Site Resubmission until they respond. | Request another round |
-| Change role (admin) | Change Lim Jun Hao's role to Officer? | They get officer permissions on their next request. This does not sign them out. | Change role |
+| Change role (admin) | Change Lim Jun Hao's role to Licensing officer? (a radio group "New role" above the sentence: Operator, Licensing officer, Administrator) | They get licensing officer permissions on their next request. This does not sign them out. | Change role |
 | Deactivate user (admin, danger) | Deactivate Lim Jun Hao? | They cannot sign in until you reactivate the account, and any request they make from now on is refused. Cases stay in the queue for other officers. | Deactivate |
 
 Notifications, in the existing "reference plus one line" style: to the operator at checklist submit, "PF-2026-000231: The licensing officer completed the site visit and needs more information on 3 items"; to the operator on another round, "PF-2026-000231: The licensing officer needs more information on 2 items"; to officers on send, "PF-2026-000231: The operator answered the clarification request"; to the operator on route to approval, the existing status line.

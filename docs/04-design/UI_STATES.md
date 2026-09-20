@@ -17,12 +17,13 @@ UX-002 requires explicit loading, empty, error and success states for every data
 | Permission denied (403) | full-panel "Not available for your role" | UC0-A 3a |
 | Not found (404) | "Application not found" with back link | SEC-002 (other operators' applications look like 404) |
 | Stale version (409 `version_conflict`) | banner "This application changed since you opened it: Reload" | REL-007 |
+| Stale checklist (409 `version_conflict`, v0.4.0) | the server returns the current content; the page merges the officer's unsaved input over it and says "Updated from another session; your unsaved changes are kept"; never a silent overwrite (US-061) | REL-007, designed |
 | Invalid transition (409 `invalid_transition`) | dialog error line listing allowed actions | SEC-004 |
 | Session expired (401) | any 401 (or the token's own expiry timer) ends the session in one place; sign-in page shows "Your session ended" and honours the return path only inside the role's own area | SEC-006 (built) |
 | Unsaved changes | browser "leave site?" prompt on refresh or close while a section is dirty; in-app navigation and Sign out show the "Leave without saving?" / "Sign out without saving?" dialog with Stay focused; "Save and exit" saves the partial draft first | built |
 | Updated elsewhere | a dirty section is never overwritten by data from another tab: warning with "Discard my edits" | built |
 | Check taking too long | after 3 minutes pending or running, polling stops, the block says so and Re-run is offered | built |
-| Offline / network | the request fails as `network_error` ("Could not reach the server") in the `ErrorPanel` or the inline `Alert`; reads retry through the query client when the page is refreshed. No offline toast or reconnect listener is built | partial |
+| Offline / network | the request fails as `network_error` ("Could not reach the server") in the `ErrorPanel` or the inline `Alert`; reads retry through the query client when the page is refreshed. **v0.4.0 (US-061):** the checklist page listens to `navigator.onLine` and shows a warning banner ("You are offline: changes will not save until you reconnect"); its `SaveIndicator` gains a "Could not save, retrying" tone; a save whose response was lost is replayed with the same `save_id` and answered 200, never as a conflict | partial; checklist designed |
 | Rate limited (429, US-058) | the server message ("Too many requests. Try again in a moment.") in the `ErrorPanel` or inline `Alert`; on sign-in, the message names which limit was hit; queries do not retry a 4xx, so a limit never causes a retry storm | built |
 | Draft limit (409 `draft_limit`, US-058) | "You already have 20 draft applications. Submit or delete one before starting another." in the dashboard and list alerts, without the generic retry advice | built |
 | Unknown route (404) | `NotFoundPanel` "Page not found" with a link to the front page; an application that does not exist keeps "Application not found" | built |
@@ -79,7 +80,32 @@ Progress on S-15: "Items addressed n of m"; Resubmit enabled once n ≥ 1.
 | S-25 | rows skeleton | new application (only created event) | retry | none |
 | S-26 | viewer skeleton | not applicable (only linked while pending approval) | 409 when the application is no longer pending approval (link back to the case); fetch error with retry | PDF inline with the preview watermark; download fallback link |
 | S-11b (approved) | as S-11 | not applicable | download failed toast | outcome panel with the officer's note when present and Download licence (PDF) with number and validity |
-| S-40 | strip skeleton | provider none → "Provider: none (mock)" | retry | none |
+| S-30 (v0.4.0) | page skeleton in the shape of the section list | new checklist: every item Not assessed, progress "0 of 17 assessed" | 409 outside the site-visit states ("The checklist opens once a site visit is scheduled"), 409 `checklist_submitted` on a save after submit, 409 `version_conflict` merged (above), 422 on submit listing the item keys (page scrolls to the first), save failed → retrying tone, offline banner | Saved hh:mm after each autosave; submit dialog lists the flagged items; after submit the page is read-only with "Submitted on … by …" and the case page links to it |
+| S-31 (v0.4.0) | rail skeleton | nothing flagged: "Nothing to clarify. Route to approval when you are ready." with the primary action | 409 stale (reload banner as S-21); item action refused (409) shown inline; Route to approval disabled with the reason | toast per item action ("Marked clarified", "Reopened, not sent yet", "Withdrawn"); Request another round confirms with the open items listed |
+| S-18 (v0.4.0) | page skeleton | no released item: "Nothing needs your response yet" with a link back to the application | 422 on send listing the unanswered keys (scroll to the first); attachment errors inline in the item (type, size, fourth file "You can attach up to 3 files per item", duplicate "This is the same file as one already attached"); 409 when the round was already sent or the case moved (reload banner); failed send keeps every typed response | readiness line "Ready to send: n of m items answered"; toast "Responses sent"; status bar "The licensing officer is reviewing your responses"; the page becomes read-only |
+| S-19 (v0.4.0) | list skeleton | no site visit yet ("The site visit stage has not started") | retry | "Draft, never sent" on an unsent response after Reject or Withdraw |
+| S-40 (v0.4.0) | strip and table skeleton | no applications at all ("No applications yet"); provider none → "Provider: none (mock)" | retry with request id | none (read-only) |
+| S-42 (v0.4.0) | rows skeleton | no events ("Nothing has happened yet"); filtered empty ("No events of this kind") | retry; older page failed → inline retry under the list | "Show older activity" appends; user rows without a case link |
+| S-41 (v0.4.0) | rows skeleton | filter or search with no match ("No accounts match") | 409 `last_admin` ("This is the last active administrator"), `self_change` ("You cannot change your own account"), `protected_account` ("Demonstration account, protected") shown in the dialog as an inline `Alert`; own and protected rows disabled beforehand with the reason in `title`; retry | toast "Role changed" / "Account deactivated" / "Account reactivated" |
+| S-43 (v0.4.0) | as S-21 | as S-21 | 404 for an unknown id; every mutation route 403 (never reachable from the page: no control is rendered) | banner "Read-only: administrators cannot act on a case"; Back to the overview |
+
+## Checklist and clarification lifecycle (v0.4.0, S-30, S-31, S-18, S-19)
+
+The inspection record and the clarification threads are two things: the checklist's findings freeze at submit; the threads keep moving until the case leaves the post-site states.
+
+| # | Stage | Officer sees (S-30, S-31) | Operator sees (S-18, S-19) | Case status (officer label / operator label) |
+|---|-------|---------------------------|----------------------------|------------------------------------------------|
+| 1 | Visit scheduled, checklist not opened | Case page: primary action "Open checklist" | Pending Site Visit | Site Visit Scheduled / Pending Site Visit |
+| 2 | Draft on site | every item Not assessed until touched; result, comment, flag per item; Saved hh:mm, retrying, offline banner; progress "n of 17 assessed, f flagged, c comments missing"; submit disabled with the reason | nothing changes | same |
+| 3 | Submitted | findings read-only; "Submitted on … by …"; the rail shows the flagged items as Open with the finding at the top of each thread; Request another round is not needed for round 1 (submit released the items) | notice "n items need your answer"; only the flagged items with the officer's comment; response and attachments per item; Send responses disabled until every item is answered | Awaiting Post-Site Clarification / Pending Post-Site Clarification |
+| 4 | Round sent by the operator | rail header "Round 1, your turn"; items Answered with the response and attachments in the thread; per item Mark clarified or Still needs clarification; Withdraw on open items | page read-only; status bar "The licensing officer is reviewing your responses" | Post-Site Clarification Resubmitted / Post-Site Resubmitted |
+| 5 | Officer asks again | reopened items say "Not sent yet" until Request another round; Route to approval disabled while anything is open or answered | nothing changes until the round is requested | same |
+| 6 | Another round requested | rail header "Round 2, waiting on operator"; the new requests released | notice "n items need your answer" (only the reopened items); history shows round 1 | Awaiting Post-Site Resubmission / Pending Post-Site Resubmission |
+| 7 | Everything clarified or withdrawn | Route to approval enabled; Reject always available with a note | history shows every round as Clarified | Route to Approval / Pending Approval |
+| 8 | Reject or Withdraw mid-round | threads frozen as they are; an unsent operator draft shows "Draft, never sent" | outcome panel; history shows "Draft, never sent" on the unsent round | Rejected / Withdrawn |
+| 9 | Return to review, second visit | a new checklist, Visit 2, from step 1; Visit 1 stays readable | history lists Visit 1 and Visit 2 | Site Visit Scheduled again |
+
+Item states in the rail and the history: Open (amber), Answered (blue), Clarified (green), Withdrawn (grey), each a badge with a dot; the finding's result is a grey tag ("Result: Unsatisfactory"), never a badge, because it is a fact, not a state.
 
 ## Partial failure
 

@@ -66,8 +66,8 @@ Badge = dot + label, 24 px (28 px "lg" in status bars). Labels are the role-spec
 | pending_pre_site_resubmission | Pending Pre-Site Resubmission | Pending Pre-Site Resubmission | warning |
 | pre_site_resubmitted | Pre-Site Resubmitted | Pre-Site Resubmitted | info |
 | site_visit_scheduled | Site Visit Scheduled | Pending Site Visit | info |
-| site_visit_done | Site Visit Done | Pending Post-Site Clarification | info |
-| awaiting_post_site_clarification | Awaiting Post-Site Clarification | Pending Post-Site Clarification | info |
+| site_visit_done | Site Visit Done | Pending Post-Site Clarification | info (the officer is writing up the visit) |
+| awaiting_post_site_clarification | Awaiting Post-Site Clarification | Pending Post-Site Clarification | warning (the operator's turn from v0.4.0: `RELEASE_PLAN_V0_4_0.md` section 4.1) |
 | pending_post_site_resubmission | Awaiting Post-Site Resubmission | Pending Post-Site Resubmission | warning |
 | post_site_clarification_resubmitted | Post-Site Clarification Resubmitted | Post-Site Resubmitted | info |
 | pending_approval | Route to Approval | Pending Approval | info |
