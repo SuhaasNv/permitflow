@@ -197,6 +197,13 @@ class ChecklistService:
         """The current visit's draft: created on first open (True), returned afterwards (False).
         Under the application row lock so two tabs cannot create two."""
         app = self.applications.get_for(officer, application_id, for_update=True)
+        # The "get" half never depends on the status: a submitted checklist stays readable from the
+        # post-site states and after the decision (found by the accessibility gate, US-088).
+        current = self.checklists.current_for(app.id)
+        if current is not None and (
+            app.status not in SITE_VISIT_STATES or current.visit_no == self._current_visit_no(app)
+        ):
+            return current, False
         if app.status not in SITE_VISIT_STATES:
             raise Conflict("The checklist opens once a site visit is scheduled.")
         visit_no = self._current_visit_no(app)

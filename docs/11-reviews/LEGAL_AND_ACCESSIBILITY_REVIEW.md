@@ -17,7 +17,7 @@ Written by an engineer, not a lawyer. It is a good-faith reading of the law as i
 | 7 | Only connect necessary data | Yes | The verifier receives only the document type, the extracted text (capped at 20,000 characters) and the matching form section (SEC-012); LangSmith receives the result and identifiers, never the inputs, by default (T21); no analytics, no third-party scripts | `THREAT_MODEL.md` T18, T21; `tests/unit/test_openai_wire.py`, `test_tracing.py` |
 | 8 | Check analytics tracking | Yes | None exists. No Google Analytics, tag manager, Plausible, PostHog, Hotjar, Sentry or pixel; the only network calls from the browser are to our own API. Decision: keep it that way for the demonstration | `grep` over `frontend/index.html` and `src` for the usual names: nothing |
 | 9 | Check third-party embeds | Yes | None: no iframes, no maps, no video, no social widgets. The one third-party request the site made, Google Fonts (which discloses the visitor's IP address to Google), is gone: the three typefaces are now served from our origin | `frontend/public/fonts/`, `src/styles/fonts.css`, `index.html`; `docker/nginx.conf.template` caches them |
-| 10 | Make the site accessible | Yes | Automated gate: axe-core with the WCAG 2.0, 2.1 and 2.2 A and AA rules plus best practices on 14 screens at desktop width (5 public, 7 operator, 2 officer), the feedback composer and a confirmation dialog, and 7 screens at phone width (390 px, which brings in the WCAG 2.2 target-size rule): 23 states. Findings fixed: missing `main` landmark on the landing and sign-in pages, content outside landmarks (app masthead, now a named region; the sign-in page's decorative column, now a named `aside`), a contrast failure (below), and no skip link anywhere (added) | `frontend/e2e/a11y.spec.ts`, run in CI's end-to-end job |
+| 10 | Make the site accessible | Yes | Automated gate: axe-core with the WCAG 2.0, 2.1 and 2.2 A and AA rules plus best practices on 14 screens at desktop width (5 public, 7 operator, 2 officer), the feedback composer and a confirmation dialog, and 7 screens at phone width (390 px, which brings in the WCAG 2.2 target-size rule): 23 states. v0.4.0 (US-088) added the appointment card and panel, the checklist as a draft and as submitted at 1024, 820 and 390, the respond page, the history with rounds, the four admin screens and the add-account dialog, a 44 px target measurement and a keyboard walk of the checklist. Findings fixed: missing `main` landmark on the landing and sign-in pages, content outside landmarks (app masthead, now a named region; the sign-in page's decorative column, now a named `aside`), a contrast failure (below), and no skip link anywhere (added) | `frontend/e2e/a11y.spec.ts`, run in CI's end-to-end job |
 | 11 | Add alt text | Not applicable | The site has no `<img>` elements. Every SVG is decorative and carries `aria-hidden="true"`; the brand mark is inside a link whose accessible name is "PermitFlow home". The licence PDF's brand mark is drawn as vector paths, not an image | `grep -rn "<img" src` returns nothing; `Logo.tsx` |
 | 12 | Check colour contrast | Yes | Every text token was computed against every surface token (WCAG relative luminance). `text-3` (#66717f) failed at 4.34:1 on `surface-3` and at 4.36:1 on `primary-soft`, contradicting the design system's claim of 4.5:1 everywhere. Changed to #616c7a: lowest pairing now 4.68:1 (`surface-3`); 5.34:1 on white. `line-strong` is a border colour, never text, and is not held to the text ratio | `src/styles/index.css`, `docs/04-design/DESIGN_SYSTEM.md`; the computation is reproduced in this document's appendix |
 | 13 | Make forms keyboard-friendly | Yes | Sign-in completes from the keyboard alone (test); every control has a visible `:focus-visible` ring (2 px, 2 px offset, `info` blue at 5.99:1 on white); dialogs are native `<dialog>` elements opened with `showModal()`, so the browser traps focus inside, Escape closes (wired to the cancel action) and focus returns to the opener; focus lands on Cancel for destructive dialogs and on the primary action otherwise; the drop zone is a native file input with a visible label and focus ring, so Enter or Space opens the picker; a skip link to `#main` was added to the landing page, the policy pages and the app shell (missing before this story); radio groups, selects and checkboxes are native controls with labels; axe's `label`, `focus-order-semantics` and `tabindex` rules pass on every screen | `a11y.spec.ts` (keyboard sign-in, skip link); `Dialog.tsx`; `DropZone.tsx`; `index.css` `:focus-visible`, `.pf-skip-link` |
@@ -74,3 +74,26 @@ WCAG 2.x relative luminance, ratio = (L1 + 0.05) / (L2 + 0.05). Text tokens agai
 | info #175cd3 | 5.99 | 5.49 | 5.68 | 5.24 | 5.26 | 5.42 |
 
 All at or above 4.5:1 (AA for normal text). Large text and UI components need 3:1; nothing relies on the lower bar.
+
+### v0.4.0 pairings (recomputed 21 Sep 2026, US-088)
+
+The new screens put text on the soft tone surfaces: the account-in-use block and the operator's counter-proposal on `warning-soft`, the Active and Protected chips on `success-soft`, the read-only banner on `neutral-soft`, the four `Alert` tones with their own darker text. Same computation.
+
+| Token | on warning-soft (#fff6e5) | on success-soft (#ecfdf3) | on error-soft (#fef3f2) | on info-soft (#eef4ff) | on neutral-soft (#f2f4f7) |
+|-------|------|------|------|------|------|
+| text #1b2430 | 14.58 | 14.84 | 14.40 | 14.18 | 14.21 |
+| text-2 #465060 | 7.59 | 7.73 | 7.50 | 7.38 | 7.40 |
+| text-3 #616c7a | 4.97 | 5.06 | 4.91 | 4.83 | 4.84 |
+| primary #a8192a | 6.90 | 7.02 | 6.81 | 6.70 | 6.72 |
+| success #067647 | 5.30 | 5.40 | 5.23 | 5.15 | 5.16 |
+| warning #9a4a00 | 5.83 | 5.94 | 5.76 | 5.67 | 5.68 |
+| Alert warning text #6e3500 | 9.01 | | | | |
+| Alert info text #0f3e8a | | | | 9.16 | |
+| Alert error text #7a1a12 | | | 9.74 | | |
+| Alert success text #04532f | | 8.72 | | | |
+
+White on `primary` (every primary button, the take-over action) is 7.40:1. The lowest v0.4.0 pairing is `text-3` on `info-soft` at 4.83:1. `line-strong` (#aeb6c2, 2.04:1 on white) remains a border colour and never carries text or a state on its own: every status has a label beside its dot.
+
+### Target size on the touch screens (US-088)
+
+The root font size is 15 px, so the `h-10` control height is 37.5 px. Since 21 Sep 2026 every button, input and chip is at least 44 px tall below the desktop breakpoint (1280 px) and compact from it; the gate measures every control on the checklist (390, 820, 1024) and the respond page (390, 820) and fails below 44 x 44. Inline text links (breadcrumbs, the header's tab links) are exempt as WCAG 2.5.8 allows for links in running text; a checkbox is measured by the label that wraps it. A keyboard walk of the checklist (Space and Enter pick a result, Tab reaches the flag and the comment, the autosave follows) is part of the gate.

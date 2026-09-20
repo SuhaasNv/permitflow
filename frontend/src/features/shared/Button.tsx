@@ -22,8 +22,9 @@ export const buttonClasses = (variant: Variant = 'primary', size: Size = 'md', e
     'transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
     'active:translate-y-px active:duration-75',
     'disabled:pointer-events-none disabled:border-line disabled:bg-neutral-soft disabled:text-text-3 disabled:shadow-none',
-    size === 'md' && 'h-10 px-4',
-    size === 'sm' && 'h-10 px-3 text-[13px] sm:h-8',
+    // 44 px on touch widths (the root is 15 px, so h-10 is 37.5 px); compact from the desktop breakpoint.
+    size === 'md' && 'h-10 min-h-[44px] px-4 xl:min-h-0',
+    size === 'sm' && 'h-10 min-h-[44px] px-3 text-[13px] sm:h-8 xl:min-h-0',
     size === 'lg' && 'h-12 px-6 text-[15px]',
     variant === 'primary' &&
       'pf-btn-primary border-transparent bg-primary text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)] hover:text-white',

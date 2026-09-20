@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-088 The accessibility gate over the new screens (21 Sep 2026, Sprint 7)
+
+- The gate now covers the checklist as a draft and as submitted, the respond page, the history with rounds, the appointment, the four admin screens and the add-account dialog at phone and desktop widths, measures every control on the checklist and the respond page against 44 px, and walks the checklist by keyboard. Two findings fixed on the way: controls were 37.5 px on touch widths (44 px below the desktop breakpoint now) and a submitted checklist could not be opened once the case moved past the visit.
+
 ## US-089 Use case 3 and storage on the dashboard (21 Sep 2026, Sprint 7)
 
 - Four new metric families (checklists submitted, clarification rounds released and answered, evidence bytes, storage by kind including the volume itself), a dashboard row generated from the script, an alert when the upload volume passes 80 %, and the Telegram `/queue` answer naming the post-site cases. The "whose turn" numbers on the dashboard, the hourly digest and the bot now follow the same rule as the administrator's overview.

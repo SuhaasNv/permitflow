@@ -245,6 +245,28 @@ export async function seedVisitConfirmed(): Promise<Seeded> {
   return seeded
 }
 
+/** The visit done and the checklist submitted through the API with two items flagged, so the operator has a
+ * clarification round to answer (Awaiting Post-Site Clarification; US-063, US-064). */
+export async function seedAwaitingClarification(): Promise<Seeded & { flagged: string[] }> {
+  const seeded = await seedVisitConfirmed()
+  const off = await login(OFFICER)
+  const schema = await call<{ sections: { items: { key: string }[] }[] }>(off, '/checklist-schema')
+  const keys = schema.sections.flatMap((s) => s.items.map((i) => i.key))
+  const flagged = keys.slice(0, 2)
+  const created = await call<{ version: number }>(off, `/officer/applications/${seeded.id}/checklist`, { method: 'POST' })
+  const items = keys.map((key) =>
+    flagged.includes(key)
+      ? { key, result: 'unsatisfactory', comment: `Please confirm ${key.replaceAll('_', ' ')}.`, needs_clarification: true }
+      : { key, result: 'satisfactory', comment: null, needs_clarification: false },
+  )
+  await call(off, `/officer/applications/${seeded.id}/checklist`, {
+    method: 'PUT',
+    body: JSON.stringify({ items, version: created.version }),
+  })
+  await call(off, `/officer/applications/${seeded.id}/checklist/submit`, { method: 'POST' })
+  return { ...seeded, flagged }
+}
+
 /** On the case page: open the checklist, mark every item satisfactory, wait for the autosave, submit (US-063). */
 export async function submitCleanChecklist(page: Page) {
   await page.getByRole('link', { name: /Open checklist|Continue checklist/ }).click()
