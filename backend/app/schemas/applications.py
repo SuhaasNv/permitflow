@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.clarification import ClarificationBlock
 from app.schemas.site_visit import SiteVisitOperatorView
+from app.schemas.storage import StorageView
 
 
 class SectionView(BaseModel):
@@ -156,6 +157,7 @@ class ApplicationOperatorView(BaseModel):
     site_visit: SiteVisitOperatorView | None = None
     # The clarification rounds after the site visit (US-064): present once an item was released.
     clarification: ClarificationBlock | None = None
+    storage: StorageView | None = None
     created_at: datetime
     updated_at: datetime
 

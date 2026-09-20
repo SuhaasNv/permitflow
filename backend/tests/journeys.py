@@ -54,6 +54,17 @@ def draft(client: TestClient, h: Headers) -> str:
     return str(client.post("/api/v1/applications", headers=h).json()["id"])
 
 
+def tiny_png() -> bytes:
+    """A real 4 x 4 PNG: since US-085 an image the server cannot decode is refused at upload."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    out = BytesIO()
+    Image.new("RGB", (4, 4), (255, 255, 255)).save(out, "PNG")
+    return out.getvalue()
+
+
 def upload(
     client: TestClient,
     h: Headers,

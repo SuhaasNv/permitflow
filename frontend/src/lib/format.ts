@@ -72,7 +72,8 @@ export function formatRelative(iso: string, now: number = Date.now()): string {
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+  const mb = n / (1024 * 1024)
+  return mb >= 10 ? `${Math.round(mb)} MB` : `${mb.toFixed(1)} MB`
 }
 
 /** Time-of-day greeting for the dashboard, by the Singapore hour. */

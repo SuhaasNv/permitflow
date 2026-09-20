@@ -1,3 +1,4 @@
+import type { StorageView } from './applications'
 import { API_URL, AppError, notifyUnauthorized, request } from './client'
 import { uploadToken } from './documents'
 
@@ -50,6 +51,8 @@ export interface ClarificationView {
   round: number
   can_respond: boolean
   can_send: boolean
+  /** The application's storage room (US-085), for the line above the file picker. */
+  storage: StorageView | null
 }
 
 /** The block on the operator's application view (US-064). */

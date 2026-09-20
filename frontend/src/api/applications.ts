@@ -107,8 +107,16 @@ export interface ApplicationView {
   site_visit: SiteVisitOperator | null
   /** The clarification rounds after the site visit (US-064); present once an item was released. */
   clarification: ClarificationBlock | null
+  /** What the application holds on the volume against its budget (US-085). */
+  storage: StorageView | null
   created_at: string
   updated_at: string
+}
+
+export interface StorageView {
+  used_bytes: number
+  budget_bytes: number
+  remaining_bytes: number
 }
 
 export function listApplications(): Promise<ApplicationSummary[]> {

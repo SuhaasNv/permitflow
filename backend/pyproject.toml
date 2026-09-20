@@ -19,6 +19,7 @@ dependencies = [
   "reportlab>=5.0.1",
   "langsmith>=0.13.0",
   "prometheus-client>=0.26.0",
+  "pillow>=12.3.0",
 ]
 
 [dependency-groups]

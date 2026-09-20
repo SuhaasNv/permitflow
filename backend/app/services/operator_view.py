@@ -22,6 +22,7 @@ from app.schemas.applications import (
 )
 from app.schemas.clarification import ClarificationBlock
 from app.schemas.site_visit import SiteVisitOperatorView
+from app.schemas.storage import StorageView
 
 LICENCE_TITLE = "Food Establishment Licence"
 
@@ -199,6 +200,7 @@ def operator_view(
     site_visit: SiteVisitOperatorView | None = None,
     open_clarifications: int = 0,
     clarification: ClarificationBlock | None = None,
+    storage: StorageView | None = None,
 ) -> ApplicationOperatorView:
     documents = documents or []
     docs_by_type = {d.document_type: (d, r) for d, r in documents}
@@ -267,6 +269,7 @@ def operator_view(
         licence=licence,
         site_visit=site_visit,
         clarification=clarification,
+        storage=storage,
         created_at=app.created_at,
         updated_at=app.updated_at,
     )

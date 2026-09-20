@@ -34,6 +34,9 @@ class Settings(BaseSettings):
 
     upload_dir: str = "./data/uploads"
     upload_max_bytes: int = 10 * 1024 * 1024
+    # US-085: everything one application holds on the volume (every document version, clarification
+    # evidence, the licence). A 5 GB volume holds about 34 applications at the ceiling; most use a tenth.
+    storage_budget_bytes: int = 150 * 1024 * 1024
 
     login_rate_limit_per_minute: int = 10
     # Request limits per client IP, sliding minute (US-058): every request, and sign-in attempts of any

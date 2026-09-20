@@ -48,6 +48,7 @@ const view: ApplicationView = {
   licence: null,
   site_visit: null,
   clarification: null,
+  storage: { used_bytes: 3 * 1024 * 1024, budget_bytes: 150 * 1024 * 1024, remaining_bytes: 147 * 1024 * 1024 },
   created_at: '2026-09-18T00:00:00Z',
   updated_at: '2026-09-18T00:00:00Z',
 }

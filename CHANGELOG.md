@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-085 Storage budget and photos without camera data (21 Sep 2026, Sprint 6)
+
+- Every JPG or PNG an operator uploads, as a document or as clarification evidence, is stored without its camera data (location, device, time), turned upright first, colour profile kept. Each application has 150 MB of storage room across every document version, its evidence and its licence; the pages say how much is left before a file is chosen, and a file that would pass the room is refused with the room named. One upload pipeline now serves both paths.
+
 ## US-093 One live session per account (21 Sep 2026, Sprint 6)
 
 - An account is signed in on one device at a time. A second sign-in is refused and names the device that holds the account and when it was last active; the person may sign that device out and continue, and the other device lands on the sign-in page with the reason and the time on its next request. Sign-out ends the session on the server; a session unseen for 60 minutes (`SESSION_IDLE_MINUTES`) ends by itself. Continuity is the server-side draft: the checklist autosaves, so the next device opens it where the last one left it (Playwright 09 proves it with two browser contexts). Added at the owner's request (an officer on an iPad, then the laptop). Tokens issued before this change are refused (no session id), so every signed-in browser signs in once more after the deploy.

@@ -7,6 +7,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.schemas.storage import StorageView
+
 
 class ClarificationRequestOut(BaseModel):
     id: uuid.UUID
@@ -59,6 +61,8 @@ class ClarificationOperatorView(BaseModel):
     round: int
     can_respond: bool
     can_send: bool
+    # The application's storage room (US-085), for the line above the file picker.
+    storage: StorageView | None = None
 
 
 class ClarificationResponseIn(BaseModel):
