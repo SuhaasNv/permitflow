@@ -2,17 +2,19 @@
 
 What each version of PermitFlow brings, written for the people who use it. Newest first. The engineering record behind each entry is `CHANGELOG.md`; every release adds an entry here before it is tagged (`docs/09-operations/BRANCHING.md`, rule 5).
 
-Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for fixes on a release, `v0.4.0` onwards for the epics below.
+Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for fixes on a release, `v0.4.0` for the two epics below.
 
 ---
 
 ## Coming next
 
-**v0.4.0: the admin panel.** A read-only oversight view for the licensing office: applications by status, the ones that have gone quiet, today's submissions, the health of the automatic document checks (how many ran, how many failed, how long they took), a feed of recent activity across every application, and a user directory where an administrator can change a role or deactivate an account (every change audited; the last active administrator cannot be removed). The admin role and its routes are already reserved; the screens are the work. Stories US-070 to US-073.
+**v0.4.0: the admin panel and use case 3.** Two epics in one release.
 
-**v0.5.0: use case 3, the site visit.** After a visit is scheduled, the officer opens the inspection checklist on site from a tablet, fills it item by item with comments, saves it as a draft between rooms and finishes it later, and marks the items that need clarification. Submitting the checklist moves the case to Pending Post-Site Clarification on its own. The operator then sees only the flagged items with the officer's comment on each, answers them one by one and attaches supporting documents; several rounds per item are supported and every exchange is kept with its timestamps. The three post-site statuses and their transitions already exist and are tested; the checklist model, the officer's tablet screen and the operator's targeted-response screen are the work. Stories US-060 to US-066.
+*The admin panel.* A read-only oversight view for the licensing office: applications by status, the ones that have gone quiet, today's submissions, the health of the automatic document checks (how many ran, how many failed, how long they took), a feed of recent activity across every application, and a user directory where an administrator can change a role or deactivate an account (every change audited; the last active administrator cannot be removed). The admin role and its routes are already reserved; the screens are the work. Stories US-070 to US-073.
 
-**Unreleased, on `dev` since 20 September 2026 (will ship as v0.3.1 or with v0.4.0):** a refused action tells the operator where the application is in their own words; a check stuck past three minutes offers Re-run on its own; a failed background refresh no longer replaces the page or drops unsaved work; oversized uploads are refused before the file is read; a refused check no longer counts against the daily allowance; provider problems are reported to operators as "unavailable" rather than as technical codes; the release process is pinned and protected (release images only from a tag, production on a fixed image, main behind a pull request with required checks).
+*Use case 3, the site visit.* After a visit is scheduled, the officer opens the inspection checklist on site from a tablet, fills it item by item with comments, saves it as a draft between rooms and finishes it later, and marks the items that need clarification. Submitting the checklist moves the case to Pending Post-Site Clarification on its own. The operator then sees only the flagged items with the officer's comment on each, answers them one by one and attaches supporting documents; several rounds per item are supported and every exchange is kept with its timestamps. The three post-site statuses and their transitions already exist and are tested; the checklist model, the officer's tablet screen and the operator's targeted-response screen are the work. Stories US-060 to US-066.
+
+**Unreleased, on `dev` since 20 September 2026 (will ship as v0.3.1, or with v0.4.0):** a refused action tells the operator where the application is in their own words; a check stuck past three minutes offers Re-run on its own; a failed background refresh no longer replaces the page or drops unsaved work; oversized uploads are refused before the file is read; a refused check no longer counts against the daily allowance; provider problems are reported to operators as "unavailable" rather than as technical codes; the release process is pinned and protected (release images only from a tag, production on a fixed image, main behind a pull request with required checks).
 
 ---
 

@@ -78,7 +78,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `12-demo/documents/README.md` and `12-demo/documents/with_issues/NOTES.md` | written | The three generated document sets (clean, with planted issues, second business), how to regenerate them, the planted values |
 | `04-design/prototype-src/README.md` | written | How the clickable prototype was generated |
 | `11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` | written (19 Sep) | The owner's legal, privacy and accessibility checklist answered item by item with evidence; laws considered; risks flagged; contrast computation (US-057) |
-| `../RELEASE_NOTES.md` | written (20 Sep) | What each version brings, in the users' words, newest first, with what comes next (v0.4.0 admin panel, v0.5.0 use case 3) |
+| `../RELEASE_NOTES.md` | written (20 Sep) | What each version brings, in the users' words, newest first, with what comes next (v0.4.0: the admin panel and use case 3) |
 | `../CHANGELOG.md` | written (Sprints 1 to 3 closed; v0.3.0 released 19 Sep) | Milestones, sprint closes with Shipped / Slipped / Retro |
 | `../README.md` | written | What it is, stack and why, hosts, setup, demo accounts, security, tests, CI, deployment, AI verification, AI Usage, What I would do next |
 | `13-debrief/README.md` | written (19 Sep) | The pitch deck and the technical deck (pptx and handout PDF), the launch video, the narrated walkthrough and the technical video (videos in Git LFS) |
