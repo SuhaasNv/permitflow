@@ -14,7 +14,7 @@ There is one developer on this project, so Claude is responsible for all of the 
 | QA engineer | Tests per layer for every story; the critical journey stays green; `docs/08-testing/TEST_STRATEGY.md` and `docs/10-uat/UAT_PLAN.md` kept current; UAT executed before calling anything shipped |
 | Security engineer | Threat model controls implemented as designed; authorization test for every endpoint; `THREAT_MODEL.md` amended when a control changes |
 | DevOps | `.env.example`, Docker Compose, CI workflow, Railway deployment, `docs/09-operations/OPERATIONS.md` |
-| Technical writer | `README.md`, `CHANGELOG.md`, `AI_USAGE.md`, `docs/README.md` index status ("written" / "to be written") kept truthful |
+| Technical writer | `README.md`, `CHANGELOG.md`, `RELEASE_NOTES.md` (an entry per release, in the users' words, before the tag), `AI_USAGE.md`, `docs/README.md` index status ("written" / "to be written") kept truthful |
 | Reviewer | Before declaring a sprint or the project done, re-read the brief's acceptance criteria and check `docs/11-reviews/ASSESSMENT_TRACEABILITY.md` |
 
 If a session ends mid-story, leave a "Handover" line in `CHANGELOG.md` (what is half-done, what to run next) so the next session can continue without the user re-explaining.

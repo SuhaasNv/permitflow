@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Release notes introduced (20 Sep 2026)
+
+- `RELEASE_NOTES.md` at the root: an entry per version in the users' words (v0.1.0, v0.2.0, v0.3.0), the unreleased fixes on `dev`, and what comes next (v0.4.0 admin panel, v0.5.0 use case 3 with the officer's on-site checklist from a tablet). `BRANCHING.md` rule 5 makes the entry part of every release; the README carries the current version and the roadmap under "Release notes".
+
 ## Final check (20 Sep 2026, before submission, US-075)
 
 A last pass over the whole repository on `feat/us-075-final-check` (left unmerged for the owner to read the diff in the morning): every suite re-run from a cold clone (backend, frontend, Playwright with the accessibility gate), an API-level edge-case run of 166 checks (`backend/scripts/uat_edges.py`, recorded in `docs/10-uat/UAT_PLAN.md`), three independent reviews (backend, frontend, documentation against code) and the fixes below. Recorded as US-075 on the board.
