@@ -183,3 +183,26 @@ def test_sessions_gauge_counts_live_sessions(client: TestClient, db: Session) ->
     client.post("/api/v1/auth/logout", headers=_auth(op))
     assert AuthService(db).live_count() == 1
     assert AuthService(db, clock=lambda: datetime.now(UTC) + timedelta(minutes=61)).live_count() == 0
+
+
+def test_two_first_sign_ins_at_once_leave_one_live_session(client: TestClient, db: Session) -> None:
+    """Two devices signing in to a fresh account at the same instant: one 200, one 409, one live row
+    (the user row is the lock; a `FOR UPDATE` on a session that does not exist yet locks nothing)."""
+    import threading
+
+    make_user(db, "off@example.sg", Role.OFFICER)
+    results: list[int] = []
+    barrier = threading.Barrier(2)
+
+    def attempt(ua: str) -> None:
+        barrier.wait()
+        results.append(_sign_in(client, "off@example.sg", ua).status_code)
+
+    threads = [threading.Thread(target=attempt, args=(ua,)) for ua in (IPAD, MAC)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(results) == [200, 409], results
+    live = db.scalars(select(UserSession).where(UserSession.revoked_at.is_(None))).all()
+    assert len(live) == 1

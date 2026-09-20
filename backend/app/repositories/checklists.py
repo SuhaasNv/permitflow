@@ -53,6 +53,21 @@ class ChecklistRepository:
             out.setdefault(row.application_id, row)
         return out
 
+    def items_for_many(self, checklist_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, list[ChecklistItem]]:
+        """The items of several checklists in one query (the operator list's open counts)."""
+        ids = list(checklist_ids)
+        if not ids:
+            return {}
+        stmt = (
+            select(ChecklistItem)
+            .where(ChecklistItem.checklist_id.in_(ids))
+            .order_by(ChecklistItem.checklist_id, ChecklistItem.position)
+        )
+        out: dict[uuid.UUID, list[ChecklistItem]] = {}
+        for item in self.db.scalars(stmt):
+            out.setdefault(item.checklist_id, []).append(item)
+        return out
+
     def items_for(self, checklist_id: uuid.UUID) -> list[ChecklistItem]:
         stmt = (
             select(ChecklistItem)

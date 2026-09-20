@@ -60,6 +60,9 @@ class AuthService:
         if user is None or not user.is_active or not ok:
             raise Unauthorized("Email or password is incorrect.")
         now = self.clock()
+        # The user row is the serialisation point: `FOR UPDATE` on the live session locks nothing when
+        # there is none, so two first sign-ins racing would both pass (review finding, 21 Sep).
+        self.users.lock(user.id)
         other = self.sessions.live_for_user(user.id, now, self.idle)
         if other is not None and not take_over:
             self.db.rollback()

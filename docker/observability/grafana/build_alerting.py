@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates the Grafana alerting provisioning files (US-077, Telegram): the six incident rules (one alert
+"""Generates the Grafana alerting provisioning files (US-077, Telegram): the seven incident rules (one alert
 per environment, from the `environment` label) and an hourly digest per environment, one Telegram contact
 point, the notification policy, the message template. Run after editing; the YAML files under alerting/
 are what Grafana provisions. The start script copies them only when TELEGRAM_BOT_TOKEN and

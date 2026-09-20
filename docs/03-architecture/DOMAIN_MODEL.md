@@ -178,7 +178,7 @@ Append-only.
 | id | UUID | |
 | application_id | FK Application, nullable | null for user-management events |
 | actor_id | FK User, nullable | null for system events |
-| event_type | str | `application.created`, `section.updated`, `document.uploaded`, `document.replaced`, `document.deleted`, `verification.requested`, `verification.completed`, `revision.submitted`, `status.changed`, `feedback.created`, `feedback.released`, `feedback.addressed`, `feedback.resolved`, `feedback.withdrawn`, `feedback.reopened`, `feedback.restored`, `licence.issued` (planned with the admin epic: `user.role_changed`, `user.deactivated`, `user.reactivated`) |
+| event_type | str | `application.created`, `section.updated`, `document.uploaded`, `document.replaced`, `document.deleted`, `verification.requested`, `verification.completed`, `revision.submitted`, `status.changed`, `feedback.created`, `feedback.released`, `feedback.addressed`, `feedback.resolved`, `feedback.withdrawn`, `feedback.reopened`, `feedback.restored`, `licence.issued`, the site visit, checklist and clarification events (`site_visit.*`, `checklist.*`, `clarification.*`, v0.4.0), and the user events with no application (`user.created`, `user.role_changed`, `user.deactivated`, `user.reactivated`, `user.session_taken_over`, `user.signed_out`) |
 | payload | JSON | event-specific data (from/to status, revision number, feedback id, document type, verification status) |
 | created_at | datetime | |
 
@@ -262,6 +262,7 @@ One template item on one checklist; every key of the template is present from cr
 | result | enum `not_assessed`, `satisfactory`, `unsatisfactory`, `not_applicable` | `not_assessed` only while a draft |
 | comment | text, max 2000, nullable | required at submit for an unsatisfactory or flagged item |
 | needs_clarification | bool | the flag the operator will be asked about (US-062) |
+| custom_title, parent_key | str(120) nullable, str(48) nullable | an extra finding of the officer's own (US-092): a server key `extra_<hex>`, its title, and the template item it sits under (or null under Other findings); `is_extra` property |
 | clarification_status | enum `none`, `open`, `answered`, `resolved`, `withdrawn` | restates the latest request's state; keeps changing after submit (US-064 to US-066) |
 | resolved_by_id, resolved_at | | |
 
@@ -320,7 +321,7 @@ Required document types: `business_profile`, `floor_plan`, `tenancy_agreement`, 
 | SiteVisit, SiteVisitProposal | own application; accept, counter, reschedule | all; propose, decide, confirm, reschedule | all; read |
 | Checklist, ChecklistItem | none (the operator receives the flagged items through the clarification view, US-064) | all; create, save, submit | all; read |
 | ClarificationRequest, ClarificationResponse, ClarificationAttachment | own application; read released requests, draft and send answers, attach and remove files until sent, download own files | all; ask, resolve, withdraw (US-066); download | all; read, download |
-| User | self | self | all; change role, deactivate/reactivate (planned, US-073) |
+| User | self | self | all; change role, deactivate/reactivate, create (US-073) |
 
 ## Invariants (enforced in services and tested)
 

@@ -4,7 +4,7 @@ moves the case (US-065). Every mutation locks the application row first (ADR-008
 decisions live in US-066."""
 
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from datetime import UTC, datetime
 from typing import BinaryIO
 
@@ -143,11 +143,13 @@ class ClarificationService:
     def open_counts(self, app_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
         """Items waiting for the operator per application (the list and the dashboard)."""
         checklists = self.checklists.current_for_many(app_ids)
-        out: dict[uuid.UUID, int] = {}
-        for app_id, checklist in checklists.items():
-            items = self.checklists.items_for(checklist.id)
-            out[app_id] = sum(1 for i in items if i.clarification_status == ClarificationStatus.OPEN)
-        return out
+        items = self.checklists.items_for_many(c.id for c in checklists.values())
+        return {
+            app_id: sum(
+                1 for i in items.get(checklist.id, []) if i.clarification_status == ClarificationStatus.OPEN
+            )
+            for app_id, checklist in checklists.items()
+        }
 
     def _item_out(
         self,
@@ -477,12 +479,14 @@ class ClarificationService:
         by_item: dict[uuid.UUID, list[ClarificationRequest]] = {}
         for q in requests:
             by_item.setdefault(q.item_id, []).append(q)
+        # Every author name in one query, not one per round (review finding, 21 Sep).
+        names = {uid: name for uid, (name, _) in self.user_names(q.author_id for q in requests).items()}
         threads: list[ClarificationThreadOut] = []
         for item in items:
             rounds = by_item.get(item.id, [])
             if not rounds:
                 continue
-            threads.append(self._thread_out(app, item, rounds, responses, attachments))
+            threads.append(self._thread_out(app, item, rounds, responses, attachments, names))
         counts = {
             s: sum(1 for t in threads if t.status == s) for s in ("open", "answered", "resolved", "withdrawn")
         }
@@ -605,6 +609,7 @@ class ClarificationService:
         rounds: list[ClarificationRequest],
         responses: dict[uuid.UUID, ClarificationResponse],
         attachments: dict[uuid.UUID, list[ClarificationAttachment]],
+        names: dict[uuid.UUID, str],
     ) -> ClarificationThreadOut:
         parent = ITEM_BY_KEY.get(item.parent_key or "")
         title = item_title(item.item_key, item.custom_title)
@@ -618,7 +623,7 @@ class ClarificationService:
         out: list[ClarificationThreadRequestOut] = []
         for q in rounds:
             r = responses.get(q.id)
-            author = self.users_name(q.author_id)
+            author = names.get(q.author_id, "")
             out.append(
                 ClarificationThreadRequestOut(
                     id=q.id,
@@ -666,8 +671,7 @@ class ClarificationService:
             pending_release=any(q.released_at is None and q.withdrawn_at is None for q in rounds),
         )
 
-    def users_name(self, user_id: uuid.UUID) -> str:
+    def user_names(self, user_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, tuple[str, str]]:
         from app.repositories.users import UserRepository  # noqa: PLC0415
 
-        user = UserRepository(self.db).get(user_id)
-        return user.full_name if user else ""
+        return UserRepository(self.db).names(user_ids)
