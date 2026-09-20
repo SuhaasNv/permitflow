@@ -361,3 +361,112 @@ def test_scheduled_again_before_a_new_date_does_not_reuse_the_done_visit(
         if i["id"] == app_id
     )
     assert row["next_action"] == "Propose a visit date"
+
+
+def test_extra_findings_free_and_linked(client: TestClient, db: Session) -> None:
+    """US-092: the officer adds a free finding and a second finding under a template item; both carry a
+    result, a comment and the flag; the title is required; a removed one goes; they count and flow to
+    the operator like any item."""
+    app_id, op, off, _ = under_review(client, db)
+    arrange_visit(client, off, op, app_id)
+    body = _open(client, off, app_id)
+    items = _items()
+    items.append(
+        {
+            "key": None,
+            "result": "unsatisfactory",
+            "comment": "Loose tiles by the rear door.",
+            "needs_clarification": True,
+            "custom_title": "Loose floor tiles at the rear exit",
+        }
+    )
+    items.append(
+        {
+            "key": None,
+            "result": "unsatisfactory",
+            "comment": "Second trap under the sink also blocked.",
+            "needs_clarification": False,
+            "custom_title": "Second floor trap blocked",
+            "parent_key": "floor_trap_graded",
+        }
+    )
+    r = client.put(URL.format(app_id), headers=off, json={"items": items, "version": body["version"]})
+    assert r.status_code == 200, r.text
+    saved = r.json()
+    extras = [i for i in saved["items"] if i["is_extra"]]
+    assert len(extras) == 2 and all(i["key"].startswith("extra_") for i in extras)
+    free = next(i for i in extras if i["parent_key"] is None)
+    linked = next(i for i in extras if i["parent_key"] == "floor_trap_graded")
+    assert free["title"] == "Loose floor tiles at the rear exit" and free["section"] == "other"
+    assert linked["title"] == "Second floor trap blocked" and linked["section"] == "premises"
+    assert (
+        saved["counts"]["total"] == 19
+        and saved["counts"]["flagged"] == 1
+        and saved["counts"]["unsatisfactory"] == 2
+    )
+    # the title is required; a parent must be a template item
+    bad = _items() + [
+        {
+            "key": None,
+            "result": "satisfactory",
+            "comment": None,
+            "needs_clarification": False,
+            "custom_title": "  ",
+        }
+    ]
+    r = client.put(URL.format(app_id), headers=off, json={"items": bad, "version": saved["version"]})
+    assert r.status_code == 422 and "title" in str(r.json()["error"]["details"]["fields"])
+    bad = _items() + [
+        {
+            "key": None,
+            "result": "satisfactory",
+            "comment": None,
+            "needs_clarification": False,
+            "custom_title": "x",
+            "parent_key": "gold_taps",
+        }
+    ]
+    r = client.put(URL.format(app_id), headers=off, json={"items": bad, "version": saved["version"]})
+    assert r.status_code == 422
+    # keep the linked one, rename it, drop the free one
+    keep = _items() + [
+        {
+            "key": linked["key"],
+            "result": "unsatisfactory",
+            "comment": "Second trap under the sink also blocked.",
+            "needs_clarification": True,
+            "custom_title": "Second floor trap blocked (under the sink)",
+            "parent_key": "floor_trap_graded",
+        }
+    ]
+    r = client.put(URL.format(app_id), headers=off, json={"items": keep, "version": saved["version"]})
+    assert r.status_code == 200, r.text
+    extras = [i for i in r.json()["items"] if i["is_extra"]]
+    assert (
+        len(extras) == 1
+        and extras[0]["title"] == "Second floor trap blocked (under the sink)"
+        and r.json()["counts"]["total"] == 18
+    )
+    # submit: the flagged extra reaches the operator with its parent's title first
+    r = _submit(client, off, app_id)
+    assert r.status_code == 200, r.text
+    mine = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    assert [i["title"] for i in mine["items"]] == [
+        "Floor trap in the food preparation area: Second floor trap blocked (under the sink)"
+    ]
+    assert mine["items"][0]["requests"][0]["message"] == "Second trap under the sink also blocked."
+    case = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    assert case["clarification"]["items"][0]["title"].startswith("Floor trap in the food preparation area: ")
+    from sqlalchemy import select
+
+    from app.models import AuditEvent
+
+    submitted = next(
+        e
+        for e in db.scalars(select(AuditEvent).where(AuditEvent.application_id == app_id))
+        if e.event_type == "checklist.submitted"
+    )
+    assert submitted.payload["extra_titles"] == ["Second floor trap blocked (under the sink)"]
+    # frozen: an extra cannot be added after submit
+    r = client.put(URL.format(app_id), headers=off, json={"items": keep, "version": r.json()["version"]})
+    assert r.status_code == 409

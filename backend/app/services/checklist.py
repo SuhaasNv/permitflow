@@ -13,12 +13,17 @@ from app.core.errors import Conflict, NotFound, ValidationFailed, VersionConflic
 from app.domain.checklist_schema import (
     CHECKLIST_VERSION,
     DESCRIPTION,
+    EXTRA_PREFIX,
     ITEM_BY_KEY,
     ITEM_KEYS,
     ITEMS,
     MAX_COMMENT,
+    MAX_EXTRA_TITLE,
     POSITION,
     SECTIONS,
+    is_extra_key,
+    item_section,
+    item_title,
 )
 from app.domain.enums import (
     ApplicationStatus,
@@ -249,11 +254,37 @@ class ChecklistService:
                 details={"current": self._out(row).model_dump(mode="json")},
             )
         items = {i.item_key: i for i in self.checklists.items_for(row.id)}
+        kept: set[str] = set()
+        position = max((i.position for i in items.values()), default=0)
         for entry in body.items:
+            if entry.key is None or (is_extra_key(entry.key) and entry.key not in items):
+                # A new extra finding (US-092): the server assigns the key and the next position.
+                position += 1
+                item = ChecklistItem(
+                    checklist_id=row.id,
+                    item_key=f"{EXTRA_PREFIX}{uuid.uuid4().hex[:8]}",
+                    position=position,
+                    result=ChecklistResult(entry.result),
+                    comment=(entry.comment or "").strip() or None,
+                    needs_clarification=entry.needs_clarification,
+                    clarification_status=ClarificationStatus.NONE,
+                    custom_title=(entry.custom_title or "").strip(),
+                    parent_key=entry.parent_key or None,
+                )
+                self.checklists.add(item)
+                kept.add(item.item_key)
+                continue
             item = items[entry.key]
             item.result = ChecklistResult(entry.result)
             item.comment = (entry.comment or "").strip() or None
             item.needs_clarification = entry.needs_clarification
+            if item.is_extra:
+                item.custom_title = (entry.custom_title or "").strip() or item.custom_title
+            kept.add(entry.key)
+        # An extra finding left out of the list was removed by the officer (draft only).
+        for key, item in items.items():
+            if item.is_extra and key not in kept:
+                self.db.delete(item)
         row.version += 1
         row.last_save_id = body.save_id
         row.updated_at = self.now()
@@ -326,6 +357,7 @@ class ChecklistService:
                 "unsatisfactory": counts.unsatisfactory,
                 "not_applicable": counts.not_applicable,
                 "flagged_keys": [i.item_key for i in flagged],
+                "extra_titles": [i.custom_title for i in items if i.is_extra],
             },
         )
         self.db.flush()
@@ -378,20 +410,30 @@ class ChecklistService:
     def _validate_items(entries: list[ChecklistItemIn]) -> dict[str, str]:
         errors: dict[str, str] = {}
         seen: set[str] = set()
-        for e in entries:
-            if e.key not in ITEM_BY_KEY:
-                errors[e.key] = "This item is not on the checklist."
+        for n, e in enumerate(entries):
+            key = e.key or f"new_{n}"
+            extra = e.key is None or is_extra_key(key)
+            if not extra and key not in ITEM_BY_KEY:
+                errors[key] = "This item is not on the checklist."
                 continue
-            if e.key in seen:
-                errors[e.key] = "This item appears twice."
+            if key in seen:
+                errors[key] = "This item appears twice."
                 continue
-            seen.add(e.key)
+            seen.add(key)
             try:
                 ChecklistResult(e.result)
             except ValueError:
-                errors[e.key] = "Choose Satisfactory, Unsatisfactory or Not applicable."
+                errors[key] = "Choose Satisfactory, Unsatisfactory or Not applicable."
             if e.comment is not None and len(e.comment) > MAX_COMMENT:
-                errors[e.key] = f"Keep the comment under {MAX_COMMENT} characters."
+                errors[key] = f"Keep the comment under {MAX_COMMENT} characters."
+            if extra:
+                title = (e.custom_title or "").strip()
+                if not title:
+                    errors[key] = "Give the finding a title."
+                elif len(title) > MAX_EXTRA_TITLE:
+                    errors[key] = f"Keep the title under {MAX_EXTRA_TITLE} characters."
+                if e.parent_key and e.parent_key not in ITEM_BY_KEY:
+                    errors[key] = "A finding can only sit under a checklist item."
         missing = [k for k in ITEM_KEYS if k not in seen]
         if missing and not errors:
             errors["items"] = f"Every item must be sent: {len(missing)} missing."
@@ -420,14 +462,17 @@ class ChecklistService:
                 ChecklistItemOut(
                     id=i.id,
                     key=i.item_key,
-                    section=ITEM_BY_KEY[i.item_key].section,
-                    title=ITEM_BY_KEY[i.item_key].title,
-                    guidance=ITEM_BY_KEY[i.item_key].guidance,
+                    section=item_section(i.item_key, i.parent_key),
+                    title=item_title(i.item_key, i.custom_title),
+                    guidance=ITEM_BY_KEY[i.item_key].guidance if i.item_key in ITEM_BY_KEY else "",
                     position=i.position,
                     result=i.result.value,
                     comment=i.comment,
                     needs_clarification=i.needs_clarification,
                     clarification_status=i.clarification_status.value,
+                    is_extra=i.is_extra,
+                    custom_title=i.custom_title,
+                    parent_key=i.parent_key,
                 )
                 for i in items
             ],

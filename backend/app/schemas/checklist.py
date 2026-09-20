@@ -39,6 +39,10 @@ class ChecklistItemOut(BaseModel):
     comment: str | None
     needs_clarification: bool
     clarification_status: str
+    # Extra findings (US-092): the officer's own title, and the template item it sits under when linked.
+    is_extra: bool = False
+    custom_title: str | None = None
+    parent_key: str | None = None
 
 
 class ChecklistCounts(BaseModel):
@@ -81,10 +85,13 @@ class ChecklistSummaryOut(BaseModel):
 
 
 class ChecklistItemIn(BaseModel):
-    key: str
+    # None for a new extra finding: the server assigns its key and returns it (US-092).
+    key: str | None = None
     result: str
     comment: str | None = Field(default=None, max_length=2000)
     needs_clarification: bool = False
+    custom_title: str | None = Field(default=None, max_length=120)
+    parent_key: str | None = Field(default=None, max_length=48)
 
 
 class ChecklistSaveIn(BaseModel):

@@ -27,6 +27,12 @@ test('checklist: open from the case, assess items, save the draft, see the summa
   await groups.nth(16).getByRole('button', { name: 'Not applicable' }).click()
   await expect(page.getByText('3 of 17 assessed, 1 flagged').first()).toBeVisible()
   await expect(page.getByText('Assess 14 more items to submit.')).toBeVisible()
+  // a finding of the officer's own, under Other findings (US-092): titled, assessed, saved with its own key
+  await page.getByRole('button', { name: 'Add a finding' }).click()
+  await expect(page.getByText('Give the finding a title.')).toBeVisible()
+  await page.getByRole('textbox', { name: /^Other finding/ }).fill('Loose floor tiles at the rear exit')
+  await page.getByRole('group', { name: 'Result' }).nth(17).getByRole('button', { name: 'Satisfactory', exact: true }).click()
+  await expect(page.getByText('4 of 18 assessed, 1 flagged').first()).toBeVisible()
   // pressing the selected result again clears it; autosave fires 1.5 s after the last touch (US-061)
   await groups.nth(16).getByRole('button', { name: 'Not applicable' }).click()
   await expect(groups.nth(16).getByRole('button', { name: 'Not applicable' })).toHaveAttribute('aria-pressed', 'false')
@@ -35,12 +41,13 @@ test('checklist: open from the case, assess items, save the draft, see the summa
 
   // the draft survives a reload and the case summarises it
   await page.reload()
-  await expect(page.getByText('3 of 17 assessed, 1 flagged').first()).toBeVisible()
+  await expect(page.getByText('4 of 18 assessed, 1 flagged').first()).toBeVisible()
+  await expect(page.getByRole('textbox', { name: /^Other finding/ })).toHaveValue('Loose floor tiles at the rear exit')
   await expect(groups.nth(1).getByRole('button', { name: 'Unsatisfactory', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByLabel(/Comment/)).toHaveValue('Floor slopes away from the trap; water pools by the wok station.')
   await page.getByRole('link', { name: 'Back to the case' }).click()
   await expect(status(page)).toHaveText('Site Visit Scheduled')
-  await expect(page.locator('section:has(#checklist-title)')).toContainText('Visit 1: 3 of 17 assessed, 1 flagged')
+  await expect(page.locator('section:has(#checklist-title)')).toContainText('Visit 1: 4 of 18 assessed, 1 flagged')
   await expect(page.getByRole('link', { name: 'Continue checklist' })).toBeVisible()
   // no route straight to approval any more: the checklist is the way (US-063)
   await expect(page.getByRole('button', { name: 'Route to approval' })).toHaveCount(0)

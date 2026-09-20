@@ -36,6 +36,10 @@ export interface ChecklistItem {
   comment: string | null
   needs_clarification: boolean
   clarification_status: ClarificationStatus
+  /** Extra findings (US-092): the officer's own title, and the template item it sits under when linked. */
+  is_extra: boolean
+  custom_title: string | null
+  parent_key: string | null
 }
 
 export interface ChecklistCounts {
@@ -77,10 +81,13 @@ export interface ChecklistSummary {
 }
 
 export interface ChecklistItemInput {
-  key: string
+  /** null for a new extra finding: the server assigns its key (US-092). */
+  key: string | null
   result: ChecklistResult
   comment: string | null
   needs_clarification: boolean
+  custom_title?: string | null
+  parent_key?: string | null
 }
 
 export interface ChecklistSaveInput {
@@ -103,8 +110,8 @@ export function getChecklist(id: string, visit?: number): Promise<Checklist> {
   return request<Checklist>(`/officer/applications/${id}/checklist${visit ? `?visit=${visit}` : ''}`)
 }
 
-export function saveChecklist(id: string, body: ChecklistSaveInput): Promise<Checklist> {
-  return request<Checklist>(`/officer/applications/${id}/checklist`, { method: 'PUT', body })
+export function saveChecklist(id: string, body: ChecklistSaveInput, keepalive = false): Promise<Checklist> {
+  return request<Checklist>(`/officer/applications/${id}/checklist`, { method: 'PUT', body, keepalive })
 }
 
 /** Freezes the findings and moves the case to Awaiting Post-Site Clarification (US-063). */

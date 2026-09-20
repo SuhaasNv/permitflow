@@ -2,6 +2,11 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-092 Extra findings on the checklist (21 Sep 2026, Sprint 5)
+
+- An officer adds a finding of their own: free under Other findings, or as a second finding under a template item ("Finding 2 on this item"), each with a title, the same result, comment and flag, removable while a draft; the draft save assigns the key; counts and the submit rules cover them; a flagged one reaches the operator with its parent's title first. Added at the owner's question whether the checklist can take items of the officer's own and two findings on one item.
+- Also at the owner's question: the draft is sent the moment the tab goes to the background or the page unloads (keepalive), so an iPad lid closing loses nothing; the browser's leave-page alert stays only while a save is pending or failing. From the Sonnet review of the clarification stories: the operator's notice asks for a response only while the office is waiting, evidence on a withdrawn item's answer is refused, Send waits for an answer or file still in flight. The queue's long status labels wrap at tablet width (H4).
+
 ## US-090 Singapore time everywhere (21 Sep 2026, Sprint 5)
 
 - The frontend renders every instant in Asia/Singapore through one helper set in `lib/format.ts` (dates, times, relative times, the greeting, the save indicator, the session tooltip); date-only values stay the calendar dates they name. Tests sit on 16:00 UTC, midnight in Singapore, and the whole suite runs under four browser zones.

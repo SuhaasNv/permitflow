@@ -59,3 +59,10 @@ class ChecklistItem(Base):
     )
     resolved_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # An extra finding (US-092): its own title, and the template item it sits under when linked.
+    custom_title: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    parent_key: Mapped[str | None] = mapped_column(String(48), nullable=True)
+
+    @property
+    def is_extra(self) -> bool:
+        return self.item_key.startswith("extra_")

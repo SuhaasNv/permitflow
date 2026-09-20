@@ -11,7 +11,7 @@ import * as api from '@/api/officer'
 import { AppProviders } from '@/app/providers'
 import { formSchema, officerView } from '@/test/fixtures'
 import { OfficerCasePage } from './CasePage'
-import { AUTOSAVE_DELAY_MS, ChecklistPage, mergeFindings, retryDelay, summarise } from './ChecklistPage'
+import { AUTOSAVE_DELAY_MS, ChecklistPage, adoptServerKeys, mergeFindings, retryDelay, summarise, toInput } from './ChecklistPage'
 
 const defs = [
   ['premises', 'Premises', ['layout_matches_plan', 'floor_trap_graded']],
@@ -41,6 +41,9 @@ function item(key: string, section: string, position: number, over: Partial<Chec
     comment: null,
     needs_clarification: false,
     clarification_status: 'none',
+    is_extra: false,
+    custom_title: null,
+    parent_key: null,
     ...over,
   }
 }
@@ -287,6 +290,97 @@ describe('site visit checklist (US-060, US-061)', () => {
     renderAt('/officer/applications/a1/checklist')
     expect(await screen.findByText('The checklist opens once a site visit is scheduled')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to the case' })).toBeInTheDocument()
+  })
+
+  it('an extra finding is added with a title, saved with a null key, adopts the server key and can be removed (US-092)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(checklistApi, 'openChecklist').mockResolvedValue(draft)
+    const serverExtra = item('extra_1a2b3c4d', 'premises', 4, {
+      result: 'unsatisfactory',
+      comment: 'Second trap blocked.',
+      is_extra: true,
+      custom_title: 'Second floor trap blocked',
+      parent_key: 'floor_trap_graded',
+    })
+    const save = vi.spyOn(checklistApi, 'saveChecklist').mockResolvedValue({ ...draft, version: 4, items: [...draft.items, serverExtra] })
+    renderAt('/officer/applications/a1/checklist')
+    await screen.findByRole('heading', { name: 'Site visit checklist' })
+    expect(screen.getByRole('heading', { name: 'Other findings' })).toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: 'Add another finding' })[1]!)
+    const title = await screen.findByLabelText(/Finding 2 on this item/)
+    expect(screen.getByText('Give the finding a title.')).toBeInTheDocument()
+    expect(screen.getByText('Assess 4 more items and title 1 finding to submit.')).toBeInTheDocument()
+    // untitled: nothing is sent for it
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS + 10)
+    expect(save).not.toHaveBeenCalled()
+    await user.type(title, 'Second floor trap blocked')
+    const groups = screen.getAllByRole('group', { name: 'Result' })
+    await user.click(within(groups[2]!).getByRole('button', { name: /^Unsatisfactory$/ }))
+    await user.type(screen.getByLabelText(/Comment/), 'Second trap blocked.')
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS + 30)
+    expect(save).toHaveBeenCalled()
+    const body = save.mock.calls.at(-1)![1]
+    const extra = body.items.find((i) => i.custom_title)
+    expect(extra).toEqual({
+      key: null,
+      result: 'unsatisfactory',
+      comment: 'Second trap blocked.',
+      needs_clarification: false,
+      custom_title: 'Second floor trap blocked',
+      parent_key: 'floor_trap_graded',
+    })
+    // the server key is adopted: the next save sends it, and Remove drops it
+    await user.click(screen.getAllByLabelText('Need further clarification')[2]!)
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS + 30)
+    const again = save.mock.calls.at(-1)![1].items.find((i) => i.custom_title)
+    expect(again?.key).toBe('extra_1a2b3c4d')
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    await vi.advanceTimersByTimeAsync(30)
+    expect(save.mock.calls.at(-1)![1].items.some((i) => i.custom_title)).toBe(false)
+    vi.useRealTimers()
+  })
+
+  it('hiding the page sends the last entries at once with keepalive', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(checklistApi, 'openChecklist').mockResolvedValue(draft)
+    const save = vi.spyOn(checklistApi, 'saveChecklist').mockResolvedValue({ ...draft, version: 4 })
+    renderAt('/officer/applications/a1/checklist')
+    const groups = await screen.findAllByRole('group', { name: 'Result' })
+    await user.click(within(groups[0]!).getByRole('button', { name: /^Satisfactory$/ }))
+    expect(save).not.toHaveBeenCalled()
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.advanceTimersByTimeAsync(10)
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save.mock.calls[0]![2]).toBe(true)
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
+    vi.useRealTimers()
+  })
+
+  it('toInput and adoptServerKeys handle extras', () => {
+    const local = {
+      a: { result: 'satisfactory' as const, comment: '', needs_clarification: false },
+      new_1: {
+        result: 'unsatisfactory' as const,
+        comment: 'x',
+        needs_clarification: true,
+        extra: true,
+        title: 'Loose tiles',
+        parent: null,
+      },
+      new_2: { result: 'not_assessed' as const, comment: '', needs_clarification: false, extra: true, title: '', parent: 'a' },
+    }
+    expect(toInput(local)).toEqual([
+      { key: 'a', result: 'satisfactory', comment: null, needs_clarification: false },
+      { key: null, result: 'unsatisfactory', comment: 'x', needs_clarification: true, custom_title: 'Loose tiles', parent_key: null },
+    ])
+    const adopted = adoptServerKeys(local, [
+      item('extra_9', 'other', 5, { is_extra: true, custom_title: 'Loose tiles', parent_key: null, result: 'unsatisfactory' }),
+    ])
+    expect(Object.keys(adopted).sort()).toEqual(['a', 'extra_9', 'new_2'])
+    expect(adopted.extra_9).toMatchObject({ title: 'Loose tiles', comment: 'x', needs_clarification: true })
   })
 
   it('mergeFindings keeps my touched items on top of theirs', () => {

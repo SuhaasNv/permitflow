@@ -7,6 +7,7 @@ import { Alert } from '@/features/shared/Alert'
 import { Breadcrumb } from '@/features/shared/Breadcrumb'
 import { Button, buttonClasses } from '@/features/shared/Button'
 import { CheckboxField, TextAreaField } from '@/features/shared/Controls'
+import { Field } from '@/features/shared/Field'
 import { Dialog } from '@/features/shared/Dialog'
 import { SaveIndicator } from '@/features/shared/SaveIndicator'
 import { StatusBadge } from '@/features/shared/StatusBadge'
@@ -67,21 +68,82 @@ export function mergeFindings(theirs: Findings, mine: Findings, touched: Iterabl
 }
 
 /** Local working copy of the item findings, keyed by item key. */
-export type Findings = Record<string, { result: ChecklistResult; comment: string; needs_clarification: boolean }>
+export interface Finding {
+  result: ChecklistResult
+  comment: string
+  needs_clarification: boolean
+  /** An extra finding of the officer's own (US-092): its title, and the template item it sits under. */
+  extra?: boolean
+  title?: string
+  parent?: string | null
+}
+
+export type Findings = Record<string, Finding>
+
+/** Keys of extra findings not yet saved start with this; the server assigns the real key on save. */
+export const NEW_PREFIX = 'new_'
 
 export function findingsOf(items: ChecklistItem[]): Findings {
   const out: Findings = {}
-  for (const i of items) out[i.key] = { result: i.result, comment: i.comment ?? '', needs_clarification: i.needs_clarification }
+  for (const i of items) {
+    const f: Finding = { result: i.result, comment: i.comment ?? '', needs_clarification: i.needs_clarification }
+    if (i.is_extra) Object.assign(f, { extra: true, title: i.custom_title ?? '', parent: i.parent_key })
+    out[i.key] = f
+  }
   return out
 }
 
+/** The save payload: every template item and every extra finding that has a title (an untitled one stays local). */
 export function toInput(findings: Findings): ChecklistItemInput[] {
-  return Object.entries(findings).map(([key, f]) => ({
-    key,
-    result: f.result,
-    comment: f.comment.trim() || null,
-    needs_clarification: f.needs_clarification,
-  }))
+  const out: ChecklistItemInput[] = []
+  for (const [key, f] of Object.entries(findings)) {
+    if (f.extra) {
+      const title = (f.title ?? '').trim()
+      if (!title) continue
+      out.push({
+        key: key.startsWith(NEW_PREFIX) ? null : key,
+        result: f.result,
+        comment: f.comment.trim() || null,
+        needs_clarification: f.needs_clarification,
+        custom_title: title,
+        parent_key: f.parent ?? null,
+      })
+      continue
+    }
+    out.push({ key, result: f.result, comment: f.comment.trim() || null, needs_clarification: f.needs_clarification })
+  }
+  return out
+}
+
+/** After a save: the server's keys replace the local ones of the extras it created, matched by title and parent. */
+export function adoptServerKeys(local: Findings, saved: ChecklistItem[]): Findings {
+  const out: Findings = { ...local }
+  const known = new Set(Object.keys(local))
+  for (const item of saved) {
+    if (!item.is_extra || known.has(item.key)) continue
+    const match = Object.entries(out).find(
+      ([k, f]) =>
+        k.startsWith(NEW_PREFIX) &&
+        f.extra &&
+        (f.title ?? '').trim() === (item.custom_title ?? '') &&
+        (f.parent ?? null) === item.parent_key,
+    )
+    if (match) {
+      const [oldKey, f] = match
+      delete out[oldKey]
+      out[item.key] = { ...f }
+    } else {
+      out[item.key] = {
+        result: item.result,
+        comment: item.comment ?? '',
+        needs_clarification: item.needs_clarification,
+        extra: true,
+        title: item.custom_title ?? '',
+        parent: item.parent_key,
+      }
+    }
+  }
+  return out
 }
 
 /** Counts and the sentence the sticky card shows, computed on the working copy so they move as you type. */
@@ -97,10 +159,12 @@ export function summarise(findings: Findings): {
   const assessed = values.filter((f) => f.result !== 'not_assessed').length
   const flagged = values.filter((f) => f.needs_clarification).length
   const missing = values.filter((f) => (f.result === 'unsatisfactory' || f.needs_clarification) && !f.comment.trim()).length
+  const untitled = values.filter((f) => f.extra && !(f.title ?? '').trim()).length
   const parts: string[] = []
   const left = total - assessed
   if (left) parts.push(`assess ${left} more ${left === 1 ? 'item' : 'items'}`)
   if (missing) parts.push(`add ${missing} ${missing === 1 ? 'comment' : 'comments'}`)
+  if (untitled) parts.push(`title ${untitled} ${untitled === 1 ? 'finding' : 'findings'}`)
   const remaining = parts.length ? parts.join(' and ').replace(/^./, (c) => c.toUpperCase()) + ' to submit.' : null
   return { assessed, flagged, missing, total, remaining }
 }
@@ -217,7 +281,7 @@ export function ChecklistPage() {
       flush()
     }, delay)
   }
-  const flush = () => {
+  const flush = (keepalive = false) => {
     const items = current()
     const version = versionRef.current
     if (!items || version === null || !dirtyRef.current || inFlight.current) return
@@ -226,7 +290,7 @@ export function ChecklistPage() {
     inFlight.current = true
     saveId.current ??= crypto.randomUUID()
     save.mutate(
-      { items: toInput(items), version, save_id: saveId.current },
+      { items: toInput(items), version, save_id: saveId.current, keepalive },
       {
         onSettled: () => {
           inFlight.current = false
@@ -238,6 +302,12 @@ export function ChecklistPage() {
           attempt.current = 0
           saveId.current = null
           for (const key of sent) touched.current.delete(key)
+          if (Object.keys(work.current ?? {}).some((k) => k.startsWith(NEW_PREFIX))) {
+            // New extra findings now have server keys; the working copy follows them.
+            const adopted = adoptServerKeys(work.current ?? {}, next.items)
+            work.current = adopted
+            setEdits(adopted)
+          }
           if (touched.current.size > 0) {
             // Touched again while the save was in flight: still dirty, save once more.
             schedule(AUTOSAVE_DELAY_MS)
@@ -276,6 +346,25 @@ export function ChecklistPage() {
       },
     )
   }
+
+  // The tab goes to the background or the page unloads (an iPad lid, a closed tab): send what is on
+  // screen at once with keepalive, so the browser finishes it even after the page is gone.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden' && dirtyRef.current) {
+        if (timer.current !== null) window.clearTimeout(timer.current)
+        timer.current = null
+        flush(true)
+      }
+    }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', onHide)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', onHide)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- flush is a plain function reading refs
+  }, [])
 
   // Back online with unsaved entries: save at once.
   const wasOnline = useRef(true)
@@ -347,11 +436,41 @@ export function ChecklistPage() {
       },
     })
   }
-  const flaggedTitles = sections
-    .flatMap((s) => s.items)
-    .filter((i) => findings[i.key]?.needs_clarification)
-    .map((i) => i.title)
-  const update = (key: string, patch: Partial<Findings[string]>) => {
+  const flaggedTitles = [
+    ...sections
+      .flatMap((s) => s.items)
+      .filter((i) => findings[i.key]?.needs_clarification)
+      .map((i) => i.title),
+    ...Object.values(findings)
+      .filter((f) => f.extra && f.needs_clarification)
+      .map((f) => (f.title ?? '').trim() || 'Other finding'),
+  ]
+  const addExtra = (parent: string | null) => {
+    const key = `${NEW_PREFIX}${crypto.randomUUID().slice(0, 8)}`
+    const base = current() ?? findings
+    const next: Findings = {
+      ...base,
+      [key]: { result: 'not_assessed', comment: '', needs_clarification: false, extra: true, title: '', parent },
+    }
+    work.current = next
+    setEdits(next)
+    touched.current.add(key)
+    markDirty(true)
+  }
+  const removeExtra = (key: string) => {
+    const base = current() ?? findings
+    const next = { ...base }
+    delete next[key]
+    work.current = next
+    setEdits(next)
+    touched.current.delete(key)
+    if (!key.startsWith(NEW_PREFIX)) {
+      markDirty(true)
+      schedule(0)
+    }
+  }
+  const extrasUnder = (parent: string | null) => Object.entries(findings).filter(([, f]) => f.extra && (f.parent ?? null) === parent)
+  const update = (key: string, patch: Partial<Finding>) => {
     // Two taps in one frame must both land (a tablet taps faster than React commits): the ref is the truth.
     const base = current() ?? findings
     const next = { ...base, [key]: { ...base[key], ...patch } }
@@ -362,7 +481,68 @@ export function ChecklistPage() {
     markDirty(true)
     schedule(AUTOSAVE_DELAY_MS)
   }
-  const numbering = new Map(sections.flatMap((s) => s.items).map((i, idx) => [i.key, idx + 1]))
+  const templateKeys = sections.flatMap((s) => s.items).map((i) => i.key)
+  const numbering = new Map([...templateKeys, ...Object.keys(findings).filter((k) => findings[k]?.extra)].map((k, idx) => [k, idx + 1]))
+  const renderControls = (key: string, f: Finding, heading: string, guidance: string) => {
+    const n = numbering.get(key) ?? 0
+    const needsComment = f.result === 'unsatisfactory' || f.needs_clarification
+    const showComment = needsComment || f.comment.trim().length > 0
+    const commentMissing = needsComment && !f.comment.trim()
+    const untitled = f.extra === true && !(f.title ?? '').trim()
+    return (
+      <div className="flex flex-col gap-3.5">
+        <div className="flex items-start gap-3">
+          <span className="font-mono text-[13px] leading-6 text-text-3">{String(n).padStart(2, '0')}</span>
+          <div className="min-w-0 flex-1">
+            {f.extra && !readOnly ? (
+              <Field
+                label={heading}
+                required
+                value={f.title ?? ''}
+                maxLength={120}
+                placeholder="What you found, in a few words"
+                error={untitled ? 'Give the finding a title.' : undefined}
+                onChange={(e) => update(key, { title: e.target.value })}
+              />
+            ) : (
+              <>
+                <h3 className="text-base font-semibold leading-6">{f.extra ? (f.title ?? '') : heading}</h3>
+                {f.extra ? <p className="text-[13px] leading-5 text-text-3">{heading}</p> : null}
+                {guidance ? <p className="text-[13px] leading-5 text-text-3">{guidance}</p> : null}
+              </>
+            )}
+          </div>
+          {f.result === 'not_assessed' ? <StatusBadge label="Not assessed" tone="neutral" /> : null}
+          {f.extra && !readOnly ? (
+            <Button variant="ghost" size="sm" onClick={() => removeExtra(key)}>
+              Remove
+            </Button>
+          ) : null}
+        </div>
+        <div className={cn('flex flex-col gap-3', !compact && 'pl-[34px]')}>
+          <ResultControl value={f.result} disabled={readOnly} compact={compact} onChange={(r) => update(key, { result: r })} />
+          <CheckboxField
+            label="Need further clarification"
+            checked={f.needs_clarification}
+            disabled={readOnly}
+            onChange={(e) => update(key, { needs_clarification: e.target.checked })}
+          />
+          {showComment ? (
+            <TextAreaField
+              label="Comment"
+              required={needsComment}
+              value={f.comment}
+              readOnly={readOnly}
+              maxLength={2000}
+              error={commentMissing ? 'A comment is required for an unsatisfactory or flagged item.' : undefined}
+              help={f.needs_clarification ? 'The operator reads this when the item is flagged.' : undefined}
+              onChange={(e) => update(key, { comment: e.target.value })}
+            />
+          ) : null}
+        </div>
+      </div>
+    )
+  }
   return (
     <>
       <Breadcrumb
@@ -495,58 +675,55 @@ export function ChecklistPage() {
             </div>
             <ol>
               {s.items.map((def) => {
-                const n = numbering.get(def.key) ?? 0
                 const f = findings[def.key]
                 if (!f) return null
-                const needsComment = f.result === 'unsatisfactory' || f.needs_clarification
-                const showComment = needsComment || f.comment.trim().length > 0
-                const commentMissing = needsComment && !f.comment.trim()
                 return (
-                  <li
-                    key={def.key}
-                    id={`item-${def.key}`}
-                    className="flex scroll-mt-24 flex-col gap-3.5 border-b border-line py-5 last:border-b-0"
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="font-mono text-[13px] leading-6 text-text-3">{String(n).padStart(2, '0')}</span>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-base font-semibold leading-6">{def.title}</h3>
-                        {def.guidance ? <p className="text-[13px] leading-5 text-text-3">{def.guidance}</p> : null}
+                  <li key={def.key} id={`item-${def.key}`} className="scroll-mt-24 border-b border-line py-5 last:border-b-0">
+                    {renderControls(def.key, f, def.title, def.guidance)}
+                    {extrasUnder(def.key).length > 0 || !readOnly ? (
+                      <div className={cn('mt-4 flex flex-col gap-3', !compact && 'pl-[34px]')}>
+                        {extrasUnder(def.key).map(([key, extra], i) => (
+                          <div key={key} id={`item-${key}`} className="scroll-mt-24 rounded-md border border-line bg-surface-2 px-4 py-4">
+                            {renderControls(key, extra, `Finding ${i + 2} on this item`, '')}
+                          </div>
+                        ))}
+                        {!readOnly ? (
+                          <Button variant="ghost" size="sm" className="self-start" onClick={() => addExtra(def.key)}>
+                            Add another finding
+                          </Button>
+                        ) : null}
                       </div>
-                      {f.result === 'not_assessed' ? <StatusBadge label="Not assessed" tone="neutral" /> : null}
-                    </div>
-                    <div className={cn('flex flex-col gap-3', !compact && 'pl-[34px]')}>
-                      <ResultControl
-                        value={f.result}
-                        disabled={readOnly}
-                        compact={compact}
-                        onChange={(r) => update(def.key, { result: r })}
-                      />
-                      <CheckboxField
-                        label="Need further clarification"
-                        checked={f.needs_clarification}
-                        disabled={readOnly}
-                        onChange={(e) => update(def.key, { needs_clarification: e.target.checked })}
-                      />
-                      {showComment ? (
-                        <TextAreaField
-                          label="Comment"
-                          required={needsComment}
-                          value={f.comment}
-                          readOnly={readOnly}
-                          maxLength={2000}
-                          error={commentMissing ? 'A comment is required for an unsatisfactory or flagged item.' : undefined}
-                          help={f.needs_clarification ? 'The operator reads this when the item is flagged.' : undefined}
-                          onChange={(e) => update(def.key, { comment: e.target.value })}
-                        />
-                      ) : null}
-                    </div>
+                    ) : null}
                   </li>
                 )
               })}
             </ol>
           </section>
         ))}
+        {extrasUnder(null).length > 0 || !readOnly ? (
+          <section id="section-other" className="scroll-mt-24" aria-labelledby="section-other-title">
+            <div className="pb-1 pt-5">
+              <h2 id="section-other-title" className="text-[17px] font-semibold leading-6">
+                Other findings
+              </h2>
+              <span className="text-xs text-text-3">Anything you saw that the checklist does not name</span>
+            </div>
+            <ol>
+              {extrasUnder(null).map(([key, extra]) => (
+                <li key={key} id={`item-${key}`} className="scroll-mt-24 border-b border-line py-5 last:border-b-0">
+                  {renderControls(key, extra, 'Other finding', '')}
+                </li>
+              ))}
+            </ol>
+            {!readOnly ? (
+              <div className="py-4">
+                <Button variant="secondary" size="sm" onClick={() => addExtra(null)}>
+                  Add a finding
+                </Button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
       </div>
 
       {!readOnly ? (

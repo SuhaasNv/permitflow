@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import BadRequest, Conflict, NotFound, ValidationFailed
 from app.core.settings import get_settings
-from app.domain.checklist_schema import ITEM_BY_KEY
+from app.domain.checklist_schema import ITEM_BY_KEY, item_title
 from app.domain.enums import ApplicationStatus, ClarificationStatus, NotificationKind
 from app.domain.uploads import (
     UploadRejected,
@@ -160,6 +160,10 @@ class ClarificationService:
     ) -> ClarificationItemOut:
         current_round = max(q.round_no for q in released)
         definition = ITEM_BY_KEY.get(item.item_key)
+        parent = ITEM_BY_KEY.get(item.parent_key or "")
+        title = item_title(item.item_key, item.custom_title)
+        if item.is_extra and parent is not None:
+            title = f"{parent.title}: {title}"
         status = item.clarification_status
         answers: list[ClarificationResponseOut] = []
         for q in released:
@@ -188,7 +192,7 @@ class ClarificationService:
         return ClarificationItemOut(
             item_id=item.id,
             key=item.item_key,
-            title=definition.title if definition else item.item_key,
+            title=title,
             guidance=definition.guidance if definition else "",
             status=OPERATOR_WORDS.get(status, ""),
             round_no=current_round,
@@ -467,10 +471,13 @@ class ClarificationService:
         request = self.checklists.request(response.request_id) if response else None
         item = self.checklists.item(request.item_id) if request else None
         checklist = self.checklists.checklist(item.checklist_id) if item else None
-        if response is None or checklist is None or checklist.application_id != app.id:
+        if response is None or item is None or checklist is None or checklist.application_id != app.id:
             raise NotFound("Answer not found.")
         if app.status not in OPERATOR_TURN_STATES:
             raise Conflict("The licensing office is not waiting for your answers right now.")
+        if item.clarification_status != ClarificationStatus.OPEN:
+            # Withdrawn or already decided: the answer's evidence is frozen with its text.
+            raise Conflict("This item is not waiting for your response.")
         return response
 
     # Officer side (US-066) -----------------------------------------------------------------------
@@ -625,7 +632,10 @@ class ClarificationService:
         responses: dict[uuid.UUID, ClarificationResponse],
         attachments: dict[uuid.UUID, list[ClarificationAttachment]],
     ) -> ClarificationThreadOut:
-        definition = ITEM_BY_KEY.get(item.item_key)
+        parent = ITEM_BY_KEY.get(item.parent_key or "")
+        title = item_title(item.item_key, item.custom_title)
+        if item.is_extra and parent is not None:
+            title = f"{parent.title}: {title}"
         status = item.clarification_status
         deciding = app.status == ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED
         withdrawable = app.status in self.OFFICER_TURN_STATES + (
@@ -670,7 +680,7 @@ class ClarificationService:
         return ClarificationThreadOut(
             item_id=item.id,
             key=item.item_key,
-            title=definition.title if definition else item.item_key,
+            title=title,
             result=item.result.value,
             comment=item.comment,
             status=status.value,

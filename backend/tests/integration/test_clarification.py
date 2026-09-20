@@ -541,3 +541,36 @@ def test_reject_mid_round_keeps_the_trail(client: TestClient, db: Session) -> No
     assert mine["can_respond"] is False and mine["items"][0]["responses"][0]["sent_at"] is None
     assert _respond(client, op, app_id, view["items"][0]["item_id"], "Too late.").status_code == 409
     assert transition  # the helper import is used above; keep the walk readable
+
+
+def test_no_evidence_on_a_withdrawn_or_decided_item(client: TestClient, db: Session) -> None:
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from app.domain.enums import ClarificationStatus
+    from app.models import ChecklistItem, ClarificationRequest
+
+    app_id, op, off = _submitted(client, db)
+    view = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    coved = next(i for i in view["items"] if i["key"] == "coved_edges")
+    r = _respond(client, op, app_id, coved["item_id"], "Coving done.")
+    response_id = next(i for i in r.json()["items"] if i["key"] == "coved_edges")["responses"][0]["id"]
+    assert _attach(client, op, app_id, response_id, "before.pdf", PDF).status_code == 201
+    att = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    att_id = next(i for i in att["items"] if i["key"] == "coved_edges")["responses"][0]["attachments"][0][
+        "id"
+    ]
+    item = db.scalar(select(ChecklistItem).where(ChecklistItem.item_key == "coved_edges"))
+    assert item is not None
+    q = db.scalar(select(ClarificationRequest).where(ClarificationRequest.item_id == item.id))
+    assert q is not None
+    q.withdrawn_at = datetime.now(UTC)
+    item.clarification_status = ClarificationStatus.WITHDRAWN
+    db.commit()
+    assert _attach(client, op, app_id, response_id, "after.pdf", PDF + b"after").status_code == 409
+    r = client.delete(
+        f"/api/v1/applications/{app_id}/clarifications/responses/{response_id}/attachments/{att_id}",
+        headers=op,
+    )
+    assert r.status_code == 409
