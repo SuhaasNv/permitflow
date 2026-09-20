@@ -249,7 +249,7 @@ export function ChecklistPage() {
           <div className="mt-2 text-[13px] text-text-3">
             {readOnly
               ? `Submitted by ${draft.submitted_by ?? ''} on ${draft.submitted_at ? formatDateTime(draft.submitted_at) : ''}`
-              : `Draft, not submitted${draft.updated_at ? ` · last saved ${formatDateTime(draft.updated_at)}` : ''}`}
+              : `Draft, not submitted${draft.version > 1 && draft.updated_at ? ` · last saved ${formatDateTime(draft.updated_at)}` : ''}`}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">

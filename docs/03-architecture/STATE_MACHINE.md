@@ -47,7 +47,7 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `site_visit_scheduled` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `site_visit_done` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `site_visit_done` | `awaiting_post_site_clarification` | system | `checklist_complete` (every item assessed, every flagged or unsatisfactory item commented) | The checklist submit service (US-063); the flagged items are released to the operator in the same transaction |
-| `site_visit_done` | `pending_approval` | officer | `checklist_started = false` (transitional, Sprint 4: open only while no checklist exists for the visit; US-063 removes the edge) | Officer clicks Route to approval |
+| `site_visit_done` | `pending_approval` | officer | `checklist_started = false` (transitional: open only while no checklist exists for the current visit; since US-060 `build_context` reads the checklist, so opening one closes this route; US-063 removes the edge) | Officer clicks Route to approval |
 | `awaiting_post_site_clarification` | `post_site_clarification_resubmitted` | operator (owner) | `all_open_items_answered` | Operator clicks Send responses (round 1, US-065) |
 | `awaiting_post_site_clarification` | `pending_approval` | officer | no item `open` or `answered` | Officer clicks Route to approval (a checklist with nothing flagged, or everything withdrawn) |
 | `awaiting_post_site_clarification` | `rejected` | officer | `has_note` | Officer clicks Reject (US-079) |

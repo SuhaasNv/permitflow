@@ -2,6 +2,13 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-060 Checklist template, model and draft (20 Sep 2026, Sprint 5 started)
+
+- `GET /checklist-schema` (officers and admins): seventeen items in five sections, versioned in code, grounded in SFA's public Food Shop self-checklist and saying it is not an SFA document. `Checklist` and `ChecklistItem` (migration 0007): one per visit number, every item present from creation.
+- `POST …/checklist` creates the current visit's draft under the row lock (201) or returns it (200), 409 outside the site-visit states, audited `checklist.created`; `GET` with `?visit=n`; `PUT` saves the whole list against the template with an optimistic version (409 with the current content) and a replayable `save_id`; no audit row per save. `checklist_started` now reads the checklist, so the transitional route from Site Visit Done to approval closes once one exists. The queue says Open or Continue the checklist; the case rail carries the summary card.
+- `ChecklistPage` (S-30): section chips with counts, progress line, a result control per item (label plus dot, stretched below 1100 px), the clarification flag, a comment when one is needed with the required-comment message, a sticky card with what still blocks a submit, Save draft with "Saved just now", a version-conflict banner with Keep my entries or Take theirs. CORS preflight now allows PUT.
+- Tests: 5 backend (schema, create-or-get and the closed route, the two-tab race, the save rules, authorization) + the preflight; 5 vitest; `08-checklist.spec.ts`; axe at 1024, 820 and 390.
+
 ## US-084 Site visit appointment (20 Sep 2026, Sprint 4, pulled forward from Sprint 5)
 
 - The date is arranged inside the case (FR-043, ADR-013): Mark site visit scheduled opens a proposal dialog (date, slot, note) and `POST /officer/applications/{id}/site-visit` moves the case and records the proposal in one transaction; the operator accepts (with a confirmation) or proposes another date with a reason; the officer accepts the operator's date, keeps the one on the table or proposes a third; either side may ask to move a confirmed visit before its date; the officer may confirm a proposal left unanswered for three working days (never later than the visit); at most six proposals per visit, then only accept or keep; Mark site visit done only once confirmed. No new application status.
