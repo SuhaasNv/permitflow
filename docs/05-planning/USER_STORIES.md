@@ -138,6 +138,8 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Priority: Nice-to-have · Sprint 8 · Dependencies: US-079 · Readiness row 22
 - Definition of Done: readiness row 22 closed; vitest cases for each branch.
 
+### US-091 — As an officer reviewing clarification photos, I want the automatic check to say whether a photo shows what was asked, so that I can read the evidence faster. — Parked for v0.5.0 (decided 20 Sep 2026): a vision prompt behind the same provider interface, a golden set of photos, image tokens counted in the quota, after EXIF stripping (US-085) and a downscale; the officer decides, as with every check.
+
 ### US-085 — As the platform owner, I want attachment limits, a storage budget per application and image metadata stripped on upload, so that the new upload path cannot fill the volume or leak what a phone camera wrote.
 - Acceptance criteria: a fourth file on a response is 422 `attachment_cap`; the sum of documents, licence and attachments per application is capped at 150 MB (422 `storage_budget` naming the remaining room; the operator page shows it before the upload); JPG and PNG uploads are re-written without metadata (EXIF, XMP, ICC kept only for colour) with Pillow before the storage key is written, the `sha256` computed on the stored bytes, and a test proves GPS tags are gone; the per-file rules stay the document rules (allowlist, magic bytes, 10 MB); `OPERATIONS.md` states the volume size and the budget.
 - Priority: MVP · Sprint 6 (with US-065) · Dependencies: US-065 · Requirements: NFR-009, NFR-010, SEC-005 · Threat model T25
