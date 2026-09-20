@@ -2,6 +2,7 @@ from app.models.application import Application, ApplicationRevision
 from app.models.audit import AuditEvent
 from app.models.base import Base
 from app.models.checklist import Checklist, ChecklistItem
+from app.models.clarification import ClarificationRequest
 from app.models.document import Document, VerificationRun
 from app.models.feedback import Feedback
 from app.models.licence import Licence
@@ -20,6 +21,7 @@ __all__ = [
     "Notification",
     "Checklist",
     "ChecklistItem",
+    "ClarificationRequest",
     "SiteVisit",
     "SiteVisitProposal",
     "User",

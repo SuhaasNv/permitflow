@@ -2,6 +2,12 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-062 and US-063 Flag rule and checklist submit (20 Sep 2026, Sprint 5)
+
+- `POST …/checklist/submit`: every item assessed and every unsatisfactory or flagged item commented (422 naming the keys); from Site Visit Scheduled the officer hop to Site Visit Done is recorded first, then the system hop to Awaiting Post-Site Clarification; findings frozen; a released round-1 `ClarificationRequest` per flagged item (migration 0008); audit `checklist.submitted` between the two `status.changed`; one operator notification with the count ("needs more information on 2 items" or "nothing is needed from you"). The transitional route from Site Visit Done straight to approval is gone: every case reaches approval through the checklist, and the backend suites, the edge script (group CK, 233 checks) and the Playwright journey walk that way.
+- Page: the submit dialog lists the flagged items by title and the counts; a 422 scrolls to the first named item; after submit the page is read-only and the case card says Submitted with a View checklist link; the operator's status sentence names the count. Audit families Checklist and Clarification in the trail.
+- Fixed on the way: two taps faster than a React commit could lose an entry (the save path now reads synchronous refs).
+
 ## US-061 Checklist autosave, retry, offline and merge (20 Sep 2026, Sprint 5)
 
 - The draft autosaves 1.5 s after the last touch and on leaving the list; Save draft goes at once. A failed save keeps the entries and retries with backoff (3, 6, 12, 24 s, then every 30 s) under "Could not save, retrying"; while offline a banner says so and the save goes the moment the connection returns; a stale version takes the other tab's copy with the officer's touched items kept on top and saves again, with a notice. Pressing a selected result again clears it. `SaveIndicator` gained the retrying tone.

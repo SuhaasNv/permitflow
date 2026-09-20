@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import type { Checklist, ChecklistItem, ChecklistItemInput, ChecklistResult } from '@/api/checklist'
 import { AppError } from '@/api/client'
@@ -7,6 +7,7 @@ import { Alert } from '@/features/shared/Alert'
 import { Breadcrumb } from '@/features/shared/Breadcrumb'
 import { Button, buttonClasses } from '@/features/shared/Button'
 import { CheckboxField, TextAreaField } from '@/features/shared/Controls'
+import { Dialog } from '@/features/shared/Dialog'
 import { SaveIndicator } from '@/features/shared/SaveIndicator'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
@@ -14,7 +15,7 @@ import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { formatDateTime } from '@/lib/format'
 import { guardUnload, setUnsaved } from '@/lib/unsaved'
-import { useChecklist, useChecklistSchema, useOfficerApplication, useSaveChecklist } from './queries'
+import { useChecklist, useChecklistSchema, useOfficerApplication, useSaveChecklist, useSubmitChecklist } from './queries'
 
 const RESULTS: { value: ChecklistResult; label: string; on: string }[] = [
   { value: 'satisfactory', label: 'Satisfactory', on: 'border-success-line bg-success-soft text-success' },
@@ -154,26 +155,28 @@ export function ChecklistPage() {
   const schema = useChecklistSchema()
   const checklist = useChecklist(id)
   const save = useSaveChecklist(id)
+  const submit = useSubmitChecklist(id)
+  const navigate = useNavigate()
   const toast = useToast()
+  const [confirming, setConfirming] = useState(false)
   // The working copy is the server draft until the officer touches it, then the officer's edits only.
+  // State renders; the refs beside it are written synchronously in the handlers so a timer or a blur
+  // that fires between two fast taps reads what was tapped, never what was last committed.
   const [edits, setEdits] = useState<Findings | null>(null)
-  const [savedVersion, setSavedVersion] = useState<number | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [dirty, setDirty] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [merged, setMerged] = useState<number | null>(null)
   const compact = useMediaQuery('(max-width: 1099px)')
   const online = useOnline()
-  // The timers and the latest values they read: a scheduled save must send what is on screen now.
   const timer = useRef<number | null>(null)
   const attempt = useRef(0)
   const touched = useRef<Set<string>>(new Set())
-  const latest = useRef<{ findings: Findings | null; version: number | null; dirty: boolean; saving: boolean }>({
-    findings: null,
-    version: null,
-    dirty: false,
-    saving: false,
-  })
+  const work = useRef<Findings | null>(null) // the edits, synchronous
+  const server = useRef<Checklist | null>(null) // the last draft the server sent
+  const versionRef = useRef<number | null>(null) // the version the next save is based on
+  const dirtyRef = useRef(false)
+  const inFlight = useRef(false)
 
   useEffect(() => guardUnload(), [])
   useEffect(
@@ -183,18 +186,27 @@ export function ChecklistPage() {
     },
     [],
   )
+  useEffect(() => {
+    if (checklist.data) {
+      server.current = checklist.data
+      if (versionRef.current === null) versionRef.current = checklist.data.version
+    }
+  }, [checklist.data])
 
   const findings = useMemo(() => edits ?? (checklist.data ? findingsOf(checklist.data.items) : null), [edits, checklist.data])
   const summary = useMemo(() => (findings ? summarise(findings) : null), [findings])
-  const version = savedVersion ?? checklist.data?.version ?? null
-  const saving = save.isPending
-  // Mirrored after every commit so a timer fired later reads what is on screen, not a stale closure.
-  useEffect(() => {
-    latest.current = { findings, version, dirty, saving }
-  }, [findings, version, dirty, saving])
 
-  // Plain functions on purpose: a timer runs the flush of the render that scheduled it, and that flush
-  // reads everything that can change from `latest`, so it always sends what is on screen.
+  const setVersion = (v: number) => {
+    versionRef.current = v
+  }
+  const markDirty = (value: boolean) => {
+    dirtyRef.current = value
+    setDirty(value)
+    setUnsaved(value)
+  }
+  const current = (): Findings | null => work.current ?? (server.current ? findingsOf(server.current.items) : null)
+
+  // Plain functions on purpose: everything they read lives in refs written by the handlers.
   const schedule = (delay: number) => {
     if (timer.current !== null) window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
@@ -203,15 +215,20 @@ export function ChecklistPage() {
     }, delay)
   }
   const flush = () => {
-    const now = latest.current
-    if (!now.findings || now.version === null || !now.dirty || now.saving) return
+    const items = current()
+    const version = versionRef.current
+    if (!items || version === null || !dirtyRef.current || inFlight.current) return
     if (!navigator.onLine) return // the online event schedules the save
     const sent = new Set(touched.current)
+    inFlight.current = true
     save.mutate(
-      { items: toInput(now.findings), version: now.version, save_id: crypto.randomUUID() },
+      { items: toInput(items), version, save_id: crypto.randomUUID() },
       {
+        onSettled: () => {
+          inFlight.current = false
+        },
         onSuccess: (next) => {
-          setSavedVersion(next.version)
+          setVersion(next.version)
           setSavedAt(Date.now())
           setRetrying(false)
           attempt.current = 0
@@ -220,17 +237,18 @@ export function ChecklistPage() {
             // Touched again while the save was in flight: still dirty, save once more.
             schedule(AUTOSAVE_DELAY_MS)
           } else {
-            setDirty(false)
-            setUnsaved(false)
+            markDirty(false)
           }
         },
         onError: (e) => {
           if (e instanceof AppError && e.status === 409 && e.code === 'version_conflict') {
-            const current = e.details?.current
-            if (current && typeof current === 'object') {
-              const theirs = current as Checklist
-              setEdits(mergeFindings(findingsOf(theirs.items), latest.current.findings ?? {}, touched.current))
-              setSavedVersion(theirs.version)
+            const theirs = e.details?.current
+            if (theirs && typeof theirs === 'object') {
+              const other = theirs as Checklist
+              const mergedCopy = mergeFindings(findingsOf(other.items), current() ?? {}, touched.current)
+              work.current = mergedCopy
+              setEdits(mergedCopy)
+              setVersion(other.version)
               setMerged(touched.current.size)
               schedule(0)
             }
@@ -252,7 +270,7 @@ export function ChecklistPage() {
   // Back online with unsaved entries: save at once.
   const wasOnline = useRef(true)
   useEffect(() => {
-    if (online && !wasOnline.current && latest.current.dirty) schedule(0)
+    if (online && !wasOnline.current && dirtyRef.current) schedule(0)
     wasOnline.current = online
     // eslint-disable-next-line react-hooks/exhaustive-deps -- schedule is a plain function reading refs
   }, [online])
@@ -293,11 +311,44 @@ export function ChecklistPage() {
   const sections = schema.data.sections
   const readOnly = draft.status === 'submitted'
 
+  const doSubmit = () => {
+    submit.mutate(undefined, {
+      onSuccess: () => {
+        setConfirming(false)
+        markDirty(false)
+        toast.push({
+          title: 'Checklist submitted',
+          body:
+            summary.flagged > 0
+              ? `The operator has been asked about ${summary.flagged} ${summary.flagged === 1 ? 'item' : 'items'}.`
+              : 'Nothing was flagged. The case can be routed to approval.',
+          tone: 'success',
+        })
+        navigate(`/officer/applications/${id}`)
+      },
+      onError: (e) => {
+        setConfirming(false)
+        if (e instanceof AppError && e.status === 422) {
+          const keys = e.details?.items
+          const first = Array.isArray(keys) && typeof keys[0] === 'string' ? keys[0] : null
+          if (first) document.getElementById(`item-${first}`)?.scrollIntoView({ block: 'center' })
+        }
+        toast.push({ title: 'Could not submit the checklist', body: e.message, tone: 'error' })
+      },
+    })
+  }
+  const flaggedTitles = sections
+    .flatMap((s) => s.items)
+    .filter((i) => findings[i.key]?.needs_clarification)
+    .map((i) => i.title)
   const update = (key: string, patch: Partial<Findings[string]>) => {
-    setEdits({ ...findings, [key]: { ...findings[key], ...patch } })
+    // Two taps in one frame must both land (a tablet taps faster than React commits): the ref is the truth.
+    const base = current() ?? findings
+    const next = { ...base, [key]: { ...base[key], ...patch } }
+    work.current = next
+    setEdits(next)
     touched.current.add(key)
-    setDirty(true)
-    setUnsaved(true)
+    markDirty(true)
     schedule(AUTOSAVE_DELAY_MS)
   }
   const numbering = new Map(sections.flatMap((s) => s.items).map((i, idx) => [i.key, idx + 1]))
@@ -418,7 +469,7 @@ export function ChecklistPage() {
         className="pf-surface px-5"
         onBlur={(e) => {
           // Leaving the list saves at once; moving between fields inside it waits for the debounce.
-          if (!readOnly && latest.current.dirty && !e.currentTarget.contains(e.relatedTarget)) schedule(0)
+          if (!readOnly && dirtyRef.current && !e.currentTarget.contains(e.relatedTarget)) schedule(0)
         }}
       >
         {sections.map((s) => (
@@ -440,7 +491,11 @@ export function ChecklistPage() {
                 const showComment = needsComment || f.comment.trim().length > 0
                 const commentMissing = needsComment && !f.comment.trim()
                 return (
-                  <li key={def.key} className="flex flex-col gap-3.5 border-b border-line py-5 last:border-b-0">
+                  <li
+                    key={def.key}
+                    id={`item-${def.key}`}
+                    className="flex scroll-mt-24 flex-col gap-3.5 border-b border-line py-5 last:border-b-0"
+                  >
                     <div className="flex items-start gap-3">
                       <span className="font-mono text-[13px] leading-6 text-text-3">{String(n).padStart(2, '0')}</span>
                       <div className="min-w-0 flex-1">
@@ -495,12 +550,43 @@ export function ChecklistPage() {
             <Button variant="secondary" loading={save.isPending} disabled={!dirty} onClick={() => schedule(0)}>
               Save draft
             </Button>
-            <Button disabled title={summary.remaining ?? 'Submitting the checklist arrives with the next update.'}>
-              Mark visit done and submit
+            <Button
+              disabled={summary.remaining !== null || dirty || save.isPending}
+              title={summary.remaining ?? (dirty || save.isPending ? 'Wait for the draft to save.' : undefined)}
+              onClick={() => setConfirming(true)}
+            >
+              {view.status === 'site_visit_done' ? 'Submit checklist' : 'Mark visit done and submit'}
             </Button>
           </div>
         </div>
       ) : null}
+      <Dialog
+        open={confirming}
+        title={view.status === 'site_visit_done' ? 'Submit the checklist?' : 'Mark the visit done and submit the checklist?'}
+        confirmLabel="Submit"
+        busy={submit.isPending}
+        onConfirm={doSubmit}
+        onCancel={() => setConfirming(false)}
+      >
+        <p>
+          The findings become final and the case moves on.{' '}
+          {flaggedTitles.length > 0
+            ? `The operator is asked about ${flaggedTitles.length} flagged ${flaggedTitles.length === 1 ? 'item' : 'items'} and reads your comment on each:`
+            : 'Nothing is flagged: the operator is told the visit is recorded and you can route the case to approval.'}
+        </p>
+        {flaggedTitles.length > 0 ? (
+          <ul className="list-disc pl-5">
+            {flaggedTitles.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        ) : null}
+        <p className="text-text-3">
+          {summary.assessed} items assessed: {summary.total - Object.values(findings).filter((f) => f.result !== 'satisfactory').length}{' '}
+          satisfactory, {Object.values(findings).filter((f) => f.result === 'unsatisfactory').length} unsatisfactory,{' '}
+          {Object.values(findings).filter((f) => f.result === 'not_applicable').length} not applicable.
+        </p>
+      </Dialog>
     </>
   )
 }

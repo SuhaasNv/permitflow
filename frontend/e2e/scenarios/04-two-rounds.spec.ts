@@ -12,6 +12,7 @@ import {
   signIn,
   signOut,
   status,
+  submitCleanChecklist,
 } from '../helpers.js'
 
 /** Workflow 4: two consecutive resubmission rounds, each compared and resolved, then the outcome. */
@@ -85,14 +86,11 @@ test('two resubmission rounds: fix, resubmit, compare, resolve, again, then appr
   await expect(page.getByRole('button', { name: 'Mark site visit done' })).toBeDisabled()
   await acceptVisit(app.id)
   await page.reload()
-  for (const [action, confirm] of [
-    ['Mark site visit done', 'Mark done'],
-    ['Route to approval', 'Route to approval'],
-  ] as const) {
-    await page.getByRole('button', { name: action }).click()
-    await confirmDialog(page, confirm)
-    await page.waitForTimeout(300)
-  }
+  // The checklist is the record of the visit and the only way on (US-060 to US-063).
+  await submitCleanChecklist(page)
+  await page.getByRole('button', { name: 'Route to approval' }).click()
+  await page.locator('dialog[open]').getByRole('button', { name: 'Route to approval' }).click()
+  await expect(status(page)).toHaveText('Route to Approval')
   await page.getByRole('button', { name: 'Approve' }).click()
   await confirmDialog(page, 'Approve')
   await expect(status(page)).toHaveText('Approved')

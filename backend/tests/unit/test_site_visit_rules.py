@@ -110,3 +110,25 @@ def test_midnight_in_singapore_not_utc() -> None:
         )
         is not None
     )
+
+
+def test_checklist_audit_summaries_read_as_sentences() -> None:
+    from app.domain.audit_labels import summarize
+
+    assert (
+        summarize("checklist.created", {"visit_no": 1, "items": 17})
+        == "Checklist opened for visit 1 (17 items)"
+    )
+    assert summarize(
+        "checklist.submitted",
+        {
+            "visit_no": 1,
+            "satisfactory": 14,
+            "unsatisfactory": 2,
+            "not_applicable": 1,
+            "flagged_keys": ["a", "b"],
+        },
+    ) == (
+        "Checklist submitted for visit 1: 14 satisfactory, 2 unsatisfactory, 1 not applicable, "
+        "2 flagged for clarification"
+    )

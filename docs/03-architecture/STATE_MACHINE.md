@@ -46,8 +46,7 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `site_visit_scheduled` | `site_visit_done` | officer | `visit_confirmed` (the current SiteVisit is `confirmed`: the operator accepted, the officer decided a counter, or confirmed after three working days of silence; US-084) | Officer clicks Mark site visit done; the visit row becomes `done` in the same transaction |
 | `site_visit_scheduled` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `site_visit_done` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
-| `site_visit_done` | `awaiting_post_site_clarification` | system | `checklist_complete` (every item assessed, every flagged or unsatisfactory item commented) | The checklist submit service (US-063); the flagged items are released to the operator in the same transaction |
-| `site_visit_done` | `pending_approval` | officer | `checklist_started = false` (transitional: open only while no checklist exists for the current visit; since US-060 `build_context` reads the checklist, so opening one closes this route; US-063 removes the edge) | Officer clicks Route to approval |
+| `site_visit_done` | `awaiting_post_site_clarification` | system | `checklist_complete` (the current visit's checklist is submitted: every item assessed, every flagged or unsatisfactory item commented, checked by the submit) | The checklist submit service (US-063, built): from `site_visit_scheduled` the officer hop is recorded first; the flagged items' round-1 requests are released in the same transaction; the transitional route straight to approval was removed with this story |
 | `awaiting_post_site_clarification` | `post_site_clarification_resubmitted` | operator (owner) | `all_open_items_answered` | Operator clicks Send responses (round 1, US-065) |
 | `awaiting_post_site_clarification` | `pending_approval` | officer | no item `open` or `answered` | Officer clicks Route to approval (a checklist with nothing flagged, or everything withdrawn) |
 | `awaiting_post_site_clarification` | `rejected` | officer | `has_note` | Officer clicks Reject (US-079) |
@@ -128,6 +127,7 @@ Terminal states: `approved`, `rejected`, `withdrawn`.
 | `→ pending_pre_site_resubmission` | set `released_to_operator_at` on every `open` feedback item (audit `feedback.released`); audit `status.changed`; notify operator |
 | any officer or system transition | audit `status.changed` (`trigger` = `officer` or `system`, the acting user as actor); the operator is notified `status_changed` with the operator label for every target in `WorkflowService.NOTIFY_OPERATOR` (every officer or system target); the caller may pass the body when it carries facts the service does not know (the count of flagged items at checklist submit) |
 | `→ site_visit_done` | mark the current SiteVisit `done` (`done_at`); the appointment stays readable on both sides (US-084) |
+| `→ awaiting_post_site_clarification` (system, from the checklist submit) | checklist `submitted` with `submitted_by`, `submitted_at`; a released round-1 `ClarificationRequest` per flagged item and the item `open`; audit `checklist.submitted` then `status.changed` (`trigger = system`); one operator notification with the count (US-063) |
 | `→ approved` / `→ rejected` | store `decision_note` (the `status.changed` audit payload carries `has_note`); on approval, issue the licence and audit `licence.issued` (ADR-010) |
 
 ## Built (Sprint 2; the post-site edges amended in Sprint 4, US-079)

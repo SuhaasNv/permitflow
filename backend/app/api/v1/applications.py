@@ -18,6 +18,7 @@ from app.schemas.applications import (
 from app.schemas.compare import CompareOut
 from app.schemas.site_visit import SiteVisitCounterIn, SiteVisitRescheduleIn
 from app.services.applications import ApplicationService
+from app.services.checklist import ChecklistService
 from app.services.compare import CompareService
 from app.services.documents import DocumentService, content_disposition
 from app.services.draft_deletion import DraftDeletionService
@@ -50,6 +51,7 @@ def _view(service: ApplicationService, app: Application) -> ApplicationOperatorV
         ],
         licence=licence_view(LicenceService(service.db).for_application(app.id)),
         site_visit=SiteVisitService(service.db).operator_view(app),
+        open_clarifications=ChecklistService(service.db).facts(app).open_clarifications,
     )
 
 

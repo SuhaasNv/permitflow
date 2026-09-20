@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
-import { acceptVisit, proposeVisit } from './helpers.js'
+import { acceptVisit, proposeVisit, status, submitCleanChecklist } from './helpers.js'
 
 const PASSWORD = process.env.SEED_PASSWORD ?? 'PermitFlow!2026'
 const OPERATOR = 'operator@permitflow.example.sg'
@@ -162,14 +162,11 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
   await expect(page.getByRole('button', { name: 'Mark site visit done' })).toBeDisabled()
   await acceptVisit(appUrl.split('/').pop() ?? '')
   await page.reload()
-  for (const [action, confirm] of [
-    ['Mark site visit done', 'Mark done'],
-    ['Route to approval', 'Route to approval'],
-  ] as const) {
-    await page.getByRole('button', { name: action }).click()
-    await page.locator('dialog[open]').getByRole('button', { name: confirm }).click()
-    await page.waitForTimeout(300)
-  }
+  // The checklist is the record of the visit and the only way on (US-060 to US-063).
+  await submitCleanChecklist(page)
+  await page.getByRole('button', { name: 'Route to approval' }).click()
+  await page.locator('dialog[open]').getByRole('button', { name: 'Route to approval' }).click()
+  await expect(status(page)).toHaveText('Route to Approval')
   await page.getByRole('link', { name: 'Preview licence' }).click()
   await expect(page.getByRole('heading', { name: 'Licence preview' })).toBeVisible()
   await expect(page.locator('object[type="application/pdf"]')).toBeVisible()

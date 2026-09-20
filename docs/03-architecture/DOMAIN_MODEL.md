@@ -14,7 +14,7 @@ User 1───* Application 1───* ApplicationRevision
                  ├───* AuditEvent (append-only)
                  ├───1 Licence (one per approved application, US-051)
                  ├───* SiteVisit 1───* SiteVisitProposal (the appointment and its rounds, US-084)
-                 └───* Checklist 1───* ChecklistItem (the inspection record per visit, US-060)
+                 └───* Checklist 1───* ChecklistItem 1───* ClarificationRequest (the record per visit and its threads, US-060, US-063)
 ```
 
 ## Entities
@@ -251,6 +251,21 @@ One template item on one checklist; every key of the template is present from cr
 | resolved_by_id, resolved_at | | |
 
 The template (`GET /checklist-schema`) is static in code and versioned like the form schema: seventeen items in five sections (Premises, Kitchen, Storage, Upkeep, People), each with a key, a title, one line of guidance and `applicable_by_default`. It follows the Singapore Food Agency's public Food Shop pre-licensing self-checklist and says in its own description that it is not an SFA document.
+
+### ClarificationRequest
+
+The officer's question on one flagged item, one row per round (US-063 to US-066). Round 1 is created and released when the checklist is submitted, with the officer's comment as its message; later rounds come from "Still needs clarification" and are released by "Request another round".
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | |
+| item_id | FK ChecklistItem | |
+| round_no | int | 1 at submit, then increments per item |
+| author_id | FK User | the officer |
+| message | text, max 2000 | |
+| released_at | datetime, nullable | the operator sees the request only once released |
+| withdrawn_at | datetime, nullable | |
+| created_at | datetime | |
 
 ### CommentTemplate (static configuration, not a table)
 `{key, target_type, title, body}` defined in `domain/feedback_templates.py` and served by `GET /officer/feedback-templates` (officers only). Templates are data, not code, so they can move to a table later without API change.

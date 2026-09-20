@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Checklist, ChecklistItem
+from app.models import Checklist, ChecklistItem, ClarificationRequest
 
 
 class ChecklistRepository:
@@ -55,5 +55,16 @@ class ChecklistRepository:
         )
         return list(self.db.scalars(stmt))
 
-    def add(self, row: Checklist | ChecklistItem) -> None:
+    def requests_for_items(self, item_ids: Iterable[uuid.UUID]) -> list[ClarificationRequest]:
+        ids = list(item_ids)
+        if not ids:
+            return []
+        stmt = (
+            select(ClarificationRequest)
+            .where(ClarificationRequest.item_id.in_(ids))
+            .order_by(ClarificationRequest.item_id, ClarificationRequest.round_no)
+        )
+        return list(self.db.scalars(stmt))
+
+    def add(self, row: Checklist | ChecklistItem | ClarificationRequest) -> None:
         self.db.add(row)
