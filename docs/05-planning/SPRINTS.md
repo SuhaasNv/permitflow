@@ -173,6 +173,7 @@ The plan, its reviews and every design decision: `RELEASE_PLAN_V0_4_0.md`. All w
 | Story | Title (short) | Priority |
 |-------|---------------|----------|
 | US-084 | Site visit appointment: date and slot proposed by the officer, accepted or countered by the operator, confirmed, rescheduled; done only once confirmed (added 20 Sep, owner's product decision) | MVP |
+| US-090 | Singapore time for every new date; working-day rules tested around midnight (NFR-016) | MVP |
 | US-060 | Checklist schema, model (one per visit), migration, `POST` to create, capture screen at 820 and 1024 | MVP |
 | US-061 | Idempotent draft autosave, saved and retrying states, offline banner, conflict merge | MVP |
 | US-062 | "Need further clarification" per item with a required comment | MVP |
@@ -195,6 +196,8 @@ The plan, its reviews and every design decision: `RELEASE_PLAN_V0_4_0.md`. All w
 |-------|---------------|----------|
 | US-065 | Responses with attachments (camera on phones); Send responses with its guard | MVP |
 | US-066 | Rounds: review, clarified, still needs clarification, another round, per-item trail, history, notifications | MVP |
+| US-085 | Attachment cap, 150 MB storage budget per application, image metadata stripped (NFR-009, NFR-010) | MVP |
+| US-087 | Poor-connection behaviour: retry with backoff, offline notice, nothing lost; phone performance budget (NFR-012, NFR-013) | MVP |
 | US-042 (extension) | `07-site-visit.spec.ts`; a11y states; `uat_edges.py` additions and the officer-only label check live | MVP |
 | V23 | Thumbnails in the thread | Nice-to-have |
 
@@ -212,7 +215,8 @@ The plan, its reviews and every design decision: `RELEASE_PLAN_V0_4_0.md`. All w
 | US-072 | Activity feed and read-only case (six code sites) | Nice-to-have |
 | US-073 | User directory with protected accounts; seeded admin and spare officer | Nice-to-have |
 | US-042 (extension) | `08-admin.spec.ts`; a11y states for the four admin screens | Nice-to-have |
-| V16 | Post-site states on the dashboard and in `/queue`, two counters | Nice-to-have |
+| US-088 | Accessibility gate over the eight new screens, 44 px targets, keyboard checklist (NFR-015) | MVP |
+| US-089 | Use case 3 and storage on the dashboard, volume alert, `/queue` post-site counts (NFR-014, NFR-017; was V16) | Nice-to-have |
 
 **Exit criteria:** sprint DoD; authorization matrix for every `/admin` route and every officer GET route; the two-admins concurrency test deterministic; `THREAT_MODEL.md` T19 as built; readiness row 15 updated.
 
@@ -225,6 +229,7 @@ The plan, its reviews and every design decision: `RELEASE_PLAN_V0_4_0.md`. All w
 | Story | Title (short) | Priority |
 |-------|---------------|----------|
 | US-080 | UAT U13 to U18 on development; readiness, traceability, final review addendum, README, SCOPE, CHANGELOG, RELEASE_NOTES, docs index, `AI_USAGE.md` appendix | MVP |
+| US-086 | Latency budgets under load: k6 against a seeded scratch database, indexes, numbers recorded (NFR-008, NFR-011) | MVP |
 | US-083 | Officer `phase`, `outcome`, `can_resolve` (readiness row 22) | Nice-to-have |
 | US-081 | Release v0.4.0 (release plan section 9), on the owner's go, at any later date | release checklist |
 

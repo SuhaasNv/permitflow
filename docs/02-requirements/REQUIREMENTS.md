@@ -63,6 +63,17 @@ Scope status per requirement is tracked in `SCOPE.md` and, at the end, in `docs/
 | NFR-005 | Configuration is via environment variables with documented defaults; no secrets in the repository. (SUB) |
 | NFR-006 | The application is deployable to Railway (backend + Postgres + static frontend) with a health endpoint. |
 | NFR-007 | Structured logs include request id, user id (when authenticated), route, status and duration; AI calls log latency and outcome. |
+| NFR-008 | Checklist draft saves answer in under 300 ms at p95 at MVP volume (a save is one document of at most 32 KB: seventeen items, comments of at most 2,000 characters); the client sends one save per pause of 1.5 s, never one per keystroke. (v0.4.0, US-086) |
+| NFR-009 | Attachment limits: one file at most 10 MB (the document rule), three files per clarification response, and a storage budget of 150 MB per application across documents, licence and attachments, refused with 422 `storage_budget` and a sentence the operator can act on. Images (JPG, PNG) are stored as uploaded; no server-side downscaling in v0.4.0. (v0.4.0, US-085) |
+| NFR-010 | Uploaded images carry no metadata: EXIF (GPS, device, timestamps) is stripped on the server before the file is stored, since an officer downloads what a phone camera wrote. (v0.4.0, US-085) |
+| NFR-011 | Admin read endpoints answer in under 500 ms at p95 with 10,000 applications and 100,000 audit rows (indexes on `audit_events (application_id, created_at)` and `verification_runs (started_at)`; the activity feed by keyset, never `OFFSET`). (v0.4.0, US-086) |
+| NFR-012 | Poor connections: a failed checklist save or attachment upload retries with backoff (1 s, 2 s, 4 s, up to 30 s); the offline notice appears within a second of the browser reporting `offline`; nothing typed is lost while the tab stays open. (v0.4.0, US-087) |
+| NFR-013 | Phone performance for the operator's respond page: first contentful paint under 2.5 s on a throttled 4G profile; the page's JavaScript under 250 KB gzipped; uploads show progress. (v0.4.0, US-087) |
+| NFR-014 | Storage is observed: a `permitflow_storage_bytes` gauge by kind (documents, licences, attachments) on `/metrics`, an alert at 80 % of the Railway volume, and the volume size written in `OPERATIONS.md`. (v0.4.0, US-089) |
+| NFR-015 | The eight new screens pass the accessibility gate (WCAG 2.2 AA plus best practice, axe-core) in CI, every touch target on the checklist and the respond page is at least 44 px, and the checklist is workable by keyboard (Tab through the items, Space to pick a result). (v0.4.0, US-088) |
+| NFR-016 | Every date the site visit, the checklist and the admin screens show is in Singapore time (Asia/Singapore) and stored in UTC; "today" and "idle" on the admin overview are Singapore calendar days. (v0.4.0, US-090) |
+| NFR-017 | Use case 3 is observable: counters for checklists submitted, clarification rounds requested and attachment bytes stored, a dashboard row generated from the same script as the rest, and the post-site states in the Telegram `/queue` reply. (v0.4.0, US-089) |
+| NFR-018 | Audit growth is bounded: no audit row per draft save; the activity feed is read in pages of 50 by keyset; the audit table's indexes carry the admin queries. (v0.4.0; covered by US-061, US-072, US-086) |
 
 ## 3. Security requirements
 
