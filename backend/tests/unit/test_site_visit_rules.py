@@ -86,3 +86,27 @@ def test_reply_deadline_never_falls_after_the_visit() -> None:
     assert reply_deadline(proposed) == date(2026, 9, 23)
     assert reply_deadline(proposed, date(2026, 9, 22)) == date(2026, 9, 22)
     assert reply_deadline(proposed, date(2026, 10, 2)) == date(2026, 9, 23)
+
+
+def test_midnight_in_singapore_not_utc() -> None:
+    """Singapore is UTC+8: 16:00 UTC is already the next calendar day there (NFR-016, US-090)."""
+    assert today_in_singapore(datetime(2026, 9, 21, 15, 59, tzinfo=UTC)) == date(2026, 9, 21)
+    assert today_in_singapore(datetime(2026, 9, 21, 16, 0, tzinfo=UTC)) == date(2026, 9, 22)
+    # a proposal at 23:30 Friday in Singapore counts from Friday; one at 00:30 Saturday from Saturday
+    friday_late = datetime(2026, 9, 25, 15, 30, tzinfo=UTC)
+    saturday_early = datetime(2026, 9, 25, 16, 30, tzinfo=UTC)
+    assert reply_deadline(friday_late) == date(2026, 9, 30)
+    assert reply_deadline(saturday_early) == date(2026, 9, 30)  # Saturday start counts from Monday
+    # the operator's "too soon" rule uses the Singapore date: a Tuesday counter made late Sunday SGT
+    assert (
+        date_problem(
+            date(2026, 9, 22), today_in_singapore(datetime(2026, 9, 20, 15, 0, tzinfo=UTC)), by_operator=True
+        )
+        is None
+    )
+    assert (
+        date_problem(
+            date(2026, 9, 22), today_in_singapore(datetime(2026, 9, 20, 16, 0, tzinfo=UTC)), by_operator=True
+        )
+        is not None
+    )

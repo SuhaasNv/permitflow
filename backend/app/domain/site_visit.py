@@ -31,7 +31,7 @@ REPLY_WORKING_DAYS = 3
 # Proposals per visit, both sides together, reschedules included. At the cap only the closing moves remain:
 # the operator accepts, the officer accepts the operator's date or keeps the original.
 MAX_ROUNDS = 6
-ROUND_LIMIT_REASON = "Round limit reached: accept or keep a date."
+ROUND_LIMIT_REASON = "No more dates can be proposed for this visit."
 
 
 def rounds_left(proposal_count: int) -> int:

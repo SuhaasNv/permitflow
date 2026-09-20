@@ -351,13 +351,13 @@ def test_six_rounds_then_only_the_closing_moves_remain(client: TestClient, db: S
     )
     assert r.status_code == 200, r.text
     officer = _officer_view(client, off, app_id)["site_visit"]
-    assert officer["rounds_left"] == 0 and "Round limit" in officer["round_limit_reason"]
+    assert officer["rounds_left"] == 0 and "No more dates" in officer["round_limit_reason"]
     r = client.post(
         f"/api/v1/officer/applications/{app_id}/site-visit/decide",
         headers=off,
         json={"action": "propose", "date": next_working_day(14), "slot": "morning"},
     )
-    assert r.status_code == 409 and "Round limit" in r.json()["error"]["message"]
+    assert r.status_code == 409 and "No more dates" in r.json()["error"]["message"]
     r = client.post(
         f"/api/v1/officer/applications/{app_id}/site-visit/decide",
         headers=off,
@@ -373,7 +373,7 @@ def test_six_rounds_then_only_the_closing_moves_remain(client: TestClient, db: S
         headers=op,
         json={"date": next_working_day(14), "slot": "morning", "reason": "One more time."},
     )
-    assert r.status_code == 409 and "Round limit" in r.json()["error"]["message"]
+    assert r.status_code == 409 and "No more dates" in r.json()["error"]["message"]
 
 
 def test_keep_after_a_reschedule_keeps_the_confirmed_date_not_round_one(

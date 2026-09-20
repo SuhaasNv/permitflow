@@ -136,7 +136,7 @@ describe('site visit appointment, officer side (US-084)', () => {
     )
     expect(transition).not.toHaveBeenCalled()
     expect(await screen.findByText('Waiting for the operator')).toBeInTheDocument()
-    expect(screen.getByText('The operator has until 24 Sep 2026 to reply. Visit 1.')).toBeInTheDocument()
+    expect(screen.getByText('The operator has until 24 Sep 2026 to reply.')).toBeInTheDocument()
   })
 
   it('shows the server date rule under the field on a 422', async () => {
@@ -221,12 +221,12 @@ describe('site visit appointment, officer side (US-084)', () => {
       counter: counterRound,
       rounds: [officerRound, counterRound],
       rounds_left: 0,
-      round_limit_reason: 'Round limit reached: accept or keep a date.',
+      round_limit_reason: "No more dates can be proposed for this visit: accept the operator's date or keep the one on the table.",
     })
     vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(scheduled(capped))
     renderPage()
     expect(await screen.findByRole('button', { name: 'Propose another date' })).toBeDisabled()
-    expect(screen.getByText('Round limit reached: accept or keep a date.')).toBeInTheDocument()
+    expect(screen.getByText(/No more dates can be proposed for this visit/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Accept Thu 24 Sep, afternoon' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Keep Tue 22 Sep, morning' })).toBeEnabled()
   })

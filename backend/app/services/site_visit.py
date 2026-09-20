@@ -46,6 +46,10 @@ OPERATOR_WORDS: dict[SiteVisitStatus, str] = {
     SiteVisitStatus.CONFIRMED: "Confirmed",
     SiteVisitStatus.DONE: "Done",
 }
+OPERATOR_LIMIT_REASON = "No more dates can be proposed for this visit. You can still accept this one."
+OFFICER_LIMIT_REASON = (
+    "No more dates can be proposed for this visit: accept the operator's date or keep the one on the table."
+)
 OFFICER_WORDS: dict[SiteVisitStatus, str] = {
     SiteVisitStatus.PROPOSED: "Waiting for the operator",
     SiteVisitStatus.COUNTER_PROPOSED: "Waiting for you",
@@ -108,7 +112,7 @@ class SiteVisitService:
             counter=self._pending_counter(visit, proposals),
             can_reschedule=reschedulable,
             rounds_left=left,
-            round_limit_reason=ROUND_LIMIT_REASON if left == 0 else None,
+            round_limit_reason=OFFICER_LIMIT_REASON if left == 0 else None,
             rounds=[self._proposal_out(p) for p in proposals],
         )
 
@@ -135,7 +139,7 @@ class SiteVisitService:
             can_reschedule=reschedulable,
             earliest_date=earliest_date(self.today(), by_operator=True),
             rounds_left=left,
-            round_limit_reason=ROUND_LIMIT_REASON if left == 0 else None,
+            round_limit_reason=OPERATOR_LIMIT_REASON if left == 0 else None,
             # The officer's name stays inside the office (T3): operators see the role, never the person.
             rounds=[self._proposal_out(p, mask_officer=True) for p in proposals],
         )

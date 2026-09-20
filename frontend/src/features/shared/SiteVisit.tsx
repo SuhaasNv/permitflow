@@ -14,16 +14,21 @@ export function fieldErrorsOf(error: unknown): Record<string, string> {
   return out
 }
 
-/** "2026-09-22" for a local calendar date. */
+/** "2026-09-22" for a UTC calendar date. */
 export function isoDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return d.toISOString().slice(0, 10)
 }
 
-/** Bounds for the native date input: from `earliest` (or tomorrow) to 60 days out. The server has the last word. */
+/** The calendar date in Singapore right now, whatever the browser's own zone (NFR-016). */
+export function todayInSingapore(now: Date = new Date()): string {
+  return now.toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' })
+}
+
+/** Bounds for the native date input: from `earliest` (or tomorrow in Singapore) to 60 days out. The server has the last word. */
 export function dateBounds(earliest?: string | null, now: Date = new Date()): { min: string; max: string } {
-  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-  const max = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 60)
-  return { min: earliest ?? isoDate(tomorrow), max: isoDate(max) }
+  const today = new Date(`${todayInSingapore(now)}T00:00:00Z`)
+  const plus = (days: number) => isoDate(new Date(today.getTime() + days * 86_400_000))
+  return { min: earliest ?? plus(1), max: plus(60) }
 }
 
 export interface SlotControlProps {
@@ -83,8 +88,7 @@ const OUTCOME_TONE: Record<SiteVisitProposal['outcome'], string> = {
 /** "You proposed ..." from the reader's side; the other side by role or name. */
 export function roundTitle(p: SiteVisitProposal, reader: 'officer' | 'operator'): string {
   const who = p.author_role === reader ? 'You' : reader === 'operator' ? 'The officer' : p.author_name
-  const verb = p.round === 1 ? 'proposed' : 'proposed instead'
-  return `${who} ${verb} ${p.when}`
+  return p.round === 1 ? `${who} proposed ${p.when}` : `${who} proposed another date: ${p.when}`
 }
 
 export interface VisitRoundsProps {

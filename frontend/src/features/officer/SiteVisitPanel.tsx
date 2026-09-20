@@ -269,12 +269,11 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
             </p>
             {visit.note ? <p className="text-[13px] leading-[19px] text-text-2">Note to the operator: {visit.note}</p> : null}
             {visit.status === 'proposed' && visit.reply_deadline ? (
-              <p className="text-[13px] leading-[19px] text-text-3">
-                The operator has until {formatDate(visit.reply_deadline)} to reply. Visit {visit.visit_no}.
-              </p>
-            ) : (
-              <p className="text-[13px] leading-[19px] text-text-3">Visit {visit.visit_no}.</p>
-            )}
+              <p className="text-[13px] leading-[19px] text-text-3">The operator has until {formatDate(visit.reply_deadline)} to reply.</p>
+            ) : null}
+            {visit.visit_no > 1 ? (
+              <p className="text-[13px] leading-[19px] text-text-3">Visit {visit.visit_no} for this application.</p>
+            ) : null}
 
             {visit.status === 'counter_proposed' && visit.counter && form === null ? (
               <div className="flex flex-col gap-2">
@@ -368,7 +367,7 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
             {form === 'reschedule' ? (
               <DateForm
                 title="Request a different date"
-                submitLabel="Send the new date"
+                submitLabel="Propose the new date"
                 reasonLabel="Reason"
                 reasonRequired
                 busy={reschedule.isPending}

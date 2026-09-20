@@ -145,7 +145,7 @@ describe('site visit appointment, operator side (US-084)', () => {
     )
     expect(await screen.findByText('Waiting for the officer')).toBeInTheDocument()
     expect(screen.getByText('You proposed Thursday 24 September 2026, afternoon (14:00 to 17:00)')).toBeInTheDocument()
-    expect(screen.getByText('You proposed instead Thursday 24 September 2026, afternoon (14:00 to 17:00)')).toBeInTheDocument()
+    expect(screen.getByText('You proposed another date: Thursday 24 September 2026, afternoon (14:00 to 17:00)')).toBeInTheDocument()
   })
 
   it('shows the server date rule under the field and reloads on a 409', async () => {
@@ -170,10 +170,16 @@ describe('site visit appointment, operator side (US-084)', () => {
 
   it('at the round cap the counter form gives way to the reason', async () => {
     vi.spyOn(api, 'getApplication').mockResolvedValue(
-      pendingVisit(visit({ can_counter: false, rounds_left: 0, round_limit_reason: 'Round limit reached: accept or keep a date.' })),
+      pendingVisit(
+        visit({
+          can_counter: false,
+          rounds_left: 0,
+          round_limit_reason: 'No more dates can be proposed for this visit. You can still accept this one.',
+        }),
+      ),
     )
     renderPage()
-    expect(await screen.findByText('Round limit reached: accept or keep a date.')).toBeInTheDocument()
+    expect(await screen.findByText('No more dates can be proposed for this visit. You can still accept this one.')).toBeInTheDocument()
     expect(screen.queryByRole('form', { name: 'Propose this date' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Accept this date' })).toBeEnabled()
   })
