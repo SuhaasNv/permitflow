@@ -37,6 +37,29 @@ Measured with every source file counted, not only the files a test happens to im
 
 What the numbers do not say: a covered line is a line that ran, not a line whose behaviour is asserted. The tests added for US-053 were chosen by behaviour first (the acceptance criteria list them in `../05-planning/USER_STORIES.md`); the percentage is the check that nothing was left untested, not the goal. Playwright coverage is not counted: it runs against a built bundle.
 
+## Load (US-086)
+
+`backend/scripts/load/`: `seed_load.py` fills a scratch database (it refuses a URL without `load` or `scratch` in it) with 10,000 applications across every status, one revision each, 100,000 audit rows over 90 days and one case with a confirmed visit; `permitflow.js` is the k6 script (three scenarios, thresholds p95 under 300, 500 and 200 ms); `run_load.py` runs the same three requests with threads for a machine without k6 and exits 1 when a budget is missed.
+
+```bash
+docker exec permitflow-db psql -U permitflow -d postgres -c "CREATE DATABASE permitflow_load"
+export DATABASE_URL=postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow_load
+uv run alembic upgrade head && uv run python scripts/load/seed_load.py
+AI_PROVIDER=mock RATE_LIMIT_PER_MINUTE=0 uv run uvicorn app.main:app --port 8001
+uv run python scripts/load/run_load.py --base http://localhost:8001/api/v1 --app <the printed case id>
+# or: k6 run -e BASE=http://localhost:8001/api/v1 -e APP=<id> scripts/load/permitflow.js
+```
+
+Results on 21 Sep 2026 (MacBook, PostgreSQL 16 in Docker, one uvicorn worker, 20 s per scenario, 5 threads, 10 for the feed):
+
+| Request | n | p50 | p95 | Budget |
+|---------|---|-----|-----|--------|
+| Checklist draft save (17 items, six 1,800-character comments) | 3,731 | 14.1 ms | 18.4 ms | 300 ms (NFR-008) |
+| Admin overview | 404 | 241 ms | 312 ms | 500 ms (NFR-011) |
+| Activity feed, three keyset pages of 50 | 6,873 | 26.9 ms | 46.3 ms | 200 ms (NFR-011) |
+
+The first run missed the overview budget at 2.8 s: the idle list loaded every open application and its newest event in Python. It is one grouped query now (`AuditRepository.idle_applications`, over the `(application_id, created_at)` index of migration 0013), and the business names are read for the ten shown only. Migration 0013 adds the indexes NFR-011 names plus `(created_at, id)` for the feed's keyset and `(event_type, created_at)` for today's counts.
+
 ## Bundle size (US-087)
 
 `npm run size` (`scripts/check-bundle-size.mjs`) runs in the frontend CI job after the build and fails above 250 KB gzipped for the JavaScript the respond page loads; the app ships one bundle, so the figure is the whole app: 215 KB gzipped (763 KB raw) on 21 Sep 2026.
