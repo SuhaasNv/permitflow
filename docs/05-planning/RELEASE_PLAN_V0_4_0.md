@@ -66,7 +66,7 @@ Committed to v0.4.0 by product decision; if time forces a cut it ships as v0.5.0
 
 ### Parked for v0.5.0 (named now so they are not discovered missing in the debrief)
 
-Photo evidence per checklist item from the officer's camera (the reviewers' first request in any inspection app); reason chips that fill an item's comment; ten-second undo for Mark clarified and Withdraw (the pattern of US-039); a late flag after submit; a document check on clarification attachments ("does this answer the request"); an offline mirror of the checklist draft replayed on reconnect; CSV export of the activity feed; officer assignment (SCOPE C2).
+Photo evidence per checklist item from the officer's camera (the reviewers' first request in any inspection app); reason chips that fill an item's comment; ten-second undo for Mark clarified and Withdraw (the pattern of US-039); a late flag after submit; **a vision check on the operator's clarification photos (US-091, decided 20 Sep 2026: "does this photo show what was asked", yes, no or unclear with a reason, a golden set of photos, image tokens counted in the quota, after EXIF stripping and a downscale)**; an offline mirror of the checklist draft replayed on reconnect; CSV export of the activity feed; officer assignment (SCOPE C2); a user's own password change (needed once admins create accounts in the app).
 
 ### Cut order for v0.4.0 if behind
 
