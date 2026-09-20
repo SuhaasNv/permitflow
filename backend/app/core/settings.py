@@ -26,6 +26,9 @@ class Settings(BaseSettings):
 
     jwt_secret: str = ""
     jwt_expires_minutes: int = 480
+    # US-093: a session unseen for this long ends by itself, so a device left signed in on site never
+    # locks the account. Sign-in and every request refresh "seen"; the token's own expiry is unchanged.
+    session_idle_minutes: int = 60
 
     cors_origins: str = "http://localhost:3000"
 

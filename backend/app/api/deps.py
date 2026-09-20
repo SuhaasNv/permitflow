@@ -29,11 +29,13 @@ def get_current_user(
     payload = decode_access_token(credentials.credentials)
     try:
         user_id = uuid.UUID(str(payload.get("sub")))
+        session_id = uuid.UUID(str(payload.get("sid")))
     except ValueError as exc:
         raise Unauthorized("Invalid or missing credentials.") from exc
-    # Role and active flag are re-checked against the row on every request (T19).
-    user = AuthService(db).current_user(user_id)
+    # Role, active flag and the session row are re-checked on every request (T19, T27).
+    user = AuthService(db).current_user(user_id, session_id)
     request.state.user_id = str(user.id)
+    request.state.session_id = session_id
     return user
 
 

@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-093 One live session per account (21 Sep 2026, Sprint 6)
+
+- An account is signed in on one device at a time. A second sign-in is refused and names the device that holds the account and when it was last active; the person may sign that device out and continue, and the other device lands on the sign-in page with the reason and the time on its next request. Sign-out ends the session on the server; a session unseen for 60 minutes (`SESSION_IDLE_MINUTES`) ends by itself. Continuity is the server-side draft: the checklist autosaves, so the next device opens it where the last one left it (Playwright 09 proves it with two browser contexts). Added at the owner's request (an officer on an iPad, then the laptop). Tokens issued before this change are refused (no session id), so every signed-in browser signs in once more after the deploy.
+
 ## US-092 Extra findings on the checklist (21 Sep 2026, Sprint 5)
 
 - An officer adds a finding of their own: free under Other findings, or as a second finding under a template item ("Finding 2 on this item"), each with a title, the same result, comment and flag, removable while a draft; the draft save assigns the key; counts and the submit rules cover them; a flagged one reaches the operator with its parent's title first. Added at the owner's question whether the checklist can take items of the officer's own and two findings on one item.

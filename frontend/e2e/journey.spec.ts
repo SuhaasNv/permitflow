@@ -14,8 +14,13 @@ async function signIn(page: Page, email: string) {
   await page.goto('/login')
   await page.getByLabel(/Email address/).fill(email)
   await page.getByLabel(/^Password/).fill(PASSWORD)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  // The API steps below sign in as the same person; the page then offers to take the session over (US-093).
+  const takeOver = page.getByRole('button', { name: 'Sign out the other device and continue' })
+  const signedIn = page.getByRole('button', { name: 'Sign out', exact: true })
+  await expect(takeOver.or(signedIn)).toBeVisible()
+  if (await takeOver.isVisible()) await takeOver.click()
+  await expect(signedIn).toBeVisible()
 }
 
 async function signOut(page: Page) {

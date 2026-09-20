@@ -32,13 +32,20 @@ export function setTokenProvider(fn: () => string | null): void {
   tokenProvider = fn
 }
 
+/** What a 401 said, so the sign-in page can explain why the session ended (US-093). */
+export interface UnauthorizedInfo {
+  code: string
+  message?: string
+  details?: Record<string, unknown>
+}
+
 /** Called once per 401 so the session can end cleanly (redirect to sign-in with a return path). */
-let unauthorizedHandler: () => void = () => undefined
-export function setUnauthorizedHandler(fn: () => void): void {
+let unauthorizedHandler: (info: UnauthorizedInfo) => void = () => undefined
+export function setUnauthorizedHandler(fn: (info: UnauthorizedInfo) => void): void {
   unauthorizedHandler = fn
 }
-export function notifyUnauthorized(): void {
-  unauthorizedHandler()
+export function notifyUnauthorized(info: UnauthorizedInfo = { code: 'unauthorized' }): void {
+  unauthorizedHandler(info)
 }
 
 function isApiErrorBody(value: unknown): value is ApiErrorBody {
@@ -94,7 +101,13 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     }
   }
   if (!response.ok) {
-    if (response.status === 401) notifyUnauthorized()
+    if (response.status === 401) {
+      notifyUnauthorized(
+        isApiErrorBody(parsed)
+          ? { code: parsed.error.code, message: parsed.error.message, details: parsed.error.details }
+          : undefined,
+      )
+    }
     if (isApiErrorBody(parsed)) throw new AppError(response.status, parsed.error, requestId)
     throw new AppError(response.status, { code: 'http_error', message: `Request failed (${response.status})` }, requestId)
   }

@@ -198,6 +198,7 @@ The plan, its reviews and every design decision: `RELEASE_PLAN_V0_4_0.md`. All w
 | US-065 | Responses with attachments (camera on phones); Send responses with its guard | MVP |
 | US-066 | Rounds: review, clarified, still needs clarification, another round, per-item trail, history, notifications | MVP |
 | US-085 | Attachment cap, 150 MB storage budget per application, image metadata stripped (NFR-009, NFR-010) | MVP |
+| US-093 | One live session per account, take-over from the sign-in page, idle limit, continuity from the last save (NFR-019; added 21 Sep 2026 at the owner's request) | MVP |
 | US-087 | Poor-connection behaviour: retry with backoff, offline notice, nothing lost; phone performance budget (NFR-012, NFR-013) | MVP |
 | US-042 (extension) | `07-site-visit.spec.ts`; a11y states; `uat_edges.py` additions and the officer-only label check live | MVP |
 | V23 | Thumbnails in the thread | Nice-to-have |

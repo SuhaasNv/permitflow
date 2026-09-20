@@ -69,7 +69,7 @@ def test_forwarded_for_is_honoured_behind_a_wildcard_trusted_proxy(
     assert blocked.status_code == 429, "a caller-supplied leading hop must not open a fresh bucket"
     other = client.post(
         "/api/v1/auth/login",
-        json={"email": "op@example.sg", "password": DEFAULT_PASSWORD},
+        json={"email": "op@example.sg", "password": DEFAULT_PASSWORD, "take_over": True},
         headers={"X-Forwarded-For": "10.0.0.1, 203.0.113.6"},
     )
     assert other.status_code == 200, "another client behind the same proxy is not blocked"

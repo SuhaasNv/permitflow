@@ -16,19 +16,22 @@ Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC
 
 ### UC0-A Log in (all personas)
 **Actor:** Operator, Officer or Admin
-**Requirements:** FR-028, SEC-006, SEC-010
+**Requirements:** FR-028, SEC-006, SEC-010, NFR-019
 
 **Main flow**
 1. User submits email and password.
-2. System verifies the argon2 hash, issues a JWT with the role claim, and the client keeps it in memory (and `sessionStorage` for reloads).
+2. System verifies the argon2 hash, records a session (device label, last seen), issues a JWT with the role claim and the session id, and the client keeps it in memory (and `sessionStorage` for reloads).
 3. Client routes the user to the home screen for their role (see Personas). Protected routes redirect to login without a valid token.
+4. Sign out ends the session on the server; the token stops working on its next use.
 
 **Alternative / error flows**
 - 1a. Wrong credentials → 401 with a generic message.
 - 1b. More than 10 attempts per minute from one IP → 429.
+- 2a. Another device holds this account's session (v0.4.0, US-093) → 409 naming the device and its last activity; the page offers "Sign out the other device and continue", which signs in with `take_over` and ends the other session; that device's next request is a 401 and its sign-in page says the account signed in elsewhere and when.
+- 2b. No request for 60 minutes → the session ends by itself; the next request is a 401 and the sign-in page says so.
 - 3a. A user opens a route for another role → the API answers 403 and the UI shows "Not available for your role".
 
-**Expected outcome:** Each persona lands in its own workspace; the role is re-checked on the server for every request.
+**Expected outcome:** Each persona lands in its own workspace; the role and the session are re-checked on the server for every request; an account is in use on one device at a time and the next device continues from the last server-side save.
 
 ---
 

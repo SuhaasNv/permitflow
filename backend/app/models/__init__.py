@@ -7,6 +7,7 @@ from app.models.document import Document, VerificationRun
 from app.models.feedback import Feedback
 from app.models.licence import Licence
 from app.models.notification import Notification
+from app.models.session import UserSession
 from app.models.site_visit import SiteVisit, SiteVisitProposal
 from app.models.user import User
 
@@ -27,5 +28,6 @@ __all__ = [
     "SiteVisit",
     "SiteVisitProposal",
     "User",
+    "UserSession",
     "VerificationRun",
 ]

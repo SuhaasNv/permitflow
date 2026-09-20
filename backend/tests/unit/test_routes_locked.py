@@ -12,6 +12,7 @@ PUBLIC = {("POST", "/auth/login"), ("GET", "/health"), ("GET", "/metrics")}
 # Any signed-in user; the data is scoped to the caller inside the query (notifications) or is not sensitive.
 SIGNED_IN = {
     ("GET", "/auth/me"),
+    ("POST", "/auth/logout"),
     ("GET", "/form-schema"),
     ("GET", "/notifications"),
     ("POST", "/notifications/read-all"),

@@ -50,6 +50,9 @@ OPENAI_TOKENS = Counter(
 APPLICATIONS = Gauge(
     "permitflow_applications", "Applications by status, refreshed on every scrape.", ["status"]
 )
+SESSIONS_ACTIVE = Gauge(
+    "permitflow_sessions_active", "Accounts signed in right now (US-093), refreshed on every scrape."
+)
 
 
 def route_template(request: Request) -> str:

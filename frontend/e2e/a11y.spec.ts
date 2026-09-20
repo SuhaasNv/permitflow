@@ -65,6 +65,13 @@ test('the sign-in form works from the keyboard alone, and the skip link reaches 
   await page.keyboard.press('Tab')
   await page.keyboard.type(process.env.SEED_PASSWORD ?? 'PermitFlow!2026')
   await page.keyboard.press('Enter')
+  // A session left live by an earlier run (US-093): the take-over is reachable by keyboard as well.
+  const takeOver = page.getByRole('button', { name: 'Sign out the other device and continue' })
+  await expect(takeOver.or(page.getByRole('button', { name: 'Sign out', exact: true }))).toBeVisible()
+  if (await takeOver.isVisible()) {
+    await takeOver.focus()
+    await page.keyboard.press('Enter')
+  }
   await expect(page).toHaveURL(/\/app\/dashboard/)
   await signOut(page)
 })

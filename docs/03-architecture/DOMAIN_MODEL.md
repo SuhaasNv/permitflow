@@ -32,6 +32,20 @@ User 1───* Application 1───* ApplicationRevision
 
 Ownership: a user owns their notifications. Operators own the applications they create. Planned for the admin epic (US-073, v0.4.0, not built): admins change roles and deactivate/reactivate users, the service refuses a change that would leave no active admin, and user changes become audit events with `application_id = null` (`user.role_changed`, `user.deactivated`, `user.reactivated`).
 
+### UserSession (v0.4.0, US-093)
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | the `sid` claim of the token issued at sign-in |
+| user_id | UUID → User | indexed; a partial index on (user_id, expires_at) where `revoked_at IS NULL` serves the "is another session live?" read and the gauge |
+| device_label | str(60) | "Safari on iPad", derived from the User-Agent at sign-in by `domain/device_label.py`; the header itself is never stored |
+| last_seen_at | datetime | refreshed by authenticated requests, at most once a minute per session |
+| expires_at | datetime | the token's own expiry |
+| revoked_at | datetime, nullable | set once |
+| revoked_reason | `taken_over` \| `signed_out` \| `idle`, nullable | why the row stopped being live |
+| created_at | datetime | |
+
+Live means: not revoked, `expires_at` in the future, `last_seen_at` within `SESSION_IDLE_MINUTES`. An account has at most one live session; `AuthService.authenticate` reads the live row under `FOR UPDATE`, refuses with `session_active` or, with `take_over`, revokes it (`taken_over`) and audits `user.session_taken_over` with `application_id = null`. Every authenticated request reads the row by id (`AuthService.current_user`); an idle row is closed the first time it is seen again. Sign-out revokes (`signed_out`) and audits `user.signed_out`.
+
 ### Application
 The aggregate root. Holds current status and the editable working copy of form data.
 | Field | Type | Notes |
@@ -319,3 +333,4 @@ Required document types: `business_profile`, `floor_plan`, `tenancy_agreement`, 
 8. `site_visit_done` is reachable only while the current visit is `confirmed`; the transition marks it `done` in the same transaction.
 9. A visit has at most six proposals; a proposal's `outcome` is written once.
 10. One checklist per (application, visit number); every template key is present from creation; `result`, `comment` and `needs_clarification` never change after `submitted_at`.
+11. At most one live session per user; a token whose session is revoked, idle or missing never authenticates, whatever its `exp`.
