@@ -24,7 +24,7 @@ What each layer of tests protects, where it lives and how to run it. Written at 
 | Static | both | ruff, ruff format, mypy strict; oxlint, tsc strict, vite build | | Types and style. `any` is not used anywhere in the frontend; mypy runs in strict mode |
 | Secrets | repo | gitleaks (CI) | | No credentials committed |
 
-Backend total on 20 Sep 2026 (v0.4.0 branch, after US-078 to US-084): 794 test cases from 204 test functions (`test_site_visit_rules.py` adds the working-day, notice, deadline and round-cap rules; the route lock test walks every route); the state-machine sweep in `test_workflow.py` alone contributes 588 parametrised cases, so the count of distinct tests is the smaller number. Sprint 3 close was 748, Sprint 2 close 620.
+Backend total on 20 Sep 2026 (v0.4.0 branch, after US-078 to US-084): 798 test cases from 208 test functions (`test_site_visit_rules.py` adds the working-day, notice, deadline and round-cap rules; the route lock test walks every route); the state-machine sweep in `test_workflow.py` alone contributes 588 parametrised cases, so the count of distinct tests is the smaller number. Sprint 3 close was 748, Sprint 2 close 620.
 
 ## Coverage (US-053)
 
@@ -33,7 +33,7 @@ Measured with every source file counted, not only the files a test happens to im
 | Suite | Command | Result (19 Sep 2026) | Threshold |
 |-------|---------|----------------------|-----------|
 | Backend (`app/`, branch coverage on) | `uv run pytest --cov=app` (`[tool.coverage.*]` in `pyproject.toml`) | 95 % statements, 763 test cases | `--cov-fail-under=80` |
-| Frontend (`src/**/*.{ts,tsx}` minus tests, fixtures and `main.tsx`) | `npm run test:coverage` (v8, `coverage.include` in `vite.config.ts`) | 82 % statements, 85 % lines, 80 % functions, 73 % branches, 191 tests | statements 80, lines 80, functions 75, branches 65 |
+| Frontend (`src/**/*.{ts,tsx}` minus tests, fixtures and `main.tsx`) | `npm run test:coverage` (v8, `coverage.include` in `vite.config.ts`) | 82 % statements, 85 % lines, 80 % functions, 73 % branches, 194 tests | statements 80, lines 80, functions 75, branches 65 |
 
 What the numbers do not say: a covered line is a line that ran, not a line whose behaviour is asserted. The tests added for US-053 were chosen by behaviour first (the acceptance criteria list them in `../05-planning/USER_STORIES.md`); the percentage is the check that nothing was left untested, not the goal. Playwright coverage is not counted: it runs against a built bundle.
 
