@@ -17,7 +17,7 @@ login_limiter = FailedLoginLimiter(
 
 @router.post("/login", response_model=TokenOut)
 def login(payload: LoginRequest, request: Request, db: DbSession) -> TokenOut:
-    key = client_key(request, _settings.trusted_proxies)
+    key = client_key(request, _settings.trusted_proxies, _settings.client_ip_header)
     if login_limiter.is_blocked(key):
         raise RateLimited("Too many failed attempts. Try again in a minute.")
     try:

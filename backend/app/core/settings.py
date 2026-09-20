@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     # Comma-separated proxy addresses whose X-Forwarded-For is trusted, or "*" on a platform whose edge
     # proxy is the only thing that can reach the container (Railway, most PaaS).
     trusted_proxies: str = ""
+    # The header the trusted edge writes with the connecting client's address, read before
+    # X-Forwarded-For (Railway: X-Real-IP). Ignored without a trusted proxy; empty disables it (US-082).
+    client_ip_header: str = "X-Real-IP"
 
     ai_provider: Literal["mock", "openai"] = "mock"
     openai_api_key: str = ""

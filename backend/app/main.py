@@ -99,6 +99,7 @@ def create_app() -> FastAPI:
         per_minute=0 if settings.app_env == "test" else settings.rate_limit_per_minute,
         login_per_minute=0 if settings.app_env == "test" else settings.login_attempts_per_minute,
         trusted_proxies=settings.trusted_proxies,
+        client_ip_header=settings.client_ip_header,
     )
 
     @app.middleware("http")
