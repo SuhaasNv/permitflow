@@ -20,7 +20,7 @@ A regulatory licensing platform built for a 3-day full-stack assessment. Busines
 
 Everything else you might look for: `CHANGELOG.md` (what shipped when), `docs/README.md` (index of every document), `AI_USAGE.md` (full account of how AI tools were used), `docs/11-reviews/ISSUES_AND_MITIGATIONS.md` (what went wrong and what we did about it), `docs/13-debrief/` (the pitch deck, the technical deck, the launch video and the narrated walkthrough).
 
-Contents: Run locally · Demo accounts · Security · Tests and checks · Environment variables · Project layout · Branching and deployment · CI · AI verification · AI Usage · What I would do next.
+Contents: Run locally · Demo accounts · Security · Tests and checks · Environment variables · Project layout · Branching and deployment · CI · AI verification · AI Usage · Release notes · What I would do next.
 
 ## Run locally
 
@@ -146,6 +146,14 @@ The brief asks how AI tools were used. Short version here; the full record with 
 **How output was checked.** Every story: full backend suite on a real PostgreSQL, vitest, Playwright where a UI path changed, `ruff`, `mypy --strict`, `tsc --strict`; browser checks at 390, 1024 and 1280 before a story moved to Done; two persona run-throughs on the last day that found two defects the tests had missed (both fixed with tests); every prompt change gated by the 14-case harness on the mock in CI and by hand against OpenAI (the harness rejected two of three wordings tried on the last day); every subagent finding reproduced before it was fixed, three kept as product choices; docs checked against code at each sprint close and once more at the end (API table against the routers, state table against `workflow.py`, test counts, dates against `git log`). I read every diff before committing; pushes only on my explicit yes.
 
 **Where the AI was unhelpful or wrong.** The first live verifier run invented enum values and reported an expired certificate as valid (fixed with a pinned wire schema and today's date in the prompt). It proposed a scope-creeping story and a full red landing band; both rejected. It offered an approval-stage option that the state machine did not allow (which led to the Return to review transition). The first certificate layout overflowed and a later "sliding" signature strip collided with the footer (three iterations, each checked as a rendered PNG). A subagent's scratch file was swept into a commit by `git add -A`. Notion notes carried the wrong day; two remote CI runs failed on line length the AI had not linted locally; licence dates were first computed in UTC. The verifier flagged the demo documents' "fictional document" footer as an injection until the third prompt wording. Details: `AI_USAGE.md`.
+
+## Release notes
+
+Current version: **v0.3.0** (19 September 2026), the version running at https://permitflow.space. It brought the public address with two isolated environments, the licence certificate issued on approval, withdrawal and draft deletion, undo and reopen for officer feedback, search on both lists, phone-width layouts, the abuse limits, the nightly AI evaluation and the accessibility gate. Use cases 1 and 2 are complete; use case 3 is not built.
+
+Coming next, in order: **v0.4.0** introduces the admin panel (oversight of applications by status, the health of the automatic checks, an activity feed across cases, and user management with audited role changes). **v0.5.0** delivers use case 3: the officer completes the site-visit checklist on site from a tablet with draft save, flags the items that need clarification, and the operator answers only those items, round by round, with documents.
+
+Every release carries an entry in `RELEASE_NOTES.md`, written for the people who use the product; `CHANGELOG.md` is the engineering record behind it.
 
 ## What I would do next
 
