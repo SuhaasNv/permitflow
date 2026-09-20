@@ -44,6 +44,13 @@ def is_idle(days: int) -> bool:
     return days > IDLE_DAYS
 
 
+def idle_cutoff(now: datetime | None = None) -> datetime:
+    """The instant before which a last activity counts as idle: the start (in Singapore) of the day
+    `IDLE_DAYS` days ago, so `idle_days(last) > IDLE_DAYS` and `last < idle_cutoff()` agree."""
+    day = today_in_singapore(now) - timedelta(days=IDLE_DAYS)
+    return singapore_day_window(day)[0]
+
+
 def percentile(values: list[float], fraction: float) -> float | None:
     """Nearest-rank percentile; None without values."""
     if not values:
@@ -56,6 +63,7 @@ def percentile(values: list[float], fraction: float) -> float | None:
 __all__ = [
     "IDLE_DAYS",
     "IDLE_LIST_SIZE",
+    "idle_cutoff",
     "idle_days",
     "is_idle",
     "percentile",

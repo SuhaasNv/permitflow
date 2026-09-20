@@ -334,4 +334,5 @@ Required document types: `business_profile`, `floor_plan`, `tenancy_agreement`, 
 8. `site_visit_done` is reachable only while the current visit is `confirmed`; the transition marks it `done` in the same transaction.
 9. A visit has at most six proposals; a proposal's `outcome` is written once.
 10. One checklist per (application, visit number); every template key is present from creation; `result`, `comment` and `needs_clarification` never change after `submitted_at`.
-11. At most one live session per user; a token whose session is revoked, idle or missing never authenticates, whatever its `exp`.
+11. Indexes for the admin reads at volume (migration 0013, US-086): `audit_events (application_id, created_at)`, `(created_at, id)`, `(event_type, created_at)`; `verification_runs (created_at)` and `(started_at)`.
+12. At most one live session per user; a token whose session is revoked, idle or missing never authenticates, whatever its `exp`.

@@ -6,7 +6,8 @@ from typing import Any
 from sqlalchemy import delete, func, select, tuple_
 from sqlalchemy.orm import Session
 
-from app.models import AuditEvent
+from app.domain.enums import ApplicationStatus
+from app.models import Application, AuditEvent
 
 
 class AuditRepository:
@@ -46,6 +47,23 @@ class AuditRepository:
             stmt = stmt.where(tuple_(AuditEvent.created_at, AuditEvent.id) < before)
         stmt = stmt.order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc()).limit(limit)
         return list(self.db.scalars(stmt))
+
+    def idle_applications(
+        self, cutoff: datetime, statuses: Iterable[ApplicationStatus]
+    ) -> list[tuple[Application, datetime]]:
+        """Open applications (in `statuses`) whose newest audit event, or their `updated_at` when they
+        have none, is older than `cutoff`, oldest first (the admin's idle list, US-070, US-086). One
+        grouped query over the (application_id, created_at) index, never a row per application."""
+        last = func.coalesce(func.max(AuditEvent.created_at), Application.updated_at)
+        stmt = (
+            select(Application, last.label("last_activity"))
+            .outerjoin(AuditEvent, AuditEvent.application_id == Application.id)
+            .where(Application.status.in_(list(statuses)))
+            .group_by(Application.id)
+            .having(last < cutoff)
+            .order_by(last.asc(), Application.reference_no.asc())
+        )
+        return [(row[0], row[1]) for row in self.db.execute(stmt)]
 
     def last_activity(self, application_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, datetime]:
         """The newest event per application (the idle list, US-070)."""

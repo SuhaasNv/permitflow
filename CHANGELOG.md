@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-086 Latency budgets under load (21 Sep 2026, Sprint 8)
+
+- A load kit (`scripts/load/`: a scratch seed of 10,000 applications and 100,000 audit rows, a k6 script and a threaded runner for a machine without k6) and the indexes the admin reads need. Measured on the scratch database: checklist save p95 18 ms, admin overview p95 312 ms, activity feed p95 46 ms, every budget met; the overview's idle list had to become one grouped query to get there (2.8 s before).
+
 ## US-083 The case response says where it stands (21 Sep 2026, Sprint 8)
 
 - The case carries its stage, its outcome and whether each feedback item can be resolved; the screens branch on those instead of on label strings, and the three places that counted open feedback share one rule. Readiness row 22 closed.

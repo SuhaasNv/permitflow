@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.settings import get_settings
 from app.domain.admin import (
     IDLE_LIST_SIZE,
+    idle_cutoff,
     idle_days,
     is_idle,
     percentile,
@@ -87,20 +88,16 @@ class AdminOverviewService:
 
     def _idle(self, now: datetime) -> tuple[list[IdleApplicationOut], int]:
         """The longest-idle open applications (no audit activity for more than seven Singapore days),
-        and how many there are in all."""
-        rows = [
-            (app, applicant)
-            for app, applicant in self.applications.list_submitted()
-            if app.status not in TERMINAL
-        ]
-        ids = [app.id for app, _ in rows]
-        last = self.audit.last_activity(ids)
-        forms = self.revisions.latest_for(ids)
+        and how many there are in all. One grouped query (US-086); the business name is read for the
+        ten shown only."""
+        open_statuses = [s for s in ApplicationStatus if s != ApplicationStatus.DRAFT and s not in TERMINAL]
+        rows = self.audit.idle_applications(idle_cutoff(now), open_statuses)
+        shown = rows[:IDLE_LIST_SIZE]
+        forms = self.revisions.latest_for([app.id for app, _ in shown])
         found: list[IdleApplicationOut] = []
-        for app, _ in rows:
-            last_at = last.get(app.id, app.updated_at)
+        for app, last_at in shown:
             days = idle_days(last_at, now)
-            if not is_idle(days):
+            if not is_idle(days):  # pragma: no cover - the cutoff and the day count agree by construction
                 continue
             revision = forms.get(app.id)
             form = revision.form_data if revision is not None else {}
@@ -117,8 +114,7 @@ class AdminOverviewService:
                     last_activity_at=last_at,
                 )
             )
-        found.sort(key=lambda i: (-i.days_idle, i.reference_no))
-        return found[:IDLE_LIST_SIZE], len(found)
+        return found, len(rows)
 
     def _checks(self, now: datetime) -> ChecksOut:
         settings = get_settings()
