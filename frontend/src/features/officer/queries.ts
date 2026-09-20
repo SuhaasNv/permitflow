@@ -78,8 +78,9 @@ export function useRerunCheck(id: string) {
   })
 }
 
-export function useFeedbackTemplates() {
-  return useQuery({ queryKey: ['officer', 'feedback-templates'], queryFn: getFeedbackTemplates, staleTime: Infinity })
+/** Officer-only on the server; an administrator's read-only case never asks for them (US-072). */
+export function useFeedbackTemplates(enabled = true) {
+  return useQuery({ queryKey: ['officer', 'feedback-templates'], queryFn: getFeedbackTemplates, staleTime: Infinity, enabled })
 }
 
 export function useCreateFeedback(id: string) {
@@ -178,10 +179,11 @@ export function useChecklistSchema() {
 /** The current visit's checklist: created on first open, returned afterwards (the POST is create-or-get,
  * so a remount reloads the draft). No refetch on focus: the page merges another tab's save through the
  * version conflict instead of replacing entries under the officer's hands. */
-export function useChecklist(id: string) {
+export function useChecklist(id: string, readOnly = false) {
   return useQuery({
     queryKey: officerKeys.checklist(id),
-    queryFn: () => openChecklist(id),
+    // An administrator reads what exists and never creates one (US-072): the GET, a 404 when there is none.
+    queryFn: () => (readOnly ? getChecklist(id) : openChecklist(id)),
     refetchOnWindowFocus: false,
     retry: false,
   })

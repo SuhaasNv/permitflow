@@ -4,7 +4,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Response, status
 
-from app.api.deps import DbSession, OfficerUser
+from app.api.deps import DbSession, OfficerOrAdmin, OfficerUser
 from app.domain.feedback_templates import TEMPLATES
 from app.schemas.clarification import ClarificationReopenIn
 from app.schemas.officer import (
@@ -30,13 +30,15 @@ router = APIRouter(prefix="/officer")
 
 
 @router.get("/applications", response_model=QueueOut)
-def review_queue(user: OfficerUser, db: DbSession) -> QueueOut:
+def review_queue(user: OfficerOrAdmin, db: DbSession) -> QueueOut:
     """Review queue: every submitted application, newest activity first (FR-015)."""
     return OfficerQueueService(db).queue()
 
 
 @router.get("/applications/{application_id}", response_model=OfficerApplicationOut)
-def officer_application(application_id: uuid.UUID, user: OfficerUser, db: DbSession) -> OfficerApplicationOut:
+def officer_application(
+    application_id: uuid.UUID, user: OfficerOrAdmin, db: DbSession
+) -> OfficerApplicationOut:
     """Full submission: current revision, documents with verification detail, history, actions (FR-016)."""
     return OfficerViewService(db).get(user, application_id)
 
@@ -207,7 +209,7 @@ def reschedule_site_visit(
 
 
 @router.get("/applications/{application_id}/audit", response_model=AuditTrailOut)
-def audit_trail(application_id: uuid.UUID, user: OfficerUser, db: DbSession) -> AuditTrailOut:
+def audit_trail(application_id: uuid.UUID, user: OfficerOrAdmin, db: DbSession) -> AuditTrailOut:
     """Append-only history of everything that happened to the application (FR-025, SEC-009)."""
     return AuditTrailService(db).for_application(user, application_id)
 

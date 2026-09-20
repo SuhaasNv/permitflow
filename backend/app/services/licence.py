@@ -119,9 +119,7 @@ class LicenceService:
         return self.licences.for_application(application_id)
 
     def open_for_download(self, user: User, application_id: uuid.UUID) -> tuple[Licence, Iterator[bytes]]:
-        """Owner or officer (SEC-002); admins wait for US-072 like document downloads."""
-        if user.role not in (Role.OPERATOR, Role.OFFICER):
-            raise NotFound("Licence not found.")
+        """Owner, any officer, or an administrator (SEC-002, US-072); the repository decides ownership."""
         app = self.applications.get_for(user, application_id)
         licence = self.for_application(app.id)
         if licence is None:

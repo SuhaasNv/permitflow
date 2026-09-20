@@ -66,9 +66,18 @@ def test_every_route_is_locked() -> None:
     assert PUBLIC <= seen and SIGNED_IN <= seen, "the allowlists name routes that do not exist"
 
 
-def test_admin_has_no_mutation_route_today() -> None:
-    """Until US-072 and US-073 land, no route admits the admin to a write; the read-only rule holds."""
+# The only writes an administrator may make: user management (US-073). Every case route stays read-only.
+ADMIN_WRITES = {("POST", "/admin/users"), ("PATCH", "/admin/users/{user_id}")}
+
+
+def test_admin_writes_are_user_management_only() -> None:
+    """The read-only rule on cases (ADR-014): no route outside user management admits the admin to a write."""
+    seen: set[tuple[str, str]] = set()
     for route in _routes():
         guards = _guards(route)
         if any("admin" in g for g in guards if g.startswith("require_role(")):
-            assert route.methods == {"GET"}, f"{route.path} lets an admin write"
+            for method in route.methods:
+                if method != "GET":
+                    seen.add((method, route.path))
+                    assert (method, route.path) in ADMIN_WRITES, f"{route.path} lets an admin write"
+    assert seen == ADMIN_WRITES

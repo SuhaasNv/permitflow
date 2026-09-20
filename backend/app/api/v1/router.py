@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    admin,
     applications,
     auth,
     checklist,
@@ -20,3 +21,4 @@ api_router.include_router(applications.router, tags=["applications"])
 api_router.include_router(officer.router, tags=["officer"])
 api_router.include_router(checklist.router, tags=["checklist"])
 api_router.include_router(notifications.router, tags=["notifications"])
+api_router.include_router(admin.router, tags=["admin"])

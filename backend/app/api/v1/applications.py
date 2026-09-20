@@ -4,7 +4,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import DbSession, OperatorUser, require_role
+from app.api.deps import AnyReader, DbSession, OperatorUser, require_role
 from app.domain.enums import ApplicationStatus, DocumentType
 from app.models import Application, User
 from app.models.enums import Role
@@ -107,7 +107,7 @@ def submit_application(
 @router.get("/{application_id}/compare", response_model=CompareOut)
 def compare_revisions(
     application_id: uuid.UUID,
-    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER))],
+    user: AnyReader,
     db: DbSession,
     from_revision: Annotated[int, Query(alias="from", ge=1)],
     to_revision: Annotated[int, Query(alias="to", ge=1)],
@@ -129,7 +129,7 @@ def resubmit_application(
 @router.get("/{application_id}/licence")
 def download_licence(
     application_id: uuid.UUID,
-    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER))],
+    user: AnyReader,
     db: DbSession,
 ) -> StreamingResponse:
     """The issued licence certificate as a PDF (US-051). Owner or officer; 404 before approval."""
@@ -320,7 +320,7 @@ def delete_document(
 def download_document(
     application_id: uuid.UUID,
     document_id: uuid.UUID,
-    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER))],
+    user: AnyReader,
     db: DbSession,
 ) -> StreamingResponse:
     doc, chunks = DocumentService(db).open_for_download(user, application_id, document_id)

@@ -27,10 +27,11 @@ User 1───* Application 1───* ApplicationRevision
 | password_hash | str | argon2 |
 | full_name | str | |
 | role | enum `operator` \| `officer` \| `admin` | single role per user (assumption); admin is read-only on applications |
-| is_active | bool | inactive users cannot authenticate; set by an admin (deactivate/reactivate) |
+| is_active | bool | inactive users cannot authenticate; set by an admin (deactivate/reactivate); re-read on every request |
+| is_protected | bool | the published demonstration accounts (US-073): no admin may change their role or deactivate them |
 | created_at | datetime | |
 
-Ownership: a user owns their notifications. Operators own the applications they create. Planned for the admin epic (US-073, v0.4.0, not built): admins change roles and deactivate/reactivate users, the service refuses a change that would leave no active admin, and user changes become audit events with `application_id = null` (`user.role_changed`, `user.deactivated`, `user.reactivated`).
+Ownership: a user owns their notifications. Operators own the applications they create. Administrators (US-073, built 21 Sep 2026) change roles, deactivate and reactivate accounts and create them; `AdminUserService` locks every admin row (`SELECT ... FOR UPDATE ... ORDER BY id`) and refuses a change that would leave no active admin (`last_admin`), a change to the caller's own row (`self_change`, which wins) and a change to a protected account (`protected_account`); a deadlock between two administrators is 409 `try_again`. User changes are audit events with `application_id = null`: `user.created`, `user.role_changed` (from, to), `user.deactivated`, `user.reactivated`, beside the session events of US-093.
 
 ### UserSession (v0.4.0, US-093)
 | Field | Type | Notes |

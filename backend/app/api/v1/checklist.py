@@ -3,17 +3,13 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Query, Response, status
 
-from app.api.deps import DbSession, OfficerUser, require_role
-from app.domain.enums import Role
-from app.models import User
+from app.api.deps import DbSession, OfficerOrAdmin, OfficerUser
 from app.schemas.checklist import ChecklistOut, ChecklistSaveIn, ChecklistSchemaOut
 from app.services.checklist import ChecklistService, schema_out
 
 router = APIRouter()
-
-OfficerOrAdmin = Annotated[User, Depends(require_role(Role.OFFICER, Role.ADMIN))]
 
 
 @router.get("/checklist-schema", response_model=ChecklistSchemaOut)

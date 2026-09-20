@@ -10,7 +10,13 @@ DEFAULT_PASSWORD = "Correct-Horse-9"
 
 
 def make_user(
-    db: Session, email: str, role: Role, *, password: str = DEFAULT_PASSWORD, active: bool = True
+    db: Session,
+    email: str,
+    role: Role,
+    *,
+    password: str = DEFAULT_PASSWORD,
+    active: bool = True,
+    protected: bool = False,
 ) -> User:
     user = User(
         email=email,
@@ -18,6 +24,7 @@ def make_user(
         role=role,
         password_hash=hash_password(password),
         is_active=active,
+        is_protected=protected,
     )
     db.add(user)
     db.commit()

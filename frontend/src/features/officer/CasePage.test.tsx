@@ -9,6 +9,7 @@ import * as api from '@/api/officer'
 import type { OfficerApplication } from '@/api/officer'
 import { AppProviders } from '@/app/providers'
 import { OfficerCasePage } from './CasePage'
+import { ReadOnlyProvider } from './readOnly'
 
 const schema = {
   sections: [
@@ -124,6 +125,77 @@ function renderPage() {
     </AppProviders>,
   )
 }
+
+function renderReadOnly() {
+  return render(
+    <AppProviders>
+      <MemoryRouter initialEntries={['/admin/applications/a1']}>
+        <Routes>
+          <Route
+            path="/admin/applications/:id"
+            element={
+              <ReadOnlyProvider value={true}>
+                <OfficerCasePage />
+              </ReadOnlyProvider>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    </AppProviders>,
+  )
+}
+
+describe('OfficerCasePage read-only for an administrator (S-43, US-072)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.spyOn(formApi, 'getFormSchema').mockResolvedValue(schema as never)
+  })
+
+  it('renders the case with the banner and no control, and never asks for the officer-only templates', async () => {
+    const underReview: OfficerApplication = {
+      ...view,
+      status: 'under_review',
+      status_label: 'Under Review',
+      feedback_editable: true,
+      feedback_locked_reason: null,
+      actions: [],
+      feedback: [
+        {
+          id: 'f1',
+          target_type: 'section',
+          section_key: 'business',
+          document_type: null,
+          target_label: 'Business details',
+          message: 'Please confirm the UEN.',
+          template_key: null,
+          resolution: 'addressed',
+          raised_in_revision: 1,
+          author_name: 'Rahim',
+          created_at: '2026-09-18T01:50:00Z',
+          released_to_operator_at: '2026-09-18T01:55:00Z',
+          addressed_in_revision: 2,
+          resolved_at: null,
+          can_undo: false,
+        },
+      ],
+    }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(underReview)
+    const templates = vi.spyOn(api, 'getFeedbackTemplates').mockResolvedValue([])
+    renderReadOnly()
+    expect(await screen.findByText('Read-only')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('href', '/admin/overview')
+    expect(screen.getByText('Every action on this case stays with the licensing officer; you are reading it.')).toBeInTheDocument()
+    expect(screen.getByText('Feedback is written by the licensing officer.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add feedback' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mark resolved' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Not fixed' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Re-run check' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Start review' })).not.toBeInTheDocument()
+    expect(screen.getByText('Need officer review')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to the overview' })).toBeInTheDocument()
+    expect(templates).not.toHaveBeenCalled()
+  })
+})
 
 describe('OfficerCasePage', () => {
   beforeEach(() => {

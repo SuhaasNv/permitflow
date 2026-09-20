@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Admin epic: US-070, US-072, US-073 (21 Sep 2026, Sprint 7)
+
+- The administrator's three screens: an operations overview (every status with its count, whose turn, the ten longest-idle applications in Singapore calendar days, today's numbers, document-check health over 24 hours against the daily quota), an activity feed across every application and every user change with a keyset "Show older activity", and user management (change a role, deactivate, reactivate, and, at the owner's request, add an account from the page). An administrator opens any case through the officer's screens without a single control: the server sends no actions and refuses every mutation. The seed now creates the administrator (Priya Nair) and a spare officer (Lim Jun Hao); the three demonstration accounts are protected from any change. ADR-014 records the design.
+
 ## US-085 Storage budget and photos without camera data (21 Sep 2026, Sprint 6)
 
 - Every JPG or PNG an operator uploads, as a document or as clarification evidence, is stored without its camera data (location, device, time), turned upright first, colour profile kept. Each application has 150 MB of storage room across every document version, its evidence and its licence; the pages say how much is left before a file is chosen, and a file that would pass the room is refused with the room named. One upload pipeline now serves both paths.

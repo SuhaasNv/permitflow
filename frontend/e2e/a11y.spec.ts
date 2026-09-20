@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 import {
+  ADMIN,
   OFFICER,
   OPERATOR,
   openCase,
@@ -179,5 +180,36 @@ test('the checklist (US-060) has no axe violations at 1024, 820 and 390', async 
     await page.waitForLoadState('networkidle')
     found.push(...(await violations(page, `${width} checklist`)))
   }
+  expectNone(found)
+})
+
+test('the admin screens (US-070 to US-073) have no axe violations at 1280 and 390, the read-only case included', async ({ page }) => {
+  const app = await seedUnderReview()
+  const found: string[] = []
+  await signIn(page, ADMIN)
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    await page.goto('/admin/overview')
+    await page.getByRole('list', { name: 'Key numbers' }).waitFor()
+    await page.waitForLoadState('networkidle')
+    found.push(...(await violations(page, `${width} admin overview`)))
+    await page.goto('/admin/activity')
+    await page.getByRole('button', { name: 'Show older activity' }).or(page.getByText('That is everything.')).waitFor()
+    found.push(...(await violations(page, `${width} admin activity`)))
+    await page.goto('/admin/users')
+    await page.getByRole('button', { name: 'Add an account' }).waitFor()
+    await page.locator('li', { hasText: '(you)' }).waitFor()
+    found.push(...(await violations(page, `${width} admin users`)))
+    await page.getByRole('button', { name: 'Add an account' }).click()
+    await page.getByRole('dialog', { name: 'Add an account' }).waitFor()
+    found.push(...(await violations(page, `${width} add-account dialog`)))
+    await page.keyboard.press('Escape')
+    await page.goto(`/admin/applications/${app.id}`)
+    await page.getByText('Read-only', { exact: true }).waitFor()
+    await page.waitForLoadState('networkidle')
+    found.push(...(await violations(page, `${width} admin read-only case`)))
+  }
+  await page.setViewportSize({ width: 1280, height: 844 })
+  await signOut(page)
   expectNone(found)
 })
