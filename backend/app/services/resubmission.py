@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.errors import InvalidTransition, ValidationFailed
 from app.domain.enums import ApplicationStatus, DocumentType, FeedbackResolution, NotificationKind
 from app.domain.form_schema import DOCUMENT_TYPE_LABELS, get_section
@@ -176,6 +177,7 @@ class ResubmissionService:
             f"{business} · Revision {number} · {len(addressed)} of {len(items)} items addressed",
         )
         self.db.commit()
+        metrics.TRANSITIONS.labels(new_status.value, "operator").inc()
         self.notifications.flush_sent()
         self.db.refresh(app)
         return app

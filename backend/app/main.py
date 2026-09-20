@@ -16,6 +16,7 @@ from starlette.responses import Response
 from app.api.v1.router import api_router
 from app.core.errors import AppError
 from app.core.logging import configure_logging, request_logging_middleware
+from app.core.metrics import RATE_LIMITED, metrics_middleware
 from app.core.rate_limit import RequestLimiter
 from app.core.settings import get_settings
 from app.domain.uploads import too_large_message
@@ -104,6 +105,7 @@ def create_app() -> FastAPI:
     async def rate_limit(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         retry_after = app.state.limiter.check(request)
         if retry_after is not None:
+            RATE_LIMITED.inc()
             response = _error_response(
                 request, 429, "rate_limited", "Too many requests. Try again in a moment."
             )
@@ -159,6 +161,7 @@ def create_app() -> FastAPI:
         return response
 
     app.middleware("http")(request_logging_middleware)
+    app.middleware("http")(metrics_middleware)  # outermost: counts every answer, 429s included
 
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:

@@ -1,0 +1,69 @@
+apiVersion: 1
+templates:
+- orgId: 1
+  name: permitflow.telegram
+  template: '{{ define "permitflow.telegram" -}}
+
+    {{- $digest := false }}{{ range .Alerts }}{{ if eq .Labels.kind "digest" }}{{ $digest = true }}{{ end }}{{ end }}
+
+    {{- if $digest }}
+
+    <b>PermitFlow · hourly digest</b>
+
+    ━━━━━━━━━━━━━━━━━━━━━━{{- range .Alerts }}{{ if and (eq .Labels.kind "digest") (eq .Labels.environment "development") }}
+
+    <b>Development</b>  ·  API {{ .Annotations.api }}
+
+    Requests  <b>{{ .Annotations.requests_per_minute }}</b> / min   ·   p99.5  <b>{{ .Annotations.p995_ms }}</b> ms
+
+    Checks  <b>{{ .Annotations.checks }}</b>   ·   spend  <b>USD {{ .Annotations.spend_usd }}</b>
+
+    Applications  <b>{{ .Annotations.applications }}</b>   ·   officer''s turn  <b>{{ .Annotations.waiting_officer }}</b>   ·   operator''s turn  <b>{{ .Annotations.waiting_operator }}</b>
+
+    ━━━━━━━━━━━━━━━━━━━━━━
+
+    {{- end }}{{ end }}{{- range .Alerts }}{{ if and (eq .Labels.kind "digest") (eq .Labels.environment "production") }}
+
+    <b>Production</b>  ·  API {{ .Annotations.api }}
+
+    Requests  <b>{{ .Annotations.requests_per_minute }}</b> / min   ·   p99.5  <b>{{ .Annotations.p995_ms }}</b> ms
+
+    Checks  <b>{{ .Annotations.checks }}</b>   ·   spend  <b>USD {{ .Annotations.spend_usd }}</b>
+
+    Applications  <b>{{ .Annotations.applications }}</b>   ·   officer''s turn  <b>{{ .Annotations.waiting_officer }}</b>   ·   operator''s turn  <b>{{ .Annotations.waiting_operator }}</b>
+
+    ━━━━━━━━━━━━━━━━━━━━━━
+
+    {{- end }}{{ end }}{{- range .Alerts }}{{ if and (eq .Labels.kind "digest") (eq .Labels.environment "local") }}
+
+    <b>Local</b>  ·  API {{ .Annotations.api }}
+
+    Requests  <b>{{ .Annotations.requests_per_minute }}</b> / min   ·   p99.5  <b>{{ .Annotations.p995_ms }}</b> ms
+
+    Checks  <b>{{ .Annotations.checks }}</b>   ·   spend  <b>USD {{ .Annotations.spend_usd }}</b>
+
+    Applications  <b>{{ .Annotations.applications }}</b>   ·   officer''s turn  <b>{{ .Annotations.waiting_officer }}</b>   ·   operator''s turn  <b>{{ .Annotations.waiting_operator }}</b>
+
+    ━━━━━━━━━━━━━━━━━━━━━━
+
+    {{- end }}{{ end }}
+
+    Dashboard  https://grafana.dev.permitflow.space/d/permitflow/permitflow
+
+    {{- end }}
+
+    {{- range .Alerts }}{{ if eq .Labels.kind "incident" }}
+
+    <b>{{ if eq .Status "firing" }}FIRING{{ else }}RESOLVED{{ end }}  ·  {{ .Labels.alertname }}</b>
+
+    Environment  <b>{{ .Labels.environment }}</b>   ·   severity  <b>{{ .Labels.severity }}</b>
+
+    {{ .Annotations.summary }}{{ if .Annotations.value }}
+
+    Value now  <code>{{ .Annotations.value }}</code>{{ end }}
+
+    Alerting  https://grafana.dev.permitflow.space/alerting/list
+
+    {{- end }}{{ end }}
+
+    {{- end }}'

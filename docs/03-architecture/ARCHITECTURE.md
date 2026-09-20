@@ -39,6 +39,7 @@ Rules:
 | feedback | feedback | `create(officer, id, target, message, template_key)`, `resolve`, `withdraw`, `list`, `templates()` |
 | notifications | notifications | `notify(user_ids, kind, application, ...)`, `list(user)`, `mark_read` |
 | audit | audit_events | `record(application_id, actor, event_type, payload)`, `list(application_id)`, `purge_draft(application_id)` |
+| metrics (US-077) | none (reads `applications` through its repository for the by-status gauge) | `refresh_gauges(db)`; the counters live in `core/metrics.py` and are incremented by the services where the events happen (verification finished, quota refused, transition committed) and by the outermost middleware (every request, every 429); `infra/ai/openai_provider.py` counts the tokens the API reports; `docs/13-observability/OBSERVABILITY.md` |
 | admin (planned, v0.4.0, US-070 to US-073) | none (would read other modules' tables through their repositories; writes users through the auth module's service) | `overview()`, `ai_health()`, `audit_feed()`, `users()`, `update_user(role, is_active)`: not built; only the role value and `AdminUser` in `api/deps.py` exist |
 
 Cross-module writes go through services, never across repositories.
@@ -147,6 +148,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /notifications | any | own notifications (newest first, 50) plus `unread_count` (built, US-025) |
 | POST | /notifications/{id}/read | any | mark read; another user's id is 404 (built, US-025) |
 | POST | /notifications/read-all | any | mark every own notification read (built, US-025) |
+| GET | /metrics | bearer token (`METRICS_TOKEN`); 404 when no token is configured; exempt from the rate limit | Prometheus text format: `permitflow_http_requests_total`, `permitflow_http_request_seconds`, `permitflow_rate_limited_total`, `permitflow_verification_runs_total`, `permitflow_verification_run_seconds`, `permitflow_quota_refusals_total`, `permitflow_transitions_total`, `permitflow_applications` (gauge), `permitflow_openai_tokens_total`; route templates and enum values as labels, never ids or text (US-077) |
 | GET | /health | public | `{status, database}`; 503 when the database ping fails, with the standard `error` object beside the status fields; provider details are not exposed publicly (the planned admin AI-health endpoint, US-071, would report them) |
 
 All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail": …}` bodies for 401/403/422 are replaced by explicit exception handlers so every error uses the standard shape (REL-001).

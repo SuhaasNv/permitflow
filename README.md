@@ -2,17 +2,17 @@
 
 ## Live: [permitflow.space](https://permitflow.space)
 
-![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/13-debrief/video/permitflow-launch-poster.jpg)
+![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/14-debrief/video/permitflow-launch-poster.jpg)
 
 https://github.com/user-attachments/assets/942739f7-e2bd-4360-b525-ecf960a7e796
 
-*Launch video, 70 seconds. The narrated walkthrough (4 min 36 s) and the technical video (4 min) are in `docs/13-debrief/video/`.*
+*Launch video, 70 seconds. The narrated walkthrough (4 min 36 s) and the technical video (4 min) are in `docs/14-debrief/video/`.*
 
 A regulatory licensing platform built for a 3-day full-stack assessment. An operator (the business owner, or an agent applying for the business) applies for a Food Establishment Licence through a guided form with checked uploads; a licensing officer reviews the submission, leaves feedback tied to a section or a document, and requests a resubmission in which only the flagged parts reopen. Every status change, feedback round and decision is audited; approval issues a licence certificate. An advisory AI verifier reads each uploaded document against the form before submission. It never decides anything.
 
 **Try it:** production, v0.3.0, at https://permitflow.space (one example application waiting in the officer's queue); development at https://dev.permitflow.space. Demo accounts below. Local setup takes about ten minutes.
 
-**Ten minutes to review it:** the technical deck's handout PDF in `docs/13-debrief/technical-deck/`, then `SCOPE.md`, then `docs/11-reviews/ASSESSMENT_TRACEABILITY.md` (every line of the brief mapped to code, test and evidence).
+**Ten minutes to review it:** the technical deck's handout PDF in `docs/14-debrief/technical-deck/`, then `SCOPE.md`, then `docs/11-reviews/ASSESSMENT_TRACEABILITY.md` (every line of the brief mapped to code, test and evidence).
 
 ## Run locally
 
@@ -65,7 +65,7 @@ A modular monolith (`api → services → domain / repositories → models`, `do
 ```
 backend/   FastAPI + SQLAlchemy 2 + Alembic
 frontend/  React + TypeScript + Vite
-docs/      01-discovery … 13-debrief, one README per folder; docs/README.md is the index
+docs/      01-discovery … 14-debrief, one README per folder; docs/README.md is the index
 ```
 
 ## Security
@@ -80,7 +80,7 @@ cd frontend && npm test && npm run lint && npm run typecheck && npm run build
 cd frontend && npm run e2e          # Playwright against the running stack (backend :8000 with AI_PROVIDER=mock, Vite :3000)
 ```
 
-759 backend cases from 170 test functions on a real PostgreSQL (the state-machine sweep alone is 588), 158 frontend tests, eight Playwright specs (the journey, six scenarios, the accessibility gate), 166 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
+763 backend cases from 174 test functions on a real PostgreSQL (the state-machine sweep alone is 588), 158 frontend tests, eight Playwright specs (the journey, six scenarios, the accessibility gate), 166 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
 
 ## Environment variables
 
@@ -94,6 +94,10 @@ cd frontend && npm run e2e          # Playwright against the running stack (back
 
 `ci.yml` runs seven blocking jobs on every push and pull request: backend, frontend, end to end with the accessibility gate, secret scan, the six-stage AI gate (`ai-gate.yml`, on the mock provider), dependency and code audit, images. `ai-eval.yml` runs the same golden and fairness sets against the real model nightly and on changes to the AI path. Images are built once and pushed to GHCR; a merge to `dev` deploys the development environment automatically; production is pinned to a release image and deployed by hand behind the owner's approval, with health gates after every rollout. Environments, secrets, migrations and rollback by layer: `docs/09-operations/OPERATIONS.md`.
 
+## Observability
+
+`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. `docker compose --profile observability up -d` runs Prometheus with six alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same services run on Railway, Grafana at https://grafana.dev.permitflow.space, and Telegram carries the alerts, an hourly digest per environment and a command bot (`/status`, `/cost`, `/queue`). Details, every metric, the dashboard and what is still missing: `docs/13-observability/OBSERVABILITY.md`.
+
 ## AI verification
 
 Every uploaded document is checked in the background against the form (`backend/app/services/verification.py`): text is extracted (PDF and TXT), sent to a provider behind `VerificationProvider`, and the structured result is validated and post-processed by deterministic rules before it is stored. `AI_PROVIDER=mock` (default) is deterministic and offline; `AI_PROVIDER=openai` uses `gpt-4.1-mini` with a strict JSON schema at temperature 0. Results are advisory: they never change a status, and the operator sees a plain outcome while the officer also sees confidence, evidence and the model. With `LANGSMITH_API_KEY` set, checks are traced with inputs hidden by default. Design: `docs/07-ai/AI_VERIFICATION_DESIGN.md`; measurements: `docs/07-ai/AI_EVALUATION.md`; how the answers are kept trustworthy, in one page: `docs/07-ai/AI_ASSURANCE.md`.
@@ -104,7 +108,7 @@ Claude Code (Claude Opus 5 for most sessions, Claude Fable 5.1 for some) in the 
 
 Every story ran the full suites, `ruff`, `mypy --strict` and `tsc --strict`, and a browser check at three widths before it moved to Done; every reviewer finding was reproduced before a fix; I read every diff before a commit and every push needed my yes. Where the AI was wrong is written down: invented enum values and a valid verdict on an expired certificate, a scope-creeping story, a transition the state machine did not allow, a scratch file in a commit, UTC licence dates, a harness fault first blamed on the model.
 
-The full record, with the prompts grouped by the decision they carry, what was discarded and how the debrief videos were made: `AI_USAGE.md`. Slides 16 to 19 of the technical deck cover the same ground.
+The full record, with the prompts grouped by the decision they carry, what was discarded and how the debrief videos were made: `AI_USAGE.md`. Slides 17 to 20 of the technical deck cover the same ground.
 
 ## Release notes
 
@@ -118,5 +122,5 @@ Each item has a row with severity in `docs/11-reviews/PRODUCTION_READINESS_REVIE
 2. A worker for the AI checks (Redis or a Postgres `SKIP LOCKED` queue) so checks survive deploys and scale apart from the API; ADR-004 has one call site to change.
 3. Object storage with signed URLs and a virus scan, a backup and restore drill, a retention policy.
 4. httpOnly cookie sessions with CSRF protection, CSP nonces, the rate windows in Redis or at the edge.
-5. Observability: a `/metrics` endpoint on the API, Prometheus scraping the API, nginx and Postgres, Grafana dashboards and alerts on an SLO; request logs and AI traces are the only telemetry today (readiness row 24).
+5. Observability, second half: acknowledgement and escalation for the Telegram alerts, nginx and Postgres exporters, one Prometheus per environment, a runbook per alert (readiness row 24).
 6. AI assurance beyond 14 golden cases: a labelled set grown from officer overrides, a red-team suite, calibrated confidence, in-region tracing, a multilingual injection classifier, Project Moonshot as the Singapore assurance evidence (`docs/07-ai/AI_ASSURANCE.md`, Limits).

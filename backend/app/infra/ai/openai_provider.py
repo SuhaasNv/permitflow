@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict
 
+from app.core import metrics
 from app.domain.enums import IssueCode
 from app.domain.verification_rules import VerificationRequest, VerificationResult
 from app.infra.ai.base import ProviderError, ProviderUnavailable
@@ -126,6 +127,7 @@ class OpenAIProvider:
             raise ProviderUnavailable(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - any other API failure is a provider error
             raise ProviderError(str(exc)) from exc
+        _count_tokens(self.model or "gpt-4.1-mini", getattr(completion, "usage", None))
         content = completion.choices[0].message.content if completion.choices else None
         if not content:
             raise ProviderError("empty response")
@@ -134,6 +136,19 @@ class OpenAIProvider:
             return VerificationResult.model_validate(_bounded(wire.model_dump()))
         except Exception as exc:
             raise ProviderError(f"schema validation failed: {exc}") from exc
+
+
+def _count_tokens(model: str, usage: Any) -> None:
+    """Billing counters for the dashboard (US-077): prompt tokens, their cached part, completion tokens."""
+    if usage is None:
+        return
+    prompt = int(getattr(usage, "prompt_tokens", 0) or 0)
+    completion = int(getattr(usage, "completion_tokens", 0) or 0)
+    details = getattr(usage, "prompt_tokens_details", None)
+    cached = int(getattr(details, "cached_tokens", 0) or 0)
+    metrics.OPENAI_TOKENS.labels(model, "prompt").inc(prompt)
+    metrics.OPENAI_TOKENS.labels(model, "cached").inc(cached)
+    metrics.OPENAI_TOKENS.labels(model, "completion").inc(completion)
 
 
 def _bounded(data: dict[str, Any]) -> dict[str, Any]:

@@ -43,7 +43,10 @@ def _client_with(outcome: Any) -> tuple[Any, _FakeCompletions]:
 
 
 def _completion(content: str | None) -> Any:
-    return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+    usage = SimpleNamespace(
+        prompt_tokens=1200, completion_tokens=80, prompt_tokens_details=SimpleNamespace(cached_tokens=1024)
+    )
+    return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))], usage=usage)
 
 
 @pytest.fixture
@@ -85,6 +88,13 @@ def test_valid_answer_is_parsed_bounded_and_sent_with_the_strict_schema(
     assert kwargs["model"] == "gpt-4.1-mini" and kwargs["temperature"] == 0
     assert kwargs["response_format"]["json_schema"]["strict"] is True
     assert kwargs["messages"][0]["role"] == "system" and "<document>" in kwargs["messages"][1]["content"]
+    # billing counters (US-077): prompt, its cached part, completion
+    from app.core import metrics
+
+    sample = metrics.OPENAI_TOKENS.labels("gpt-4.1-mini", "prompt")._value.get()
+    assert sample >= 1200
+    assert metrics.OPENAI_TOKENS.labels("gpt-4.1-mini", "cached")._value.get() >= 1024
+    assert metrics.OPENAI_TOKENS.labels("gpt-4.1-mini", "completion")._value.get() >= 80
 
 
 def test_timeout_and_connection_failures_are_unavailable_not_errors(
