@@ -55,6 +55,9 @@ def test_propose_from_under_review_moves_the_case_and_asks_the_operator(
     mine = _operator_view(client, op, app_id)
     assert mine["status_label"] == "Pending Site Visit"
     assert mine["site_visit"]["status_label"] == "Waiting for your reply"
+    # the officer's name stays inside the office: the operator sees the role
+    assert mine["site_visit"]["rounds"][0]["author_name"] == "Licensing officer"
+    assert view["site_visit"]["rounds"][0]["author_name"] not in ("", "Licensing officer")
     assert mine["site_visit"]["can_accept"] and mine["site_visit"]["can_counter"]
     assert mine["site_visit"]["reply_by"] is not None
     assert mine["needs_operator_action"] is True
@@ -369,3 +372,70 @@ def test_six_rounds_then_only_the_closing_moves_remain(client: TestClient, db: S
         json={"date": next_working_day(14), "slot": "morning", "reason": "One more time."},
     )
     assert r.status_code == 409 and "Round limit" in r.json()["error"]["message"]
+
+
+def test_keep_after_a_reschedule_keeps_the_confirmed_date_not_round_one(
+    client: TestClient, db: Session
+) -> None:
+    """Officer proposes A, operator counters B, officer accepts B; the operator later asks for C and the
+    officer keeps: the visit stays on B and the earlier rounds keep their recorded outcomes."""
+    app_id, op, off, _ = under_review(client, db)
+    a, b, c = next_working_day(3), next_working_day(5), next_working_day(8)
+    propose_visit(client, off, app_id, date=a)
+    r = client.post(
+        f"/api/v1/applications/{app_id}/site-visit/counter",
+        headers=op,
+        json={"date": b, "slot": "afternoon", "reason": "Closed that morning."},
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(
+        f"/api/v1/officer/applications/{app_id}/site-visit/decide",
+        headers=off,
+        json={"action": "accept_operator"},
+    )
+    assert r.status_code == 200 and r.json()["site_visit"]["date"] == b
+    r = client.post(
+        f"/api/v1/applications/{app_id}/site-visit/reschedule",
+        headers=op,
+        json={"date": c, "slot": "morning", "reason": "Renovation that week."},
+    )
+    assert r.status_code == 200, r.text
+    view = _officer_view(client, off, app_id)["site_visit"]
+    assert view["date"] == b and view["original"]["round"] == 2 and view["counter"]["round"] == 3
+    r = client.post(
+        f"/api/v1/officer/applications/{app_id}/site-visit/decide",
+        headers=off,
+        json={"action": "keep_original"},
+    )
+    assert r.status_code == 200, r.text
+    visit = r.json()["site_visit"]
+    assert visit["status"] == "confirmed" and visit["date"] == b and visit["slot"] == "afternoon"
+    outcomes = [
+        p.outcome.value for p in db.scalars(select(SiteVisitProposal).order_by(SiteVisitProposal.round_no))
+    ]
+    assert outcomes == ["declined", "accepted", "declined"]
+    mine = _operator_view(client, op, app_id)["site_visit"]
+    assert mine["date"] == b and mine["status_label"] == "Confirmed"
+    # the officer's own reschedule, countered, then kept: that pending proposal is the one marked kept
+    r = client.post(
+        f"/api/v1/officer/applications/{app_id}/site-visit/reschedule",
+        headers=off,
+        json={"date": c, "slot": "afternoon", "reason": "Inspector unavailable."},
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(
+        f"/api/v1/applications/{app_id}/site-visit/counter",
+        headers=op,
+        json={"date": next_working_day(9), "slot": "morning", "reason": "Not that day."},
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(
+        f"/api/v1/officer/applications/{app_id}/site-visit/decide",
+        headers=off,
+        json={"action": "keep_original"},
+    )
+    assert r.status_code == 200 and r.json()["site_visit"]["date"] == c
+    outcomes = [
+        p.outcome.value for p in db.scalars(select(SiteVisitProposal).order_by(SiteVisitProposal.round_no))
+    ]
+    assert outcomes == ["declined", "accepted", "declined", "kept", "declined"]

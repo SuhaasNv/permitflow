@@ -104,7 +104,7 @@ class SiteVisitService:
                     else "Only for a proposal the operator has left unanswered."
                 )
             ),
-            original=self._original(proposals),
+            original=self._original(visit, proposals),
             counter=self._pending_counter(visit, proposals),
             can_reschedule=reschedulable,
             rounds_left=left,
@@ -136,7 +136,8 @@ class SiteVisitService:
             earliest_date=earliest_date(self.today(), by_operator=True),
             rounds_left=left,
             round_limit_reason=ROUND_LIMIT_REASON if left == 0 else None,
-            rounds=[self._proposal_out(p) for p in proposals],
+            # The officer's name stays inside the office (T3): operators see the role, never the person.
+            rounds=[self._proposal_out(p, mask_officer=True) for p in proposals],
         )
 
     def awaits_operator(self, app_ids: list[uuid.UUID]) -> set[uuid.UUID]:
@@ -230,11 +231,22 @@ class SiteVisitService:
         )
         proposals = self.visits.proposals_for(visit.id)
         counter = proposals[-1]
-        original = next(p for p in reversed(proposals) if p.author_role == Role.OFFICER.value)
+        # The date on the table is the visit's own (proposed by the officer, or the one confirmed before
+        # the operator asked to move it). Only an officer proposal still pending is settled here: after a
+        # reschedule of a confirmed visit the earlier rounds keep the outcome they already have.
+        open_officer = next(
+            (
+                p
+                for p in reversed(proposals)
+                if p.author_role == Role.OFFICER.value and p.outcome == SiteVisitProposalOutcome.PENDING
+            ),
+            None,
+        )
         now = self.now()
         if action == "accept_operator":
             self._settle(counter, SiteVisitProposalOutcome.ACCEPTED, now)
-            self._settle(original, SiteVisitProposalOutcome.DECLINED, now)
+            if open_officer:
+                self._settle(open_officer, SiteVisitProposalOutcome.DECLINED, now)
             self._confirm(visit, officer, counter.date, counter.slot, now)
             self._audit(app, officer, "site_visit.confirmed", visit, {"how": "accepted_operator_date"})
             self._notify_operator(
@@ -244,8 +256,9 @@ class SiteVisitService:
             )
         elif action == "keep_original":
             self._settle(counter, SiteVisitProposalOutcome.DECLINED, now)
-            self._settle(original, SiteVisitProposalOutcome.KEPT, now)
-            self._confirm(visit, officer, original.date, original.slot, now)
+            if open_officer:
+                self._settle(open_officer, SiteVisitProposalOutcome.KEPT, now)
+            self._confirm(visit, officer, visit.date, visit.slot, now)
             self._audit(app, officer, "site_visit.confirmed", visit, {"how": "kept_original_date"})
             self._notify_operator(
                 app,
@@ -264,7 +277,8 @@ class SiteVisitService:
                 raise ValidationFailed("Some fields need attention.", details={"fields": {"date": problem}})
             self._check_rounds(proposals)
             self._settle(counter, SiteVisitProposalOutcome.DECLINED, now)
-            self._settle(original, SiteVisitProposalOutcome.SUPERSEDED, now)
+            if open_officer:
+                self._settle(open_officer, SiteVisitProposalOutcome.SUPERSEDED, now)
             visit.status = SiteVisitStatus.PROPOSED
             visit.date, visit.slot, visit.note = visit_date, slot_value, note
             visit.proposed_by_id = officer.id
@@ -530,9 +544,10 @@ class SiteVisitService:
             app, NotificationKind.RESUBMITTED, f"{app.reference_no}: {title}", body
         )
 
-    def _original(self, proposals: list[SiteVisitProposal]) -> SiteVisitProposalOut | None:
-        officer_rounds = [p for p in proposals if p.author_role == Role.OFFICER.value]
-        return self._proposal_out(officer_rounds[-1]) if officer_rounds else None
+    def _original(self, visit: SiteVisit, proposals: list[SiteVisitProposal]) -> SiteVisitProposalOut | None:
+        """The round that put the date on the table: the last one matching the visit's date and slot."""
+        match = next((p for p in reversed(proposals) if p.date == visit.date and p.slot == visit.slot), None)
+        return self._proposal_out(match) if match else None
 
     def _pending_counter(
         self, visit: SiteVisit, proposals: list[SiteVisitProposal]
@@ -541,12 +556,17 @@ class SiteVisitService:
             return None
         return self._proposal_out(proposals[-1])
 
-    def _proposal_out(self, p: SiteVisitProposal) -> SiteVisitProposalOut:
+    def _proposal_out(self, p: SiteVisitProposal, *, mask_officer: bool = False) -> SiteVisitProposalOut:
         author = self.users.get(p.author_id)
+        officer_round = p.author_role == Role.OFFICER.value
         return SiteVisitProposalOut(
             round=p.round_no,
             author_role=p.author_role,
-            author_name=author.full_name if author else "",
+            author_name=(
+                "Licensing officer"
+                if officer_round and mask_officer
+                else (author.full_name if author else "")
+            ),
             date=p.date,
             slot=p.slot.value,
             when=format_visit(p.date, p.slot),

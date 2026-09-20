@@ -178,3 +178,35 @@ export async function seedPendingResubmission(message = 'Please confirm the prem
   await transition(off, seeded.id, 'pending_pre_site_resubmission')
   return seeded
 }
+
+// ---- Site visit appointment (US-084) ----
+
+/** An ISO date `n` working days ahead of today in Singapore (Monday to Friday, no holiday calendar). */
+export function workingDayAhead(n: number): string {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' })
+  const d = new Date(`${today}T00:00:00Z`)
+  let left = n
+  while (left > 0) {
+    d.setUTCDate(d.getUTCDate() + 1)
+    const day = d.getUTCDay()
+    if (day !== 0 && day !== 6) left -= 1
+  }
+  return d.toISOString().slice(0, 10)
+}
+
+/** The officer proposes the visit through the UI: Mark site visit scheduled, then the dialog. */
+export async function proposeVisit(page: Page, date = workingDayAhead(3), slot: 'Morning' | 'Afternoon' = 'Morning', note?: string) {
+  await page.getByRole('button', { name: 'Mark site visit scheduled' }).click()
+  const dialog = page.locator('dialog[open]')
+  await dialog.getByLabel(/Date/).fill(date)
+  await dialog.getByRole('button', { name: new RegExp(slot) }).click()
+  if (note) await dialog.getByLabel(/Note for the operator/).fill(note)
+  await dialog.getByRole('button', { name: 'Propose visit' }).click()
+  await expect(status(page)).toHaveText('Site Visit Scheduled')
+}
+
+/** The operator accepts the proposed date through the API (setup for officer-side scenarios). */
+export async function acceptVisit(id: string) {
+  const op = await login(OPERATOR)
+  await call(op, `/applications/${id}/site-visit/accept`, { method: 'POST' })
+}
