@@ -150,7 +150,7 @@ Edges after US-079 (the sweep's expected table is regenerated from this list, ne
 |------|----|-------|-------|-------|
 | `site_visit_scheduled` | `site_visit_done` | officer | none | Mark site visit done (kept; also taken by the checklist submit when it runs from `site_visit_scheduled`, in the same transaction) |
 | `site_visit_done` | `awaiting_post_site_clarification` | system (the checklist submit service) | checklist complete | Checklist submitted |
-| `site_visit_done` | `pending_approval` | removed | | the checklist is the visit record; SCOPE assumption 6 closes |
+| `site_visit_done` | `pending_approval` | officer, transitional | `checklist_started = false` (Sprint 4: no checklist exists yet, so every pre-site journey still reaches approval); removed by US-063 with the four suite rewrites | the checklist becomes the visit record; SCOPE assumption 6 closes |
 | `awaiting_post_site_clarification` | `post_site_clarification_resubmitted` | operator | `all_open_items_answered` | Send responses (new edge) |
 | `awaiting_post_site_clarification` | `pending_approval` | officer | no `open` and no `answered` item | Route to approval (a checklist with nothing flagged, or everything withdrawn) |
 | `awaiting_post_site_clarification` | `pending_post_site_resubmission` | removed | | an officer cannot re-request before the operator answers |
