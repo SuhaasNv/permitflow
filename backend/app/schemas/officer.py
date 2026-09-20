@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.applications import LicenceView
 from app.schemas.checklist import ChecklistSummaryOut
+from app.schemas.clarification import ClarificationOfficerView
 from app.schemas.site_visit import SiteVisitOut
 
 
@@ -179,6 +180,8 @@ class OfficerApplicationOut(BaseModel):
     site_visit: SiteVisitOut | None = None
     # The current visit's checklist (US-060): present once the officer opened it.
     checklist: ChecklistSummaryOut | None = None
+    # The clarification threads once the checklist is submitted (US-066).
+    clarification: ClarificationOfficerView | None = None
     licence: LicenceView | None = None
     version: int
     created_at: datetime

@@ -20,6 +20,7 @@ from app.repositories.revisions import RevisionRepository
 from app.repositories.users import UserRepository
 from app.schemas.applications import LicenceView
 from app.schemas.checklist import ChecklistSummaryOut
+from app.schemas.clarification import ClarificationOfficerView
 from app.schemas.officer import (
     ActionOut,
     ApplicantOut,
@@ -33,6 +34,7 @@ from app.schemas.officer import (
 )
 from app.schemas.site_visit import SiteVisitOut
 from app.services.checklist import ChecklistService
+from app.services.clarification import ClarificationService
 from app.services.compare import CompareService
 from app.services.feedback import restorable, target_label
 from app.services.licence import LicenceService, licence_view
@@ -113,6 +115,7 @@ class OfficerViewService:
             licence=licence_view(LicenceService(self.db).for_application(app.id)),
             site_visit=SiteVisitService(self.db).officer_view(app),
             checklist=ChecklistService(self.db).summary(app),
+            clarification=ClarificationService(self.db).officer_view(app),
         )
 
 
@@ -131,6 +134,7 @@ def _assemble(
     licence: LicenceView | None = None,
     site_visit: SiteVisitOut | None = None,
     checklist: ChecklistSummaryOut | None = None,
+    clarification: ClarificationOfficerView | None = None,
 ) -> OfficerApplicationOut:
     now = datetime.now(UTC)
     form = current.form_data if current else app.draft_data
@@ -252,6 +256,7 @@ def _assemble(
         withdrawal_reason=app.withdrawal_reason,
         site_visit=site_visit,
         checklist=checklist,
+        clarification=clarification,
         licence=licence,
         version=app.version,
         created_at=app.created_at,

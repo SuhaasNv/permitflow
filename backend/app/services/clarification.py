@@ -39,9 +39,12 @@ from app.schemas.clarification import (
     ClarificationAttachmentOut,
     ClarificationBlock,
     ClarificationItemOut,
+    ClarificationOfficerView,
     ClarificationOperatorView,
     ClarificationRequestOut,
     ClarificationResponseOut,
+    ClarificationThreadOut,
+    ClarificationThreadRequestOut,
 )
 from app.services.documents import CHUNK, _display_name
 from app.services.notifications import NotificationService
@@ -469,3 +472,218 @@ class ClarificationService:
         if app.status not in OPERATOR_TURN_STATES:
             raise Conflict("The licensing office is not waiting for your answers right now.")
         return response
+
+    # Officer side (US-066) -----------------------------------------------------------------------
+
+    OFFICER_TURN_STATES = (
+        ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED,
+        ApplicationStatus.AWAITING_POST_SITE_CLARIFICATION,
+    )
+
+    def officer_view(self, app: Application) -> ClarificationOfficerView | None:
+        """Every thread of the current visit's submitted checklist: the item's own finding on top, every
+        request and answer, and what the officer may do with it now. None before the checklist is
+        submitted."""
+        from app.domain.enums import ChecklistStatus  # noqa: PLC0415
+
+        checklist = self.checklists.current_for(app.id)
+        if checklist is None or checklist.status != ChecklistStatus.SUBMITTED:
+            return None
+        items = self.checklists.items_for(checklist.id)
+        requests = self.checklists.requests_for_items([i.id for i in items])
+        responses = self.checklists.responses_for_requests([q.id for q in requests])
+        attachments = self.checklists.attachments_for_responses([r.id for r in responses.values()])
+        by_item: dict[uuid.UUID, list[ClarificationRequest]] = {}
+        for q in requests:
+            by_item.setdefault(q.item_id, []).append(q)
+        threads: list[ClarificationThreadOut] = []
+        for item in items:
+            rounds = by_item.get(item.id, [])
+            if not rounds:
+                continue
+            threads.append(self._thread_out(app, item, rounds, responses, attachments))
+        counts = {
+            s: sum(1 for t in threads if t.status == s) for s in ("open", "answered", "resolved", "withdrawn")
+        }
+        unreleased = sum(1 for t in threads if t.pending_release)
+        round_no = max((t.round_no for t in threads), default=0)
+        if app.status == ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED:
+            turn = f"Round {round_no}, your turn"
+        elif app.status in OPERATOR_TURN_STATES:
+            turn = f"Round {round_no}, waiting on operator"
+        else:
+            turn = f"Round {round_no}"
+        return ClarificationOfficerView(
+            visit_no=checklist.visit_no,
+            round=round_no,
+            open_count=counts["open"],
+            answered_count=counts["answered"],
+            resolved_count=counts["resolved"],
+            withdrawn_count=counts["withdrawn"],
+            unreleased_count=unreleased,
+            turn=turn,
+            items=threads,
+        )
+
+    def resolve(self, officer: User, application_id: uuid.UUID, item_id: uuid.UUID) -> None:
+        """Mark clarified: an answered item is done with (US-066)."""
+        app = self.applications.get_for(officer, application_id, for_update=True)
+        item = self._item_for(app, item_id)
+        if app.status != ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED:
+            raise Conflict("Items are decided once the operator has sent their answers.")
+        if item.clarification_status != ClarificationStatus.ANSWERED:
+            raise Conflict("Only an answered item can be marked clarified.")
+        now = datetime.now(UTC)
+        item.clarification_status = ClarificationStatus.RESOLVED
+        item.resolved_by_id = officer.id
+        item.resolved_at = now
+        self.audit.record(
+            application_id=app.id,
+            actor_id=officer.id,
+            event_type="clarification.resolved",
+            payload={"item_key": item.item_key},
+        )
+        self.db.commit()
+
+    def reopen(self, officer: User, application_id: uuid.UUID, item_id: uuid.UUID, message: str) -> None:
+        """Still needs clarification: a new question for the next round, unreleased until Request
+        another round; the item is open again."""
+        text = self._text(message)
+        app = self.applications.get_for(officer, application_id, for_update=True)
+        item = self._item_for(app, item_id)
+        if app.status != ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED:
+            raise Conflict("Items are decided once the operator has sent their answers.")
+        if item.clarification_status != ClarificationStatus.ANSWERED:
+            raise Conflict("Only an answered item can be asked about again.")
+        rounds = self.checklists.requests_for_items([item.id])
+        next_round = max((q.round_no for q in rounds), default=0) + 1
+        self.checklists.add(
+            ClarificationRequest(item_id=item.id, round_no=next_round, author_id=officer.id, message=text)
+        )
+        item.clarification_status = ClarificationStatus.OPEN
+        self.audit.record(
+            application_id=app.id,
+            actor_id=officer.id,
+            event_type="clarification.reopened",
+            payload={"item_key": item.item_key, "round": next_round},
+        )
+        self.db.commit()
+
+    def withdraw(self, officer: User, application_id: uuid.UUID, item_id: uuid.UUID) -> None:
+        """Withdraw an open question: the operator need not answer it; an unreleased draft is dropped."""
+        app = self.applications.get_for(officer, application_id, for_update=True)
+        item = self._item_for(app, item_id)
+        if app.status not in self.OFFICER_TURN_STATES + (ApplicationStatus.PENDING_POST_SITE_RESUBMISSION,):
+            raise Conflict("Questions can be withdrawn while the clarification rounds are running.")
+        if item.clarification_status != ClarificationStatus.OPEN:
+            raise Conflict("Only an open question can be withdrawn.")
+        rounds = self.checklists.requests_for_items([item.id])
+        latest = rounds[-1]
+        now = datetime.now(UTC)
+        latest.withdrawn_at = now
+        item.clarification_status = ClarificationStatus.WITHDRAWN
+        self.audit.record(
+            application_id=app.id,
+            actor_id=officer.id,
+            event_type="clarification.withdrawn",
+            payload={"item_key": item.item_key, "round": latest.round_no},
+        )
+        self.db.commit()
+
+    def release_next_round(self, app: Application, officer: User, now: datetime) -> int:
+        """Called by the workflow inside the Request another round transition: every unreleased
+        request of the current checklist is released and audited; returns how many."""
+        checklist = self.checklists.current_for(app.id)
+        if checklist is None:
+            return 0
+        items = {i.id: i for i in self.checklists.items_for(checklist.id)}
+        released = 0
+        for q in self.checklists.requests_for_items(list(items)):
+            if q.released_at is None and q.withdrawn_at is None:
+                q.released_at = now
+                released += 1
+                self.audit.record(
+                    application_id=app.id,
+                    actor_id=officer.id,
+                    event_type="clarification.released",
+                    payload={"item_key": items[q.item_id].item_key, "round": q.round_no},
+                )
+        return released
+
+    def _item_for(self, app: Application, item_id: uuid.UUID) -> ChecklistItem:
+        item = self.checklists.item(item_id)
+        checklist = self.checklists.checklist(item.checklist_id) if item else None
+        if item is None or checklist is None or checklist.application_id != app.id:
+            raise NotFound("Item not found.")
+        return item
+
+    def _thread_out(
+        self,
+        app: Application,
+        item: ChecklistItem,
+        rounds: list[ClarificationRequest],
+        responses: dict[uuid.UUID, ClarificationResponse],
+        attachments: dict[uuid.UUID, list[ClarificationAttachment]],
+    ) -> ClarificationThreadOut:
+        definition = ITEM_BY_KEY.get(item.item_key)
+        status = item.clarification_status
+        deciding = app.status == ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED
+        withdrawable = app.status in self.OFFICER_TURN_STATES + (
+            ApplicationStatus.PENDING_POST_SITE_RESUBMISSION,
+        )
+        out: list[ClarificationThreadRequestOut] = []
+        for q in rounds:
+            r = responses.get(q.id)
+            author = self.users_name(q.author_id)
+            out.append(
+                ClarificationThreadRequestOut(
+                    id=q.id,
+                    round_no=q.round_no,
+                    message=q.message,
+                    author_name=author,
+                    created_at=q.created_at,
+                    released_at=q.released_at,
+                    withdrawn_at=q.withdrawn_at,
+                    response=(
+                        ClarificationResponseOut(
+                            id=r.id,
+                            round_no=q.round_no,
+                            message=r.message,
+                            created_at=r.created_at,
+                            sent_at=r.sent_at,
+                            attachments=[
+                                ClarificationAttachmentOut(
+                                    id=a.id,
+                                    original_filename=a.original_filename,
+                                    content_type=a.content_type,
+                                    size_bytes=a.size_bytes,
+                                    uploaded_at=a.uploaded_at,
+                                )
+                                for a in attachments.get(r.id, [])
+                            ],
+                        )
+                        if r is not None and r.sent_at is not None
+                        else None
+                    ),
+                )
+            )
+        return ClarificationThreadOut(
+            item_id=item.id,
+            key=item.item_key,
+            title=definition.title if definition else item.item_key,
+            result=item.result.value,
+            comment=item.comment,
+            status=status.value,
+            round_no=max(q.round_no for q in rounds),
+            requests=out,
+            can_resolve=deciding and status == ClarificationStatus.ANSWERED,
+            can_reopen=deciding and status == ClarificationStatus.ANSWERED,
+            can_withdraw=withdrawable and status == ClarificationStatus.OPEN,
+            pending_release=any(q.released_at is None and q.withdrawn_at is None for q in rounds),
+        )
+
+    def users_name(self, user_id: uuid.UUID) -> str:
+        from app.repositories.users import UserRepository  # noqa: PLC0415
+
+        user = UserRepository(self.db).get(user_id)
+        return user.full_name if user else ""

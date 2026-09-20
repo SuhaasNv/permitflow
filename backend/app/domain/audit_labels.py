@@ -83,6 +83,24 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
                 f"Checklist submitted for visit {p.get('visit_no', '')}: {ok} satisfactory, "
                 f"{bad} unsatisfactory, {na} not applicable, {flagged} flagged for clarification"
             )
+        case "clarification.response_drafted":
+            return f"Operator drafted an answer on {p.get('item_key', '')} (round {p.get('round', '')})"
+        case "clarification.attachment_added":
+            return f"Operator attached {p.get('filename', '')} to an answer"
+        case "clarification.attachment_removed":
+            return f"Operator removed {p.get('filename', '')} from an answer"
+        case "clarification.answered":
+            return f"Answer sent on {p.get('item_key', '')} (round {p.get('round', '')})"
+        case "clarification.resolved":
+            return f"Item {p.get('item_key', '')} marked clarified"
+        case "clarification.reopened":
+            return (
+                f"Item {p.get('item_key', '')} still needs clarification (round {p.get('round', '')} drafted)"
+            )
+        case "clarification.withdrawn":
+            return f"Question on {p.get('item_key', '')} withdrawn (round {p.get('round', '')})"
+        case "clarification.released":
+            return f"Question on {p.get('item_key', '')} sent to the operator (round {p.get('round', '')})"
         case _:
             return event_type
 
