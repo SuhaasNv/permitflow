@@ -40,7 +40,7 @@ The shipped system is a complete, tested vertical slice of use cases 1 and 2 wit
 - Authorization: role per router, ownership as 404, sub-resource checks, authorization cases in every router's test file (wrong role, wrong owner, wrong state), with `POST /notifications/read-all` covered by ownership in the query rather than a cross-user test.
 - Integrity: state machine as data (588 tested combinations), row locks with an optimistic version, immutable revisions, audit rows in the same transaction, licence issued in the approval transaction.
 - Input handling: error envelope everywhere, Pydantic 422 with field details, upload allowlist and magic bytes, `Content-Length` pre-check, 10 MB.
-- Tests: 763 backend test cases (real PostgreSQL, migrations from scratch), 158 vitest, 8 Playwright specs (journey, six scenarios, accessibility gate) in CI against the full stack; coverage thresholds enforced (backend 80, frontend 80 statements).
+- Tests: 763 backend test cases (real PostgreSQL, migrations from scratch), 160 vitest, 8 Playwright specs (journey, six scenarios, accessibility gate) in CI against the full stack; coverage thresholds enforced (backend 80, frontend 80 statements).
 - Delivery: images built once, GHCR tags with `sha-`, two environments that share nothing, production behind a required reviewer, health gates after the rollout, rollback by tag.
 - Docs: every document in `docs/README.md` describes what exists; reviews record every finding and its outcome.
 

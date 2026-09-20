@@ -1,7 +1,9 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
+import { AuthProvider } from '@/features/auth/AuthContext'
 import { PolicyPage } from './PolicyPage'
 import { OPERATOR_NAME, POLICIES } from './content'
 
@@ -15,11 +17,30 @@ function renderAt(path: string) {
     ],
     { initialEntries: [path] },
   )
-  render(<RouterProvider router={router} />)
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </QueryClientProvider>,
+  )
   return router
 }
 
+function storeSession(role: 'operator' | 'officer') {
+  sessionStorage.setItem(
+    'permitflow.session',
+    JSON.stringify({
+      token: 'tok',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      user: { id: '1', email: `${role}@permitflow.example.sg`, full_name: 'Demo', role },
+    }),
+  )
+}
+
 describe('PolicyPage (US-057)', () => {
+  afterEach(() => sessionStorage.clear())
+
   it.each(['privacy', 'terms', 'cookies'] as const)('renders the %s policy with every section', (slug) => {
     renderAt(`/${slug}`)
     const policy = POLICIES[slug]
@@ -30,6 +51,17 @@ describe('PolicyPage (US-057)', () => {
     }
     expect(screen.getByRole('link', { name: policy.title })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('main')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login')
+  })
+
+  it.each([
+    ['operator', 'Back to dashboard', '/app/dashboard'],
+    ['officer', 'Back to queue', '/officer/queue'],
+  ] as const)('leads a signed-in %s back into the app instead of to the sign-in page', (role, label, href) => {
+    storeSession(role)
+    renderAt('/privacy')
+    expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', href)
+    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument()
   })
 
   it('names the operator, links the repository, and says it is not a government service', () => {

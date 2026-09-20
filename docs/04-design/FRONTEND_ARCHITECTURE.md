@@ -4,7 +4,7 @@ Rewritten on 20 September 2026 from the tree in `frontend/src`. The design-phase
 
 ## Stack
 
-React 19, TypeScript strict (no `any`), Vite, Tailwind v4, TanStack Query, React Hook Form with Zod, React Router. Tests: vitest with Testing Library (158 tests in 33 files, coverage thresholds in `vite.config.ts`), Playwright (the journey, six scenarios, an axe accessibility gate over 23 screen states). Linting: oxlint.
+React 19, TypeScript strict (no `any`), Vite, Tailwind v4, TanStack Query, React Hook Form with Zod, React Router. Tests: vitest with Testing Library (160 tests in 33 files, coverage thresholds in `vite.config.ts`), Playwright (the journey, six scenarios, an axe accessibility gate over 23 screen states). Linting: oxlint.
 
 ## Tree
 
