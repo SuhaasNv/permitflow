@@ -74,8 +74,48 @@ test('checklist: open from the case, assess items, save the draft, see the summa
   await signIn(page, OPERATOR)
   await page.goto(app.url)
   await expect(status(page)).toHaveText('Pending Post-Site Clarification')
-  await expect(page.getByText(/needs more information on 1 item/)).toBeVisible()
+  await expect(page.getByText(/needs more information on 1 item/).first()).toBeVisible()
   await expect(page.locator('main')).not.toContainText('Unsatisfactory')
   await page.getByRole('button', { name: /Notifications/ }).click()
   await expect(page.getByRole('dialog', { name: 'Notifications' })).toContainText(`${app.reference}: Pending Post-Site Clarification`)
+  await page.keyboard.press('Escape')
+  // only the flagged item, the officer's note first (US-064)
+  await page.getByRole('link', { name: 'Respond to clarification (1 item)' }).click()
+  await expect(page.getByText('Round 1: 1 of 1 item needs your response')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Floor trap in the food preparation area' })).toBeVisible()
+  await expect(page.getByText('Floor slopes away from the trap; water pools by the wok station.')).toBeVisible()
+  await expect(page.getByText('Waiting for your response')).toBeVisible()
+  await expect(page.locator('main')).not.toContainText('Layout matches the submitted floor plan')
+
+  // ---- the operator answers, attaches a file, sends (US-065) ----
+  await expect(page.getByRole('button', { name: 'Send responses' })).toBeDisabled()
+  await page.getByLabel(/Your answer/).fill('Regraded on 23 Sep; water now runs to the trap. Photo attached.')
+  await page.getByLabel(/Your answer/).blur()
+  await expect(page.getByRole('button', { name: 'Choose a file' })).toBeVisible()
+  await page
+    .locator('input[type=file][multiple]')
+    .setInputFiles({
+      name: 'floor-trap.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('Photo description: floor regraded, water runs to the trap.'),
+    })
+  await expect(page.getByRole('button', { name: 'floor-trap.txt' })).toBeVisible()
+  await expect(page.getByText('1 of 3 files attached.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Send responses' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Send responses' }).click()
+  await page.locator('dialog[open]').getByRole('button', { name: 'Send responses' }).click()
+  await expect(page.getByText('Round 1: every item is answered')).toBeVisible()
+  await expect(page.getByText('Sent', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Send responses' })).toHaveCount(0)
+  await page.getByRole('link', { name: 'Back to the application' }).click()
+  await expect(status(page)).toHaveText('Post-Site Resubmitted')
+  await expect(page.getByRole('heading', { name: 'Your answers were sent to the licensing office' })).toBeVisible()
+  await signOut(page)
+
+  // ---- the officer is told and the case is theirs again ----
+  await signIn(page, OFFICER)
+  await openCase(page, app.reference)
+  await expect(status(page)).toHaveText('Post-Site Clarification Resubmitted')
+  await page.getByRole('button', { name: /Notifications/ }).click()
+  await expect(page.getByRole('dialog', { name: 'Notifications' })).toContainText('The operator answered the clarification request')
 })

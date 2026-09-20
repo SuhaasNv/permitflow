@@ -9,6 +9,8 @@ import {
   withdrawApplication,
   submitApplication,
 } from '@/api/applications'
+import type { ClarificationView } from '@/api/clarification'
+import { attachToResponse, getClarifications, removeAttachment, respondToClarification, sendClarifications } from '@/api/clarification'
 import { getFormSchema } from '@/api/formSchema'
 import type { DateInput } from '@/api/siteVisit'
 import { acceptSiteVisit, counterSiteVisit, rescheduleSiteVisitAsOperator } from '@/api/siteVisit'
@@ -147,4 +149,50 @@ export function useRescheduleSiteVisit(id: string) {
     mutationFn: (body: DateInput) => rescheduleSiteVisitAsOperator(id, body),
     onSuccess: (view) => afterVisitChange(qc, id, view),
   })
+}
+
+/** The flagged items with the officer's questions (US-064); refetches on focus so a new round shows. */
+export function useClarifications(id: string, enabled = true) {
+  return useQuery({
+    queryKey: [...applicationKeys.detail(id), 'clarifications'] as const,
+    queryFn: () => getClarifications(id),
+    enabled,
+    refetchOnWindowFocus: true,
+  })
+}
+
+function afterClarificationChange(qc: ReturnType<typeof useQueryClient>, id: string, view: ClarificationView) {
+  qc.setQueryData([...applicationKeys.detail(id), 'clarifications'], view)
+  void qc.invalidateQueries({ queryKey: applicationKeys.detail(id), exact: true })
+  void qc.invalidateQueries({ queryKey: applicationKeys.all })
+}
+
+export function useRespond(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ itemId, message }: { itemId: string; message: string }) => respondToClarification(id, itemId, message),
+    onSuccess: (view) => afterClarificationChange(qc, id, view),
+  })
+}
+
+export function useAttach(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ responseId, file }: { responseId: string; file: File }) => attachToResponse(id, responseId, file),
+    onSuccess: (result) => afterClarificationChange(qc, id, result.view),
+  })
+}
+
+export function useRemoveAttachment(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ responseId, attachmentId }: { responseId: string; attachmentId: string }) =>
+      removeAttachment(id, responseId, attachmentId),
+    onSuccess: (view) => afterClarificationChange(qc, id, view),
+  })
+}
+
+export function useSendClarifications(id: string) {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: () => sendClarifications(id), onSuccess: (view) => afterClarificationChange(qc, id, view) })
 }

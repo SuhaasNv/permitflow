@@ -14,7 +14,7 @@ User 1───* Application 1───* ApplicationRevision
                  ├───* AuditEvent (append-only)
                  ├───1 Licence (one per approved application, US-051)
                  ├───* SiteVisit 1───* SiteVisitProposal (the appointment and its rounds, US-084)
-                 └───* Checklist 1───* ChecklistItem 1───* ClarificationRequest (the record per visit and its threads, US-060, US-063)
+                 └───* Checklist 1───* ChecklistItem 1───* ClarificationRequest 1───1 ClarificationResponse 1───* ClarificationAttachment
 ```
 
 ## Entities
@@ -267,6 +267,14 @@ The officer's question on one flagged item, one row per round (US-063 to US-066)
 | withdrawn_at | datetime, nullable | |
 | created_at | datetime | |
 
+### ClarificationResponse
+
+The operator's answer to one request (US-065): one per request (unique), drafted then sent with the round; `message` up to 2000 characters; `sent_at` set by "Send responses"; append-only afterwards.
+
+### ClarificationAttachment
+
+Evidence on an answer (US-065): `original_filename`, `stored_key` (server-generated), `content_type`, `size_bytes`, `sha256`, `uploaded_by`, `uploaded_at`; the same allowlist, magic-byte and size checks as documents; at most three per answer; an identical file on the same answer is kept once; removable until the answer is sent.
+
 ### CommentTemplate (static configuration, not a table)
 `{key, target_type, title, body}` defined in `domain/feedback_templates.py` and served by `GET /officer/feedback-templates` (officers only). Templates are data, not code, so they can move to a table later without API change.
 
@@ -296,6 +304,7 @@ Required document types: `business_profile`, `floor_plan`, `tenancy_agreement`, 
 | AuditEvent | none | all applications; read | all applications; read, cross-application feed |
 | SiteVisit, SiteVisitProposal | own application; accept, counter, reschedule | all; propose, decide, confirm, reschedule | all; read |
 | Checklist, ChecklistItem | none (the operator receives the flagged items through the clarification view, US-064) | all; create, save, submit | all; read |
+| ClarificationRequest, ClarificationResponse, ClarificationAttachment | own application; read released requests, draft and send answers, attach and remove files until sent, download own files | all; ask, resolve, withdraw (US-066); download | all; read, download |
 | User | self | self | all; change role, deactivate/reactivate (planned, US-073) |
 
 ## Invariants (enforced in services and tested)

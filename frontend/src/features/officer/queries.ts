@@ -172,12 +172,15 @@ export function useChecklistSchema() {
   return useQuery({ queryKey: ['checklist-schema'], queryFn: getChecklistSchema, staleTime: Infinity })
 }
 
-/** The current visit's checklist, created on first open; refetches on focus so another tab's save shows. */
+/** The current visit's checklist: created on first open, returned afterwards (the POST is create-or-get,
+ * so a remount reloads the draft). No refetch on focus: the page merges another tab's save through the
+ * version conflict instead of replacing entries under the officer's hands. */
 export function useChecklist(id: string) {
   return useQuery({
     queryKey: officerKeys.checklist(id),
     queryFn: () => openChecklist(id),
     refetchOnWindowFocus: false,
+    retry: false,
   })
 }
 

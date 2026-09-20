@@ -128,6 +128,7 @@ Terminal states: `approved`, `rejected`, `withdrawn`.
 | any officer or system transition | audit `status.changed` (`trigger` = `officer` or `system`, the acting user as actor); the operator is notified `status_changed` with the operator label for every target in `WorkflowService.NOTIFY_OPERATOR` (every officer or system target); the caller may pass the body when it carries facts the service does not know (the count of flagged items at checklist submit) |
 | `→ site_visit_done` | mark the current SiteVisit `done` (`done_at`); the appointment stays readable on both sides (US-084) |
 | `→ awaiting_post_site_clarification` (system, from the checklist submit) | checklist `submitted` with `submitted_by`, `submitted_at`; a released round-1 `ClarificationRequest` per flagged item and the item `open`; audit `checklist.submitted` then `status.changed` (`trigger = system`); one operator notification with the count (US-063) |
+| `→ post_site_clarification_resubmitted` (operator, from Send responses) | every open item's answer gets `sent_at` and the item becomes `answered`; audit `clarification.answered` per item then `status.changed` (`trigger = operator`); every active officer notified "The operator answered the clarification request" (US-065) |
 | `→ approved` / `→ rejected` | store `decision_note` (the `status.changed` audit payload carries `has_note`); on approval, issue the licence and audit `licence.issued` (ADR-010) |
 
 ## Built (Sprint 2; the post-site edges amended in Sprint 4, US-079)

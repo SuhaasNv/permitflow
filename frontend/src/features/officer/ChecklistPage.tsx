@@ -177,6 +177,9 @@ export function ChecklistPage() {
   const versionRef = useRef<number | null>(null) // the version the next save is based on
   const dirtyRef = useRef(false)
   const inFlight = useRef(false)
+  // One id per attempt at the same batch of entries: a retry reuses it, so a save whose reply was lost
+  // answers with the state instead of a conflict; a new touch starts a new batch.
+  const saveId = useRef<string | null>(null)
 
   useEffect(() => guardUnload(), [])
   useEffect(
@@ -221,8 +224,9 @@ export function ChecklistPage() {
     if (!navigator.onLine) return // the online event schedules the save
     const sent = new Set(touched.current)
     inFlight.current = true
+    saveId.current ??= crypto.randomUUID()
     save.mutate(
-      { items: toInput(items), version, save_id: crypto.randomUUID() },
+      { items: toInput(items), version, save_id: saveId.current },
       {
         onSettled: () => {
           inFlight.current = false
@@ -232,6 +236,7 @@ export function ChecklistPage() {
           setSavedAt(Date.now())
           setRetrying(false)
           attempt.current = 0
+          saveId.current = null
           for (const key of sent) touched.current.delete(key)
           if (touched.current.size > 0) {
             // Touched again while the save was in flight: still dirty, save once more.
@@ -255,7 +260,12 @@ export function ChecklistPage() {
             return
           }
           if (e instanceof AppError && (e.status === 409 || e.status === 422)) {
+            // Submitted elsewhere, or a state the draft cannot be saved in: stop the autosave loop and
+            // reload so the page shows what stands (read-only once submitted).
             toast.push({ title: 'Could not save the checklist', body: e.message, tone: 'error' })
+            saveId.current = null
+            markDirty(false)
+            void checklist.refetch()
             return
           }
           // Network or server trouble: keep the entries and try again with backoff.
@@ -346,6 +356,7 @@ export function ChecklistPage() {
     const base = current() ?? findings
     const next = { ...base, [key]: { ...base[key], ...patch } }
     work.current = next
+    if (!inFlight.current) saveId.current = null // a new batch of entries gets its own id
     setEdits(next)
     touched.current.add(key)
     markDirty(true)

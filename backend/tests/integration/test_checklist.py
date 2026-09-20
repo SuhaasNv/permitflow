@@ -337,3 +337,27 @@ def _operator_id(db: Session, op: Headers) -> uuid.UUID:
     user = db.scalar(select(User).where(User.email == "op@example.sg"))
     assert user is not None
     return user.id
+
+
+def test_scheduled_again_before_a_new_date_does_not_reuse_the_done_visit(
+    client: TestClient, db: Session
+) -> None:
+    """Return to review, Mark site visit scheduled through the transition, no new date proposed yet:
+    the checklist of the done visit is not handed back; a fresh draft for visit 2 opens instead and the
+    queue asks for a date."""
+    app_id, op, off, _ = under_review(client, db)
+    arrange_visit(client, off, op, app_id)
+    first = _open(client, off, app_id)
+    client.put(URL.format(app_id), headers=off, json={"items": _items(), "version": first["version"]})
+    assert _submit(client, off, app_id).status_code == 200
+    transition(client, off, app_id, "pending_approval")
+    transition(client, off, app_id, "under_review")
+    transition(client, off, app_id, "site_visit_scheduled")  # the plain transition, no proposal yet
+    r = client.post(URL.format(app_id), headers=off)
+    assert r.status_code == 201 and r.json()["visit_no"] == 2 and r.json()["status"] == "draft", r.text
+    row = next(
+        i
+        for i in client.get("/api/v1/officer/applications", headers=off).json()["items"]
+        if i["id"] == app_id
+    )
+    assert row["next_action"] == "Propose a visit date"

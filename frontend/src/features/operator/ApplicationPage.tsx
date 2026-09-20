@@ -15,6 +15,7 @@ import { formatDate } from '@/lib/format'
 import { ApplicationHeader } from './ApplicationHeader'
 import { CompletionCard } from './CompletionCard'
 import { FeedbackNotice, targetHref } from './FeedbackNotice'
+import { ClarificationNotice } from './ClarificationNotice'
 import { SiteVisitCard } from './SiteVisitCard'
 import { applicationKeys, useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
 
@@ -230,7 +231,12 @@ export function ApplicationPage() {
           </Alert>
         </div>
       ) : null}
-      {view.site_visit ? (
+      {view.clarification ? (
+        <div className="mb-6">
+          <ClarificationNotice view={view} />
+        </div>
+      ) : null}
+      {view.site_visit && !view.clarification ? (
         <div className="mb-6">
           <SiteVisitCard view={view} />
         </div>

@@ -4,7 +4,13 @@ from collections.abc import Iterable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Checklist, ChecklistItem, ClarificationRequest
+from app.models import (
+    Checklist,
+    ChecklistItem,
+    ClarificationAttachment,
+    ClarificationRequest,
+    ClarificationResponse,
+)
 
 
 class ChecklistRepository:
@@ -66,5 +72,55 @@ class ChecklistRepository:
         )
         return list(self.db.scalars(stmt))
 
-    def add(self, row: Checklist | ChecklistItem | ClarificationRequest) -> None:
+    def responses_for_requests(
+        self, request_ids: Iterable[uuid.UUID]
+    ) -> dict[uuid.UUID, ClarificationResponse]:
+        ids = list(request_ids)
+        if not ids:
+            return {}
+        stmt = select(ClarificationResponse).where(ClarificationResponse.request_id.in_(ids))
+        return {r.request_id: r for r in self.db.scalars(stmt)}
+
+    def attachments_for_responses(
+        self, response_ids: Iterable[uuid.UUID]
+    ) -> dict[uuid.UUID, list[ClarificationAttachment]]:
+        ids = list(response_ids)
+        if not ids:
+            return {}
+        stmt = (
+            select(ClarificationAttachment)
+            .where(ClarificationAttachment.response_id.in_(ids))
+            .order_by(ClarificationAttachment.uploaded_at)
+        )
+        out: dict[uuid.UUID, list[ClarificationAttachment]] = {}
+        for a in self.db.scalars(stmt):
+            out.setdefault(a.response_id, []).append(a)
+        return out
+
+    def item(self, item_id: uuid.UUID) -> ChecklistItem | None:
+        return self.db.get(ChecklistItem, item_id)
+
+    def checklist(self, checklist_id: uuid.UUID) -> Checklist | None:
+        return self.db.get(Checklist, checklist_id)
+
+    def request(self, request_id: uuid.UUID) -> ClarificationRequest | None:
+        return self.db.get(ClarificationRequest, request_id)
+
+    def response(self, response_id: uuid.UUID) -> ClarificationResponse | None:
+        return self.db.get(ClarificationResponse, response_id)
+
+    def attachment(self, attachment_id: uuid.UUID) -> ClarificationAttachment | None:
+        return self.db.get(ClarificationAttachment, attachment_id)
+
+    def delete(self, row: ClarificationAttachment) -> None:
+        self.db.delete(row)
+
+    def add(
+        self,
+        row: Checklist
+        | ChecklistItem
+        | ClarificationRequest
+        | ClarificationResponse
+        | ClarificationAttachment,
+    ) -> None:
         self.db.add(row)

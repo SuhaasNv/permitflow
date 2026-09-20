@@ -1,4 +1,5 @@
 import { request } from './client'
+import type { ClarificationBlock } from './clarification'
 import type { DocumentView } from './documents'
 import type { SiteVisitOperator } from './siteVisit'
 import type { Tone } from '@/features/shared/StatusBadge'
@@ -104,6 +105,8 @@ export interface ApplicationView {
   licence: LicenceView | null
   /** The site visit appointment once the officer proposes one (US-084). */
   site_visit: SiteVisitOperator | null
+  /** The clarification rounds after the site visit (US-064); present once an item was released. */
+  clarification: ClarificationBlock | null
   created_at: string
   updated_at: string
 }
