@@ -96,7 +96,7 @@ cd frontend && npm run e2e          # Playwright against the running stack (back
 
 ## Observability
 
-`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. `docker compose --profile observability up -d` runs Prometheus with six alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same two services run on Railway, Grafana at https://grafana.dev.permitflow.space. Details, every metric, the dashboard and what is still missing (alert routing, exporters): `docs/13-observability/OBSERVABILITY.md`.
+`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. `docker compose --profile observability up -d` runs Prometheus with six alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same services run on Railway, Grafana at https://grafana.dev.permitflow.space, and Telegram carries the alerts, an hourly digest per environment and a command bot (`/status`, `/cost`, `/queue`). Details, every metric, the dashboard and what is still missing: `docs/13-observability/OBSERVABILITY.md`.
 
 ## AI verification
 
@@ -122,5 +122,5 @@ Each item has a row with severity in `docs/11-reviews/PRODUCTION_READINESS_REVIE
 2. A worker for the AI checks (Redis or a Postgres `SKIP LOCKED` queue) so checks survive deploys and scale apart from the API; ADR-004 has one call site to change.
 3. Object storage with signed URLs and a virus scan, a backup and restore drill, a retention policy.
 4. httpOnly cookie sessions with CSRF protection, CSP nonces, the rate windows in Redis or at the edge.
-5. Observability, second half: route the alerts (Alertmanager to email or Slack), nginx and Postgres exporters, one Prometheus per environment, a runbook per alert (readiness row 24).
+5. Observability, second half: acknowledgement and escalation for the Telegram alerts, nginx and Postgres exporters, one Prometheus per environment, a runbook per alert (readiness row 24).
 6. AI assurance beyond 14 golden cases: a labelled set grown from officer overrides, a red-team suite, calibrated confidence, in-region tracing, a multilingual injection classifier, Project Moonshot as the Singapore assurance evidence (`docs/07-ai/AI_ASSURANCE.md`, Limits).

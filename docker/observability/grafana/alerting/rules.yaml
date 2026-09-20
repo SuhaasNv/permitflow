@@ -1,0 +1,1000 @@
+apiVersion: 1
+deleteRules:
+- orgId: 1
+  uid: pf-digest
+groups:
+- orgId: 1
+  name: permitflow
+  folder: PermitFlow
+  interval: 1m
+  rules:
+  - uid: pf-api-down
+    title: PermitFlow API down
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: min by (environment) (up{job="permitflow-api"})
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 1
+          operator:
+            type: and
+          query:
+            params:
+            - B
+          reducer:
+            type: last
+            params: []
+          type: query
+    for: 2m
+    labels:
+      severity: critical
+      kind: incident
+    annotations:
+      summary: The API's metrics endpoint has not answered for two minutes.
+      value: '{{ printf "%.3g" $values.B.Value }}'
+    noDataState: Alerting
+    execErrState: Error
+    isPaused: false
+  - uid: pf-api-5xx
+    title: PermitFlow API error burst
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: (sum by (environment) (rate(permitflow_http_requests_total{status=~"5.."}[5m])) or sum by (environment) (rate(permitflow_http_requests_total[5m])) * 0) / sum by (environment) (rate(permitflow_http_requests_total[5m]))
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0.01
+          operator:
+            type: and
+          query:
+            params:
+            - B
+          reducer:
+            type: last
+            params: []
+          type: query
+    for: 5m
+    labels:
+      severity: critical
+      kind: incident
+    annotations:
+      summary: More than 1 % of API answers are 5xx over five minutes.
+      value: '{{ printf "%.3g" $values.B.Value }}'
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
+  - uid: pf-api-slow
+    title: PermitFlow API slow
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: histogram_quantile(0.995, sum by (environment, le) (rate(permitflow_http_request_seconds_bucket[10m])))
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0.5
+          operator:
+            type: and
+          query:
+            params:
+            - B
+          reducer:
+            type: last
+            params: []
+          type: query
+    for: 10m
+    labels:
+      severity: warning
+      kind: incident
+    annotations:
+      summary: The 99.5th percentile of API latency is above 500 ms.
+      value: '{{ printf "%.3g" $values.B.Value }}'
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
+  - uid: pf-checks-failing
+    title: PermitFlow document checks failing
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: (sum by (environment) (rate(permitflow_verification_runs_total{outcome=~"failed|unavailable"}[30m])) or sum by (environment) (rate(permitflow_verification_runs_total[30m])) * 0) / sum by (environment) (rate(permitflow_verification_runs_total[30m]))
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0.2
+          operator:
+            type: and
+          query:
+            params:
+            - B
+          reducer:
+            type: last
+            params: []
+          type: query
+    for: 15m
+    labels:
+      severity: warning
+      kind: incident
+    annotations:
+      summary: More than 20 % of document checks fail or are unavailable.
+      value: '{{ printf "%.3g" $values.B.Value }}'
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
+  - uid: pf-checks-slow
+    title: PermitFlow document checks slow
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: histogram_quantile(0.95, sum by (environment, le) (rate(permitflow_verification_run_seconds_bucket[30m])))
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 180
+          operator:
+            type: and
+          query:
+            params:
+            - B
+          reducer:
+            type: last
+            params: []
+          type: query
+    for: 15m
+    labels:
+      severity: warning
+      kind: incident
+    annotations:
+      summary: The 95th percentile of document check time is above three minutes.
+      value: '{{ printf "%.3g" $values.B.Value }}'
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
+  - uid: pf-rate-limiting
+    title: PermitFlow rate limiting
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: sum by (environment) (rate(permitflow_rate_limited_total[5m]))
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 1
+          operator:
+            type: and
+          query:
+            params:
+            - B
+          reducer:
+            type: last
+            params: []
+          type: query
+    for: 10m
+    labels:
+      severity: info
+      kind: incident
+    annotations:
+      summary: The per-client limiter is refusing more than one request a second.
+      value: '{{ printf "%.3g" $values.B.Value }}'
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
+  - uid: pf-digest-development
+    title: PermitFlow hourly digest (development)
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: min(up{job="permitflow-api", environment="development"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: D
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: D
+        expr: sum(rate(permitflow_http_requests_total{environment="development"}[1h])) * 60 or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: E
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: E
+        expr: histogram_quantile(0.995, sum by (le) (rate(permitflow_http_request_seconds_bucket{environment="development"}[1h]))) * 1000 or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: F
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: F
+        expr: sum(increase(permitflow_verification_runs_total{environment="development"}[1h])) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: G
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: G
+        expr: ((sum(increase(permitflow_openai_tokens_total{environment="development", kind="prompt"}[1h])) - sum(increase(permitflow_openai_tokens_total{environment="development", kind="cached"}[1h]))) * 0.4 + sum(increase(permitflow_openai_tokens_total{environment="development", kind="cached"}[1h])) * 0.1 + sum(increase(permitflow_openai_tokens_total{environment="development", kind="completion"}[1h])) * 1.6) / 1e6 or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: H
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: H
+        expr: sum(permitflow_applications{environment="development"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: I
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: I
+        expr: sum(permitflow_applications{environment="development", status=~"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: J
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: J
+        expr: sum(permitflow_applications{environment="development", status=~"pending_pre_site_resubmission|pending_post_site_resubmission"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: Ar
+      datasourceUid: __expr__
+      model:
+        refId: Ar
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Dr
+      datasourceUid: __expr__
+      model:
+        refId: Dr
+        type: reduce
+        expression: D
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Er
+      datasourceUid: __expr__
+      model:
+        refId: Er
+        type: reduce
+        expression: E
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Fr
+      datasourceUid: __expr__
+      model:
+        refId: Fr
+        type: reduce
+        expression: F
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Gr
+      datasourceUid: __expr__
+      model:
+        refId: Gr
+        type: reduce
+        expression: G
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Hr
+      datasourceUid: __expr__
+      model:
+        refId: Hr
+        type: reduce
+        expression: H
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Ir
+      datasourceUid: __expr__
+      model:
+        refId: Ir
+        type: reduce
+        expression: I
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Jr
+      datasourceUid: __expr__
+      model:
+        refId: Jr
+        type: reduce
+        expression: J
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Z
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: Z
+        expr: count(up{job="permitflow-api", environment="development"})
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: Zr
+      datasourceUid: __expr__
+      model:
+        refId: Zr
+        type: reduce
+        expression: Z
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: Zr
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0
+          operator:
+            type: and
+          query:
+            params:
+            - Zr
+          reducer:
+            type: last
+            params: []
+          type: query
+    for: 0s
+    labels:
+      severity: info
+      kind: digest
+      environment: development
+    annotations:
+      summary: PermitFlow, the last hour, development
+      api: '{{ if ge (index $values "Ar").Value 1.0 }}up{{ else }}DOWN{{ end }}'
+      requests_per_minute: '{{ printf "%.0f" (index $values "Dr").Value }}'
+      p995_ms: '{{ printf "%.0f" (index $values "Er").Value }}'
+      checks: '{{ printf "%.0f" (index $values "Fr").Value }}'
+      spend_usd: '{{ printf "%.3f" (index $values "Gr").Value }}'
+      applications: '{{ printf "%.0f" (index $values "Hr").Value }}'
+      waiting_officer: '{{ printf "%.0f" (index $values "Ir").Value }}'
+      waiting_operator: '{{ printf "%.0f" (index $values "Jr").Value }}'
+    noDataState: OK
+    execErrState: OK
+    isPaused: false
+  - uid: pf-digest-production
+    title: PermitFlow hourly digest (production)
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: min(up{job="permitflow-api", environment="production"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: D
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: D
+        expr: sum(rate(permitflow_http_requests_total{environment="production"}[1h])) * 60 or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: E
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: E
+        expr: histogram_quantile(0.995, sum by (le) (rate(permitflow_http_request_seconds_bucket{environment="production"}[1h]))) * 1000 or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: F
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: F
+        expr: sum(increase(permitflow_verification_runs_total{environment="production"}[1h])) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: G
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: G
+        expr: ((sum(increase(permitflow_openai_tokens_total{environment="production", kind="prompt"}[1h])) - sum(increase(permitflow_openai_tokens_total{environment="production", kind="cached"}[1h]))) * 0.4 + sum(increase(permitflow_openai_tokens_total{environment="production", kind="cached"}[1h])) * 0.1 + sum(increase(permitflow_openai_tokens_total{environment="production", kind="completion"}[1h])) * 1.6) / 1e6 or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: H
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: H
+        expr: sum(permitflow_applications{environment="production"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: I
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: I
+        expr: sum(permitflow_applications{environment="production", status=~"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: J
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: J
+        expr: sum(permitflow_applications{environment="production", status=~"pending_pre_site_resubmission|pending_post_site_resubmission"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: Ar
+      datasourceUid: __expr__
+      model:
+        refId: Ar
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Dr
+      datasourceUid: __expr__
+      model:
+        refId: Dr
+        type: reduce
+        expression: D
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Er
+      datasourceUid: __expr__
+      model:
+        refId: Er
+        type: reduce
+        expression: E
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Fr
+      datasourceUid: __expr__
+      model:
+        refId: Fr
+        type: reduce
+        expression: F
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Gr
+      datasourceUid: __expr__
+      model:
+        refId: Gr
+        type: reduce
+        expression: G
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Hr
+      datasourceUid: __expr__
+      model:
+        refId: Hr
+        type: reduce
+        expression: H
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Ir
+      datasourceUid: __expr__
+      model:
+        refId: Ir
+        type: reduce
+        expression: I
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Jr
+      datasourceUid: __expr__
+      model:
+        refId: Jr
+        type: reduce
+        expression: J
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Z
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: Z
+        expr: count(up{job="permitflow-api", environment="production"})
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: Zr
+      datasourceUid: __expr__
+      model:
+        refId: Zr
+        type: reduce
+        expression: Z
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: Zr
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0
+          operator:
+            type: and
+          query:
+            params:
+            - Zr
+          reducer:
+            type: last
+            params: []
+          type: query
+    for: 0s
+    labels:
+      severity: info
+      kind: digest
+      environment: production
+    annotations:
+      summary: PermitFlow, the last hour, production
+      api: '{{ if ge (index $values "Ar").Value 1.0 }}up{{ else }}DOWN{{ end }}'
+      requests_per_minute: '{{ printf "%.0f" (index $values "Dr").Value }}'
+      p995_ms: '{{ printf "%.0f" (index $values "Er").Value }}'
+      checks: '{{ printf "%.0f" (index $values "Fr").Value }}'
+      spend_usd: '{{ printf "%.3f" (index $values "Gr").Value }}'
+      applications: '{{ printf "%.0f" (index $values "Hr").Value }}'
+      waiting_officer: '{{ printf "%.0f" (index $values "Ir").Value }}'
+      waiting_operator: '{{ printf "%.0f" (index $values "Jr").Value }}'
+    noDataState: OK
+    execErrState: OK
+    isPaused: false
+  - uid: pf-digest-local
+    title: PermitFlow hourly digest (local)
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: min(up{job="permitflow-api", environment="local"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: D
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: D
+        expr: sum(rate(permitflow_http_requests_total{environment="local"}[1h])) * 60 or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: E
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: E
+        expr: histogram_quantile(0.995, sum by (le) (rate(permitflow_http_request_seconds_bucket{environment="local"}[1h]))) * 1000 or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: F
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: F
+        expr: sum(increase(permitflow_verification_runs_total{environment="local"}[1h])) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: G
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: G
+        expr: ((sum(increase(permitflow_openai_tokens_total{environment="local", kind="prompt"}[1h])) - sum(increase(permitflow_openai_tokens_total{environment="local", kind="cached"}[1h]))) * 0.4 + sum(increase(permitflow_openai_tokens_total{environment="local", kind="cached"}[1h])) * 0.1 + sum(increase(permitflow_openai_tokens_total{environment="local", kind="completion"}[1h])) * 1.6) / 1e6 or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: H
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: H
+        expr: sum(permitflow_applications{environment="local"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: I
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: I
+        expr: sum(permitflow_applications{environment="local", status=~"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: J
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: J
+        expr: sum(permitflow_applications{environment="local", status=~"pending_pre_site_resubmission|pending_post_site_resubmission"}) or vector(0)
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: Ar
+      datasourceUid: __expr__
+      model:
+        refId: Ar
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Dr
+      datasourceUid: __expr__
+      model:
+        refId: Dr
+        type: reduce
+        expression: D
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Er
+      datasourceUid: __expr__
+      model:
+        refId: Er
+        type: reduce
+        expression: E
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Fr
+      datasourceUid: __expr__
+      model:
+        refId: Fr
+        type: reduce
+        expression: F
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Gr
+      datasourceUid: __expr__
+      model:
+        refId: Gr
+        type: reduce
+        expression: G
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Hr
+      datasourceUid: __expr__
+      model:
+        refId: Hr
+        type: reduce
+        expression: H
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Ir
+      datasourceUid: __expr__
+      model:
+        refId: Ir
+        type: reduce
+        expression: I
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Jr
+      datasourceUid: __expr__
+      model:
+        refId: Jr
+        type: reduce
+        expression: J
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: Z
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: Z
+        expr: count(up{job="permitflow-api", environment="local"})
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: Zr
+      datasourceUid: __expr__
+      model:
+        refId: Zr
+        type: reduce
+        expression: Z
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: Zr
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0
+          operator:
+            type: and
+          query:
+            params:
+            - Zr
+          reducer:
+            type: last
+            params: []
+          type: query
+    for: 0s
+    labels:
+      severity: info
+      kind: digest
+      environment: local
+    annotations:
+      summary: PermitFlow, the last hour, local
+      api: '{{ if ge (index $values "Ar").Value 1.0 }}up{{ else }}DOWN{{ end }}'
+      requests_per_minute: '{{ printf "%.0f" (index $values "Dr").Value }}'
+      p995_ms: '{{ printf "%.0f" (index $values "Er").Value }}'
+      checks: '{{ printf "%.0f" (index $values "Fr").Value }}'
+      spend_usd: '{{ printf "%.3f" (index $values "Gr").Value }}'
+      applications: '{{ printf "%.0f" (index $values "Hr").Value }}'
+      waiting_officer: '{{ printf "%.0f" (index $values "Ir").Value }}'
+      waiting_operator: '{{ printf "%.0f" (index $values "Jr").Value }}'
+    noDataState: OK
+    execErrState: OK
+    isPaused: false
