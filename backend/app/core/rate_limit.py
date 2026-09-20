@@ -21,18 +21,29 @@ from collections import deque
 from fastapi import Request
 
 
-def client_key(request: Request, trusted_proxies: str) -> str:
-    """The socket address, or the client address a trusted proxy recorded in X-Forwarded-For.
+def client_key(request: Request, trusted_proxies: str, client_ip_header: str = "") -> str:
+    """The address every per-client limiter keys on.
 
-    A proxy appends the address it saw to the end of the header, so the rightmost hop that is not itself a
-    trusted proxy is the one the proxy vouches for; anything left of it was supplied by the caller and would
-    let an attacker pick a fresh limiter bucket per request (T4). With `*`, every hop but the last is
-    treated as caller-supplied.
+    Without a trusted proxy it is the socket address, whatever headers the caller sends (T4). Behind one,
+    the platform's own client header wins when it is configured and present (`CLIENT_IP_HEADER`, Railway's
+    `X-Real-IP`): the edge writes it from the connection it accepted, so a caller cannot choose it. Failing
+    that, X-Forwarded-For: a proxy appends the address it saw to the end of the header, so the rightmost hop
+    that is not itself a trusted proxy is the one the proxy vouches for; with `*`, every hop but the last is
+    treated as caller-supplied. On Railway that last hop turned out to be the edge instance, not the caller
+    (readiness row 25, US-082), which is why the client header comes first.
     """
     host = request.client.host if request.client else "unknown"
     trusted = {p.strip() for p in trusted_proxies.split(",") if p.strip()}
+    if not (host in trusted or "*" in trusted):
+        return host
+    if client_ip_header:
+        real = request.headers.get(client_ip_header.lower())
+        if real:
+            first = real.split(",")[0].strip()
+            if first:
+                return first
     forwarded = request.headers.get("x-forwarded-for")
-    if not forwarded or not (host in trusted or "*" in trusted):
+    if not forwarded:
         return host
     hops = [h.strip() for h in forwarded.split(",") if h.strip()]
     for hop in reversed(hops):
@@ -104,10 +115,13 @@ class WindowLimiter(_Window):
 class RequestLimiter:
     """The two request buckets the middleware consults, replaceable on `app.state` in tests."""
 
-    def __init__(self, *, per_minute: int, login_per_minute: int, trusted_proxies: str) -> None:
+    def __init__(
+        self, *, per_minute: int, login_per_minute: int, trusted_proxies: str, client_ip_header: str = ""
+    ) -> None:
         self.general = WindowLimiter(per_minute)
         self.login = WindowLimiter(login_per_minute)
         self.trusted_proxies = trusted_proxies
+        self.client_ip_header = client_ip_header
 
     def check(self, request: Request) -> int | None:
         path = request.url.path
@@ -115,7 +129,7 @@ class RequestLimiter:
         # answering while a client is being refused (the scrape is bearer-token protected, US-077).
         if path.endswith(("/health", "/healthz", "/metrics")):
             return None
-        key = client_key(request, self.trusted_proxies)
+        key = client_key(request, self.trusted_proxies, self.client_ip_header)
         bucket = self.login if path.endswith("/auth/login") and request.method == "POST" else self.general
         return bucket.hit(key)
 

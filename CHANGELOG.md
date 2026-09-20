@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-082 Limiter keyed on the real caller behind the edge (20 Sep 2026, Sprint 4)
+
+- `client_key` reads the edge's own client header before `X-Forwarded-For` when the peer is a trusted proxy: `CLIENT_IP_HEADER`, default `X-Real-IP`, the header Railway documents for the connecting address (its edge instance is the last forwarded hop, which is what readiness row 25 found). Without a trusted proxy the socket address still wins, so a caller cannot pick a bucket with a forged header. Both limiters (every request, sign-in attempts) and the failed-login block use it. Tests: the edge case, the forged header, an older platform without the header, a multi-value header, two callers behind one edge in separate buckets. `.env.example`, `OPERATIONS.md`, `SECURITY_REVIEW.md` and readiness row 25 updated; the on-platform check with two callers runs once `dev` is deployed.
+
 ## Non-functional requirements for v0.4.0 (20 Sep 2026, owner's request)
 
 - `REQUIREMENTS.md` NFR-008 to NFR-018: checklist save latency, attachment limits and a 150 MB storage budget per application, image metadata stripped on upload, admin read latency at 10,000 applications, poor-connection behaviour, phone performance of the respond page, storage observed with an alert, the accessibility gate over the new screens, Singapore time for every new date, use case 3 on the dashboard, bounded audit growth.
