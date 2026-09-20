@@ -60,3 +60,22 @@ def test_round_cap_counts_both_sides() -> None:
 
     assert MAX_ROUNDS == 6
     assert rounds_left(0) == 6 and rounds_left(5) == 1 and rounds_left(6) == 0 and rounds_left(9) == 0
+
+
+def test_audit_summaries_read_as_sentences() -> None:
+    from app.domain.audit_labels import summarize
+
+    base = {"visit_no": 1, "date": "2026-09-22", "slot": "morning", "status": "proposed"}
+    assert (
+        summarize("site_visit.proposed", {**base, "round": 1})
+        == "Site visit proposed: 2026-09-22, morning (round 1)"
+    )
+    assert summarize("site_visit.counter_proposed", {**base, "round": 2}) == (
+        "Operator proposed another visit date (round 2)"
+    )
+    assert summarize("site_visit.confirmed", {**base, "how": "kept_original_date"}) == (
+        "Site visit confirmed: 2026-09-22, morning (original date kept)"
+    )
+    assert summarize("site_visit.rescheduled", {**base, "round": 3, "by": "operator"}) == (
+        "Site visit reschedule asked by the operator: 2026-09-22, morning (round 3)"
+    )
