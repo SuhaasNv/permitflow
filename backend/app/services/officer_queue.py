@@ -6,6 +6,7 @@ from app.domain.enums import ApplicationStatus, SiteVisitStatus, VerificationSta
 from app.domain.labels import officer_label, tone_for
 from app.domain.officer_actions import NextAction, is_decided, next_action
 from app.repositories.applications import ApplicationRepository
+from app.repositories.checklists import ChecklistRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
@@ -32,6 +33,7 @@ class OfficerQueueService:
         self.feedback = FeedbackRepository(db)
         self.documents = DocumentRepository(db)
         self.visits = SiteVisitRepository(db)
+        self.checklists = ChecklistRepository(db)
 
     def queue(self) -> QueueOut:
         rows = self.applications.list_submitted()
@@ -41,11 +43,20 @@ class OfficerQueueService:
         open_counts = self.feedback.open_counts(ids)
         runs = self.documents.latest_runs_for_applications(ids)
         visits = self.visits.current_for_many(ids)
+        checklists = self.checklists.current_for_many(ids)
 
         items: list[QueueItemOut] = []
         for app, applicant in rows:
             action = next_action(app.status)
             visit = visits.get(app.id)
+            if app.status == ApplicationStatus.SITE_VISIT_DONE:
+                # The checklist is the visit record (US-060); without one the transitional route to
+                # approval still stands (US-079) and the row says so.
+                action = (
+                    NextAction("Continue the checklist", True)
+                    if app.id in checklists
+                    else NextAction("Route to approval", True)
+                )
             if app.status == ApplicationStatus.SITE_VISIT_SCHEDULED:
                 # While the appointment is being arranged the row says whose move it is (US-084).
                 if visit is None:
@@ -54,6 +65,10 @@ class OfficerQueueService:
                     action = NextAction("Waiting on operator", False)
                 elif visit.status == SiteVisitStatus.COUNTER_PROPOSED:
                     action = NextAction("Decide the visit date", True)
+                elif visit.status == SiteVisitStatus.CONFIRMED:
+                    action = NextAction(
+                        "Continue the checklist" if app.id in checklists else "Open the checklist", True
+                    )
             count, first_submitted = stats.get(app.id, (0, None))
             app_runs = runs.get(app.id, [])
             # The submitted form, never the working copy: during a resubmission round `draft_data` holds

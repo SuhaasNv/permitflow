@@ -96,3 +96,27 @@ class SiteVisitProposalOutcome(enum.StrEnum):
     KEPT = "kept"  # the officer kept this date over the operator's counter-proposal
     DECLINED = "declined"  # the other side chose a different date
     SUPERSEDED = "superseded"  # replaced by a later proposal from the same side
+
+
+class ChecklistStatus(enum.StrEnum):
+    """The site visit checklist (US-060): a draft while the officer works, submitted once frozen."""
+
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+
+
+class ChecklistResult(enum.StrEnum):
+    NOT_ASSESSED = "not_assessed"
+    SATISFACTORY = "satisfactory"
+    UNSATISFACTORY = "unsatisfactory"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class ClarificationStatus(enum.StrEnum):
+    """An item's clarification thread (US-062 to US-066): none until flagged and submitted."""
+
+    NONE = "none"
+    OPEN = "open"
+    ANSWERED = "answered"
+    RESOLVED = "resolved"
+    WITHDRAWN = "withdrawn"

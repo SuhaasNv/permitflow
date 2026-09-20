@@ -2,6 +2,9 @@
 
 from app.domain.enums import (
     ApplicationStatus,
+    ChecklistResult,
+    ChecklistStatus,
+    ClarificationStatus,
     DocumentType,
     FeedbackResolution,
     FeedbackTargetType,
@@ -24,6 +27,9 @@ __all__ = [
     "LicenceType",
     "NotificationKind",
     "Role",
+    "ChecklistResult",
+    "ChecklistStatus",
+    "ClarificationStatus",
     "SiteVisitProposalOutcome",
     "SiteVisitSlot",
     "SiteVisitStatus",
