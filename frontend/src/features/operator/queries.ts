@@ -170,6 +170,7 @@ function afterClarificationChange(qc: ReturnType<typeof useQueryClient>, id: str
 export function useRespond(id: string) {
   const qc = useQueryClient()
   return useMutation({
+    mutationKey: ['clarification', id],
     mutationFn: ({ itemId, message }: { itemId: string; message: string }) => respondToClarification(id, itemId, message),
     onSuccess: (view) => afterClarificationChange(qc, id, view),
   })
@@ -178,6 +179,7 @@ export function useRespond(id: string) {
 export function useAttach(id: string) {
   const qc = useQueryClient()
   return useMutation({
+    mutationKey: ['clarification', id],
     mutationFn: ({ responseId, file }: { responseId: string; file: File }) => attachToResponse(id, responseId, file),
     onSuccess: (result) => afterClarificationChange(qc, id, result.view),
   })
@@ -186,6 +188,7 @@ export function useAttach(id: string) {
 export function useRemoveAttachment(id: string) {
   const qc = useQueryClient()
   return useMutation({
+    mutationKey: ['clarification', id],
     mutationFn: ({ responseId, attachmentId }: { responseId: string; attachmentId: string }) =>
       removeAttachment(id, responseId, attachmentId),
     onSuccess: (view) => afterClarificationChange(qc, id, view),

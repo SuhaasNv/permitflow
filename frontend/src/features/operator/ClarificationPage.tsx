@@ -1,3 +1,4 @@
+import { useIsMutating } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -222,6 +223,8 @@ export function ClarificationPage() {
   const send = useSendClarifications(id)
   const toast = useToast()
   const [confirming, setConfirming] = useState(false)
+  // An answer or a file still on its way to the server: the send waits so nothing typed is left behind.
+  const saving = useIsMutating({ mutationKey: ['clarification', id] }) > 0
 
   if (app.isError && app.data === undefined) {
     if (app.error instanceof AppError && app.error.status === 404)
@@ -355,8 +358,8 @@ export function ClarificationPage() {
               </span>
               <Button
                 size="lg"
-                disabled={!c.can_send}
-                title={c.can_send ? undefined : 'Answer every item first.'}
+                disabled={!c.can_send || saving}
+                title={saving ? 'Wait for your answer to save.' : c.can_send ? undefined : 'Answer every item first.'}
                 onClick={() => setConfirming(true)}
               >
                 Send responses

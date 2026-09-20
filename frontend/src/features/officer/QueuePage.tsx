@@ -78,7 +78,8 @@ function Row({ item }: { item: QueueItem }) {
         to={`/officer/applications/${item.id}`}
         className={cn(
           'group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-4 text-text no-underline sm:px-5',
-          'lg:grid-cols-[130px_minmax(0,1fr)_200px_130px] 2xl:grid-cols-[150px_minmax(0,1fr)_230px_130px_120px_150px]',
+          // The status column wraps its badge and the action column takes what its label needs (H4).
+          'lg:grid-cols-[120px_minmax(0,1fr)_minmax(170px,230px)_190px] 2xl:grid-cols-[150px_minmax(0,1fr)_230px_130px_120px_190px]',
           'transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out)] hover:bg-surface-2 hover:text-text focus-visible:bg-surface-2',
         )}
       >
@@ -97,8 +98,12 @@ function Row({ item }: { item: QueueItem }) {
             <span className="2xl:hidden"> · {formatRelative(item.last_activity_at)}</span>
           </div>
         </div>
-        <div className="col-start-1 lg:col-start-auto">
-          <StatusBadge label={item.status_label} tone={item.status_tone} />
+        <div className="col-start-1 min-w-0 lg:col-start-auto">
+          <StatusBadge
+            label={item.status_label}
+            tone={item.status_tone}
+            className="h-auto min-h-6 whitespace-normal py-0.5 text-left leading-4"
+          />
           <div className="mt-1.5 hidden lg:block 2xl:hidden">
             <ChecksCell item={item} />
           </div>
@@ -211,7 +216,7 @@ export function OfficerQueuePage() {
               className="w-full sm:ml-auto sm:w-80"
             />
           </div>
-          <div className="hidden grid-cols-[130px_minmax(0,1fr)_200px_130px] gap-x-4 border-b border-line bg-surface-2 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 lg:grid 2xl:grid-cols-[150px_minmax(0,1fr)_230px_130px_120px_150px]">
+          <div className="hidden grid-cols-[120px_minmax(0,1fr)_minmax(170px,230px)_190px] gap-x-4 border-b border-line bg-surface-2 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 lg:grid 2xl:grid-cols-[150px_minmax(0,1fr)_230px_130px_120px_190px]">
             <span>Reference</span>
             <span>Business · applicant</span>
             <span>
