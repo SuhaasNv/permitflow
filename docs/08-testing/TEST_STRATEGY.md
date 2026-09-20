@@ -64,6 +64,10 @@ The first run missed the overview budget at 2.8 s: the idle list loaded every op
 
 `npm run size` (`scripts/check-bundle-size.mjs`) runs in the frontend CI job after the build and fails above 250 KB gzipped for the JavaScript the respond page loads; the app ships one bundle, so the figure is the whole app: 215 KB gzipped (763 KB raw) on 21 Sep 2026.
 
+## Running the browser suites locally, twice in a day
+
+Two things bit on 21 Sep 2026 and are worth knowing: the daily document-check quotas (`AI_RUNS_PER_USER_PER_DAY`, 60; `AI_RUNS_PER_DAY`, 1,000) count the shared demonstration operator's runs across every local Playwright and UAT run, so after a day of runs the checks come back `unavailable` and scenario 01 fails on purpose; start the local API with `AI_RUNS_PER_USER_PER_DAY=0 AI_RUNS_PER_DAY=0` for a test day (CI starts from an empty database). And since US-093 an account holds one session, so the UAT edge script and the Playwright suite must not run at the same time: each signs the other's demonstration accounts out.
+
 ## Shared journey helpers
 
 `backend/tests/journeys.py` builds applications in any state with one call (`draft`, `complete_draft`, `submitted`, `under_review`, `add_feedback`, `flag_and_request`, `transition`, `upload`) so that an integration test reads as the scenario it protects rather than as setup. `factories.py` seeds users per role.
