@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-090 Singapore time everywhere (21 Sep 2026, Sprint 5)
+
+- The frontend renders every instant in Asia/Singapore through one helper set in `lib/format.ts` (dates, times, relative times, the greeting, the save indicator, the session tooltip); date-only values stay the calendar dates they name. Tests sit on 16:00 UTC, midnight in Singapore, and the whole suite runs under four browser zones.
+
 ## US-066 Clarification rounds (21 Sep 2026, Sprint 5)
 
 - The officer marks an answered item clarified, asks again (an unreleased question for the next round, shown as Not sent yet) or withdraws an open question; Request another round releases the drafts and tells the operator with the count; Route to approval waits for nothing open or answered; rounds are counted per item. The case carries every thread with the finding on top; the rail (S-31) replaces the feedback panel in the post-site states; the operator's history page lists the rounds. Audit labels for every clarification event.

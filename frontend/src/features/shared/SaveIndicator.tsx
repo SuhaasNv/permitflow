@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { cn } from '@/lib/cn'
+import { inSingapore } from '@/lib/format'
 
 export interface SaveIndicatorProps {
   dirty: boolean
@@ -18,8 +19,8 @@ function relative(savedAt: number, now: number): string {
   if (seconds < 60) return `Saved ${seconds} s ago`
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return `Saved ${minutes} min ago`
-  const d = new Date(savedAt)
-  return `Saved at ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  const p = inSingapore(new Date(savedAt))
+  return `Saved at ${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`
 }
 
 /** "Unsaved changes" / "Saving…" / "Saved just now" with a live relative time. Polite live region. */

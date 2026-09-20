@@ -2,7 +2,7 @@ import { AppError } from '@/api/client'
 import type { SiteVisitProposal, SiteVisitSlot } from '@/api/siteVisit'
 import { SLOT_OPTIONS } from '@/api/siteVisit'
 import { cn } from '@/lib/cn'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime, todayInSingapore } from '@/lib/format'
 
 /** The per-field messages of a 422 (`details.fields`), empty for any other error. */
 export function fieldErrorsOf(error: unknown): Record<string, string> {
@@ -19,10 +19,7 @@ export function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
-/** The calendar date in Singapore right now, whatever the browser's own zone (NFR-016). */
-export function todayInSingapore(now: Date = new Date()): string {
-  return now.toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' })
-}
+export { todayInSingapore }
 
 /** Bounds for the native date input: from `earliest` (or tomorrow in Singapore) to 60 days out. The server has the last word. */
 export function dateBounds(earliest?: string | null, now: Date = new Date()): { min: string; max: string } {
