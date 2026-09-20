@@ -28,26 +28,14 @@ A typical demo: upload `with_issues/` first, walk through the findings, then rep
 ```
 docs/12-demo/documents/
   README.md                 this file
-  generate.mjs              regenerates every PDF from the templates
-  src/                      templates with {{PLACEHOLDERS}} and the shared base.css
-  clean/                    rendered .html (exact source of each PDF) and .pdf
-  with_issues/              same, plus NOTES.md listing the planted issues
+  clean/                    the four PDFs that agree with the Kopi & Kaya form values
+  with_issues/              the four PDFs with planted defects, plus NOTES.md listing them
+  second_business/          the four PDFs for Serangoon Spice House (the production example)
 ```
 
-The `.html` files next to each PDF are the filled templates, written by the generator, so you can open one in a browser to see exactly what was printed.
+## How they were made
 
-## Regenerating
-
-The generator uses Playwright's bundled Chromium from the frontend workspace. Run it from `frontend/` so the `@playwright/test` import resolves:
-
-```bash
-cd frontend
-node ../docs/12-demo/documents/generate.mjs
-```
-
-If Chromium is not installed yet: `cd frontend && npx playwright install chromium`.
-
-To change a value, edit the template in `src/` (shared content) or the `SETS` object in `generate.mjs` (values that differ between the two sets), then rerun. Quick checks after regenerating:
+Each PDF was rendered by Chromium (Playwright) from an HTML template with the values filled in, so the text is selectable and the AI check can read it. The templates and the generator are working files and are not part of the repository; the PDFs are the fixtures the tests, the evaluation set (`backend/evals/cases.json`) and the walkthroughs use. To change a value, edit the PDF's source in the workshop and re-render; then check:
 
 ```bash
 pdfinfo docs/12-demo/documents/clean/tenancy_agreement.pdf | grep Pages

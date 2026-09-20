@@ -1,0 +1,37 @@
+# Prometheus on Railway (US-077): one instance scrapes both environments over HTTPS on the owner's domain,
+# each with its own METRICS_TOKEN. Rendered at container start from the service's variables
+# (OPERATIONS.md, Observability): __DEV_TOKEN__ and __PROD_TOKEN__.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - alerts.yml
+
+scrape_configs:
+  - job_name: permitflow-api
+    metrics_path: /api/v1/metrics
+    scheme: https
+    authorization:
+      type: Bearer
+      credentials: __DEV_TOKEN__
+    static_configs:
+      - targets: ["api.dev.permitflow.space"]
+        labels:
+          environment: development
+  - job_name: permitflow-api-production
+    metrics_path: /api/v1/metrics
+    scheme: https
+    authorization:
+      type: Bearer
+      credentials: __PROD_TOKEN__
+    static_configs:
+      - targets: ["api.permitflow.space"]
+        labels:
+          environment: production
+    relabel_configs:
+      - target_label: job
+        replacement: permitflow-api
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

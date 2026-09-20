@@ -1,11 +1,11 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.models import Application, Document, VerificationRun
-from app.models.enums import DocumentType
+from app.models.enums import DocumentType, VerificationStatus
 
 
 class DocumentRepository:
@@ -60,6 +60,47 @@ class DocumentRepository:
         for run in self.db.scalars(stmt):
             out[run.document_id] = run  # ascending order: the last one wins
         return out
+
+    def all_for(self, application_id: uuid.UUID) -> list[Document]:
+        """Every document row of an application, replaced ones included (draft deletion)."""
+        return list(self.db.scalars(select(Document).where(Document.application_id == application_id)))
+
+    def purge_for_application(self, application_id: uuid.UUID) -> list[str]:
+        """Delete every document and verification run of a draft (US-045); returns the stored keys so
+        the caller can remove the files after the commit. Only drafts are ever deleted (SCOPE.md 14)."""
+        docs = self.all_for(application_id)
+        if docs:
+            ids = [d.id for d in docs]
+            self.db.execute(delete(VerificationRun).where(VerificationRun.document_id.in_(ids)))
+            self.db.execute(delete(Document).where(Document.application_id == application_id))
+        return [d.stored_key for d in docs]
+
+    def claim_run(self, run_id: uuid.UUID, started_at: datetime) -> bool:
+        """Atomic pending-to-running claim: true for exactly one caller per run."""
+        result = self.db.execute(
+            update(VerificationRun)
+            .where(VerificationRun.id == run_id, VerificationRun.status == VerificationStatus.PENDING)
+            .values(status=VerificationStatus.RUNNING, started_at=started_at)
+        )
+        return int(getattr(result, "rowcount", 0) or 0) == 1
+
+    def fail_interrupted_runs(self, running_before: datetime, finished_at: datetime) -> int:
+        """Runs still `running` since before `running_before`, and every `pending` run, become
+        `failed: interrupted` (startup after a restart); returns how many."""
+        result = self.db.execute(
+            update(VerificationRun)
+            .where(
+                or_(
+                    and_(
+                        VerificationRun.status == VerificationStatus.RUNNING,
+                        VerificationRun.started_at < running_before,
+                    ),
+                    VerificationRun.status == VerificationStatus.PENDING,
+                )
+            )
+            .values(status=VerificationStatus.FAILED, error_reason="interrupted", finished_at=finished_at)
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
     def add(self, doc: Document) -> Document:
         self.db.add(doc)

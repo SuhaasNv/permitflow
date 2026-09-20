@@ -21,9 +21,9 @@ Rules:
 - `api` never imports `repositories` and never queries or mutates `models`; it may name two model types (`User`, `Application`) in annotations. It calls services and maps exceptions to HTTP. Operator-facing refusals are worded by `domain/operator_errors.py` with the operator's own label and no internal code (FR-026).
 - `domain` is pure Python: no SQLAlchemy, no FastAPI, no I/O. It contains the enumerations (`domain/enums.py`, re-exported by `models/enums.py` for the persistence layer), the state machine (`domain/workflow.py`: transition table, guards, `available_actions` for the UI), labels (`domain/labels.py`: the assessment table verbatim plus the badge tone), form schema, diff and resolution rules: the code a reviewer should read first.
 - `schemas` (`app/schemas/`): Pydantic request and response models shared by the API and the services. No ORM, no I/O; they may import `domain` enums. Services return these so routers stay thin, and the layering test forbids services, schemas and repositories from importing `app.api` or FastAPI.
-- `services` orchestrate: load via repositories, apply domain rules, mutate, write audit events, create notifications, commit. One service method = one transaction.
+- `services` orchestrate: load via repositories, apply domain rules, mutate, write audit events, create notifications, commit. One service method = one transaction. The only SQLAlchemy name a service imports is `Session`; every statement (`select`, `update`, `delete`, `text`) lives in a repository.
 - `infra.ai` exposes `VerificationProvider`; `services.verification` is the only caller. No other module imports `infra.ai`.
-- A unit test enforces the two most important rules (routers do not import repositories; domain does not import SQLAlchemy/FastAPI).
+- `tests/unit/test_layering.py` enforces these rules by parsing every module: routers do not import repositories or query models; domain does not import SQLAlchemy or FastAPI; schemas are free of ORM and I/O; services import nothing from SQLAlchemy but `Session`; only the verification service reaches the AI providers; only `AuditRepository.purge_draft` deletes audit rows.
 
 ## Module boundaries and data ownership
 
@@ -39,6 +39,7 @@ Rules:
 | feedback | feedback | `create(officer, id, target, message, template_key)`, `resolve`, `withdraw`, `list`, `templates()` |
 | notifications | notifications | `notify(user_ids, kind, application, ...)`, `list(user)`, `mark_read` |
 | audit | audit_events | `record(application_id, actor, event_type, payload)`, `list(application_id)`, `purge_draft(application_id)` |
+| metrics (US-077) | none (reads `applications` through its repository for the by-status gauge) | `refresh_gauges(db)`; the counters live in `core/metrics.py` and are incremented by the services where the events happen (verification finished, quota refused, transition committed) and by the outermost middleware (every request, every 429); `infra/ai/openai_provider.py` counts the tokens the API reports; `docs/13-observability/OBSERVABILITY.md` |
 | admin (planned, v0.4.0, US-070 to US-073) | none (would read other modules' tables through their repositories; writes users through the auth module's service) | `overview()`, `ai_health()`, `audit_feed()`, `users()`, `update_user(role, is_active)`: not built; only the role value and `AdminUser` in `api/deps.py` exist |
 
 Cross-module writes go through services, never across repositories.
@@ -147,6 +148,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /notifications | any | own notifications (newest first, 50) plus `unread_count` (built, US-025) |
 | POST | /notifications/{id}/read | any | mark read; another user's id is 404 (built, US-025) |
 | POST | /notifications/read-all | any | mark every own notification read (built, US-025) |
+| GET | /metrics | bearer token (`METRICS_TOKEN`); 404 when no token is configured; exempt from the rate limit | Prometheus text format: `permitflow_http_requests_total`, `permitflow_http_request_seconds`, `permitflow_rate_limited_total`, `permitflow_verification_runs_total`, `permitflow_verification_run_seconds`, `permitflow_quota_refusals_total`, `permitflow_transitions_total`, `permitflow_applications` (gauge), `permitflow_openai_tokens_total`; route templates and enum values as labels, never ids or text (US-077) |
 | GET | /health | public | `{status, database}`; 503 when the database ping fails, with the standard `error` object beside the status fields; provider details are not exposed publicly (the planned admin AI-health endpoint, US-071, would report them) |
 
 All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail": …}` bodies for 401/403/422 are replaced by explicit exception handlers so every error uses the standard shape (REL-001).
@@ -186,6 +188,7 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 - Request logging middleware: request id, method, path, status, duration, user id; request id echoed in `X-Request-ID`.
 - Verification logs: run id, provider, model, latency, outcome, `raw_output_valid`.
 - `/health`: database ping (503 on failure). AI provider configuration is never reported publicly; the planned admin AI-health endpoint (US-071) would carry it.
+- Metrics (US-077): `core/metrics.py` holds the Prometheus counters and histograms, the outermost middleware counts every answer, the services increment their own events, `api/v1/metrics.py` renders them behind a bearer token. Prometheus scrapes them every 15 s; Grafana draws one dashboard (API health, document checks, cost, queue); six alert rules and an hourly digest reach Telegram, where a small bot also answers `/status` and friends. The layer in full, with the Railway services: `../13-observability/OBSERVABILITY.md`.
 
 ## Deployment
 

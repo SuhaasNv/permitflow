@@ -1,0 +1,24 @@
+# Prometheus for a local PermitFlow (US-077). Rendered at container start by prometheus-start.sh:
+# __TARGET__ is the API host:port, __TOKEN__ the value of METRICS_TOKEN (the API serves /metrics only
+# with that token). One environment, labelled "local".
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - alerts.yml
+
+scrape_configs:
+  - job_name: permitflow-api
+    metrics_path: /api/v1/metrics
+    scheme: __SCHEME__
+    authorization:
+      type: Bearer
+      credentials: __TOKEN__
+    static_configs:
+      - targets: ["__TARGET__"]
+        labels:
+          environment: __ENVIRONMENT__
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

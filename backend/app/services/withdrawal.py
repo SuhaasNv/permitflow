@@ -5,6 +5,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.errors import InvalidTransition
 from app.domain.enums import ApplicationStatus, NotificationKind
 from app.domain.operator_errors import refusal
@@ -63,6 +64,7 @@ class WithdrawalService:
             + (f" Reason: {reason}" if reason else " No reason was given."),
         )
         self.db.commit()
+        metrics.TRANSITIONS.labels(resolved.value, "operator").inc()
         self.notifications.flush_sent()
         self.db.refresh(app)
         return app

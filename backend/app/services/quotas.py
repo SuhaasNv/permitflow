@@ -13,12 +13,14 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.errors import Conflict
 from app.core.settings import get_settings
 from app.domain.enums import VerificationStatus
 from app.models import VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.documents import DocumentRepository
+from app.repositories.users import UserRepository
 
 DAILY_LIMIT_REASON = "daily_limit_reached"
 
@@ -26,7 +28,13 @@ DAILY_LIMIT_REASON = "daily_limit_reached"
 def ensure_draft_capacity(db: Session, operator_id: uuid.UUID) -> None:
     """Refuse a new draft once the operator holds `MAX_DRAFTS_PER_USER` open ones (0 disables)."""
     limit = get_settings().max_drafts_per_user
-    if limit > 0 and ApplicationRepository(db).count_drafts(operator_id) >= limit:
+    if limit <= 0:
+        return
+    # Lock the operator's user row for the rest of the transaction, so the count and the insert that
+    # follows it are serialised per operator; a second create waits here and then sees the new draft.
+    UserRepository(db).lock(operator_id)
+    if ApplicationRepository(db).count_drafts(operator_id) >= limit:
+        metrics.QUOTA_REFUSALS.labels("drafts").inc()
         raise Conflict(
             f"You already have {limit} draft applications. Submit or delete one before starting another.",
             details={"code": "draft_limit", "limit": limit},
@@ -41,9 +49,11 @@ def verification_over_quota(db: Session, operator_id: uuid.UUID) -> str | None:
     if settings.ai_runs_per_user_per_day > 0:
         used = repo.count_runs_since(since, operator_id=operator_id, exclude_reason=DAILY_LIMIT_REASON)
         if used >= settings.ai_runs_per_user_per_day:
+            metrics.QUOTA_REFUSALS.labels("ai_runs_per_user").inc()
             return DAILY_LIMIT_REASON
     if settings.ai_runs_per_day > 0:
         if repo.count_runs_since(since, exclude_reason=DAILY_LIMIT_REASON) >= settings.ai_runs_per_day:
+            metrics.QUOTA_REFUSALS.labels("ai_runs_per_day").inc()
             return DAILY_LIMIT_REASON
     return None
 
@@ -55,6 +65,7 @@ def new_run(db: Session, document_id: uuid.UUID, operator_id: uuid.UUID) -> Veri
     if reason is None:
         return VerificationRun(document_id=document_id, status=VerificationStatus.PENDING, provider="none")
     now = datetime.now(UTC)
+    metrics.VERIFICATION_RUNS.labels(VerificationStatus.UNAVAILABLE.value, "none").inc()
     return VerificationRun(
         document_id=document_id,
         status=VerificationStatus.UNAVAILABLE,

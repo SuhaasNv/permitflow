@@ -23,7 +23,7 @@ def test_window_limiter_admits_up_to_the_limit_then_reports_seconds_to_wait() ->
     assert WindowLimiter(0).hit("a") is None  # 0 disables
 
 
-def test_request_limiter_uses_the_login_bucket_for_sign_in_only_and_exempts_health() -> None:
+def test_request_limiter_uses_the_login_bucket_for_sign_in_only_and_exempts_health_and_metrics() -> None:
     limiter = RequestLimiter(per_minute=100, login_per_minute=2, trusted_proxies="")
     login = _request("/api/v1/auth/login", "POST")
     assert limiter.check(login) is None and limiter.check(login) is None
@@ -32,6 +32,7 @@ def test_request_limiter_uses_the_login_bucket_for_sign_in_only_and_exempts_heal
     assert limiter.check(_request("/api/v1/auth/me")) is None  # only POST /auth/login is special
     for _ in range(200):
         assert limiter.check(_request("/api/v1/health")) is None
+        assert limiter.check(_request("/api/v1/metrics")) is None
 
 
 def test_client_key_takes_the_hop_the_trusted_proxy_appended_not_the_one_the_caller_sent() -> None:

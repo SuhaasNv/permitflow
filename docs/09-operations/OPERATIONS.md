@@ -37,6 +37,9 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `LANGSMITH_ENDPOINT` | `https://api.smith.langchain.com` | backend | Must match the organisation's region (fixed at sign-up): `eu.api.` for EU, `apac.api.` for APAC (Sydney). |
 | `LANGSMITH_PROJECT` | `permitflow` | backend | Project name the traces land in; use one per environment (`permitflow-dev`, `permitflow`). |
 | `LANGSMITH_HIDE_INPUTS` | `true` | backend | Keeps the document text and form section out of the trace; outputs (status, codes, confidence, summary, evidence quotes of at most 300 characters) stay. `false` only in development. |
+| `METRICS_TOKEN` | empty | backend | Turns on `GET /api/v1/metrics` for Prometheus (US-077); the scraper presents it as a bearer token. Empty: the route answers 404. Generate with `openssl rand -hex 24`; one value per environment, the same value in that environment's Prometheus scrape config. |
+| `METRICS_TARGET`, `METRICS_SCHEME`, `ENVIRONMENT_LABEL` | `host.docker.internal:8000`, `http`, `local` | Prometheus (Compose) | Where the local Prometheus scrapes and how it labels the environment; `backend:8000` with the `full` profile. Not read by the app. |
+| `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ROOT_URL` | `admin`, `permitflow`, `http://localhost:3001` | Grafana (Compose) | The local Grafana sign-in and its public URL. Not read by the app. |
 | `VITE_API_URL` | `http://localhost:8000/api/v1` | frontend | Build-time, read from `frontend/.env` (not the repo root). In the container the runtime `API_URL` wins. |
 
 ## Seeding
@@ -78,7 +81,7 @@ One Railway project (`permitflow`), two environments that share nothing:
 | | development | production |
 |---|---|---|
 | Deploys from | `dev` | `main` (release tags `v0.<sprint>.0`) |
-| Images | `ghcr.io/suhaasnv/permitflow-backend:dev`, `...-frontend:dev` (moving tags, every merge) | pinned `sha-<release commit>` (`sha-38df991` for v0.3.0); the `:v0.3.0` tag names the same image |
+| Images | `ghcr.io/suhaasnv/permitflow-backend:dev`, `...-frontend:dev` (moving tags, every merge) | pinned `sha-<commit>`: `sha-2226d11` since 20 Sep 2026 (v0.3.0 plus the post-release fixes recorded in `CHANGELOG.md`, deployed at the owner's decision without a new version; the git tag `v0.3.0` and the `:v0.3.0` images still name the 19 Sep build `38df991`) |
 | Frontend | https://dev.permitflow.space (US-052; Railway host https://frontend-development-afe2.up.railway.app) | https://permitflow.space (also `www`; Railway host https://frontend-production-2d8b.up.railway.app) |
 | API | https://api.dev.permitflow.space/api/v1 (US-052; Railway host https://backend-development-4e04.up.railway.app/api/v1) | https://api.permitflow.space/api/v1 (Railway host https://backend-production-19cd.up.railway.app/api/v1) |
 | State (19 Sep 2026) | live: deployed on every merge to `dev`, seeded | live since v0.3.0 (19 Sep, 17:00 SGT): images `ghcr.io/suhaasnv/permitflow-{backend,frontend}:main` attached, first deployment committed from the Railway staging area, then the approved `deploy.yml` run redeployed with the health gates; seeded once; production UAT recorded in `docs/10-uat/UAT_PLAN.md`; reset after the UAT and left with one example application (Serangoon Spice House, Application Received) |
@@ -128,6 +131,15 @@ Both environments live on the owner's domain with one convention: the environmen
 
 In Railway, per environment: frontend service → Settings → Networking → Custom domain (the frontend hosts); backend service → the API host. Railway shows the CNAME target for each; the owner adds those records at the registrar (the apex `permitflow.space` may need the registrar's ALIAS/ANAME record or Railway's provided A records; the others are plain CNAMEs). Then set per environment: backend `CORS_ORIGINS` to that environment's frontend origins, frontend `API_URL` to that environment's API host plus `/api/v1`; GitHub environment variables `FRONTEND_URL` and `BACKEND_URL` to the same hosts so the deploy health gates check them. The railway.app hosts keep working as fallbacks. TLS is issued by Railway once DNS resolves (minutes to an hour).
 
+### Observability (US-077)
+
+Three layers: structured request logs with a request id (`core/logging.py`), LangSmith traces for the AI checks (US-055, inputs hidden), and Prometheus metrics with a Grafana dashboard and six alert rules. The full description (every metric family and label, the dashboard rows, the alert rules, the local profile, the Railway services, the security controls, what is still missing) is `docs/13-observability/OBSERVABILITY.md`; what an operator needs day to day:
+
+- `GET /api/v1/metrics` is off unless `METRICS_TOKEN` is set, needs that bearer token, is exempt from the per-client limiter and never counts itself. One token per environment; the same value sits in that environment's Prometheus configuration. Rotate by setting the new value on the backend and in the Prometheus variable, then redeploying both.
+- Locally: `docker compose --profile observability up -d` (Prometheus `:9090`, Grafana `:3001`, sign-in from `GRAFANA_ADMIN_*`); the dashboard JSON is generated by `docker/observability/grafana/build_dashboard.py`, never edited by hand.
+- On Railway (development environment, three services): `prometheus` (private network only, volume `/prometheus`, config in `PROMETHEUS_CONFIG` and `PROMETHEUS_ALERTS`, tokens in `DEV_METRICS_TOKEN` and `PROD_METRICS_TOKEN`, `RAILWAY_RUN_UID=0` because the image runs as a non-root user and volumes mount as root) scrapes both APIs over HTTPS; `grafana` (volume `/var/lib/grafana`, `PORT=3000`, healthcheck `/api/health`, provisioning files written at start from `GF_PROVISION_*` and `GF_DASHBOARD_PERMITFLOW`, `RAILWAY_RUN_UID=0`) is public at `https://grafana.dev.permitflow.space` (CNAME and `_railway-verify` TXT at Namecheap), sign-in only. The variable names and the start commands are recorded in `docs/13-observability/OBSERVABILITY.md`; secrets are set by the owner from the CLI, never through the assistant.
+- Alerts reach Telegram: Grafana sends the six incident rules and an hourly digest per environment to the owner's chat, and a small bot (`telegram-bot`, third Railway service) answers `/status`, `/dev`, `/prod`, `/checks`, `/cost`, `/queue`, `/alerts`. The Railway start commands and variables: `docker/observability/railway/README.md`.
+
 ### Rollback
 
 Three layers, one solved, two planned.
@@ -137,6 +149,8 @@ Three layers, one solved, two planned.
 **Schema (rule, not tooling).** There is no `alembic downgrade` in production. The compatibility rule under Migrations (add nullable, drop one release later) is what makes a code rollback safe across a release that changed the schema; the older image reads the newer tables. A release that cannot honour the rule ships its schema change one release ahead of the code that needs it.
 
 **Data (planned, readiness rows 13 and 14).** Today: Railway's managed Postgres backups (point-in-time restore from the dashboard), no backup of the uploads volume, no restore drill. Before real users: a nightly `pg_dump` and a copy of the uploads volume to object storage (30 days), one restore drill into a scratch environment, and a staging environment cloned from production data so a migration is rehearsed before it reaches production. Order: backups and the drill first, staging second.
+
+**Observability.** The two monitoring services roll back like any image service (previous tag, redeploy); their data volumes persist. A wrong dashboard or rule is a variable: set the previous file content and redeploy.
 
 **Configuration.** A wrong variable (a CORS origin, a quota, a model name) is rolled back by setting the previous value in Railway (Variables) and redeploying; Railway keeps the variable history per service, so the previous value is visible there. The values that matter are listed in the Secrets and variables table above; nothing is derived at build time except the frontend's `API_URL`, which is read at container start.
 

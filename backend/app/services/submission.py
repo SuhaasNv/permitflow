@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.errors import InvalidTransition, ValidationFailed
 from app.domain import completeness as completeness_rules
 from app.domain.enums import ApplicationStatus, NotificationKind
@@ -77,6 +78,7 @@ class SubmissionService:
             f"{business} · Food Establishment Licence · Revision {number}",
         )
         self.db.commit()
+        metrics.TRANSITIONS.labels(new_status.value, "operator").inc()
         self.notifications.flush_sent()
         self.db.refresh(app)
         return app

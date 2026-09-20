@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.errors import InvalidTransition, ValidationFailed, VersionConflict
 from app.domain.enums import ApplicationStatus, NotificationKind
 from app.domain.labels import operator_label
@@ -110,6 +111,7 @@ class WorkflowService:
             if licence_key is not None:
                 get_storage().delete(licence_key)
             raise
+        metrics.TRANSITIONS.labels(resolved.value, "officer").inc()
         self.notifications.flush_sent()
         self.db.refresh(app)
         return app

@@ -1,5 +1,7 @@
 # PermitFlow: Documentation Index
 
+Each numbered folder has its own `README.md` (what the folder is for, when it was written, one line per document, where to start); this file is the index across them.
+
 Status legend: **written** (solutioning phase, before code) · **to be written** (produced during or after implementation). Documents written before code describe the intended design; where the built system differs, the document was updated in the same change or the difference is recorded in the readiness review.
 
 ## Product and requirements
@@ -40,7 +42,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Security
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `06-security/THREAT_MODEL.md` | written | Threats T1 to T22, planned controls, validation, production gaps |
+| `06-security/THREAT_MODEL.md` | written | Threats T1 to T23 (T23 the metrics endpoint, 20 Sep), planned controls, validation, production gaps |
 
 ## AI
 | Document | Status | Purpose |
@@ -53,7 +55,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Planning
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-075 (US-059 the debrief material, US-074 the post-release review, US-075 the final check before submission), 1:1 with Notion |
+| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-077 (US-059 the debrief material, US-074 the post-release review, US-075 the final check before submission, US-076 the fixes after the cold review, US-077 the observability layer), 1:1 with Notion |
 | `05-planning/SPRINTS.md` | written | Three one-day sprints, sprint DoD, close ritual, cut order |
 | `05-planning/KANBAN.md` | written | Flow, WIP limits, story-to-day mapping |
 | `05-planning/notion/*.png` | written (19 Sep) | The Notion board after the release: the workspace page, the Epics table, the Stories table |
@@ -75,13 +77,15 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `11-reviews/FINAL_REVIEW.md` | written (19 Sep) | What was built, the decisions to defend, trade-offs, what the AI got wrong, what to show in the debrief |
 | `11-reviews/ISSUES_AND_MITIGATIONS.md` | written (19 Sep) | Every issue found across the reviews and run-throughs, its risk, mitigation and evidence; what was kept as a decision |
 | `06-security/SECURITY_REVIEW.md` | written (19 Sep) | The owner's hardening checklist and four abuse scenarios, before and after US-058, with tests and what production adds |
-| `12-demo/documents/README.md` and `12-demo/documents/with_issues/NOTES.md` | written | The three generated document sets (clean, with planted issues, second business), how to regenerate them, the planted values |
+| `12-demo/documents/README.md` and `12-demo/documents/with_issues/NOTES.md` | written | The three document sets as PDFs (clean, with planted issues, second business), the form values they agree with, the planted values |
 | `04-design/prototype-src/README.md` | written | How the clickable prototype was generated |
 | `11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` | written (19 Sep) | The owner's legal, privacy and accessibility checklist answered item by item with evidence; laws considered; risks flagged; contrast computation (US-057) |
 | `../RELEASE_NOTES.md` | written (20 Sep) | What each version brings, in the users' words, newest first, with what comes next (v0.4.0: the admin panel and use case 3) |
 | `../CHANGELOG.md` | written (Sprints 1 to 3 closed; v0.3.0 released 19 Sep) | Milestones, sprint closes with Shipped / Slipped / Retro |
 | `../README.md` | written | What it is, stack and why, hosts, setup, demo accounts, security, tests, CI, deployment, AI verification, AI Usage, What I would do next |
-| `13-debrief/README.md` | written (19 Sep) | The pitch deck and the technical deck (pptx and handout PDF), the launch video, the narrated walkthrough and the technical video (videos in Git LFS) |
+| `01-discovery/README.md` to `13-observability/README.md` | written (20 Sep) | A README per folder: purpose, document index, reading order, related folders |
+| `13-observability/OBSERVABILITY.md` and `13-observability/README.md` | written (20 Sep) | The observability layer: logs, traces and Prometheus metrics; the endpoint and its token; every metric family; the Grafana dashboard; six alert rules; local profile and Railway services; T23; what is missing. Three dashboard renders beside it |
+| `14-debrief/README.md` | written (19 Sep) | The pitch deck and the technical deck (pptx and handout PDF), the launch video, the narrated walkthrough and the technical video (videos in Git LFS) |
 
 ## Review history
 - 18 Sep 2026: UI/UX design phase: two independent design-critique passes on the prototype (pass 1 scored 6.6/10 with 11 rendering bugs and 15 fixes; all applied; pass 2 results recorded in `04-design/UI_DESIGN.md`). Scope changes from the phase: public landing page (M1, FR-031), admin user management (S7, FR-030, US-073, T19), upload validation and hash-based duplicate detection made explicit (M3, SEC-005).

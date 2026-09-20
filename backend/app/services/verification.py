@@ -10,9 +10,9 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, or_, update
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.settings import get_settings
 from app.domain.enums import Role, VerificationStatus
@@ -53,13 +53,9 @@ def run_verification(run_id: uuid.UUID) -> None:
     settings = get_settings()
     with session_factory()() as db:
         # Atomic claim: only one worker can move a run from pending to running.
-        claimed = db.execute(
-            update(VerificationRun)
-            .where(VerificationRun.id == run_id, VerificationRun.status == VerificationStatus.PENDING)
-            .values(status=VerificationStatus.RUNNING, started_at=datetime.now(UTC))
-        )
+        claimed = DocumentRepository(db).claim_run(run_id, datetime.now(UTC))
         db.commit()
-        if int(getattr(claimed, "rowcount", 0) or 0) != 1:
+        if not claimed:
             return
         run = db.get(VerificationRun, run_id)
         doc = db.get(Document, run.document_id) if run else None
@@ -219,6 +215,8 @@ def _finish(
         },
     )
     db.commit()
+    metrics.VERIFICATION_RUNS.labels(status.value, provider).inc()
+    metrics.VERIFICATION_SECONDS.labels(provider).observe(run.latency_ms / 1000)
     logger.info(
         "verification_completed",
         extra={
@@ -242,23 +240,9 @@ def mark_stale_runs_failed(grace_seconds: int = 60) -> int:
     settings = get_settings()
     cutoff = datetime.now(UTC) - timedelta(seconds=settings.ai_timeout_seconds * 2 + grace_seconds)
     with session_factory()() as db:
-        result = db.execute(
-            update(VerificationRun)
-            .where(
-                or_(
-                    and_(
-                        VerificationRun.status == VerificationStatus.RUNNING,
-                        VerificationRun.started_at < cutoff,
-                    ),
-                    VerificationRun.status == VerificationStatus.PENDING,
-                )
-            )
-            .values(
-                status=VerificationStatus.FAILED, error_reason="interrupted", finished_at=datetime.now(UTC)
-            )
-        )
+        count = DocumentRepository(db).fail_interrupted_runs(cutoff, datetime.now(UTC))
         db.commit()
-        return int(getattr(result, "rowcount", 0) or 0)
+        return count
 
 
 class VerificationService:
