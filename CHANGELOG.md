@@ -12,7 +12,7 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 
 ## After the cold review (20 Sep 2026, US-076)
 
-A fresh reviewer session rated the repository the way a hiring manager's assistant would and named one shipped defect worth fixing before submission. Fixed the same day, on `fix/us-076-review-defects`:
+A fresh reviewer session with no memory of the project rated the repository against the brief and named one shipped defect worth fixing before submission. Fixed the same day, on `fix/us-076-review-defects`:
 
 - The officer queue reads the business name and premises address from the latest submitted revision (`RevisionRepository.latest_for`, one `DISTINCT ON` query) instead of the operator's working copy, so an unsubmitted edit during a resubmission round never appears in the queue; test added.
 - The draft quota takes `SELECT ... FOR UPDATE` on the operator's user row before counting (`UserRepository.lock`), so two simultaneous creates cannot both pass at limit minus one; a test proves the lock is held for the transaction.
