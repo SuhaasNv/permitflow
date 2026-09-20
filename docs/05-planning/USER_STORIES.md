@@ -134,7 +134,7 @@ Story format: **US-xxx — As a [user], I want [capability], so that [value].**
 - Definition of Done: readiness row 25 closed; `rate_limit.py` tests extended.
 
 ### US-083 — As an officer, I want the case response to carry `phase`, `outcome` and `can_resolve`, so that the screens stop recomputing server rules.
-- Acceptance criteria: `OfficerApplicationOut` gains `phase` (pre_site, site_visit, post_site, decision, decided), `outcome` (approved, rejected, withdrawn or null) and `can_resolve` per feedback item; `CasePage.tsx`, `QueuePage.tsx` and the operator list rows branch on these fields, never on label or tone strings; the two screens that computed the flagged-items count differently share one helper.
+- Acceptance criteria: `OfficerApplicationOut` gains `phase` (pre_site, site_visit, post_site, decision, decided), `outcome` (approved, rejected, withdrawn or null) and `can_resolve` per feedback item; `CasePage.tsx`, `QueuePage.tsx` and the operator list rows branch on these fields, never on label or tone strings; the two screens that computed the flagged-items count differently share one helper. The queue row's next-action chip gets its own column from `lg` (layout audit H4: at 1280 it drops under the reference and a wide label is clipped on the left).
 - Priority: Nice-to-have · Sprint 8 · Dependencies: US-079 · Readiness row 22
 - Definition of Done: readiness row 22 closed; vitest cases for each branch.
 
