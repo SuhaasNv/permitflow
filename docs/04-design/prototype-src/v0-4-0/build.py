@@ -998,38 +998,38 @@ BOARDS: list[tuple[str, str, int, int, str, int]] = [
 ]
 
 
-def build(key: str, w: int, h: int) -> str:
-    if key == "checklist-1024":
+def build(board: str, w: int, h: int) -> str:
+    if board == "checklist-1024":
         return build_checklist(w, h, "online")
-    if key == "checklist-820":
+    if board == "checklist-820":
         return build_checklist(w, h, "offline")
-    if key == "case":
+    if board == "case":
         return build_case_with_rail(w, h, False)
-    if key == "case-ro":
+    if board == "case-ro":
         return build_case_with_rail(w, h, True)
-    if key == "respond-390":
+    if board == "respond-390":
         return build_respond(w, h)
-    if key == "respond-390-sheet":
+    if board == "respond-390-sheet":
         return build_respond(w, h, with_dialog=True)
-    if key == "respond-1280":
+    if board == "respond-1280":
         return build_respond(w, h, with_dialog=True)
-    if key == "history":
+    if board == "history":
         return build_history(w, h)
-    if key == "admin-overview":
+    if board == "admin-overview":
         return build_admin_overview(w, h)
-    if key == "admin-activity":
+    if board == "admin-activity":
         return build_admin_activity(w, h)
-    if key == "admin-users":
+    if board == "admin-users":
         return build_admin_users(w, h)
-    if key == "schedule-dialog":
+    if board == "schedule-dialog":
         return build_schedule_dialog(w, h)
-    if key in ("operator-appointment-390", "operator-appointment-1280"):
+    if board in ("operator-appointment-390", "operator-appointment-1280"):
         return build_operator_appointment(w, h)
-    if key == "officer-counter":
+    if board == "officer-counter":
         return build_officer_counter(w, h)
-    if key == "operator-confirmed-390":
+    if board == "operator-confirmed-390":
         return build_operator_confirmed(w, h)
-    raise KeyError(key)
+    raise KeyError(board)
 
 
 def main(out: Path) -> None:
@@ -1038,8 +1038,8 @@ def main(out: Path) -> None:
     boards: dict[str, dict[str, object]] = {}
     order: list[str] = []
     x, y, row_h, row = 0, 0, 0, 0
-    for fname, title, w, h, key, r in BOARDS:
-        (proj / fname).write_text(build(key, w, h), encoding="utf-8")
+    for fname, title, w, h, board, r in BOARDS:
+        (proj / fname).write_text(build(board, w, h), encoding="utf-8")
         if r != row:
             row, x, y, row_h = r, 0, y + row_h + 240, 0
         boards[fname] = {"x": x, "y": y, "w": w, "h": h, "title": title, "is_interactive": False}
