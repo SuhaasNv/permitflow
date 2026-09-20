@@ -111,3 +111,45 @@ export async function downloadAttachment(applicationId: string, attachmentId: st
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
+
+// Officer side (US-066) ------------------------------------------------------------------------------
+
+export interface ThreadRequest {
+  id: string
+  round_no: number
+  message: string
+  author_name: string
+  created_at: string
+  released_at: string | null
+  withdrawn_at: string | null
+  response: ClarificationResponse | null
+}
+
+export type ThreadStatus = 'open' | 'answered' | 'resolved' | 'withdrawn'
+
+export interface ClarificationThread {
+  item_id: string
+  key: string
+  title: string
+  result: string
+  comment: string | null
+  status: ThreadStatus | string
+  round_no: number
+  requests: ThreadRequest[]
+  can_resolve: boolean
+  can_reopen: boolean
+  can_withdraw: boolean
+  pending_release: boolean
+}
+
+export interface ClarificationOfficerView {
+  visit_no: number
+  round: number
+  open_count: number
+  answered_count: number
+  resolved_count: number
+  withdrawn_count: number
+  unreleased_count: number
+  turn: string
+  items: ClarificationThread[]
+}

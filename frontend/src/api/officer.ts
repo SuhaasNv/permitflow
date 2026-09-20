@@ -1,4 +1,5 @@
 import type { ChecklistSummary } from './checklist'
+import type { ClarificationOfficerView } from './clarification'
 import { request } from './client'
 import type { SiteVisitOfficer } from './siteVisit'
 import type { Tone } from '@/features/shared/StatusBadge'
@@ -165,6 +166,8 @@ export interface OfficerApplication {
   site_visit: SiteVisitOfficer | null
   /** The current visit's checklist once the officer opened it (US-060). */
   checklist: ChecklistSummary | null
+  /** The clarification threads once the checklist is submitted (US-066). */
+  clarification: ClarificationOfficerView | null
   version: number
   created_at: string
   updated_at: string
@@ -252,4 +255,21 @@ export interface AuditEvent {
 
 export function getAuditTrail(id: string): Promise<{ application_id: string; events: AuditEvent[] }> {
   return request<{ application_id: string; events: AuditEvent[] }>(`/officer/applications/${id}/audit`)
+}
+
+// Clarification rounds (US-066): each decision returns the refreshed case.
+
+export function resolveClarification(id: string, itemId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/clarifications/${itemId}/resolve`, { method: 'POST' })
+}
+
+export function reopenClarification(id: string, itemId: string, message: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/clarifications/${itemId}/reopen`, {
+    method: 'POST',
+    body: { message },
+  })
+}
+
+export function withdrawClarification(id: string, itemId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/clarifications/${itemId}/withdraw`, { method: 'POST' })
 }

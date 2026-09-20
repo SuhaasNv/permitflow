@@ -32,7 +32,8 @@ function ItemAnswer({ appId, item }: { appId: string; item: ClarificationItem })
   const attach = useAttach(appId)
   const remove = useRemoveAttachment(appId)
   const toast = useToast()
-  const latest = item.responses.at(-1) ?? null
+  // The answer of the current round only; earlier rounds are shown read-only under their question.
+  const latest = item.responses.find((r) => r.round_no === item.round_no) ?? null
   const [text, setText] = useState(latest?.message ?? '')
   const [fileError, setFileError] = useState<string | null>(null)
   const saved = useRef(latest?.message ?? '')
@@ -311,16 +312,36 @@ export function ClarificationPage() {
                   <StatusBadge label={item.status} tone={TONE[item.status] ?? 'neutral'} />
                 </div>
                 <div className="mt-4 flex flex-col gap-3 sm:pl-[34px]">
-                  {item.requests.map((q) => (
-                    <div key={q.id} className="rounded-md border border-line bg-surface-2 px-4 py-3">
-                      <div className="text-xs font-semibold uppercase tracking-[0.04em] text-text-3">
-                        The officer asked{item.requests.length > 1 ? ` (round ${q.round_no})` : ''}
+                  {item.requests.map((q) => {
+                    const earlier = q.round_no < item.round_no ? item.responses.find((r) => r.round_no === q.round_no) : null
+                    return (
+                      <div key={q.id} className="flex flex-col gap-2">
+                        <div className="rounded-md border border-line bg-surface-2 px-4 py-3">
+                          <div className="text-xs font-semibold uppercase tracking-[0.04em] text-text-3">
+                            The officer asked{item.requests.length > 1 ? ` (round ${q.round_no})` : ''}
+                          </div>
+                          <p className="mt-1 text-sm leading-5 text-text">{q.message}</p>
+                          <div className="mt-1 text-xs text-text-3">{formatDateTime(q.released_at)}</div>
+                        </div>
+                        {earlier ? (
+                          <div className="rounded-md border border-line px-4 py-3">
+                            <div className="text-xs font-semibold uppercase tracking-[0.04em] text-text-3">
+                              You answered{earlier.sent_at ? `, sent ${formatDateTime(earlier.sent_at)}` : ''}
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap text-sm leading-5">{earlier.message}</p>
+                            {earlier.attachments.length ? (
+                              <p className="mt-1 text-xs text-text-3">{earlier.attachments.map((a) => a.original_filename).join(', ')}</p>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
-                      <p className="mt-1 text-sm leading-5 text-text">{q.message}</p>
-                      <div className="mt-1 text-xs text-text-3">{formatDateTime(q.released_at)}</div>
-                    </div>
-                  ))}
-                  <ItemAnswer key={item.responses.at(-1)?.id ?? 'none'} appId={id} item={item} />
+                    )
+                  })}
+                  <ItemAnswer
+                    key={`${item.round_no}-${item.responses.find((r) => r.round_no === item.round_no)?.id ?? 'none'}`}
+                    appId={id}
+                    item={item}
+                  />
                 </div>
               </li>
             ))}
