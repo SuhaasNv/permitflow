@@ -18,7 +18,7 @@ from html import escape
 from pathlib import Path
 
 # Tokens (DESIGN_SYSTEM.md)
-BG, SURFACE, SURFACE2 = "#F3F4F6", "#FFFFFF", "#F9FAFB"
+BG, SURFACE, SURFACE2, SURFACE3 = "#F3F4F6", "#FFFFFF", "#F8F9FB", "#EEF0F3"
 LINE, LINE_STRONG = "#D9DEE5", "#AEB6C2"
 TEXT, TEXT2, TEXT3 = "#1B2430", "#465060", "#616C7A"
 PRIMARY, PRIMARY_HOVER, PRIMARY_SOFT, PRIMARY_LINE = "#A8192A", "#8A1422", "#FBEDEE", "#EFB8BE"
@@ -33,6 +33,10 @@ TONES = {
     "neutral": ("#475467", "#F2F4F7", "#D0D5DD"),
     "primary": (PRIMARY, PRIMARY_SOFT, PRIMARY_LINE),
 }
+# The product's self-hosted faces (frontend/public/fonts), uploaded to the canvas as assets so the
+# artboards render with exactly the files the site serves: one weight each, heavier weights synthesised.
+FONT_SANS = "/_blob/5be9a8ff2fce72ada39cecc7b881da40"
+FONT_MONO = "/_blob/4a8962c75cbd7d2b1073efbaead3d5f9"
 SANS = "'Public Sans', system-ui, sans-serif"
 MONO = "'IBM Plex Mono', ui-monospace, monospace"
 
@@ -141,8 +145,8 @@ def chip(label: str, on: bool, count: str = "", href: str | None = None, done: b
     """Filter or section chip: neutral-soft when selected, never primary-soft (pass 2 rule)."""
     inner = (icon(IC["check"], 12, TONES["success"][0]) if done else "") + escape(label) + (div(st(font_family=MONO, font_size="12px", color=TEXT3), count, "span") if count else "")
     style = st(display="inline-flex", align_items="center", gap="6px", height="36px", padding="0 12px", border_radius="6px",
-               border=f"1px solid {TEXT if on else LINE_STRONG}", background=NEUTRAL_SOFT if on else SURFACE, color=TEXT if on else TEXT2,
-               font_size="13px", font_weight=600 if on else 500, text_decoration="none", cursor="pointer", font_family=SANS)
+               border="1px solid transparent", background=SURFACE3 if on else "transparent", color=TEXT if on else TEXT2,
+               font_size="14px", font_weight=600 if on else 500, text_decoration="none", cursor="pointer", font_family=SANS)
     if href:
         return div(style, inner, "a", href=href, aria_current="true" if on else "false")
     return div(style, inner, "button", type="button", aria_pressed="true" if on else "false")
@@ -153,14 +157,23 @@ def surface(inner: str, pad: str = "20px", extra: str = "") -> str:
 
 
 def card_header(title: str, right: str = "", kicker: str = "") -> str:
-    left = (text(kicker, 12, 16, 600, TEXT3, "text-transform: uppercase; letter-spacing: 0.08em") if kicker else "") + text(title, 16, 24, 600)
-    return div(st(display="flex", align_items="center", justify_content="space-between", gap="16px", padding="14px 20px", border_bottom=f"1px solid {LINE}"),
-               div(st(display="flex", flex_direction="column", gap="2px"), left) + div(st(display="flex", gap="8px", align_items="center"), right))
+    """Main-column card header as shipped: an uppercase kicker line ("SUBMISSION · REVISION 1") with a small right meta."""
+    label = f"{kicker} · {title}" if kicker else title
+    return div(st(display="flex", align_items="center", justify_content="space-between", gap="16px", padding="16px 20px", border_bottom=f"1px solid {LINE}"),
+               text(label, 12, 16, 600, TEXT2, "text-transform: uppercase; letter-spacing: 0.08em") + div(st(display="flex", gap="8px", align_items="center", font_size="12px", color=TEXT3), right))
 
 
 def panel(title: str, body: str, right: str = "", kicker: str = "", pad: str = "20px") -> str:
     return div(st(background=SURFACE, border=f"1px solid {LINE}", border_radius="10px", overflow="hidden"),
                card_header(title, right, kicker) + div(st(padding=pad), body))
+
+
+def rail_panel(title: str, body: str, right: str = "", divider: bool = False) -> str:
+    """Rail panel as shipped: 17 px title, small right meta, body in the same block (hairline only when asked)."""
+    head = div(st(display="flex", align_items="baseline", justify_content="space-between", gap="12px", padding="16px 20px 0"),
+               text(title, 17, 24, 600) + div(st(font_size="12px", color=TEXT3, display="flex", gap="8px", align_items="center"), right))
+    return div(st(background=SURFACE, border=f"1px solid {LINE}", border_radius="10px", overflow="hidden"),
+               head + (div(st(margin="12px 20px 0", border_top=f"1px solid {LINE}"), "") if divider else "") + div(st(padding="12px 20px 20px"), body))
 
 
 def alert(tone: str, lead: str, body: str = "", icon_key: str = "info", action: str = "") -> str:
@@ -179,10 +192,10 @@ def def_list(rows: list[tuple[str, str]]) -> str:
         for i, (k, v) in enumerate(rows)), "dl")
 
 
-def facts_row(rows: list[tuple[str, str]]) -> str:
-    """The as-built key facts strip: lowercase labels, one row, full width."""
-    return div(st(display="flex", gap="32px", flex_wrap="wrap", padding="14px 20px", background=SURFACE, border=f"1px solid {LINE}", border_radius="10px"),
-               "".join(div(st(display="flex", flex_direction="column", gap="2px", min_width="0"), text(k, 12, 16, 400, TEXT3) + text(v, 14, 20, 600)) for k, v in rows))
+def facts_row(rows: list[tuple[str, str, str]]) -> str:
+    """The shipped key facts strip: four columns, label in text-3, value, a second line in text-3, no box."""
+    return div(st(display="grid", grid_template_columns=f"repeat({len(rows)}, minmax(0, 1fr))", gap="24px", padding="16px 0 4px", border_top=f"1px solid {LINE}"),
+               "".join(div(st(display="flex", flex_direction="column", gap="2px", min_width="0"), text(k, 13, 18, 400, TEXT3) + text(v, 14, 20, 500) + (text(sub, 13, 18, 400, TEXT3) if sub else "")) for k, v, sub in rows))
 
 
 def table(headers: list[str], rows: list[list[str]], widths: list[str] | None = None, font: int = 13, numeric: set[int] | None = None) -> str:
@@ -273,17 +286,17 @@ NAV = {
     "admin": [("Overview", "Overview", "chart"), ("Activity", "Activity", "activity"), ("Users", "Users", "users")],
 }
 ROLE_LABEL = {"operator": "Operator", "officer": "Licensing officer", "admin": "Administrator"}
-ROLE_KICKER = {"operator": "Applicant", "officer": "Licensing office", "admin": "Administration"}
+ROLE_KICKER = {"operator": "Operator", "officer": "Licensing officer", "admin": "Administrator"}
 USERS = {"operator": "Tan Wei Ling", "officer": "Rahim bin Abdullah", "admin": "Priya Nair"}
 
 
-def logo() -> str:
+def logo(phone: bool = False) -> str:
     mark = (
         '<svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" style="flex-shrink: 0"><rect width="32" height="32" rx="7" fill="#A8192A"></rect>'
         '<path d="M9 10h14M9 16h9M9 22h4M16.5 22l2.5 2.5L24 18" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>'
     )
-    return div(st(display="flex", align_items="center", gap="10px", text_decoration="none", color=TEXT), mark + text("PermitFlow", 17, 22, 700, TEXT, "letter-spacing: -0.02em", "span")
-               + div(st(border_left=f"1px solid {LINE}", padding_left="10px", font_size="12px", color=TEXT3), "Licensing Services", "span"), "a", href="#", aria_label="PermitFlow home")
+    tail = "" if phone else div(st(border_left=f"1px solid {LINE}", padding_left="10px", font_size="12px", color=TEXT3), "Licensing Services", "span")
+    return div(st(display="flex", align_items="center", gap="10px", text_decoration="none", color=TEXT), mark + text("PermitFlow", 17, 22, 700, TEXT, "letter-spacing: -0.02em", "span") + tail, "a", href="#", aria_label="PermitFlow home")
 
 
 def initials(name: str) -> str:
@@ -292,44 +305,44 @@ def initials(name: str) -> str:
 
 
 def shell(width: int, height: int, role: str, active: str, content: str, nav: str = "full", overlay: str = "") -> str:
-    """App shell as shipped: masthead 28 (secure portal, session), top bar 56, side nav 232 or 64, footer; bottom tab bar on phones."""
+    """App shell as shipped (frontend/src/app/AppShell.tsx): masthead 28, top bar 56, side nav 232 with its own footer, or the bottom tab bar on phones."""
     phone = nav == "phone"
     masthead = div(st(height="28px", background=INK, color="#AEB6C2", display="flex", align_items="center", padding="0 16px" if phone else "0 24px", font_size="12px", gap="8px", white_space="nowrap", overflow="hidden"),
-                   text("Secure licensing portal", 12, 16, 600, "#FFFFFF", "", "span") + ("" if phone else text("· Food Establishments Unit", 12, 16, 400, "#AEB6C2", "", "span"))
-                   + div(st(margin_left="auto", font_variant_numeric="tabular-nums", color="#E6C8CC"), "Signed in until 18:32", "span", role="status"), role="region", aria_label="Portal notice")
+                   text("Secure licensing portal", 12, 16, 600, "#FFFFFF", "", "span") + ("" if phone else text("· Food Establishments Unit", 12, 16, 400, "#AEB6C2", "", "span")), role="region", aria_label="Portal notice")
     bell = div(st(position="relative", width="40px", height="40px", display="flex", align_items="center", justify_content="center", border_radius="6px", color=TEXT2, border="none", background="transparent", cursor="pointer"), icon(IC["bell"], 18)
-               + div(st(position="absolute", top="6px", right="6px", min_width="16px", height="16px", border_radius="999px", background=PRIMARY, color="#FFFFFF", font_size="10px", font_weight=700, display="flex", align_items="center", justify_content="center", padding="0 4px"), "2"), "button", type="button", aria_label="Notifications, 2 unread")
+               + div(st(position="absolute", top="4px", right="4px", min_width="18px", height="18px", border_radius="999px", background=PRIMARY, color="#FFFFFF", font_size="10px", font_weight=700, display="flex", align_items="center", justify_content="center", padding="0 4px", border="2px solid #FFFFFF", box_sizing="border-box"), "2"), "button", type="button", aria_label="Notifications, 2 unread")
     avatar = div(st(width="32px", height="32px", border_radius="999px", background=INK, color="#FFFFFF", font_size="11px", font_weight=600, letter_spacing="0.04em", display="flex", align_items="center", justify_content="center", flex_shrink=0), initials(USERS[role]), "span")
     user = div(st(display="flex", align_items="center", gap="10px"), avatar + ("" if phone else div(st(display="flex", flex_direction="column"), text(USERS[role], 13, 16, 600) + text(ROLE_LABEL[role], 12, 16, 400, TEXT3))))
-    signout = "" if phone else div(st(height="32px", padding="0 12px", border_radius="6px", font_size="13px", font_weight=600, color=TEXT2, border="none", background="transparent", cursor="pointer", font_family=SANS), "Sign out", "button", type="button")
+    signout = div(st(height="32px", padding="0 12px", border_radius="6px", font_size="13px", font_weight=600, color=TEXT2, border="none", background="transparent", cursor="pointer", font_family=SANS), "Sign out", "button", type="button")
+    brand = logo(phone)
     topbar = div(st(height="56px", background="rgba(255,255,255,0.95)", border_bottom=f"1px solid {LINE}", display="flex", align_items="center", gap="12px", padding="0 12px" if phone else "0 24px", box_sizing="border-box"),
                  ("" if phone else div(st(width="40px", height="40px", display="flex", align_items="center", justify_content="center", color=TEXT2, border="none", background="transparent", cursor="pointer"), icon(IC["menu"], 18), "button", type="button", aria_label="Collapse navigation"))
-                 + logo() + div(st(margin_left="auto", display="flex", align_items="center", gap="4px"), bell + user + signout), "header")
+                 + brand + div(st(margin_left="auto", display="flex", align_items="center", gap="4px"), bell + user + signout), "header")
     sidenav = ""
     bottomnav = ""
     if phone:
         tabs = ""
         for label, short, ic in NAV[role]:
             on = label == active
-            pill = div(st(width="44px", height="28px", border_radius="999px", background=NEUTRAL_SOFT if on else "transparent", display="flex", align_items="center", justify_content="center"), icon(IC[ic], 20), "span")
-            tabs += div(st(display="flex", flex_direction="column", align_items="center", justify_content="center", gap="2px", flex_grow=1, height="64px", color=TEXT if on else TEXT3, font_size="11px", font_weight=600, text_decoration="none"), pill + escape(short), "a", href="#", aria_current="page" if on else "false")
-        bottomnav = div(st(position="absolute", left="0", right="0", bottom="0", height="64px", background=SURFACE, border_top=f"1px solid {LINE}", display="flex"), tabs, "nav", aria_label="Main")
+            pill = div(st(width="44px", height="28px", border_radius="999px", background=SURFACE3 if on else "transparent", display="flex", align_items="center", justify_content="center"), icon(IC[ic], 20), "span")
+            tabs += div(st(display="flex", flex_direction="column", align_items="center", justify_content="center", gap="2px", flex_grow=1, height="64px", color=TEXT if on else TEXT2, font_size="12px", font_weight=500, text_decoration="none"), pill + escape(short), "a", href="#", aria_current="page" if on else "false")
+        bottomnav = div(st(position="absolute", left="0", right="0", bottom="0", height="64px", background="rgba(255,255,255,0.95)", border_top=f"1px solid {LINE}", display="flex"), tabs, "nav", aria_label="Main")
     else:
-        collapsed = nav == "collapsed"
-        w = 64 if collapsed else 232
-        items = "" if collapsed else text(ROLE_KICKER[role], 12, 16, 600, TEXT3, "text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 11px 12px")
+        items = text(ROLE_KICKER[role], 12, 16, 600, TEXT3, "text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 11px 12px")
         for label, _short, ic in NAV[role]:
             on = label == active
-            common = st(display="flex", align_items="center", gap="10px", height="40px", border_radius="6px", background=NEUTRAL_SOFT if on else "transparent",
-                        color=TEXT if on else TEXT2, font_size="14px", font_weight=600 if on else 500, border_left=f"3px solid {PRIMARY}" if on else "3px solid transparent",
-                        box_sizing="border-box", text_decoration="none", justify_content="center" if collapsed else "flex-start", padding="0" if collapsed else "0 12px", width="40px" if collapsed else "auto")
-            extra_attrs = {"aria_label": label} if collapsed else {}
-            items += div(common, icon(IC[ic], 18) + ("" if collapsed else escape(label)), "a", href="#", aria_current="page" if on else "false", **extra_attrs)
-        sidenav = div(st(width=f"{w}px", flex_shrink=0, background=SURFACE, border_right=f"1px solid {LINE}", padding="12px", box_sizing="border-box", display="flex", flex_direction="column", gap="2px", align_items="center" if collapsed else "stretch"), items, "nav", aria_label="Main")
-    pad = "16px 16px 96px" if phone else ("24px 24px 40px" if width <= 1024 else "24px 32px 40px")
-    main = div(st(flex_grow=1, min_width=0, padding=pad, box_sizing="border-box", display="flex", flex_direction="column", gap="20px"), content, "main", id="main")
-    footer = "" if phone else div(st(padding="16px 32px", font_size="12px", color=TEXT3, border_top=f"1px solid {LINE}", display="flex", gap="16px"), "PermitFlow · Fictional assessment product · Privacy · Terms", "footer")
-    body = div(st(display="flex", flex_grow=1, align_items="stretch"), sidenav + div(st(display="flex", flex_direction="column", flex_grow=1, min_width=0), main + footer))
+            items += div(st(display="flex", align_items="center", gap="12px", height="40px", padding="0 11px", border_radius="6px", background=SURFACE3 if on else "transparent",
+                            color=TEXT if on else TEXT2, font_size="14px", font_weight=600 if on else 500, text_decoration="none"),
+                         icon(IC[ic], 18) + escape(label), "a", href="#", aria_current="page" if on else "false")
+        version = div(st(display="inline-flex", align_items="center", height="16px", padding="0 6px", border=f"1px solid {LINE}", border_radius="4px", font_family=MONO, font_size="10px", color=TEXT3), "v0.4.0-dev", "span")
+        nav_footer = div(st(margin_top="auto", padding="16px 12px 20px", display="flex", flex_direction="column", gap="4px", font_size="12px", color=TEXT3),
+                         div(st(display="flex", align_items="center", gap="8px"), text("PermitFlow", 12, 16, 500, TEXT2, "", "span") + version)
+                         + text("Fictional assessment product", 12, 16, 400, TEXT3)
+                         + div(st(display="flex", gap="12px", margin_top="4px"), div(st(color=TEXT3, text_decoration="none"), "Privacy", "a", href="#") + div(st(color=TEXT3, text_decoration="none"), "Terms", "a", href="#")))
+        sidenav = div(st(width="232px", flex_shrink=0, background=SURFACE, border_right=f"1px solid {LINE}", padding="12px 12px 0", box_sizing="border-box", display="flex", flex_direction="column", gap="2px"), items + nav_footer, "nav", aria_label="Main")
+    pad = "16px 16px 96px" if phone else ("24px 24px 40px" if width <= 1024 else "32px 40px 48px")
+    main = div(st(flex_grow=1, min_width=0, padding=pad, box_sizing="border-box", display="flex", flex_direction="column", gap="24px", max_width="1360px"), content, "main", id="main")
+    body = div(st(display="flex", flex_grow=1, align_items="stretch"), sidenav + main)
     root = div(st(width=f"{width}px", height=f"{height}px", box_sizing="border-box", background=BG, color=TEXT, font_family=SANS, font_size="15px", line_height="22px", display="flex", flex_direction="column", position="relative", overflow="hidden"),
                masthead + topbar + body + bottomnav + overlay)
     return root
@@ -346,10 +359,10 @@ def page(title: str, width: int, height: int, root: str) -> str:
 <body>
 <x-dc>
 <helmet>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono&amp;display=swap" rel="stylesheet">
 <style>
-body{{margin:0;background:{BG};font-family:{SANS}}}
+@font-face{{font-family:'Public Sans';font-style:normal;font-weight:400;font-display:swap;src:url('{FONT_SANS}') format('woff2')}}
+@font-face{{font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;src:url('{FONT_MONO}') format('woff2')}}
+body{{margin:0;background:{BG};font-family:{SANS};-webkit-font-smoothing:antialiased}}
 a{{color:{PRIMARY}}}a:hover{{color:{PRIMARY_HOVER}}}
 button{{font-family:inherit}}
 table{{font-variant-numeric:tabular-nums}}
@@ -385,6 +398,29 @@ def page_header(title: str, subtitle: str = "", eyebrow: str = "", actions: str 
                + text(title, 28, 36, 600, TEXT, "letter-spacing: -0.015em", "h1")
                + (text(subtitle, 15, 22, 400, TEXT2) if subtitle else ""))
     return div(st(display="flex", align_items="flex-end", justify_content="space-between", gap="16px", flex_wrap="wrap"), left + div(st(display="flex", gap="8px", align_items="center", flex_shrink=0), actions))
+
+
+def case_header(crumbs: list[str], ref: str, licence: str, title: str, b: str, explanation: str, meta: str = "", actions: str = "", phone: bool = False) -> str:
+    """Application header as shipped: breadcrumb, mono reference with the licence type, title, badge, explanation, meta line, hairline."""
+    ref_line = div(st(display="flex", gap="8px", align_items="center", flex_wrap="wrap"), mono(ref, 13, TEXT2) + text("·", 13, 18, 400, TEXT3, "", "span") + text(licence, 13, 18, 400, TEXT3, "", "span"))
+    head = div(st(display="flex", align_items="flex-start", justify_content="space-between", gap="16px", flex_wrap="wrap"),
+               div(st(display="flex", flex_direction="column", gap="8px", min_width="0"),
+                   ref_line + text(title, 30 if not phone else 28, 36, 600, TEXT, "letter-spacing: -0.015em", "h1")
+                   + div(st(display="flex", gap="12px", align_items="center", flex_wrap="wrap"), b + ("" if phone else text(explanation, 14, 20, 400, TEXT2, "", "span")))
+                   + (text(explanation, 15, 22, 400, TEXT2) if phone else "")
+                   + (text(meta, 13, 18, 400, TEXT3) if meta else ""))
+               + div(st(display="flex", gap="8px", align_items="center", flex_shrink=0), actions))
+    return div(st(display="flex", flex_direction="column", gap="12px"), breadcrumb(crumbs) + head)
+
+
+def list_header(kicker: str, title: str, summary: str, meta: str = "", actions: str = "") -> str:
+    """List and admin page header as shipped: uppercase kicker, title, one summary line, one meta line."""
+    left = div(st(display="flex", flex_direction="column", gap="6px", min_width="0"),
+               text(kicker, 12, 16, 600, TEXT3, "text-transform: uppercase; letter-spacing: 0.08em")
+               + text(title, 32, 40, 600, TEXT, "letter-spacing: -0.015em", "h1")
+               + text(summary, 17, 24, 400, TEXT2)
+               + (text(meta, 14, 20, 400, TEXT3) if meta else ""))
+    return div(st(display="flex", align_items="flex-start", justify_content="space-between", gap="16px", flex_wrap="wrap"), left + div(st(display="flex", gap="8px", align_items="center", flex_shrink=0, padding_top="40px"), actions))
 
 
 def status_bar(b: str, explanation: str, meta: str = "", actions: str = "", stack: bool = False) -> str:
@@ -548,11 +584,12 @@ def checklist_body(compact: bool, state: str) -> str:
 
 
 def build_checklist(width: int, height: int, state: str) -> str:
-    compact = width < 900
-    hdr = breadcrumb(["Review queue", "PF-2026-000214", "Site visit checklist"]) + page_header("Site visit checklist", "Kopi & Kaya Toast House Pte. Ltd. · 12 Jalan Besar #01-03", ref="PF-2026-000214", actions=button("Back to the case", "ghost", icon_path=IC["back"]))
-    sb = status_bar(badge("Site Visit Scheduled", "info", "lg"), "Visit 1, 22 Sep 2026. Fill the checklist on site; it saves as you go.", "Draft, not submitted", save_indicator("retrying" if state == "offline" else "saved"), stack=compact)
-    content = hdr + sb + checklist_body(compact, state)
-    return page("Site visit checklist", width, height, shell(width, height, "officer", "Review queue", content, nav="collapsed"))
+    compact = width < 1100  # the sidebar leaves 540 px at 820 and 744 px at 1024: controls stretch
+    hdr = case_header(["Review queue", "PF-2026-000214", "Site visit checklist"], "PF-2026-000214", "Food Establishment Licence", "Site visit checklist",
+                      badge("Site Visit Scheduled", "info"), "Kopi & Kaya Toast House Pte. Ltd., 12 Jalan Besar #01-03. Visit 1, 22 Sep 2026. Fill the checklist on site; it saves as you go.",
+                      meta="Draft, not submitted", actions=div(st(display="flex", gap="12px", align_items="center"), save_indicator("retrying" if state == "offline" else "saved") + button("Back to the case", "secondary", size="sm")))
+    content = hdr + checklist_body(compact, state)
+    return page("Site visit checklist", width, height, shell(width, height, "officer", "Review queue", content))
 
 
 # One chronology for the demo case (UI_STATES lifecycle rows 3 to 6):
@@ -579,11 +616,10 @@ def thread_item(n: int, key: str, finding: str, state: str, rounds: list[dict[st
 def clarification_rail(viewer: str) -> str:
     ro = viewer != "officer"
     you = "You" if not ro else OFFICER
-    header = div(st(display="flex", flex_direction="column", gap="6px", padding="14px 20px", border_bottom=f"1px solid {LINE}"),
-                 div(st(display="flex", justify_content="space-between", align_items="center", gap="8px"), text("Clarification", 16, 24, 600) + tag("Round 2", "neutral"))
-                 + text("Your turn: the operator answered on 28 Sep." if not ro else "The officer's turn: the operator answered on 28 Sep.", 13, 18, 400, TEXT2)
-                 + text("1 open · 1 answered · 1 clarified", 13, 18, 400, TEXT3))
-    next_step = "" if ro else div(st(display="flex", flex_direction="column", gap="8px", padding="16px 20px", border_bottom=f"1px solid {LINE}", background=SURFACE2),
+    header = div(st(display="flex", flex_direction="column", gap="4px", padding="16px 20px 12px", border_bottom=f"1px solid {LINE}"),
+                 div(st(display="flex", justify_content="space-between", align_items="baseline", gap="8px"), text("Clarification", 17, 24, 600) + mono("1 open · 1 answered · 1 clarified", 12, TEXT3))
+                 + text("Round 2, your turn: the operator answered on 28 Sep." if not ro else "Round 2, the officer's turn: the operator answered on 28 Sep.", 13, 18, 400, TEXT2))
+    next_step = "" if ro else div(st(display="flex", flex_direction="column", gap="8px", padding="16px 20px", border_bottom=f"1px solid {LINE}"),
                                   text("Next step", 12, 16, 600, TEXT3, "text-transform: uppercase; letter-spacing: 0.08em")
                                   + button("Request another round (1 item)", "primary", full=True)
                                   + button("Route to approval", "secondary", disabled_reason="1 item is answered but not yet clarified", full=True)
@@ -617,25 +653,26 @@ def checklist_summary_card() -> str:
     body = div(st(display="flex", flex_direction="column", gap="8px"),
                text("17 items: 13 satisfactory, 3 unsatisfactory, 1 not applicable. 3 flagged for clarification.", 15, 22, 400)
                + text(f"Submitted by {OFFICER} on 22 Sep 2026, 16:40. The findings are final; the clarification threads carry what came after.", 13, 20, 400, TEXT2))
-    return panel("Site visit checklist", body, button("View checklist", "secondary", size="sm", icon_path=IC["eye"]), kicker="Visit 1 · 22 Sep 2026")
+    return panel("Visit 1, 22 Sep 2026", body, button("View checklist", "secondary", size="sm"), kicker="Site visit checklist")
 
 
 def collapsed_sections() -> str:
     rows = "".join(div(st(display="flex", justify_content="space-between", align_items="center", padding="14px 20px", border_bottom=f"1px solid {LINE}" if i < 3 else "none"),
-                       div(st(display="flex", gap="10px", align_items="center"), text(s, 15, 22, 600) + tag("Unchanged since Revision 3", "neutral")) + button("Show", "ghost", size="sm"))
-                   for i, s in enumerate(["Business", "Premises", "Operations", "Declarations"]))
-    return div(st(background=SURFACE, border=f"1px solid {LINE}", border_radius="10px", overflow="hidden"), card_header("Submission", "", "Revision 3") + rows)
+                       div(st(display="flex", gap="12px", align_items="center"), mono(f"{i + 1:02d}", 13, TEXT3) + text(s, 17, 24, 600) + tag("Unchanged since Revision 3", "neutral")) + button("Show", "ghost", size="sm"))
+                   for i, s in enumerate(["Business details", "Premises", "Operations", "Declarations"]))
+    return div(st(background=SURFACE, border=f"1px solid {LINE}", border_radius="10px", overflow="hidden"), card_header("Revision 3", text("4 of 4 sections complete", 12, 16, 400, TEXT3), "Submission") + rows)
 
 
 def build_case_with_rail(width: int, height: int, read_only: bool) -> str:
     role = "admin" if read_only else "officer"
-    hdr = breadcrumb(["Overview" if read_only else "Review queue", "PF-2026-000214"]) + page_header("Kopi & Kaya Toast House Pte. Ltd.", "Food Establishment Licence · 12 Jalan Besar #01-03", ref="PF-2026-000214", actions=(button("Back to the overview", "ghost", icon_path=IC["back"]) if read_only else button("Compare revisions", "secondary", size="sm")))
-    ro = alert("neutral", "Read-only: administrators cannot act on a case", "Every action on this page is reserved for licensing officers. What you see is what the officer sees.", "lock") if read_only else ""
     explanation = "The operator answered. Decide each item, then move the case on." if not read_only else "The operator answered. The officer decides item by item, then requests another round or routes to approval."
-    sb = status_bar(badge("Post-Site Clarification Resubmitted", "info", "lg"), explanation, "Round 2 · last activity 28 Sep 2026", "" if read_only else button("Audit trail", "ghost", size="sm"))
-    facts = facts_row([("Applicant", f"{OPERATOR} (operator)"), ("Licence", "Food Establishment Licence"), ("Premises", "12 Jalan Besar #01-03, Singapore 208811"), ("Submitted", "Revision 3 · 19 Sep 2026")])
+    hdr = case_header(["Overview" if read_only else "Review queue", "PF-2026-000214"], "PF-2026-000214", "Food Establishment Licence", "Kopi & Kaya Toast House Pte. Ltd.",
+                      badge("Post-Site Clarification Resubmitted", "info"), explanation, meta="Round 2 · last activity 28 Sep 2026",
+                      actions=(button("Back to the overview", "secondary", size="sm") if read_only else button("Compare revisions", "secondary", size="sm")))
+    ro = alert("neutral", "Read-only: administrators cannot act on a case", "Every action on this page is reserved for licensing officers. What you see is what the officer sees.", "lock") if read_only else ""
+    facts = facts_row([("Applicant", OPERATOR, "operator@permitflow.example.sg"), ("Submitted", "19 Sep, 15:40", "Revision 3"), ("Premises", "12 Jalan Besar #01-12", ""), ("Last activity", "28 Sep, 10:30", "Created 17 Sep 2026")])
     left = div(st(display="flex", flex_direction="column", gap="20px", flex_grow=1, min_width=0), checklist_summary_card() + collapsed_sections())
-    content = hdr + ro + sb + facts + div(st(display="flex", gap="20px", align_items="flex-start"), left + clarification_rail(role))
+    content = hdr + ro + facts + div(st(display="flex", gap="24px", align_items="flex-start"), left + clarification_rail(role))
     return page("Case: clarification" if not read_only else "Case, read-only", width, height, shell(width, height, role, "Overview" if read_only else "Review queue", content))
 
 
@@ -685,9 +722,10 @@ def respond_body(phone: bool, all_answered: bool, focused_third: bool = False) -
 
 def build_respond(width: int, height: int, with_dialog: bool = False) -> str:
     phone = width < 600
-    hdr = (breadcrumb(["My applications", "PF-2026-000214"]) if not phone else "") + page_header("Respond to clarification", "Kopi & Kaya Toast House Pte. Ltd." if not phone else "", ref="PF-2026-000214", actions=("" if phone else button("Back to the application", "ghost", icon_path=IC["back"])))
-    sb = status_bar(badge("Pending Post-Site Clarification", "warning", "lg"), "The licensing officer needs more information on 3 items after the site visit. Only those items are shown; answer each one, then send.", "Round 1", "", stack=phone)
-    content = hdr + sb + respond_body(phone, all_answered=with_dialog, focused_third=phone and not with_dialog)
+    hdr = case_header(["My applications", "PF-2026-000214", "Respond"], "PF-2026-000214", "Food Establishment Licence", "Respond to clarification",
+                      badge("Pending Post-Site Clarification", "warning"), "The licensing officer needs more information on 3 items after the site visit. Only those items are shown; answer each one, then send.",
+                      meta="Round 1 · Kopi & Kaya Toast House Pte. Ltd.", actions=("" if phone else button("Back to the application", "secondary", size="sm")), phone=phone)
+    content = hdr + respond_body(phone, all_answered=with_dialog, focused_third=phone and not with_dialog)
     overlay = dialog("Send your responses?", "Your answers and attachments for all 3 items go to the licensing officer. You cannot change them once sent.", "Send responses",
                      list_items=[TITLES["floor_trap_graded"], TITLES["coved_edges"], TITLES["chiller_temperature"]], sheet=phone) if with_dialog else ""
     return page("Respond to clarification", width, height, shell(width, height, "operator", "My applications", content, nav="phone" if phone else "full", overlay=overlay))
@@ -696,17 +734,17 @@ def build_respond(width: int, height: int, with_dialog: bool = False) -> str:
 # Operator history ------------------------------------------------------------------------------
 
 def build_history(width: int, height: int) -> str:
-    hdr = breadcrumb(["My applications", "PF-2026-000214", "History"]) + page_header("History", "Kopi & Kaya Toast House Pte. Ltd.", ref="PF-2026-000214", actions=button("Back to the application", "ghost", icon_path=IC["back"]))
+    hdr = case_header(["My applications", "PF-2026-000214", "History"], "PF-2026-000214", "Food Establishment Licence", "Kopi & Kaya Toast House Pte. Ltd.",
+                      badge("Post-Site Resubmitted", "info"), "The licensing officer is reviewing your responses. Nothing is needed from you right now.", meta="Round 2 sent 28 Sep 2026", actions=button("Back to the application", "secondary", size="sm"))
     tabs = div(st(display="flex", gap="4px", border_bottom=f"1px solid {LINE}"), "".join(
         div(st(padding="10px 14px", font_size="14px", font_weight=600 if on else 500, color=TEXT if on else TEXT2, border_bottom=f"2px solid {PRIMARY}" if on else "2px solid transparent", text_decoration="none"), escape(t), "a", href="#", aria_current="page" if on else "false")
         for t, on in [("Revisions", False), ("Feedback", False), ("Site visit", True)]))
-    sb = status_bar(badge("Post-Site Resubmitted", "info", "lg"), "The licensing officer is reviewing your responses. Nothing is needed from you right now.", "Round 2 sent 28 Sep 2026")
     visit = div(st(display="flex", flex_direction="column", gap="12px"),
                 div(st(display="flex", gap="12px", align_items="center", flex_wrap="wrap"), text("Visit 1 · 22 Sep 2026", 17, 24, 600) + tag("Inspection recorded", "neutral", IC["check"]) + text("3 items needed clarification", 13, 18, 400, TEXT3))
                 + alert("neutral", "You see only the items the officer asked about", "The inspection itself is the licensing office's record.", "info"))
 
     def rnd(title: str, when: str, items: list[dict[str, str]], state_badge: str, tone: str) -> str:
-        return panel(title, timeline(items), badge(state_badge, tone), kicker=when)
+        return rail_panel(title, timeline(items), text(when, 12, 16, 400, TEXT3, "", "span") + badge(state_badge, tone), divider=True)
     r1 = rnd("Round 1", "22 to 25 Sep 2026", [
         {"tone": "warning", "title": f"{TITLES['floor_trap_graded']}: the officer asked", "body": "Please confirm the floor will be regraded and by when.", "meta": "22 Sep 2026, 16:40"},
         {"tone": "info", "title": "You answered", "body": "Contractor engaged; regrading booked for 27 Sep.", "meta": "Sent 25 Sep 2026, 09:12", "extra": attachment_row("regrading-quote-27sep.pdf", "PDF · 212 KB", "file")},
@@ -720,7 +758,7 @@ def build_history(width: int, height: int) -> str:
         {"tone": "warning", "title": f"{TITLES['floor_trap_graded']}: the officer asked again", "body": "Please send a photo once the floor is regraded and a short note on the drainage test.", "meta": "25 Sep 2026, 14:05"},
         {"tone": "info", "title": "You answered", "body": "Regrading done 27 Sep; water now runs to the trap.", "meta": "Sent 28 Sep 2026, 10:30", "extra": attachment_row("floor-trap-after-regrade.jpg", "JPG · 1.8 MB")},
     ], "Sent", "info")
-    content = hdr + tabs + sb + visit + r1 + r2
+    content = hdr + tabs + visit + r1 + r2
     return page("History: site visit", width, height, shell(width, height, "operator", "My applications", content))
 
 
@@ -742,34 +780,34 @@ def build_admin_overview(width: int, height: int) -> str:
     drafts = sum(c for _, c, _, t in STATUS_COUNTS if t == "draft")
     office = sum(c for _, c, _, t in STATUS_COUNTS if t == "office")
     operators = sum(c for _, c, _, t in STATUS_COUNTS if t == "operator")
-    hdr = page_header("Operations overview", "Is anything stuck, and are the document checks working. Numbers as of 23 Sep 2026, 14:32 SGT.", eyebrow="Administration", actions=button("Refresh", "secondary", size="sm"))
+    hdr = list_header("Administrator", "Operations overview", f"{total} applications · {office} with the office · {operators} waiting on operators", "Numbers as of 23 Sep 2026, 14:32 SGT · refreshes every 60 s", actions=button("Refresh", "secondary", size="sm"))
     strip = stat_strip([(str(total), "Applications", f"{total - drafts} submitted, {drafts} drafts", False), (str(office), "With the office", "Waiting on an officer", False), (str(operators), "Waiting on operators", "Resubmission or clarification", False), ("2", "Idle over 7 days", "Oldest since 14 Sep", True)])
     mx = max(c for _, c, _, _ in STATUS_COUNTS)
     rows = [[text(lbl, 13, 20, 400, TEXT2 if c else TEXT3), str(c), bar(c / mx, tone, 8, "100%")] for lbl, c, tone, _ in STATUS_COUNTS]
-    status_table = panel("Applications by status", table(["Officer status", "Count", ""], rows, ["auto", "80px", "40%"], numeric={1}), kicker="Internal statuses, officer labels", pad="0")
+    status_table = panel("Officer labels", table(["Status", "Count", ""], rows, ["auto", "80px", "40%"], numeric={1}), text("14 statuses", 12, 16, 400, TEXT3), kicker="Applications by status", pad="0")
     idle_rows = [
         [mono("PF-2026-000209"), "Nasi Padang Corner", badge("Pending Pre-Site Resubmission", "warning"), "9", "14 Sep 2026", button("Open", "ghost", size="sm")],
         [mono("PF-2026-000198"), "Bak Kut Teh House Pte. Ltd.", badge("Application Received", "info"), "8", "15 Sep 2026", button("Open", "ghost", size="sm")],
     ]
-    idle = panel("Idle for more than 7 days", table(["Reference", "Business", "Status", "Days idle", "Last activity", ""], idle_rows, ["150px", "auto", "220px", "90px", "130px", "80px"], numeric={3}), kicker="Ten longest, in Singapore calendar days", pad="0")
-    health = panel("Document checks, last 24 hours",
-                   div(st(display="flex", flex_direction="column", gap="12px"),
-                       def_list([("Checks run", "38"), ("Verified", "29"), ("Issues found", "6"), ("Needs officer review", "2"), ("Could not read", "0"), ("Failed or unavailable", "1"), ("Average time", "4.1 s"), ("Slowest 5 % of checks", "9.8 s")])
-                       + text("Provider: OpenAI, gpt-4.1-mini. Results are advisory; officers decide.", 13, 18, 400, TEXT2)),
-                   text("1 of 38 checks failed", 13, 18, 400, TEXT2), kicker="Advisory checks")
-    quota = panel("Today", div(st(display="flex", flex_direction="column", gap="12px"),
-                               def_list([("Submissions", "2"), ("Resubmissions", "1"), ("Checklists submitted", "1"), ("Clarification rounds", "1")])
-                               + div(st(display="flex", flex_direction="column", gap="6px"), div(st(display="flex", justify_content="space-between"), text("Document checks against the platform quota", 13, 18, 500) + text("41 of 1,000", 13, 18, 400, TEXT3, "font-variant-numeric: tabular-nums")) + bar(41 / 1000, "info", 6))),
-                  kicker="Singapore calendar day")
+    idle = panel("Ten longest, in Singapore calendar days", table(["Reference", "Business", "Status", "Days idle", "Last activity", ""], idle_rows, ["150px", "auto", "220px", "90px", "130px", "80px"], numeric={3}), text("2 applications", 12, 16, 400, TEXT3), kicker="Idle for more than 7 days", pad="0")
+    health = rail_panel("Document checks",
+                        div(st(display="flex", flex_direction="column", gap="12px"),
+                            def_list([("Checks run", "38"), ("Verified", "29"), ("Issues found", "6"), ("Needs officer review", "2"), ("Could not read", "0"), ("Failed or unavailable", "1"), ("Average time", "4.1 s"), ("Slowest 5 % of checks", "9.8 s")])
+                            + text("Last 24 hours. Provider: OpenAI, gpt-4.1-mini. Checks are advisory: the decision is the officer's.", 13, 18, 400, TEXT3)),
+                        text("1 of 38 failed", 12, 16, 400, TEXT3, "", "span"))
+    quota = rail_panel("Today", div(st(display="flex", flex_direction="column", gap="12px"),
+                                    def_list([("Submissions", "2"), ("Resubmissions", "1"), ("Checklists submitted", "1"), ("Clarification rounds", "1")])
+                                    + div(st(display="flex", flex_direction="column", gap="6px"), div(st(display="flex", justify_content="space-between"), text("Document checks against the platform quota", 13, 18, 500) + text("41 of 1,000", 13, 18, 400, TEXT3, "font-variant-numeric: tabular-nums")) + bar(41 / 1000, "info", 6))),
+                       text("Singapore calendar day", 12, 16, 400, TEXT3, "", "span"))
     grid = div(st(display="grid", grid_template_columns="repeat(2, minmax(0, 1fr))", gap="20px", align_items="start"), status_table + div(st(display="flex", flex_direction="column", gap="20px"), health + quota))
     content = hdr + strip + grid + idle
     return page("Admin overview", width, height, shell(width, height, "admin", "Overview", content))
 
 
 def build_admin_activity(width: int, height: int) -> str:
-    hdr = page_header("Activity", "The latest audit events across every application and every user change. Nothing here can be edited.", eyebrow="Administration")
+    hdr = list_header("Administrator", "Activity", "The latest audit events across every application and every user change.", "Append-only. Nothing here can be edited or removed.")
     fams = ["All", "Application", "Section", "Document", "Check", "Revision", "Status", "Feedback", "Checklist", "Clarification", "User"]
-    chips = div(st(display="flex", gap="6px", flex_wrap="wrap"), "".join(chip(f, i == 0) for i, f in enumerate(fams)), role="group", aria_label="Event family")
+    chips = div(st(display="flex", gap="4px", flex_wrap="wrap", padding="12px 16px", background=SURFACE, border=f"1px solid {LINE}", border_radius="10px 10px 0 0", border_bottom="none"), "".join(chip(f, i == 0) for i, f in enumerate(fams)), role="group", aria_label="Event family")
     ev = [
         ("14:31", "clarification.answered", f"{OPERATOR} answered \"{TITLES['floor_trap_graded']}\" in round 2", f"{OPERATOR} · operator", "PF-2026-000214"),
         ("14:05", "user.role_changed", "Lim Jun Hao changed from operator to licensing officer", "Priya Nair · administrator", ""),
@@ -785,17 +823,17 @@ def build_admin_activity(width: int, height: int) -> str:
         ("08:50", "status.changed", "Route to Approval to Approved", f"{OFFICER} · officer", "PF-2026-000202"),
     ]
     rows = [[div(st(font_variant_numeric="tabular-nums", color=TEXT3), f"23 Sep · {t}"), mono(et, 12, TEXT2), text(s, 13, 20), text(a, 13, 20, 400, TEXT2), (div(st(display="inline-flex", color=TEXT, text_decoration="none"), mono(r, 13, TEXT), "a", href="#") if r else text("no case", 13, 20, 400, TEXT3))] for t, et, s, a, r in ev]
-    feed = panel("Latest 50 events", table(["When", "Event", "What happened", "Who", "Case"], rows, ["120px", "170px", "auto", "180px", "130px"]) + div(st(display="flex", justify_content="center", padding="12px"), button("Show older activity", "ghost")), kicker="Newest first", pad="0")
-    content = hdr + chips + feed
+    feed = panel("Newest first", table(["When", "Event", "What happened", "Who", "Case"], rows, ["120px", "170px", "auto", "180px", "130px"]) + div(st(display="flex", justify_content="center", padding="12px"), button("Show older activity", "ghost")), text("Latest 50 events", 12, 16, 400, TEXT3), kicker="Activity", pad="0")
+    content = hdr + div(st(display="flex", flex_direction="column"), chips + feed)
     return page("Admin activity", width, height, shell(width, height, "admin", "Activity", content))
 
 
 def build_admin_users(width: int, height: int) -> str:
-    hdr = page_header("Users", "Change a role or deactivate an account. Every change is audited. New accounts are set up by the service team, not here.", eyebrow="Administration")
+    hdr = list_header("Administrator", "Users", "6 accounts · 3 operators · 2 licensing officers · 1 administrator", "Change a role or deactivate an account; every change is audited. New accounts are set up by the service team, not here.")
     search_input = div(st(border="none", outline="none", background="transparent", font_family=SANS, font_size="14px", color=TEXT, flex_grow=1, min_width=0), "", "input", type="search", placeholder="Search by name or email", aria_label="Search by name or email")
-    search = div(st(display="flex", gap="12px", align_items="center", flex_wrap="wrap"),
-                 div(st(display="flex", align_items="center", gap="8px", height="40px", padding="0 12px", border=f"1px solid {LINE_STRONG}", border_radius="6px", background=SURFACE, width="360px", box_sizing="border-box", color=TEXT3), icon(IC["search"], 16) + search_input, "label")
-                 + div(st(display="flex", gap="6px"), "".join(chip(f, i == 0) for i, f in enumerate(["All", "Operators", "Licensing officers", "Administrators"]))))
+    search = div(st(display="flex", gap="12px", align_items="center", justify_content="space-between", flex_wrap="wrap", padding="12px 16px", background=SURFACE, border=f"1px solid {LINE}", border_radius="10px 10px 0 0", border_bottom="none"),
+                 div(st(display="flex", gap="4px"), "".join(chip(f, i == 0, c) for i, (f, c) in enumerate([("All", "6"), ("Operators", "3"), ("Licensing officers", "2"), ("Administrators", "1")])))
+                 + div(st(display="flex", align_items="center", gap="8px", height="36px", padding="0 12px", border=f"1px solid {LINE_STRONG}", border_radius="6px", background=SURFACE, width="300px", box_sizing="border-box", color=TEXT3), icon(IC["search"], 16) + search_input, "label"))
 
     def actions(own: bool, protected: bool, active: bool) -> str:
         if own:
@@ -817,10 +855,10 @@ def build_admin_users(width: int, height: int) -> str:
         rows.append([div(st(display="flex", flex_direction="column", gap="2px"), text(name + (" (you)" if own else ""), 13, 20, 600) + text(email, 12, 16, 400, TEXT3)), role,
                      div(st(display="flex", gap="6px", flex_wrap="wrap"), badge("Active" if active else "Deactivated", "success" if active else "neutral") + (tag("Protected", "neutral", IC["lock"]) if protected else "")), created,
                      div(st(display="flex", gap="4px", justify_content="flex-end"), actions(own, protected, active))])
-    tbl = panel("6 accounts", table(["User", "Role", "Status", "Created", ""], rows, ["auto", "150px", "220px", "120px", "220px"]), kicker="Directory", pad="0")
+    tbl = panel("All accounts", table(["User", "Role", "Status", "Created", ""], rows, ["auto", "150px", "220px", "120px", "220px"]), text("6 accounts", 12, 16, 400, TEXT3), kicker="Directory", pad="0")
     overlay = dialog("Change Lim Jun Hao's role to Licensing officer?", "They get licensing officer permissions on their next request. This does not sign them out.", "Change role",
                      extra=radio_group("New role", ["Operator", "Licensing officer", "Administrator"], "Licensing officer"))
-    content = hdr + search + tbl
+    content = hdr + div(st(display="flex", flex_direction="column"), search + tbl)
     return page("Admin users", width, height, shell(width, height, "admin", "Users", content, overlay=overlay))
 
 
@@ -828,11 +866,11 @@ def build_admin_users(width: int, height: int) -> str:
 
 BOARDS: list[tuple[str, str, int, int, str, int]] = [
     # file, title, w, h, builder key, row
-    ("Main.dc.html", "S-30 Checklist, iPad landscape 1024", 1024, 4460, "checklist-1024", 0),
-    ("S30-Checklist-820.dc.html", "S-30 Checklist, iPad portrait 820, offline", 820, 5000, "checklist-820", 0),
+    ("Main.dc.html", "S-30 Checklist, iPad landscape 1024", 1024, 4700, "checklist-1024", 0),
+    ("S30-Checklist-820.dc.html", "S-30 Checklist, iPad portrait 820, offline", 820, 5400, "checklist-820", 0),
     ("S31-Case-Clarification.dc.html", "S-31 Officer case with the clarification rail", 1280, 2600, "case", 0),
-    ("S18-Respond-Phone.dc.html", "S-18 Respond to clarification, phone 390", 390, 2800, "respond-390", 1),
-    ("S18-Respond-Phone-Sheet.dc.html", "S-18 phone, send dialog as a sheet", 390, 2800, "respond-390-sheet", 1),
+    ("S18-Respond-Phone.dc.html", "S-18 Respond to clarification, phone 390", 390, 2300, "respond-390", 1),
+    ("S18-Respond-Phone-Sheet.dc.html", "S-18 phone, send dialog as a sheet", 390, 2300, "respond-390-sheet", 1),
     ("S18-Respond-Desktop.dc.html", "S-18 Respond to clarification, 1280, send dialog", 1280, 2000, "respond-1280", 1),
     ("S19-History.dc.html", "S-19 Operator history, site visit", 1280, 1800, "history", 1),
     ("S40-Admin-Overview.dc.html", "S-40 Admin overview", 1280, 1700, "admin-overview", 2),

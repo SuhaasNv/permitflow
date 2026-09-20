@@ -61,9 +61,15 @@ Board: "PermitFlow, Xtremax Assessment". Stories data source `collection://0a2a5
 7. Any scope change → `SCOPE.md` (MUST/SHOULD/COULD/DEFERRED) the moment it is decided.
 8. AI prompt or provider change → `docs/07-ai/` and later `AI_USAGE.md`.
 9. `CHANGELOG.md` entry for meaningful milestones (not every commit).
-10. Work on a `feat/us-<id>-<slug>` branch from `dev` and merge it into `dev` with `--no-ff` (`docs/09-operations/BRANCHING.md`); `main` only receives releases. Commit with a conventional message (`feat:`, `fix:`, `test:`, `docs:`, `chore:`): short subject (≤ 50 chars), conclusive, body only when the "why" is not obvious. Never mention Claude, AI tools or add attribution trailers. Never `git push` without telling the user first and getting a yes in that turn.
+10. Work on a `feat/us-<id>-<slug>` branch from `dev` and merge it into `dev` with `--no-ff` (`docs/09-operations/BRANCHING.md`); `main` only receives releases. **A story branch is merged into `dev` only when every item of its Definition of Done is met (items 1 to 9 above, tests green, docs true, Notion moved) and, for a story whose DoD names an owner review (a design pass, an acceptance run), only after the owner's yes.** Until then the work stays on its branch, however long that takes: `dev` is deployed and read during the assessment and stays clean. Never merge partial work; a story that spans a sprint close stays In progress on its branch. Commit with a conventional message (`feat:`, `fix:`, `test:`, `docs:`, `chore:`): short subject (≤ 50 chars), conclusive, body only when the "why" is not obvious. Never mention Claude, AI tools or add attribution trailers. Never `git push` without telling the user first and getting a yes in that turn.
 
 Then prompt the user with a one-line status: what is Done, what is next, and anything they must decide.
+
+## 4a. Design before code, approval before merge (owner's rule, 20 Sep 2026)
+
+- A story that adds or changes a screen starts with its artboards on the prototype canvas, drawn from the shipped product (take fresh screenshots of the development environment: shell, fonts, tokens, spacing), not from the design documents alone. The owner reviews the artboards and says yes before any code for that screen is written.
+- The prototype generator lives in `docs/04-design/prototype-src/`; artboards are regenerated from it, never edited by hand. The canvas fonts are the product's own files uploaded as assets, so weights render as they ship.
+- Nothing merges into `dev` before the story is whole (rule 10 above). Nothing is pushed without a yes in that turn. The owner may be away on Remote Control: post the link and the one-line question, then wait.
 
 ## 5. Sprint close (end of each day, or when the user says the sprint is over)
 
