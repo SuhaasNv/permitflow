@@ -21,6 +21,7 @@ import { AuditTrail } from './AuditTrail'
 import { ComparePanel } from './ComparePanel'
 import { FeedbackPanel } from './FeedbackPanel'
 import type { Target } from './FeedbackPanel'
+import { ProposeVisitDialog, SiteVisitPanel } from './SiteVisitPanel'
 import { useOfficerApplication, useRerunCheck, useTransition } from './queries'
 
 interface ActionCopy {
@@ -40,11 +41,6 @@ const ACTION_COPY: Record<string, ActionCopy> = {
     title: 'Request a resubmission?',
     body: 'Your open feedback is released to the operator. Only the flagged sections and documents reopen for them.',
     confirm: 'Request resubmission',
-  },
-  site_visit_scheduled: {
-    title: 'Mark the site visit as scheduled?',
-    body: 'Status only: no appointment is booked here. The operator is told an officer will contact them to arrange the visit.',
-    confirm: 'Mark scheduled',
   },
   site_visit_done: {
     title: 'Mark the site visit as done?',
@@ -103,11 +99,13 @@ function ReviewRail({
   view,
   targets,
   onAction,
+  onPropose,
   busy,
 }: {
   view: OfficerApplication
   targets: Target[]
   onAction: (action: OfficerAction) => void
+  onPropose: () => void
   busy: boolean
 }) {
   const toast = useToast()
@@ -116,6 +114,7 @@ function ReviewRail({
   const rest = view.actions.filter((a) => a !== primary)
   return (
     <aside className="order-first flex flex-col gap-5 lg:order-none lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-104px)] lg:self-start lg:overflow-y-auto">
+      {view.site_visit !== null || view.status === 'site_visit_scheduled' ? <SiteVisitPanel view={view} onPropose={onPropose} /> : null}
       <section className="pf-surface" aria-labelledby="review-title">
         <div className={cn('px-5 pt-5', view.actions.length === 0 && 'pb-5')}>
           <h2 id="review-title" className="text-[17px] font-semibold leading-6">
@@ -183,10 +182,14 @@ function ReviewRail({
                   ))}
               </ul>
             ) : null}
-            {view.actions.some((a) => a.target === 'site_visit_scheduled' || a.target === 'site_visit_done') ? (
+            {view.actions.some((a) => a.target === 'site_visit_scheduled') ? (
               <p className="mt-1 text-xs leading-[17px] text-text-3">
-                The site visit steps change the status only. The visit checklist and post-visit clarification rounds are out of scope for
-                this release.
+                Scheduling proposes a date and slot to the operator; the case moves to Site Visit Scheduled at once.
+              </p>
+            ) : null}
+            {view.actions.some((a) => a.target === 'site_visit_done') ? (
+              <p className="mt-1 text-xs leading-[17px] text-text-3">
+                Mark the visit done once it has taken place. The visit checklist and post-visit clarification rounds are not built yet.
               </p>
             ) : null}
           </div>
@@ -245,6 +248,7 @@ export function OfficerCasePage() {
   const rerun = useRerunCheck(id)
   const toast = useToast()
   const [pending, setPending] = useState<OfficerAction | null>(null)
+  const [proposing, setProposing] = useState(false)
   const [note, setNote] = useState('')
   const [noteError, setNoteError] = useState<string | null>(null)
 
@@ -560,10 +564,18 @@ export function OfficerCasePage() {
 
           <AuditTrail applicationId={id} />
         </div>
-        <ReviewRail view={view} targets={targets} busy={transition.isPending} onAction={(a) => setPending(a)} />
+        <ReviewRail
+          view={view}
+          targets={targets}
+          busy={transition.isPending}
+          // Scheduling the visit is the proposal itself (US-084): the dialog asks for the date and slot.
+          onAction={(a) => (a.target === 'site_visit_scheduled' ? setProposing(true) : setPending(a))}
+          onPropose={() => setProposing(true)}
+        />
         {/* Below lg the rail renders first (order) so the officer's actions are not the last thing on the page. */}
       </div>
 
+      <ProposeVisitDialog open={proposing} view={view} onClose={() => setProposing(false)} />
       <Dialog
         open={pending !== null}
         title={copy?.title ?? ''}

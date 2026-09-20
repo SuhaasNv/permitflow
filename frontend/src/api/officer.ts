@@ -1,4 +1,5 @@
 import { request } from './client'
+import type { SiteVisitOfficer } from './siteVisit'
 import type { Tone } from '@/features/shared/StatusBadge'
 
 export interface QueueItem {
@@ -159,6 +160,8 @@ export interface OfficerApplication {
   decision_note: string | null
   withdrawal_reason: string | null
   licence: import('./applications').LicenceView | null
+  /** The appointment while the case is Site Visit Scheduled (US-084); null before the officer proposes one. */
+  site_visit: SiteVisitOfficer | null
   version: number
   created_at: string
   updated_at: string
