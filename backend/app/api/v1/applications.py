@@ -15,7 +15,11 @@ from app.schemas.applications import (
     UploadOut,
     WithdrawIn,
 )
-from app.schemas.clarification import ClarificationOperatorView
+from app.schemas.clarification import (
+    ClarificationAttachOut,
+    ClarificationOperatorView,
+    ClarificationResponseIn,
+)
 from app.schemas.compare import CompareOut
 from app.schemas.site_visit import SiteVisitCounterIn, SiteVisitRescheduleIn
 from app.services.applications import ApplicationService
@@ -189,6 +193,79 @@ def reschedule_site_visit(
 def clarifications(application_id: uuid.UUID, user: OperatorUser, db: DbSession) -> ClarificationOperatorView:
     """Only the flagged items with a released question, in operator words (US-064)."""
     return ClarificationService(db).operator_view(user, application_id)
+
+
+@router.post(
+    "/{application_id}/clarifications/{item_id}/responses",
+    response_model=ClarificationOperatorView,
+)
+def respond_to_clarification(
+    application_id: uuid.UUID,
+    item_id: uuid.UUID,
+    body: ClarificationResponseIn,
+    user: OperatorUser,
+    db: DbSession,
+) -> ClarificationOperatorView:
+    """Draft or rewrite the answer to the open question on one item (US-065)."""
+    return ClarificationService(db).respond(user, application_id, item_id, body.message)
+
+
+@router.post(
+    "/{application_id}/clarifications/responses/{response_id}/attachments",
+    response_model=ClarificationAttachOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def attach_to_response(
+    application_id: uuid.UUID,
+    response_id: uuid.UUID,
+    user: OperatorUser,
+    db: DbSession,
+    file: Annotated[UploadFile, File()],
+) -> ClarificationAttachOut:
+    view, unchanged = ClarificationService(db).attach(
+        user, application_id, response_id, file.filename or "", file.content_type, file.file
+    )
+    return ClarificationAttachOut(view=view, unchanged=unchanged)
+
+
+@router.delete(
+    "/{application_id}/clarifications/responses/{response_id}/attachments/{attachment_id}",
+    response_model=ClarificationOperatorView,
+)
+def remove_attachment(
+    application_id: uuid.UUID,
+    response_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+    user: OperatorUser,
+    db: DbSession,
+) -> ClarificationOperatorView:
+    return ClarificationService(db).remove_attachment(user, application_id, response_id, attachment_id)
+
+
+@router.post("/{application_id}/clarifications/send", response_model=ClarificationOperatorView)
+def send_clarifications(
+    application_id: uuid.UUID, user: OperatorUser, db: DbSession
+) -> ClarificationOperatorView:
+    """Send every drafted answer of the round; the case moves to Post-Site Clarification Resubmitted."""
+    return ClarificationService(db).send(user, application_id)
+
+
+@router.get("/{application_id}/clarifications/attachments/{attachment_id}/download")
+def download_attachment(
+    application_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER, Role.ADMIN))],
+    db: DbSession,
+) -> StreamingResponse:
+    row, chunks = ClarificationService(db).open_attachment(user, application_id, attachment_id)
+    return StreamingResponse(
+        chunks,
+        media_type=row.content_type,
+        headers={
+            "Content-Disposition": content_disposition(row.original_filename),
+            "Content-Length": str(row.size_bytes),
+        },
+    )
 
 
 @router.patch("/{application_id}/sections/{key}", response_model=ApplicationOperatorView)

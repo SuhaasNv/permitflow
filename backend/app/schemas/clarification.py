@@ -5,7 +5,7 @@ checklist, so what the operator receives is decided by the schema, not filtered 
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ClarificationRequestOut(BaseModel):
@@ -61,6 +61,16 @@ class ClarificationOperatorView(BaseModel):
     can_send: bool
 
 
+class ClarificationResponseIn(BaseModel):
+    message: str = Field(max_length=2000)
+
+
+class ClarificationAttachOut(BaseModel):
+    view: ClarificationOperatorView
+    # An identical file on the same answer is kept once and reported as no change (SEC-005).
+    unchanged: bool
+
+
 class ClarificationBlock(BaseModel):
     """The block on the operator's application view: what to show and whether to act."""
 
@@ -71,10 +81,12 @@ class ClarificationBlock(BaseModel):
 
 
 __all__ = [
+    "ClarificationAttachOut",
     "ClarificationAttachmentOut",
     "ClarificationBlock",
     "ClarificationItemOut",
     "ClarificationOperatorView",
     "ClarificationRequestOut",
+    "ClarificationResponseIn",
     "ClarificationResponseOut",
 ]

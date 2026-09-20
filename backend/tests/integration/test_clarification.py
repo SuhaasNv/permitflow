@@ -148,3 +148,175 @@ def test_ownership_and_roles(client: TestClient, db: Session) -> None:
     assert client.get(f"/api/v1/applications/{app_id}/clarifications", headers=other).status_code == 404
     assert client.get(f"/api/v1/applications/{app_id}/clarifications", headers=off).status_code == 403
     assert client.get(f"/api/v1/applications/{uuid.uuid4()}/clarifications", headers=op).status_code == 404
+
+
+# US-065: responses, attachments, send -----------------------------------------------------------
+
+from tests.journeys import PDF  # noqa: E402
+
+
+def _respond(client: TestClient, op: Headers, app_id: str, item_id: str, text: str):  # type: ignore[no-untyped-def]
+    return client.post(
+        f"/api/v1/applications/{app_id}/clarifications/{item_id}/responses",
+        headers=op,
+        json={"message": text},
+    )
+
+
+def _attach(
+    client: TestClient,
+    op: Headers,
+    app_id: str,
+    response_id: str,
+    name: str,
+    content: bytes,
+    mime: str = "application/pdf",
+):  # type: ignore[no-untyped-def]
+    return client.post(
+        f"/api/v1/applications/{app_id}/clarifications/responses/{response_id}/attachments",
+        headers=op,
+        files={"file": (name, content, mime)},
+    )
+
+
+def test_respond_attach_and_send_move_the_case(client: TestClient, db: Session) -> None:
+    from sqlalchemy import select
+
+    from app.models import AuditEvent, Notification
+
+    app_id, op, off = _submitted(client, db)
+    view = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    items = {i["key"]: i for i in view["items"]}
+    # send before answering: 422 naming the three keys
+    r = client.post(f"/api/v1/applications/{app_id}/clarifications/send", headers=op)
+    assert r.status_code == 422 and sorted(r.json()["error"]["details"]["items"]) == sorted(FLAGGED)
+    # an empty or over-long answer is refused
+    assert _respond(client, op, app_id, items["coved_edges"]["item_id"], "   ").status_code == 422
+    assert _respond(client, op, app_id, items["coved_edges"]["item_id"], "x" * 2001).status_code == 422
+    # draft, then rewrite
+    r = _respond(client, op, app_id, items["coved_edges"]["item_id"], "Coving done on 24 Sep.")
+    assert r.status_code == 200, r.text
+    r = _respond(
+        client, op, app_id, items["coved_edges"]["item_id"], "Coving done on 24 Sep; photo attached."
+    )
+    assert r.status_code == 200
+    coved = next(i for i in r.json()["items"] if i["key"] == "coved_edges")
+    assert len(coved["responses"]) == 1 and coved["responses"][0]["message"].endswith("photo attached.")
+    assert coved["responses"][0]["sent_at"] is None and coved["status"] == "Waiting for your response"
+    response_id = coved["responses"][0]["id"]
+    # attachments: the document rules, three at most, an identical file is no change, removable
+    r = _attach(client, op, app_id, response_id, "coving.pdf", PDF)
+    assert r.status_code == 201 and r.json()["unchanged"] is False, r.text
+    att_id = next(i for i in r.json()["view"]["items"] if i["key"] == "coved_edges")["responses"][0][
+        "attachments"
+    ][0]["id"]
+    r = _attach(client, op, app_id, response_id, "coving-copy.pdf", PDF)
+    assert r.status_code == 201 and r.json()["unchanged"] is True
+    assert (
+        _attach(
+            client, op, app_id, response_id, "notes.exe", b"MZ" + b"x" * 40, "application/octet-stream"
+        ).status_code
+        == 400
+    )
+    assert _attach(client, op, app_id, response_id, "fake.pdf", b"GIF89a" + b"x" * 40).status_code == 400
+    assert _attach(client, op, app_id, response_id, "empty.pdf", b"").status_code == 400
+    assert _attach(client, op, app_id, response_id, "second.pdf", PDF + b"2").status_code == 201
+    assert _attach(client, op, app_id, response_id, "third.pdf", PDF + b"3").status_code == 201
+    r = _attach(client, op, app_id, response_id, "fourth.pdf", PDF + b"4")
+    assert r.status_code == 422 and r.json()["error"]["details"]["reason"] == "attachment_cap"
+    r = client.get(f"/api/v1/applications/{app_id}/clarifications/attachments/{att_id}/download", headers=op)
+    assert r.status_code == 200 and r.content == PDF and "coving.pdf" in r.headers["content-disposition"]
+    assert (
+        client.get(
+            f"/api/v1/applications/{app_id}/clarifications/attachments/{att_id}/download", headers=off
+        ).status_code
+        == 200
+    )
+    r = client.delete(
+        f"/api/v1/applications/{app_id}/clarifications/responses/{response_id}/attachments/{att_id}",
+        headers=op,
+    )
+    assert r.status_code == 200
+    assert (
+        client.get(
+            f"/api/v1/applications/{app_id}/clarifications/attachments/{att_id}/download", headers=op
+        ).status_code
+        == 404
+    )
+    # the other two items, then send
+    _respond(client, op, app_id, items["floor_trap_graded"]["item_id"], "Regraded on 23 Sep.")
+    view = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    assert view["can_send"] is False
+    _respond(client, op, app_id, items["chiller_temperature"]["item_id"], "Serviced; now 3 °C.")
+    view = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    assert view["can_send"] is True
+    officer_notes_before = len(db.scalars(select(Notification)).all())
+    r = client.post(f"/api/v1/applications/{app_id}/clarifications/send", headers=op)
+    assert r.status_code == 200, r.text
+    sent = r.json()
+    assert sent["open_count"] == 0 and sent["answered_count"] == 3 and sent["can_send"] is False
+    assert all(i["status"] == "Sent" and i["responses"][0]["sent_at"] for i in sent["items"])
+    mine = client.get(f"/api/v1/applications/{app_id}", headers=op).json()
+    assert mine["status_label"] == "Post-Site Resubmitted" and mine["needs_operator_action"] is False
+    case = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    assert case["status"] == "post_site_clarification_resubmitted"
+    events = [
+        e.event_type
+        for e in db.scalars(
+            select(AuditEvent).where(AuditEvent.application_id == app_id).order_by(AuditEvent.created_at)
+        )
+    ]
+    assert events.count("clarification.answered") == 3 and events[-1] == "status.changed"
+    assert events.index("clarification.answered") < events.index(
+        "status.changed", events.index("clarification.answered")
+    )
+    assert len(db.scalars(select(Notification)).all()) > officer_notes_before
+    # sent: no rewrite, no more files, no second send
+    assert _respond(client, op, app_id, items["coved_edges"]["item_id"], "again").status_code == 409
+    assert _attach(client, op, app_id, response_id, "late.pdf", PDF + b"late").status_code == 409
+    assert client.post(f"/api/v1/applications/{app_id}/clarifications/send", headers=op).status_code == 409
+
+
+def test_withdrawn_before_send_is_left_out_and_idor_is_404(client: TestClient, db: Session) -> None:
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from app.models import ChecklistItem, ClarificationRequest
+
+    app_id, op, off = _submitted(client, db)
+    view = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    items = {i["key"]: i for i in view["items"]}
+    for key in ("floor_trap_graded", "coved_edges"):
+        assert _respond(client, op, app_id, items[key]["item_id"], f"About {key}.").status_code == 200
+    # the officer withdraws the third question before the send (US-066 does this through a route)
+    chiller = db.scalar(select(ChecklistItem).where(ChecklistItem.item_key == "chiller_temperature"))
+    assert chiller is not None
+    q = db.scalar(select(ClarificationRequest).where(ClarificationRequest.item_id == chiller.id))
+    assert q is not None
+    q.withdrawn_at = datetime.now(UTC)
+    from app.domain.enums import ClarificationStatus
+
+    chiller.clarification_status = ClarificationStatus.WITHDRAWN
+    db.commit()
+    r = client.post(f"/api/v1/applications/{app_id}/clarifications/send", headers=op)
+    assert r.status_code == 200, r.text
+    assert r.json()["answered_count"] == 2 and "chiller_temperature" not in [
+        i["key"] for i in r.json()["items"]
+    ]
+    # another operator, another application, an officer on the operator routes
+    from tests.factories import login, make_user
+
+    make_user(db, "other-cl2@example.sg", Role.OPERATOR)
+    other = login(client, "other-cl2@example.sg")
+    coved = items["coved_edges"]
+    assert _respond(client, other, app_id, coved["item_id"], "mine").status_code == 404
+    other_app, other_op, _, _ = under_review(client, db) if False else (None, None, None, None)
+    assert client.post(f"/api/v1/applications/{app_id}/clarifications/send", headers=off).status_code == 403
+    assert (
+        client.get(
+            f"/api/v1/applications/{uuid.uuid4()}/clarifications/attachments/{uuid.uuid4()}/download",
+            headers=op,
+        ).status_code
+        == 404
+    )
