@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-083 The case response says where it stands (21 Sep 2026, Sprint 8)
+
+- The case carries its stage, its outcome and whether each feedback item can be resolved; the screens branch on those instead of on label strings, and the three places that counted open feedback share one rule. Readiness row 22 closed.
+
 ## US-087 A poor connection on site and on the phone (21 Sep 2026, Sprint 7)
 
 - The respond page keeps what the operator typed through a lost connection, says so within a second, retries the save and the upload with the same backoff as the checklist (1 s to 30 s, never while the tab is hidden), and shows a progress bar on every evidence upload. The checklist stops retrying while hidden and resumes when it comes back. A bundle size check in CI (215 KB gzipped against 250 KB) and a Playwright test with the connection cut and a Fast 4G paint budget.

@@ -4,6 +4,9 @@ import { request } from './client'
 import type { SiteVisitOfficer } from './siteVisit'
 import type { Tone } from '@/features/shared/StatusBadge'
 
+export type Phase = 'draft' | 'pre_site' | 'site_visit' | 'post_site' | 'decision' | 'decided'
+export type Outcome = 'approved' | 'rejected' | 'withdrawn' | null
+
 export interface QueueItem {
   id: string
   reference_no: string
@@ -115,6 +118,8 @@ export interface FeedbackItem {
   resolved_at: string | null
   /** The calling officer can undo their own withdraw or resolve for a short while (US-039). */
   can_undo: boolean
+  /** Open or addressed, released, and the case with the office: the server's rule, not the screen's (US-083). */
+  can_resolve: boolean
 }
 
 export interface FeedbackTemplate {
@@ -141,6 +146,9 @@ export interface OfficerApplication {
   status: string
   status_label: string
   status_tone: Tone
+  /** The stage and how it ended (US-083): the screens branch on these, never on label strings. */
+  phase: Phase
+  outcome: Outcome
   applicant: { id: string; full_name: string; email: string }
   business_name: string | null
   premises_summary: string | null

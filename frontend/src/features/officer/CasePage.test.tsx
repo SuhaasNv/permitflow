@@ -44,6 +44,8 @@ const view: OfficerApplication = {
   status: 'application_received',
   status_label: 'Application Received',
   status_tone: 'info',
+  phase: 'pre_site',
+  outcome: null,
   applicant: { id: 'u1', full_name: 'Tan Wei Ling', email: 'op@example.sg' },
   business_name: 'Kopi & Kaya Toast House Pte. Ltd.',
   premises_summary: '10 Jalan Besar #01-12',
@@ -176,6 +178,7 @@ describe('OfficerCasePage read-only for an administrator (S-43, US-072)', () => 
           addressed_in_revision: 2,
           resolved_at: null,
           can_undo: false,
+          can_resolve: false,
         },
       ],
     }
@@ -315,6 +318,7 @@ describe('OfficerCasePage', () => {
           addressed_in_revision: null,
           resolved_at: null,
           can_undo: false,
+          can_resolve: false,
         },
       ],
     })
@@ -415,6 +419,7 @@ describe('OfficerCasePage', () => {
       addressed_in_revision: null,
       resolved_at: null,
       can_undo: false,
+      can_resolve: false,
     }
     const underReview = {
       ...view,
@@ -442,5 +447,46 @@ describe('OfficerCasePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Undo' }))
     await waitFor(() => expect(restore).toHaveBeenCalledWith('a1', 'f1'))
     expect(await screen.findByRole('button', { name: 'Withdraw' })).toBeInTheDocument()
+  })
+
+  it('offers Mark resolved only when the server says the item can be resolved (US-083)', async () => {
+    const released = {
+      ...view,
+      status: 'pre_site_resubmitted',
+      status_label: 'Pre-Site Resubmitted',
+      phase: 'pre_site' as const,
+      feedback_editable: false,
+      feedback_locked_reason: 'Start the review to add feedback.',
+      actions: [],
+      open_feedback_count: 0,
+      feedback: [
+        {
+          id: 'f1',
+          target_type: 'section' as const,
+          section_key: 'business',
+          document_type: null,
+          target_label: 'Business details',
+          message: 'Please confirm the UEN.',
+          template_key: null,
+          resolution: 'addressed' as const,
+          raised_in_revision: 1,
+          author_name: 'Rahim',
+          created_at: '2026-09-19T01:00:00Z',
+          released_to_operator_at: '2026-09-19T01:05:00Z',
+          addressed_in_revision: 2,
+          resolved_at: null,
+          can_undo: false,
+          can_resolve: true,
+        },
+      ],
+    }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(released)
+    renderPage()
+    expect(await screen.findByRole('button', { name: 'Mark resolved' })).toBeInTheDocument()
+    // the same item with the server saying no: no control, whatever the status says
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({ ...released, feedback: [{ ...released.feedback[0]!, can_resolve: false }] })
+    renderPage()
+    await screen.findAllByText('Please confirm the UEN.')
+    expect(screen.getAllByRole('button', { name: 'Mark resolved' })).toHaveLength(1)
   })
 })

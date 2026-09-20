@@ -14,6 +14,7 @@ import { SaveIndicator } from '@/features/shared/SaveIndicator'
 import { useToast } from '@/features/shared/Toast'
 import type { SectionValues } from '@/lib/zodFromSchema'
 import { defaultsFor, sectionSchema, toPayload } from '@/lib/zodFromSchema'
+import { openItems } from '@/lib/feedback'
 
 export interface SectionFormHandle {
   /** Save the current values as a draft (partial allowed). Resolves true when saved, false when validation blocked it. */
@@ -235,13 +236,11 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
         ) : null}
       </div>
       <div className="flex flex-col gap-5 px-5 py-6 sm:px-7">
-        {feedback
-          .filter((f) => f.resolution === 'open')
-          .map((f) => (
-            <Alert key={f.id} tone="warning" title="The licensing office asked for a change here">
-              {f.message}
-            </Alert>
-          ))}
+        {openItems(feedback).map((f) => (
+          <Alert key={f.id} tone="warning" title="The licensing office asked for a change here">
+            {f.message}
+          </Alert>
+        ))}
         {feedback.some((f) => f.resolution === 'addressed') ? (
           <Alert tone="info">
             <span>You changed this section in your latest revision. The officer will review it.</span>

@@ -15,6 +15,7 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
 import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
+import { openFor as openForTarget } from '@/lib/feedback'
 import { formatBytes, formatDate, formatDateTime, formatRelative } from '@/lib/format'
 import { CheckResult } from './CheckResult'
 import { AuditTrail } from './AuditTrail'
@@ -136,7 +137,7 @@ function ReviewRail({
             Review
           </h2>
           <p className="mt-1 text-[13px] leading-[19px] text-text-2">
-            {view.status === 'withdrawn'
+            {view.outcome === 'withdrawn'
               ? 'The operator withdrew this application. Nothing further can happen to it.'
               : readOnly
                 ? 'Every action on this case stays with the licensing officer; you are reading it.'
@@ -183,7 +184,7 @@ function ReviewRail({
                 {a.label}
               </Button>
             ))}
-            {view.status === 'pending_approval' ? (
+            {view.phase === 'decision' ? (
               <Link to={`/officer/applications/${view.id}/licence-preview`} className={buttonClasses('ghost')}>
                 Preview licence
               </Link>
@@ -305,8 +306,7 @@ export function OfficerCasePage() {
       key: d.document_type,
     })),
   ]
-  const openFor = (type: 'section' | 'document', key: string) =>
-    view.feedback.filter((f) => f.resolution === 'open' && (type === 'section' ? f.section_key === key : f.document_type === key))
+  const openFor = (type: 'section' | 'document', key: string) => openForTarget(view.feedback, type, key)
   const error = transition.error instanceof AppError ? transition.error : null
   const stale = error?.status === 409 && error.code === 'version_conflict'
 
@@ -362,7 +362,7 @@ export function OfficerCasePage() {
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           <StatusBadge label={view.status_label} tone={view.status_tone} size="lg" live={view.verification_summary.checking > 0} />
           {view.decision_note ? <span className="text-sm text-text-2">Note: {view.decision_note}</span> : null}
-          {view.status === 'withdrawn' ? (
+          {view.outcome === 'withdrawn' ? (
             <span className="text-sm text-text-2">
               Withdrawn by the operator{view.withdrawal_reason ? `: ${view.withdrawal_reason}` : ' without a reason'}
             </span>
