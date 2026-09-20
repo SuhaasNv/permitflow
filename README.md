@@ -108,7 +108,7 @@ Claude Code (Claude Opus 5 for most sessions, Claude Fable 5.1 for some) in the 
 
 Every story ran the full suites, `ruff`, `mypy --strict` and `tsc --strict`, and a browser check at three widths before it moved to Done; every reviewer finding was reproduced before a fix; I read every diff before a commit and every push needed my yes. Where the AI was wrong is written down: invented enum values and a valid verdict on an expired certificate, a scope-creeping story, a transition the state machine did not allow, a scratch file in a commit, UTC licence dates, a harness fault first blamed on the model.
 
-The full record, with the prompts grouped by the decision they carry, what was discarded and how the debrief videos were made: `AI_USAGE.md`. Slides 17 to 20 of the technical deck cover the same ground.
+The full record, with the prompts grouped by the decision they carry, what was discarded and how the debrief videos were made: `AI_USAGE.md`. Slides 18 to 21 of the technical deck cover the same ground.
 
 ## Release notes
 
