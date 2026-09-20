@@ -127,3 +127,29 @@ ITEM_KEYS: tuple[str, ...] = tuple(i.key for i in ITEMS)
 ITEM_BY_KEY: dict[str, ChecklistItemDef] = {i.key: i for i in ITEMS}
 POSITION: dict[str, int] = {k: n for n, k in enumerate(ITEM_KEYS, start=1)}
 MAX_COMMENT = 2000
+
+# Extra findings (US-092): an officer's own item, free or linked to a template item.
+EXTRA_PREFIX = "extra_"
+MAX_EXTRA_TITLE = 120
+OTHER_SECTION_KEY = "other"
+OTHER_SECTION_TITLE = "Other findings"
+
+
+def is_extra_key(key: str) -> bool:
+    return key.startswith(EXTRA_PREFIX)
+
+
+def item_title(key: str, custom_title: str | None) -> str:
+    """The title of any item: the template's, or the officer's own for an extra finding."""
+    definition = ITEM_BY_KEY.get(key)
+    if definition is not None:
+        return definition.title
+    return custom_title or "Other finding"
+
+
+def item_section(key: str, parent_key: str | None) -> str:
+    definition = ITEM_BY_KEY.get(key)
+    if definition is not None:
+        return definition.section
+    parent = ITEM_BY_KEY.get(parent_key or "")
+    return parent.section if parent else OTHER_SECTION_KEY
