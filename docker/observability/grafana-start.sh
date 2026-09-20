@@ -30,5 +30,15 @@ if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
   fi
   # the bot token and the chat id go in with sed, inside quotes, so a numeric chat id stays a string
   sed -i -e "s|__TELEGRAM_BOT_TOKEN__|$TELEGRAM_BOT_TOKEN|" -e "s|__TELEGRAM_CHAT_ID__|$TELEGRAM_CHAT_ID|" "$P/alerting/contact-points.yaml"
+else
+  # no Telegram: provision the removal of anything a previous start left behind (rules, contact point, template)
+  if [ -n "$ALERTING" ]; then
+    cp "$SRC/alerting-off/"*.yaml "$P/alerting/"
+  elif [ -n "${GF_ALERTING_OFF_RULES:-}" ]; then
+    printf "%s" "$GF_ALERTING_OFF_RULES" > "$P/alerting/rules.yaml"
+    printf "%s" "$GF_ALERTING_OFF_CONTACT_POINTS" > "$P/alerting/contact-points.yaml"
+    printf "%s" "$GF_ALERTING_OFF_POLICIES" > "$P/alerting/policies.yaml"
+    printf "%s" "$GF_ALERTING_OFF_TEMPLATES" > "$P/alerting/templates.yaml"
+  fi
 fi
 exec /run.sh

@@ -1,0 +1,45 @@
+{
+ "apiVersion": 1,
+ "deleteRules": [
+  {
+   "orgId": 1,
+   "uid": "pf-api-down"
+  },
+  {
+   "orgId": 1,
+   "uid": "pf-api-5xx"
+  },
+  {
+   "orgId": 1,
+   "uid": "pf-api-slow"
+  },
+  {
+   "orgId": 1,
+   "uid": "pf-checks-failing"
+  },
+  {
+   "orgId": 1,
+   "uid": "pf-checks-slow"
+  },
+  {
+   "orgId": 1,
+   "uid": "pf-rate-limiting"
+  },
+  {
+   "orgId": 1,
+   "uid": "pf-digest-development"
+  },
+  {
+   "orgId": 1,
+   "uid": "pf-digest-production"
+  },
+  {
+   "orgId": 1,
+   "uid": "pf-digest-local"
+  },
+  {
+   "orgId": 1,
+   "uid": "pf-digest"
+  }
+ ]
+}

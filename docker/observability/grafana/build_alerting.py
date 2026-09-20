@@ -149,4 +149,12 @@ cp = OUT / "contact-points.yaml"
 cp.write_text(cp.read_text().replace("chatid: __TELEGRAM_CHAT_ID__", 'chatid: "__TELEGRAM_CHAT_ID__"').replace("bottoken: __TELEGRAM_BOT_TOKEN__", 'bottoken: "__TELEGRAM_BOT_TOKEN__"'))
 dump("policies.yaml", policies)
 dump("templates.yaml", templates)
+# alerting-off/: what Grafana provisions when the Telegram values are empty, so an instance that once
+# had the rules (a local volume, a redeploy without the token) removes them instead of keeping them.
+OFF = OUT.with_name("alerting-off"); OFF.mkdir(exist_ok=True)
+uids = [r["uid"] for r in incidents] + [f"pf-digest-{e}" for e in ENVIRONMENTS] + ["pf-digest"]
+(OFF / "rules.yaml").write_text(json.dumps({"apiVersion": 1, "deleteRules": [{"orgId": 1, "uid": u} for u in uids]}, indent=1) + "\n")
+(OFF / "contact-points.yaml").write_text(json.dumps({"apiVersion": 1, "deleteContactPoints": [{"orgId": 1, "uid": "pf-telegram"}]}, indent=1) + "\n")
+(OFF / "policies.yaml").write_text(json.dumps({"apiVersion": 1, "resetPolicies": [1]}, indent=1) + "\n")
+(OFF / "templates.yaml").write_text(json.dumps({"apiVersion": 1, "deleteTemplates": [{"orgId": 1, "name": "permitflow.telegram"}]}, indent=1) + "\n")
 print(OUT, "rules:", len(incidents) + len(ENVIRONMENTS))

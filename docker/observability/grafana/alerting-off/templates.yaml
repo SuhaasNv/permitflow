@@ -1,0 +1,9 @@
+{
+ "apiVersion": 1,
+ "deleteTemplates": [
+  {
+   "orgId": 1,
+   "name": "permitflow.telegram"
+  }
+ ]
+}
