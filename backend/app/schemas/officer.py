@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.schemas.applications import LicenceView
+from app.schemas.checklist import ChecklistSummaryOut
 from app.schemas.site_visit import SiteVisitOut
 
 
@@ -176,6 +177,8 @@ class OfficerApplicationOut(BaseModel):
     withdrawal_reason: str | None
     # The site visit appointment (US-084): present once a date was proposed for the current visit.
     site_visit: SiteVisitOut | None = None
+    # The current visit's checklist (US-060): present once the officer opened it.
+    checklist: ChecklistSummaryOut | None = None
     licence: LicenceView | None = None
     version: int
     created_at: datetime

@@ -21,6 +21,7 @@ import { AuditTrail } from './AuditTrail'
 import { ComparePanel } from './ComparePanel'
 import { FeedbackPanel } from './FeedbackPanel'
 import type { Target } from './FeedbackPanel'
+import { ChecklistCard } from './ChecklistCard'
 import { ProposeVisitDialog, SiteVisitPanel } from './SiteVisitPanel'
 import { useOfficerApplication, useRerunCheck, useTransition } from './queries'
 
@@ -118,6 +119,9 @@ function ReviewRail({
         // Keyed by case so a half-typed date on one case never reappears on the next.
         <SiteVisitPanel key={view.id} view={view} onPropose={onPropose} />
       ) : null}
+      {view.checklist !== null || view.site_visit?.status === 'confirmed' || view.status === 'site_visit_done' ? (
+        <ChecklistCard view={view} />
+      ) : null}
       <section className="pf-surface" aria-labelledby="review-title">
         <div className={cn('px-5 pt-5', view.actions.length === 0 && 'pb-5')}>
           <h2 id="review-title" className="text-[17px] font-semibold leading-6">
@@ -192,7 +196,8 @@ function ReviewRail({
             ) : null}
             {view.actions.some((a) => a.target === 'site_visit_done') ? (
               <p className="mt-1 text-xs leading-[17px] text-text-3">
-                Mark the visit done once it has taken place. The visit checklist and post-visit clarification rounds are not built yet.
+                Mark the visit done once it has taken place. The checklist is the record of the visit; submitting it (arriving with the next
+                update) will mark the visit done in the same step.
               </p>
             ) : null}
           </div>

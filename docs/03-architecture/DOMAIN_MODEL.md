@@ -13,7 +13,8 @@ User 1───* Application 1───* ApplicationRevision
                  ├───* Notification (per user)
                  ├───* AuditEvent (append-only)
                  ├───1 Licence (one per approved application, US-051)
-                 └───* SiteVisit 1───* SiteVisitProposal (the appointment and its rounds, US-084)
+                 ├───* SiteVisit 1───* SiteVisitProposal (the appointment and its rounds, US-084)
+                 └───* Checklist 1───* ChecklistItem (the inspection record per visit, US-060)
 ```
 
 ## Entities
@@ -218,6 +219,39 @@ One row per round of the negotiation: the officer's proposal, the operator's cou
 | outcome | enum `pending`, `accepted`, `kept`, `declined`, `superseded` | set once, when the round is decided; earlier rounds keep their outcome after a reschedule |
 | created_at, decided_at | datetime | |
 
+### Checklist
+
+The inspection record of one visit (US-060, FR-036, FR-037). Created on the officer's first open while the case is `site_visit_scheduled` or `site_visit_done`, under the application row lock; one per (application, visit number); the current one is the highest visit number. A draft until submitted (US-063).
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | |
+| application_id | FK Application | unique with `visit_no` |
+| visit_no | int | the current SiteVisit's number when one exists, else the next on record |
+| schema_version | int | the template version the items follow (1) |
+| status | enum `draft`, `submitted` | |
+| version | int | optimistic token for the draft save; every save bumps it |
+| last_save_id | str, nullable | the last accepted client save id: a replayed save answers with the current state |
+| created_by_id, submitted_by_id | FK User | |
+| created_at, updated_at, submitted_at | datetime | |
+
+### ChecklistItem
+
+One template item on one checklist; every key of the template is present from creation.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | |
+| checklist_id | FK Checklist | unique with `item_key` |
+| item_key, position | str, int | from `domain/checklist_schema.py` |
+| result | enum `not_assessed`, `satisfactory`, `unsatisfactory`, `not_applicable` | `not_assessed` only while a draft |
+| comment | text, max 2000, nullable | required at submit for an unsatisfactory or flagged item |
+| needs_clarification | bool | the flag the operator will be asked about (US-062) |
+| clarification_status | enum `none`, `open`, `answered`, `resolved`, `withdrawn` | restates the latest request's state; keeps changing after submit (US-064 to US-066) |
+| resolved_by_id, resolved_at | | |
+
+The template (`GET /checklist-schema`) is static in code and versioned like the form schema: seventeen items in five sections (Premises, Kitchen, Storage, Upkeep, People), each with a key, a title, one line of guidance and `applicable_by_default`. It follows the Singapore Food Agency's public Food Shop pre-licensing self-checklist and says in its own description that it is not an SFA document.
+
 ### CommentTemplate (static configuration, not a table)
 `{key, target_type, title, body}` defined in `domain/feedback_templates.py` and served by `GET /officer/feedback-templates` (officers only). Templates are data, not code, so they can move to a table later without API change.
 
@@ -246,6 +280,7 @@ Required document types: `business_profile`, `floor_plan`, `tenancy_agreement`, 
 | Notification | own | own | own |
 | AuditEvent | none | all applications; read | all applications; read, cross-application feed |
 | SiteVisit, SiteVisitProposal | own application; accept, counter, reschedule | all; propose, decide, confirm, reschedule | all; read |
+| Checklist, ChecklistItem | none (the operator receives the flagged items through the clarification view, US-064) | all; create, save, submit | all; read |
 | User | self | self | all; change role, deactivate/reactivate (planned, US-073) |
 
 ## Invariants (enforced in services and tested)
@@ -259,3 +294,4 @@ Required document types: `business_profile`, `floor_plan`, `tenancy_agreement`, 
 7. Operator API responses never contain internal status codes or audit events; they contain the operator label. (The appointment's own state names, `proposed` to `done`, are served to both sides with a role-specific label; they are not application statuses.)
 8. `site_visit_done` is reachable only while the current visit is `confirmed`; the transition marks it `done` in the same transaction.
 9. A visit has at most six proposals; a proposal's `outcome` is written once.
+10. One checklist per (application, visit number); every template key is present from creation; `result`, `comment` and `needs_clarification` never change after `submitted_at`.

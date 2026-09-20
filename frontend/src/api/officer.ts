@@ -1,3 +1,4 @@
+import type { ChecklistSummary } from './checklist'
 import { request } from './client'
 import type { SiteVisitOfficer } from './siteVisit'
 import type { Tone } from '@/features/shared/StatusBadge'
@@ -162,6 +163,8 @@ export interface OfficerApplication {
   licence: import('./applications').LicenceView | null
   /** The appointment while the case is Site Visit Scheduled (US-084); null before the officer proposes one. */
   site_visit: SiteVisitOfficer | null
+  /** The current visit's checklist once the officer opened it (US-060). */
+  checklist: ChecklistSummary | null
   version: number
   created_at: string
   updated_at: string

@@ -159,15 +159,17 @@ class WorkflowService:
         self, app: Application, *, open_feedback_count: int, has_note: bool
     ) -> TransitionContext:
         """The guard context for `app`, the same for a transition and for the case view's `actions[]`.
-        The appointment part reads the current site visit (US-084). The checklist part is fixed until
-        the checklist and clarification services land (US-060 to US-066): no checklist exists for any
-        visit, so the transitional route from Site Visit Done to approval stays open and every post-site
-        guard sees no items."""
+        The appointment part reads the current site visit (US-084); `checklist_started` reads the
+        current visit's checklist (US-060), so the transitional route from Site Visit Done straight to
+        approval closes the moment a checklist exists. The clarification part is fixed until US-063 to
+        US-066 land: no items, so every post-site guard sees none."""
+        from app.services.checklist import ChecklistService  # noqa: PLC0415 - the services call each other
+
         return TransitionContext(
             open_feedback_count=open_feedback_count,
             has_note=has_note,
             visit_confirmed=SiteVisitService(self.db).visit_confirmed(app),
-            checklist_started=False,
+            checklist_started=ChecklistService(self.db).started(app),
             checklist_complete=False,
             open_clarification_count=0,
             answered_clarification_count=0,

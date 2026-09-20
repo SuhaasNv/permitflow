@@ -2,7 +2,17 @@ import { AxeBuilder } from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
-import { OFFICER, OPERATOR, openCase, seedPendingResubmission, seedUnderReview, seedVisitProposed, signIn, signOut } from './helpers.js'
+import {
+  OFFICER,
+  OPERATOR,
+  openCase,
+  seedPendingResubmission,
+  seedUnderReview,
+  seedVisitConfirmed,
+  seedVisitProposed,
+  signIn,
+  signOut,
+} from './helpers.js'
 
 /**
  * Accessibility gate (US-057): axe-core (WCAG 2.0/2.1/2.2 A and AA rules) on every screen a person can
@@ -143,5 +153,24 @@ test('site visit screens (US-084) have no axe violations at 1280 and 390', async
   }
   await page.setViewportSize({ width: 1280, height: 844 })
   await page.getByRole('button', { name: 'Confirm without a reply' }).waitFor()
+  expectNone(found)
+})
+
+test('the checklist (US-060) has no axe violations at 1024, 820 and 390', async ({ page }) => {
+  const app = await seedVisitConfirmed()
+  const found: string[] = []
+  await signIn(page, OFFICER)
+  for (const [width, height] of [
+    [1024, 820],
+    [820, 1180],
+    [390, 844],
+  ] as const) {
+    await page.setViewportSize({ width, height })
+    await page.goto(`/officer/applications/${app.id}/checklist`)
+    await page.getByRole('heading', { name: 'Site visit checklist' }).waitFor()
+    await page.getByRole('group', { name: 'Result' }).nth(1).getByRole('button', { name: 'Unsatisfactory', exact: true }).click()
+    await page.waitForLoadState('networkidle')
+    found.push(...(await violations(page, `${width} checklist`)))
+  }
   expectNone(found)
 })
