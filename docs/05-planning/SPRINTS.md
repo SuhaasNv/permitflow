@@ -168,15 +168,18 @@ The plan, its reviews and every design decision: `RELEASE_PLAN_V0_4_0.md`. All w
 
 ### Sprint 5: "The officer inspects" (UC3, officer half, plus what the operator sees)
 
-**Goal:** after a site visit is scheduled the officer opens the checklist on a tablet, works through the seventeen items with autosave, flags what needs clarification, submits (marking the visit done in the same step when needed), and the case moves on its own; the operator sees the flagged items with the officer's comments.
+**Goal:** the site visit is arranged inside the case (date, slot, accept or counter, every round on record); then, after a site visit is scheduled, the officer opens the checklist on a tablet, works through the seventeen items with autosave, flags what needs clarification, submits (marking the visit done in the same step when needed), and the case moves on its own; the operator sees the flagged items with the officer's comments.
 
 | Story | Title (short) | Priority |
 |-------|---------------|----------|
+| US-084 | Site visit appointment: date and slot proposed by the officer, accepted or countered by the operator, confirmed, rescheduled; done only once confirmed (added 20 Sep, owner's product decision) | MVP |
 | US-060 | Checklist schema, model (one per visit), migration, `POST` to create, capture screen at 820 and 1024 | MVP |
 | US-061 | Idempotent draft autosave, saved and retrying states, offline banner, conflict merge | MVP |
 | US-062 | "Need further clarification" per item with a required comment | MVP |
 | US-063 | Submit: guards, findings frozen, the transition, release of the flagged items, one notification | MVP |
 | US-064 | Operator view of the flagged items (read-only until US-065), the `clarification` block, list wording | MVP |
+
+**Size:** a day and a half with US-084; if the second half-day is not there, US-064 moves to Sprint 6.
 
 **Between Sprint 5 and 6, `dev` shows:** the officer's whole capture and submit; the operator sees the flagged items and the officer's comments with "Answering arrives with the next update"; the officer keeps every exit (Route to approval when nothing is open, Reject) and the operator can withdraw.
 

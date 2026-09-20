@@ -862,6 +862,119 @@ def build_admin_users(width: int, height: int) -> str:
     return page("Admin users", width, height, shell(width, height, "admin", "Users", content, overlay=overlay))
 
 
+# Site visit appointment (US-084) ------------------------------------------------------------------
+
+def date_field(label: str, value: str, hint: str = "") -> str:
+    field = div(st(display="flex", align_items="center", gap="8px", height="40px", padding="0 12px", border=f"1px solid {LINE_STRONG}", border_radius="6px", background=SURFACE, color=TEXT if value else TEXT3, font_size="14px", box_sizing="border-box", width="200px"),
+                escape(value or "DD/MM/YYYY") + div(st(margin_left="auto", color=TEXT3, display="inline-flex"), icon("M3 9h18M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", 16), "span"))
+    return div(st(display="flex", flex_direction="column", gap="6px"), text(label, 13, 18, 600, TEXT, "", "label") + field + (text(hint, 12, 16, 400, TEXT3) if hint else ""))
+
+
+def slot_control(selected: str) -> str:
+    opts = [("morning", "Morning", "09:00 to 12:00"), ("afternoon", "Afternoon", "14:00 to 17:00")]
+    out = []
+    for key, label, times in opts:
+        on = key == selected
+        out.append(div(st(display="flex", flex_direction="column", gap="2px", padding="10px 14px", border_radius="6px", border=f"1px solid {TEXT if on else LINE_STRONG}", background=SURFACE3 if on else SURFACE, color=TEXT if on else TEXT2, cursor="pointer", min_width="150px", font_family=SANS, text_align="left"),
+                       text(label, 14, 20, 600 if on else 500, TEXT if on else TEXT2) + text(times, 12, 16, 400, TEXT3), "button", type="button", aria_pressed="true" if on else "false"))
+    return div(st(display="flex", flex_direction="column", gap="6px"), text("Slot", 13, 18, 600) + div(st(display="flex", gap="8px", flex_wrap="wrap"), "".join(out), role="group", aria_label="Slot"))
+
+
+def visit_history(rows: list[dict[str, str]]) -> str:
+    return timeline(rows)
+
+
+def build_schedule_dialog(width: int, height: int) -> str:
+    """S-32: the officer's case in Under Review with the Mark site visit scheduled dialog open."""
+    hdr = case_header(["Review queue", "PF-2026-000214"], "PF-2026-000214", "Food Establishment Licence", "Kopi & Kaya Toast House Pte. Ltd.",
+                      badge("Under Review", "info"), "Every feedback item is resolved. Arrange the site visit or reject.", meta="Revision 3 · last activity 19 Sep 2026", actions=button("Compare revisions", "secondary", size="sm"))
+    facts = facts_row([("Applicant", OPERATOR, "operator@permitflow.example.sg"), ("Submitted", "19 Sep, 15:40", "Revision 3"), ("Premises", "12 Jalan Besar #01-12", ""), ("Last activity", "19 Sep, 16:02", "Created 17 Sep 2026")])
+    rail = div(st(width="400px", flex_shrink=0, display="flex", flex_direction="column", gap="20px"),
+               rail_panel("Review", div(st(display="flex", flex_direction="column", gap="8px"), button("Mark site visit scheduled", "primary", full=True) + button("Request resubmission", "secondary", disabled_reason="No open feedback item", full=True) + button("Reject", "secondary", full=True)), text("your turn", 12, 16, 400, TEXT3, "", "span"))
+               + rail_panel("Feedback", text("Every item is resolved. Nothing is waiting on the operator.", 14, 20, 400, TEXT2), mono("0 open · 2 total", 12, TEXT3)))
+    left = div(st(display="flex", flex_direction="column", gap="20px", flex_grow=1, min_width=0), collapsed_sections())
+    content = hdr + facts + div(st(display="flex", gap="24px", align_items="flex-start"), left + rail)
+    body = div(st(display="flex", flex_direction="column", gap="16px"),
+               div(st(display="flex", gap="16px", flex_wrap="wrap"), date_field("Date", "22/09/2026", "A working day, from tomorrow") + slot_control("morning"))
+               + div(st(display="flex", flex_direction="column", gap="6px"), text("Note for the operator (optional)", 13, 18, 600, TEXT, "", "label") + div(st(height="72px", border=f"1px solid {LINE_STRONG}", border_radius="6px", background=SURFACE, padding="10px 12px", font_size="14px", line_height="20px", color=TEXT, box_sizing="border-box", font_family=SANS), "Please have the pest control contract and the food handlers' certificates on the premises.", "textarea", aria_label="Note for the operator")))
+    overlay = dialog("Propose a site visit?", "The operator is told the date and slot and can accept or propose another date. If they do not reply within three working days you can confirm the visit yourself. The case moves to Site Visit Scheduled now.", "Propose visit", extra=body)
+    return page("Schedule the site visit", width, height, shell(width, height, "officer", "Review queue", content, overlay=overlay))
+
+
+def appointment_card_operator(state: str, phone: bool) -> str:
+    """S-33: the operator's appointment card. `state` is proposed (reply form open) or confirmed."""
+    if state == "confirmed":
+        head = div(st(display="flex", justify_content="space-between", align_items="baseline", gap="8px"), text("Site visit", 17, 24, 600) + badge("Confirmed", "success"))
+        body = div(st(display="flex", flex_direction="column", gap="10px"),
+                   text("Thursday 24 September 2026, afternoon (14:00 to 17:00)", 16, 24, 600)
+                   + text("The officer accepted your proposed date. Have the pest control contract and the food handlers' certificates on the premises.", 14, 20, 400, TEXT2)
+                   + div(st(display="flex", gap="8px"), button("Request a different date", "secondary", size="sm")))
+        return rail_panel("Site visit", body, badge("Confirmed", "success"))
+    body = div(st(display="flex", flex_direction="column", gap="14px"),
+               text("Tuesday 22 September 2026, morning (09:00 to 12:00)", 16, 24, 600)
+               + text("Proposed by the licensing officer on 19 Sep. Note: please have the pest control contract and the food handlers' certificates on the premises.", 14, 20, 400, TEXT2)
+               + text("Reply by 24 Sep. After that the officer can confirm this date without your reply.", 13, 18, 400, TEXT3)
+               + div(st(display="flex", gap="8px", flex_wrap="wrap"), button("Accept this date", "primary", size="lg" if phone else "md", full=phone))
+               + div(st(border_top=f"1px solid {LINE}", padding_top="14px", display="flex", flex_direction="column", gap="12px"),
+                     text("Or propose another date", 14, 20, 600)
+                     + div(st(display="flex", gap="16px", flex_wrap="wrap", flex_direction="column" if phone else "row"), date_field("Date", "24/09/2026", "At least two working days ahead") + slot_control("afternoon"))
+                     + div(st(display="flex", flex_direction="column", gap="6px"), text("Reason", 13, 18, 600, TEXT, "", "label") + div(st(min_height="60px", border=f"1px solid {LINE_STRONG}", border_radius="6px", background=SURFACE, padding="10px 12px", font_size="14px", line_height="20px", color=TEXT, box_sizing="border-box", font_family=SANS, width="100%"), "The shop is closed on Tuesdays; Thursday afternoon the whole team is in.", "textarea", aria_label="Reason"))
+                     + div(st(display="flex", gap="8px"), button("Propose this date", "secondary", size="lg" if phone else "md", full=phone))))
+    return rail_panel("Site visit", body, badge("Waiting for your reply", "warning"))
+
+
+def build_operator_appointment(width: int, height: int) -> str:
+    phone = width < 600
+    hdr = case_header(["My applications", "PF-2026-000214"], "PF-2026-000214", "Food Establishment Licence", "Kopi & Kaya Toast House Pte. Ltd.",
+                      badge("Pending Site Visit", "warning"), "The licensing officer proposed a site visit. Accept the date or propose another one.", meta="Created 17 Sep 2026 · Revision 3 · History", phone=phone)
+    history = rail_panel("Visit history", timeline([
+        {"tone": "warning", "title": "The officer proposed Tue 22 Sep, morning", "body": "Please have the pest control contract and the food handlers' certificates on the premises.", "meta": "Round 1 · 19 Sep 2026, 16:02"},
+    ]), mono("1 round", 12, TEXT3), divider=True)
+    content = hdr + appointment_card_operator("proposed", phone) + history
+    return page("Site visit proposed", width, height, shell(width, height, "operator", "My applications", content, nav="phone" if phone else "full"))
+
+
+def build_officer_counter(width: int, height: int) -> str:
+    """S-34: the officer's case in Site Visit Scheduled with the operator's counter-proposal in the rail."""
+    hdr = case_header(["Review queue", "PF-2026-000214"], "PF-2026-000214", "Food Establishment Licence", "Kopi & Kaya Toast House Pte. Ltd.",
+                      badge("Site Visit Scheduled", "info"), "The operator proposed another date. Decide, then the visit is confirmed.", meta="Visit 1 · last activity 20 Sep 2026", actions=button("Compare revisions", "secondary", size="sm"))
+    facts = facts_row([("Applicant", OPERATOR, "operator@permitflow.example.sg"), ("Submitted", "19 Sep, 15:40", "Revision 3"), ("Premises", "12 Jalan Besar #01-12", ""), ("Last activity", "20 Sep, 09:40", "Created 17 Sep 2026")])
+    proposal = div(st(display="flex", flex_direction="column", gap="12px"),
+                   div(st(padding="12px 14px", background=TONES["warning"][1], border=f"1px solid {TONES['warning'][2]}", border_radius="6px", display="flex", flex_direction="column", gap="4px"),
+                       text("Operator proposes Thu 24 Sep, afternoon (14:00 to 17:00)", 14, 20, 600)
+                       + text("\"The shop is closed on Tuesdays; Thursday afternoon the whole team is in.\"", 14, 20, 400, TEXT2)
+                       + text(f"{OPERATOR} · 20 Sep 2026, 09:40", 12, 16, 400, TEXT3))
+                   + text("Your proposal: Tue 22 Sep, morning (09:00 to 12:00)", 13, 18, 400, TEXT2)
+                   + div(st(display="flex", flex_direction="column", gap="8px"),
+                         button("Accept Thu 24 Sep, afternoon", "primary", full=True)
+                         + button("Keep Tue 22 Sep, morning", "secondary", full=True)
+                         + button("Propose another date", "secondary", full=True)
+                         + button("Confirm without a reply", "ghost", disabled_reason="The operator replied; this is for a proposal left unanswered for three working days", full=True))
+                   + div(st(border_top=f"1px solid {LINE}", padding_top="12px"), text("Rounds", 12, 16, 600, TEXT3, "text-transform: uppercase; letter-spacing: 0.08em") + timeline([
+                       {"tone": "warning", "title": "You proposed Tue 22 Sep, morning", "meta": "Round 1 · 19 Sep 2026, 16:02"},
+                       {"tone": "info", "title": f"{OPERATOR} proposed Thu 24 Sep, afternoon", "body": "The shop is closed on Tuesdays; Thursday afternoon the whole team is in.", "meta": "Round 2 · 20 Sep 2026, 09:40"},
+                   ])))
+    rail = div(st(width="400px", flex_shrink=0, display="flex", flex_direction="column", gap="20px"),
+               rail_panel("Site visit", proposal, badge("Waiting for you", "warning"))
+               + rail_panel("Review", div(st(display="flex", flex_direction="column", gap="8px"), button("Mark site visit done", "secondary", disabled_reason="Confirm the visit date first", full=True) + button("Reject", "secondary", full=True)), text("visit not yet confirmed", 12, 16, 400, TEXT3, "", "span")))
+    left = div(st(display="flex", flex_direction="column", gap="20px", flex_grow=1, min_width=0), collapsed_sections())
+    content = hdr + facts + div(st(display="flex", gap="24px", align_items="flex-start"), left + rail)
+    return page("Site visit: operator's counter-proposal", width, height, shell(width, height, "officer", "Review queue", content))
+
+
+def build_operator_confirmed(width: int, height: int) -> str:
+    phone = width < 600
+    hdr = case_header(["My applications", "PF-2026-000214"], "PF-2026-000214", "Food Establishment Licence", "Kopi & Kaya Toast House Pte. Ltd.",
+                      badge("Pending Site Visit", "info"), "Your site visit is confirmed. Nothing else is needed before the visit.", meta="Created 17 Sep 2026 · Revision 3 · History", phone=phone)
+    history = rail_panel("Visit history", timeline([
+        {"tone": "warning", "title": "The officer proposed Tue 22 Sep, morning", "meta": "Round 1 · 19 Sep 2026, 16:02"},
+        {"tone": "info", "title": "You proposed Thu 24 Sep, afternoon", "body": "The shop is closed on Tuesdays; Thursday afternoon the whole team is in.", "meta": "Round 2 · 20 Sep 2026, 09:40"},
+        {"tone": "success", "title": "The officer accepted Thu 24 Sep, afternoon", "meta": "20 Sep 2026, 11:15"},
+    ]), mono("2 rounds", 12, TEXT3), divider=True)
+    content = hdr + appointment_card_operator("confirmed", phone) + history
+    return page("Site visit confirmed", width, height, shell(width, height, "operator", "My applications", content, nav="phone" if phone else "full"))
+
+
 # Canvas ----------------------------------------------------------------------------------------
 
 BOARDS: list[tuple[str, str, int, int, str, int]] = [
@@ -877,6 +990,11 @@ BOARDS: list[tuple[str, str, int, int, str, int]] = [
     ("S42-Admin-Activity.dc.html", "S-42 Admin activity", 1280, 1250, "admin-activity", 2),
     ("S41-Admin-Users.dc.html", "S-41 Admin users, change-role dialog", 1280, 950, "admin-users", 2),
     ("S43-Admin-ReadOnly-Case.dc.html", "S-43 Admin read-only case", 1280, 2500, "case-ro", 2),
+    ("S32-Schedule-Dialog.dc.html", "S-32 Officer proposes the site visit (dialog)", 1280, 1100, "schedule-dialog", 3),
+    ("S33-Operator-Appointment-Phone.dc.html", "S-33 Operator: visit proposed, reply form (390)", 390, 1500, "operator-appointment-390", 3),
+    ("S33-Operator-Appointment.dc.html", "S-33 Operator: visit proposed (1280)", 1280, 1150, "operator-appointment-1280", 3),
+    ("S34-Officer-Counter.dc.html", "S-34 Officer: the operator's counter-proposal", 1280, 1300, "officer-counter", 3),
+    ("S33-Operator-Confirmed-Phone.dc.html", "S-33 Operator: visit confirmed (390)", 390, 1200, "operator-confirmed-390", 3),
 ]
 
 
@@ -903,6 +1021,14 @@ def build(key: str, w: int, h: int) -> str:
         return build_admin_activity(w, h)
     if key == "admin-users":
         return build_admin_users(w, h)
+    if key == "schedule-dialog":
+        return build_schedule_dialog(w, h)
+    if key in ("operator-appointment-390", "operator-appointment-1280"):
+        return build_operator_appointment(w, h)
+    if key == "officer-counter":
+        return build_officer_counter(w, h)
+    if key == "operator-confirmed-390":
+        return build_operator_confirmed(w, h)
     raise KeyError(key)
 
 
@@ -924,6 +1050,7 @@ def main(out: Path) -> None:
         "row-officer": {"x": 0, "y": -300, "text": "Officer: checklist on site, then the clarification rail", "kind": "title1", "maxW": 3400},
         "row-operator": {"x": 0, "y": int(boards["S18-Respond-Phone.dc.html"]["y"]) - 300, "text": "Operator: answer only the flagged items", "kind": "title1", "maxW": 3400},  # type: ignore[call-overload]
         "row-admin": {"x": 0, "y": int(boards["S40-Admin-Overview.dc.html"]["y"]) - 300, "text": "Admin: overview, activity, users, read-only case", "kind": "title1", "maxW": 5400},  # type: ignore[call-overload]
+        "row-visit": {"x": 0, "y": int(boards["S32-Schedule-Dialog.dc.html"]["y"]) - 300, "text": "Site visit appointment: propose, accept or counter, confirm (US-084)", "kind": "title1", "maxW": 4600},  # type: ignore[call-overload]
     }
     canvas = {
         "v": 3,

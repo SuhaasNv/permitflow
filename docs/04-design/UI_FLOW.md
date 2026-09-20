@@ -100,6 +100,7 @@ Kinds from the domain model only: `submitted` and `resubmitted` (to officers), `
 
 | Step | Screen | State | What the user sees / does | Engineering hook |
 |------|--------|-------|---------------------------|------------------|
+| 0 | S-32, S-33, S-34 | under_review → site_visit_scheduled | The officer proposes a date and slot (S-32); the operator accepts or counters with a reason (S-33); the officer accepts, keeps or proposes again (S-34); either side may reschedule before the date; after three working days of silence the officer confirms alone; Mark site visit done waits for a confirmed visit (US-084) | `POST …/site-visit`, `…/site-visit/decide`, `…/site-visit/confirm`, `…/site-visit/reschedule`; operator `…/site-visit/accept`, `…/site-visit/counter` |
 | 1 | S-21 | site_visit_scheduled | Primary action "Open checklist"; the feedback rail is locked with the reason | `POST /officer/applications/{id}/checklist` (201 or 200) |
 | 2 | S-30 | site_visit_scheduled / site_visit_done | Fills each item: result, comment, flag; section picker; progress with counts; autosave with Saved hh:mm, retrying and the offline banner | `PUT …/checklist` with `version` and `save_id` (idempotent; 409 merged) |
 | 3 | S-30 | site_visit_done (hop recorded when needed) | Submit dialog lists the flagged items; findings freeze; the case moves on its own | `POST …/checklist/submit`; system transition; one operator notification |
