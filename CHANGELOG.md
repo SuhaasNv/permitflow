@@ -2,6 +2,13 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## v0.4.0 planned (20 Sep 2026, evening, after the submission)
+
+- `docs/05-planning/RELEASE_PLAN_V0_4_0.md`: the plan for use case 3 and the admin panel in five one-day sprints on `dev` (Sprints 4 to 8 in `SPRINTS.md`), production frozen on the submitted v0.3.0 until the owner runs the release ritual. Three independent reviews of the first draft (feasibility, product design, QA and security) changed it before it was adopted; section 12 of the plan records what each changed: the GitHub default branch moved from `dev` to `main` so reviewers land on the submitted release; the post-site statuses read the brief's way (the operator answers right after the checklist is submitted); the checklist bypass `site_visit_done → pending_approval` goes; one checklist per visit; the seeded demonstration accounts protected from the admin write path; the admin epic after UC3 and first in the cut order; the workflow service to take the actor and a notification policy from the caller; existing notification kinds reused so a rollback stays safe; idempotent autosave with no audit row per save; the limiter fix (readiness row 25) before autosave lands.
+- Stories: full acceptance criteria for US-060 to US-066 and US-070 to US-073; US-071 absorbed by US-070; new US-078 (design pass), US-079 (state machine and workflow amendments), US-080 (acceptance and documents), US-081 (release), US-082 (limiter behind the edge), US-083 (officer `phase` fields). Notion: Sprint Day options Sprint 4 to Sprint 8, the UC3 epic renamed, the seventeen stories set.
+- `SCOPE.md`: a v0.4.0 section, assumption 6 marked as closing, assumptions 18 to 21 (the post-site reading, no revision per round, no check on attachments, the static checklist template), the UC3 and S7 rows updated. `DEFINITION_OF_DONE.md` widths aligned with `CLAUDE.md` (390, 1024, 1280, plus 820 for the checklist). `BRANCHING.md` rule 5: `v0.<release>.0`. README notice on `dev`; working version `0.4.0-dev` (`0.4.0.dev0` in the backend).
+- No feature code changed; the first story of Sprint 4 starts on the owner's go.
+
 ## Production release of the observability endpoint (20 Sep 2026, 16:16 SGT)
 
 - Production pinned to `sha-714a159` (`main` after pull requests #9 and #10: the technical video v3, the policy-page fix, the observability endpoint). `/api/v1/metrics` answers 401 without the token in production; both Prometheus targets `up`; the dashboard's `production` view and the Telegram `/status` answer carry production numbers.
