@@ -8,6 +8,7 @@ import { RequireRole } from '@/features/auth/RequireRole'
 import { AdminOverviewPage } from '@/features/admin/OverviewPage'
 import { OfficerQueuePage } from '@/features/officer/QueuePage'
 import { OfficerCasePage } from '@/features/officer/CasePage'
+import { ChecklistPage } from '@/features/officer/ChecklistPage'
 import { LicencePreviewPage } from '@/features/officer/LicencePreviewPage'
 import { ApplicationPage } from '@/features/operator/ApplicationPage'
 import { DocumentsPage } from '@/features/operator/DocumentsPage'
@@ -56,6 +57,7 @@ export const router = createBrowserRouter([
           { path: '/officer/queue', element: <OfficerQueuePage /> },
           { path: '/officer/applications/:id', element: <OfficerCasePage /> },
           { path: '/officer/applications/:id/licence-preview', element: <LicencePreviewPage /> },
+          { path: '/officer/applications/:id/checklist', element: <ChecklistPage /> },
         ],
       },
     ],

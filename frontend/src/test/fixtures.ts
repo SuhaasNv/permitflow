@@ -246,6 +246,7 @@ export function officerView(over: Partial<OfficerApplication> = {}): OfficerAppl
     withdrawal_reason: null,
     licence: null,
     site_visit: null,
+    checklist: null,
     version: 5,
     created_at: '2026-09-19T00:50:00Z',
     updated_at: '2026-09-19T03:00:00Z',

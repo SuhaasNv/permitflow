@@ -15,6 +15,8 @@ import {
   transitionApplication,
   withdrawFeedback,
 } from '@/api/officer'
+import type { Checklist, ChecklistSaveInput } from '@/api/checklist'
+import { getChecklist, getChecklistSchema, openChecklist, saveChecklist } from '@/api/checklist'
 import type { DateInput, DecideInput, ProposeInput } from '@/api/siteVisit'
 import { confirmSiteVisitWithoutReply, decideSiteVisit, proposeSiteVisit, rescheduleSiteVisitAsOfficer } from '@/api/siteVisit'
 import { isCheckStale } from '@/features/operator/queries'
@@ -23,6 +25,7 @@ export const officerKeys = {
   queue: ['officer', 'queue'] as const,
   case: (id: string) => ['officer', 'case', id] as const,
   audit: (id: string) => ['officer', 'audit', id] as const,
+  checklist: (id: string) => ['officer', 'checklist', id] as const,
 }
 
 /** Every officer action writes audit rows, so the open trail is refetched along with the queue. */
@@ -160,5 +163,37 @@ export function useRescheduleSiteVisitAsOfficer(id: string) {
   return useMutation({
     mutationFn: (body: DateInput) => rescheduleSiteVisitAsOfficer(id, body),
     onSuccess: (view) => afterCaseChange(qc, id, view),
+  })
+}
+
+// Site visit checklist (US-060). The draft is created on first open, so the page opens it with a POST.
+
+export function useChecklistSchema() {
+  return useQuery({ queryKey: ['checklist-schema'], queryFn: getChecklistSchema, staleTime: Infinity })
+}
+
+/** The current visit's checklist, created on first open; refetches on focus so another tab's save shows. */
+export function useChecklist(id: string) {
+  return useQuery({
+    queryKey: officerKeys.checklist(id),
+    queryFn: () => openChecklist(id),
+    refetchOnWindowFocus: false,
+  })
+}
+
+export function useReadChecklist(id: string, enabled: boolean) {
+  return useQuery({ queryKey: officerKeys.checklist(id), queryFn: () => getChecklist(id), enabled })
+}
+
+/** A save refreshes the checklist and the case summary; the audit trail is untouched (no row per save). */
+export function useSaveChecklist(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: ChecklistSaveInput) => saveChecklist(id, body),
+    onSuccess: (checklist: Checklist) => {
+      qc.setQueryData(officerKeys.checklist(id), checklist)
+      void qc.invalidateQueries({ queryKey: officerKeys.case(id) })
+      void qc.invalidateQueries({ queryKey: officerKeys.queue })
+    },
   })
 }
