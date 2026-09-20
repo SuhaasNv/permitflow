@@ -67,14 +67,14 @@ The brief, in one paragraph: build a regulatory licensing platform with two role
 
 Product: withdraw with reason (US-038), delete draft (US-045), feedback undo (US-039) and reopen (US-049), respond-mode walk (US-041), search (US-036), landing page (FR-031), licence certificate with preview and download (US-051), the owner's domain (US-052).
 
-Engineering and assurance, all on the last day: coverage thresholds in CI (US-053), a live AI evaluation workflow (US-054), LangSmith tracing (US-055), the six-stage AI gate with a fairness check (US-056), the legal, privacy and accessibility review with policy pages and an axe gate (US-057), abuse resistance with rate limits, quotas, CSP and blocking audits (US-058); Return to review (US-031 follow-up), custom domain (US-052), admin role reserved (US-070 to US-073 not built).
+Engineering and assurance, all on the last day: coverage thresholds in CI (US-053), a live AI evaluation workflow (US-054), LangSmith tracing (US-055), the six-stage AI gate with a fairness check (US-056), the legal, privacy and accessibility review with policy pages and an axe gate (US-057), abuse resistance with rate limits, quotas, CSP and blocking audits (US-058); Return to review (US-031 follow-up), custom domain (US-052), admin role reserved (US-070 to US-073 not built). After the release, on 20 Sep: an observability layer (US-077): Prometheus metrics behind a token, a Grafana dashboard, six alert rules, an hourly digest and a command bot on Telegram, running locally and on Railway (`docs/13-observability/OBSERVABILITY.md`).
 
 ## Evaluation areas
 
 | Area | Where to look |
 |------|---------------|
 | Scope judgement | `SCOPE.md`, `docs/05-planning/SPRINTS.md` (cut order), `FINAL_REVIEW.md` |
-| Production readiness | `PRODUCTION_READINESS_REVIEW.md`, `docs/06-security/THREAT_MODEL.md`, `docs/06-security/SECURITY_REVIEW.md`, `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`, `docs/09-operations/OPERATIONS.md`, `.github/workflows` |
+| Production readiness | `PRODUCTION_READINESS_REVIEW.md`, `docs/06-security/THREAT_MODEL.md`, `docs/06-security/SECURITY_REVIEW.md`, `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`, `docs/09-operations/OPERATIONS.md`, `docs/13-observability/OBSERVABILITY.md`, `.github/workflows` |
 | AI tool usage | `README.md` "AI Usage", `AI_USAGE.md` |
 | AI assurance | `docs/07-ai/AI_ASSURANCE.md`, `docs/07-ai/AI_EVALUATION.md`, `.github/workflows/ai-gate.yml`, `ai-eval.yml` |
 | Code quality | `docs/03-architecture/ARCHITECTURE.md`, `tests/unit/test_layering.py`, mypy strict and TypeScript strict in CI |

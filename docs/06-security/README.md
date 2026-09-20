@@ -9,4 +9,4 @@ The threat model was written before the code (17 Sep 2026) and amended in place,
 
 The controls themselves live in the code: authorization and ownership in the services and repositories (ADR-005), the rate limiter and quotas (ADR-012), upload validation, the security headers. Every endpoint has an authorization test; `../08-testing/TEST_STRATEGY.md` says where.
 
-Related: the legal and privacy side of the same questions is `../11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`; the AI-specific threats (prompt injection, third-party data transfer) are in the threat model and detailed in `../07-ai/`.
+Related: the metrics endpoint and the Telegram channel (T23) are described in `../13-observability/OBSERVABILITY.md`; the legal and privacy side of the same questions is `../11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`; the AI-specific threats (prompt injection, third-party data transfer) are in the threat model and detailed in `../07-ai/`.
