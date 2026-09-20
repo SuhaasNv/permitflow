@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.checklist_schema import ITEM_KEYS
 from app.domain.enums import Role
-from app.models import AuditEvent, Checklist, ChecklistItem
+from app.models import AuditEvent, Checklist, ChecklistItem, ClarificationRequest, Notification
 from tests.factories import login, make_user
 from tests.journeys import arrange_visit, transition, under_review
 
@@ -69,7 +69,8 @@ def test_open_creates_once_then_returns_the_same_draft(client: TestClient, db: S
     assert len(list(db.scalars(select(ChecklistItem)))) == 17
     events = [e.event_type for e in db.scalars(select(AuditEvent).where(AuditEvent.application_id == app_id))]
     assert events.count("checklist.created") == 1
-    # the case view carries the summary and the transitional route to approval is closed
+    # the case view carries the summary; after the visit the only offered exits are the checklist's
+    # own submit (not a transition) and Reject: there is no route straight to approval (US-063)
     view = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
     assert view["checklist"]["visit_no"] == 1 and view["checklist"]["counts"]["assessed"] == 0
     transition(client, off, app_id, "site_visit_done")
@@ -80,8 +81,7 @@ def test_open_creates_once_then_returns_the_same_draft(client: TestClient, db: S
     )
     assert r.status_code == 409, r.text
     view = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
-    route = next(a for a in view["actions"] if a["target"] == "pending_approval")
-    assert route["enabled"] is False
+    assert {a["target"] for a in view["actions"]} == {"rejected"}
 
 
 def test_two_tabs_opening_at_once_create_one_checklist(client: TestClient, db: Session) -> None:
@@ -184,6 +184,156 @@ def test_authorization_and_ownership(client: TestClient, db: Session) -> None:
     assert "checklist" not in mine and "items" not in mine
 
 
-# The second-visit walk (approve path, Return to review, a second appointment, checklist visit 2, the
-# first one readable with ?visit=1) needs the submit of US-063: with a draft on record the only exits
-# from Site Visit Done are the submit and Reject. It lands with that story.
+def _submit(client: TestClient, off: Headers, app_id: str):  # type: ignore[no-untyped-def]
+    return client.post(URL.format(app_id) + "/submit", headers=off)
+
+
+def test_submit_guards_freeze_audit_order_and_one_notification(client: TestClient, db: Session) -> None:
+    """US-062 and US-063: every item assessed and every unsatisfactory or flagged item commented; from
+    Site Visit Scheduled the officer hop is recorded first, then the system hop; findings frozen;
+    round-1 requests released for the flagged items; one operator notification with the count."""
+    app_id, op, off, _ = under_review(client, db)
+    arrange_visit(client, off, op, app_id)
+    body = _open(client, off, app_id)
+    r = _submit(client, off, app_id)
+    assert r.status_code == 422 and len(r.json()["error"]["details"]["items"]) == 17
+    items = _items(
+        "satisfactory",
+        floor_trap_graded={"result": "unsatisfactory", "comment": None},  # needs a comment
+        coved_edges={"result": "satisfactory", "needs_clarification": True},  # flagged: needs a comment
+        chiller_temperature={
+            "result": "unsatisfactory",
+            "comment": "Reads 7 °C.",
+            "needs_clarification": True,
+        },
+    )
+    client.put(URL.format(app_id), headers=off, json={"items": items, "version": body["version"]})
+    r = _submit(client, off, app_id)
+    assert r.status_code == 422, r.text
+    fields = r.json()["error"]["details"]["fields"]
+    assert set(fields) == {"floor_trap_graded", "coved_edges"} and "comment" in fields["coved_edges"]
+    assert "2 items need attention" in r.json()["error"]["message"]
+    items = _items(
+        "satisfactory",
+        floor_trap_graded={"result": "unsatisfactory", "comment": "Floor slopes away from the trap."},
+        coved_edges={
+            "result": "satisfactory",
+            "comment": "Confirm the coving work.",
+            "needs_clarification": True,
+        },
+        chiller_temperature={
+            "result": "unsatisfactory",
+            "comment": "Reads 7 °C.",
+            "needs_clarification": True,
+        },
+        food_hygiene_officer={"result": "not_applicable"},
+    )
+    client.put(URL.format(app_id), headers=off, json={"items": items, "version": 2})
+    before = db.scalars(select(Notification).where(Notification.user_id == _operator_id(db, op))).all()
+    r = _submit(client, off, app_id)
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["status"] == "submitted" and out["submitted_by"] and out["submitted_at"]
+    assert out["counts"]["flagged"] == 2 and out["counts"]["missing_comments"] == 0
+    by_key = {i["key"]: i for i in out["items"]}
+    assert by_key["coved_edges"]["clarification_status"] == "open"
+    assert by_key["chiller_temperature"]["clarification_status"] == "open"
+    assert by_key["floor_trap_graded"]["clarification_status"] == "none"
+    # the case moved twice: the officer's hop then the system's, audited in that order after the submit
+    view = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    assert view["status"] == "awaiting_post_site_clarification"
+    assert view["checklist"]["status"] == "submitted"
+    events = [
+        (e.event_type, e.payload)
+        for e in db.scalars(
+            select(AuditEvent).where(AuditEvent.application_id == app_id).order_by(AuditEvent.created_at)
+        )
+    ]
+    types = [t for t, _ in events]
+    i = types.index("checklist.submitted")
+    assert types[i - 1 : i + 2] == ["status.changed", "checklist.submitted", "status.changed"]
+    assert events[i - 1][1]["to"] == "site_visit_done" and events[i - 1][1]["trigger"] == "officer"
+    assert (
+        events[i + 1][1]["to"] == "awaiting_post_site_clarification"
+        and events[i + 1][1]["trigger"] == "system"
+    )
+    assert events[i][1]["flagged_keys"] == ["coved_edges", "chiller_temperature"]
+    assert events[i][1]["unsatisfactory"] == 2 and events[i][1]["not_applicable"] == 1
+    # round-1 requests exist, released, carrying the officer's comment
+    reqs = list(db.scalars(select(ClarificationRequest)))
+    assert len(reqs) == 2 and all(q.round_no == 1 and q.released_at is not None for q in reqs)
+    assert {q.message for q in reqs} == {"Confirm the coving work.", "Reads 7 °C."}
+    # exactly one new notification for the operator, with the count
+    after = db.scalars(select(Notification).where(Notification.user_id == _operator_id(db, op))).all()
+    new = [n for n in after if n.id not in {b.id for b in before}]
+    assert len(new) == 1 and "needs more information on 2 items" in new[0].body
+    assert "Pending Post-Site Clarification" in new[0].title
+    # frozen: a save or a second submit is refused; the operator sentence names the count
+    r = client.put(URL.format(app_id), headers=off, json={"items": items, "version": out["version"]})
+    assert r.status_code == 409 and "no longer change" in r.json()["error"]["message"]
+    assert _submit(client, off, app_id).status_code == 409
+    mine = client.get(f"/api/v1/applications/{app_id}", headers=op).json()
+    assert mine["status_label"] == "Pending Post-Site Clarification"
+    assert "needs more information on 2 items" in mine["status_explanation"]
+    # the officer's route to approval waits for the items
+    route = next(a for a in view["actions"] if a["target"] == "pending_approval")
+    assert route["enabled"] is False
+    # the site visit itself is done
+    assert view["site_visit"]["status"] == "done"
+
+
+def test_nothing_flagged_moves_on_and_a_second_visit_gets_its_own_checklist(
+    client: TestClient, db: Session
+) -> None:
+    """No flag: the case still moves, the operator is told nothing is needed, the officer routes to
+    approval; Return to review and a second appointment give visit 2 its own checklist while visit 1
+    stays readable (the walk US-060 deferred to here)."""
+    app_id, op, off, _ = under_review(client, db)
+    arrange_visit(client, off, op, app_id)
+    first = _open(client, off, app_id)
+    client.put(URL.format(app_id), headers=off, json={"items": _items(), "version": first["version"]})
+    r = _submit(client, off, app_id)
+    assert r.status_code == 200 and r.json()["counts"]["flagged"] == 0
+    mine = client.get(f"/api/v1/applications/{app_id}", headers=op).json()
+    assert mine["status_explanation"].startswith("The site visit is recorded.")
+    note = db.scalars(select(Notification).order_by(Notification.created_at.desc())).first()
+    assert note is not None and "nothing is needed from you" in note.body
+    view = transition(client, off, app_id, "pending_approval")
+    assert view["status"] == "pending_approval"
+    transition(client, off, app_id, "under_review")
+    assert client.post(URL.format(app_id), headers=off).status_code == 409  # not in a site-visit state
+    arrange_visit(client, off, op, app_id)  # visit 2
+    r = client.post(URL.format(app_id), headers=off)
+    assert r.status_code == 201, r.text
+    second = r.json()
+    assert second["visit_no"] == 2 and second["id"] != first["id"] and second["status"] == "draft"
+    assert all(i["result"] == "not_assessed" for i in second["items"])
+    r = client.get(URL.format(app_id) + "?visit=1", headers=off)
+    assert r.status_code == 200 and r.json()["status"] == "submitted"
+    assert client.get(URL.format(app_id), headers=off).json()["visit_no"] == 2
+    row = next(
+        i
+        for i in client.get("/api/v1/officer/applications", headers=off).json()["items"]
+        if i["id"] == app_id
+    )
+    assert row["next_action"] == "Continue the checklist"
+
+
+def test_submit_authorization_and_wrong_state(client: TestClient, db: Session) -> None:
+    app_id, op, off, _ = under_review(client, db)
+    assert _submit(client, off, app_id).status_code == 409  # under review
+    arrange_visit(client, off, op, app_id)
+    assert _submit(client, off, app_id).status_code == 404  # no checklist yet
+    _open(client, off, app_id)
+    assert client.post(URL.format(app_id) + "/submit", headers=op).status_code == 403
+    make_user(db, "admin-cl2@example.sg", Role.ADMIN)
+    admin = login(client, "admin-cl2@example.sg")
+    assert client.post(URL.format(app_id) + "/submit", headers=admin).status_code == 403
+
+
+def _operator_id(db: Session, op: Headers) -> uuid.UUID:
+    from app.models import User
+
+    user = db.scalar(select(User).where(User.email == "op@example.sg"))
+    assert user is not None
+    return user.id

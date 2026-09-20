@@ -158,10 +158,21 @@ _VISIT_EXPLANATIONS: dict[str, str] = {
 }
 
 
-def _explanation(status: ApplicationStatus, site_visit: SiteVisitOperatorView | None) -> str:
-    """The status sentence, made specific to the appointment while one is being arranged (US-084)."""
+def _explanation(
+    status: ApplicationStatus, site_visit: SiteVisitOperatorView | None, open_clarifications: int = 0
+) -> str:
+    """The status sentence, made specific to the appointment while one is being arranged (US-084) and
+    to the number of items the officer flagged after the visit (US-063)."""
     if status == ApplicationStatus.SITE_VISIT_SCHEDULED and site_visit is not None:
         return _VISIT_EXPLANATIONS.get(site_visit.status, _EXPLANATIONS[status])
+    if status == ApplicationStatus.AWAITING_POST_SITE_CLARIFICATION:
+        if open_clarifications:
+            n = open_clarifications
+            return (
+                f"The licensing officer needs more information on {n} {'item' if n == 1 else 'items'} "
+                "after the site visit. Answering arrives with the next update."
+            )
+        return "The site visit is recorded. The licensing office is finalising its assessment."
     return _EXPLANATIONS[status]
 
 
@@ -177,6 +188,7 @@ def operator_view(
     revisions: list[RevisionSummaryView] | None = None,
     licence: LicenceView | None = None,
     site_visit: SiteVisitOperatorView | None = None,
+    open_clarifications: int = 0,
 ) -> ApplicationOperatorView:
     documents = documents or []
     docs_by_type = {d.document_type: (d, r) for d, r in documents}
@@ -214,7 +226,7 @@ def operator_view(
         licence_title=LICENCE_TITLE,
         status_label=operator_label(app.status),
         status_tone=tone_for(app.status),
-        status_explanation=_explanation(app.status, site_visit),
+        status_explanation=_explanation(app.status, site_visit, open_clarifications),
         can_edit=bool(editable_sections or editable_document_types),
         can_submit=app.status == ApplicationStatus.DRAFT and comp.is_complete,
         sections=sections,

@@ -24,7 +24,6 @@ ALL_OK = TransitionContext(
     has_changes_to_flagged_targets=True,
     is_complete=True,
     has_note=True,
-    checklist_started=False,
     checklist_complete=True,
     open_clarification_count=1,
     answered_clarification_count=0,
@@ -128,13 +127,9 @@ def test_clarification_guards() -> None:
         Actor.SYSTEM,
         TransitionContext(checklist_complete=True),
     )
-    # the transitional direct route stays open only while no checklist exists for the visit
-    assert transition(S.SITE_VISIT_DONE, S.PENDING_APPROVAL, Actor.OFFICER, TransitionContext())
-    with pytest.raises(TransitionError) as e:
-        transition(
-            S.SITE_VISIT_DONE, S.PENDING_APPROVAL, Actor.OFFICER, TransitionContext(checklist_started=True)
-        )
-    assert "checklist" in e.value.message
+    # since US-063 there is no route from Site Visit Done straight to approval: the checklist is the way
+    with pytest.raises(TransitionError):
+        transition(S.SITE_VISIT_DONE, S.PENDING_APPROVAL, Actor.OFFICER, TransitionContext())
     # the operator sends only when every open item is answered
     for src in (S.AWAITING_POST_SITE_CLARIFICATION, S.PENDING_POST_SITE_RESUBMISSION):
         with pytest.raises(TransitionError):

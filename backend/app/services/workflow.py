@@ -82,6 +82,7 @@ class WorkflowService:
         note: str | None,
         actor: Actor | None = None,
         operator_body: str | None = None,
+        notify_operator: bool = True,
     ) -> str | None:
         """Move an already locked `app` to `new_status` without committing: guards, side effects, the
         audit row and the operator's notification. Returns the licence storage key when one was issued,
@@ -145,7 +146,7 @@ class WorkflowService:
         )
         # Notification policy per edge: the operator is told when the label or their next step
         # changes; officers are told by the operator-side services (submit, resubmit, send responses).
-        if resolved in NOTIFY_OPERATOR:
+        if notify_operator and resolved in NOTIFY_OPERATOR:
             self.notifications.notify_user(
                 app.operator_id,
                 app,
@@ -159,21 +160,22 @@ class WorkflowService:
         self, app: Application, *, open_feedback_count: int, has_note: bool
     ) -> TransitionContext:
         """The guard context for `app`, the same for a transition and for the case view's `actions[]`.
-        The appointment part reads the current site visit (US-084); `checklist_started` reads the
-        current visit's checklist (US-060), so the transitional route from Site Visit Done straight to
-        approval closes the moment a checklist exists. The clarification part is fixed until US-063 to
-        US-066 land: no items, so every post-site guard sees none."""
+        The appointment part reads the current site visit (US-084); the checklist part reads the
+        current visit's checklist and its clarification threads (US-060, US-063): submitting the
+        checklist opens the automatic hop to Awaiting Post-Site Clarification, and the post-site guards
+        count the open and answered items. Since US-063 every case reaches approval through it."""
         from app.services.checklist import ChecklistService  # noqa: PLC0415 - the services call each other
 
+        checklists = ChecklistService(self.db)
+        facts = checklists.facts(app)
         return TransitionContext(
             open_feedback_count=open_feedback_count,
             has_note=has_note,
             visit_confirmed=SiteVisitService(self.db).visit_confirmed(app),
-            checklist_started=ChecklistService(self.db).started(app),
-            checklist_complete=False,
-            open_clarification_count=0,
-            answered_clarification_count=0,
-            all_open_items_answered=False,
+            checklist_complete=facts.complete,
+            open_clarification_count=facts.open_clarifications,
+            answered_clarification_count=facts.answered_clarifications,
+            all_open_items_answered=facts.all_open_answered,
         )
 
 

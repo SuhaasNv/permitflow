@@ -157,3 +157,33 @@ def flag_and_request(client: TestClient, db: Session) -> tuple[str, Headers, Hea
     )
     transition(client, off, app_id, "pending_pre_site_resubmission")
     return app_id, op, off
+
+
+def submit_clean_checklist(client: TestClient, off: Headers, app_id: str) -> dict:  # type: ignore[type-arg]
+    """Open the current visit's checklist, mark every item satisfactory, submit (US-063): the case moves
+    to Awaiting Post-Site Clarification with nothing flagged, the way to approval since US-063."""
+    from app.domain.checklist_schema import ITEM_KEYS
+
+    r = client.post(f"/api/v1/officer/applications/{app_id}/checklist", headers=off)
+    assert r.status_code in (200, 201), r.text
+    version = r.json()["version"]
+    items = [
+        {"key": k, "result": "satisfactory", "comment": None, "needs_clarification": False} for k in ITEM_KEYS
+    ]
+    r = client.put(
+        f"/api/v1/officer/applications/{app_id}/checklist",
+        headers=off,
+        json={"items": items, "version": version},
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(f"/api/v1/officer/applications/{app_id}/checklist/submit", headers=off)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def to_pending_approval(client: TestClient, off: Headers, op: Headers, app_id: str) -> dict:  # type: ignore[type-arg]
+    """From Under Review to Route to Approval the way the product does it since v0.4.0: the visit
+    arranged and accepted, the checklist submitted clean, then Route to approval."""
+    arrange_visit(client, off, op, app_id)
+    submit_clean_checklist(client, off, app_id)
+    return transition(client, off, app_id, "pending_approval")

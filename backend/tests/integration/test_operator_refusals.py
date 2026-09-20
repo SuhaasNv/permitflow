@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.enums import ApplicationStatus
 from app.domain.labels import officer_label, operator_label
-from tests.journeys import arrange_visit, transition, under_review
+from tests.journeys import to_pending_approval, transition, under_review
 
 # Codes that are also the operator's own word for the state ("draft", "approved") are plain English; the
 # ones with an underscore are internal by construction and must never appear.
@@ -27,10 +27,7 @@ def _assert_operator_safe(body: dict) -> None:  # type: ignore[type-arg]
 
 def test_refused_operator_actions_carry_no_internal_status(client: TestClient, db: Session) -> None:
     app_id, op, off, _ = under_review(client, db)
-    transition(client, off, app_id, "site_visit_scheduled")
-    arrange_visit(client, off, op, app_id)
-    transition(client, off, app_id, "site_visit_done")
-    transition(client, off, app_id, "pending_approval")
+    to_pending_approval(client, off, op, app_id)
 
     r = client.post(f"/api/v1/applications/{app_id}/resubmit", headers=op)
     assert r.status_code == 409, r.text

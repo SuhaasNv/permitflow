@@ -52,3 +52,9 @@ def save_checklist(
     application_id: uuid.UUID, body: ChecklistSaveIn, user: OfficerUser, db: DbSession
 ) -> ChecklistOut:
     return ChecklistService(db).save(user, application_id, body)
+
+
+@router.post("/officer/applications/{application_id}/checklist/submit", response_model=ChecklistOut)
+def submit_checklist(application_id: uuid.UUID, user: OfficerUser, db: DbSession) -> ChecklistOut:
+    """Freeze the findings and move the case to Awaiting Post-Site Clarification (US-063)."""
+    return ChecklistService(db).submit(user, application_id)

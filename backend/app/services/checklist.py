@@ -4,6 +4,7 @@ Created on first open while the case is in a site-visit state, saved as a draft,
 because a draft is not a record until it is submitted."""
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
@@ -20,7 +21,8 @@ from app.domain.checklist_schema import (
     SECTIONS,
 )
 from app.domain.enums import ApplicationStatus, ChecklistResult, ChecklistStatus, ClarificationStatus
-from app.models import Application, Checklist, ChecklistItem, User
+from app.domain.workflow import Actor
+from app.models import Application, Checklist, ChecklistItem, ClarificationRequest, User
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.checklists import ChecklistRepository
@@ -40,6 +42,20 @@ from app.schemas.checklist import (
 
 SITE_VISIT_STATES = (ApplicationStatus.SITE_VISIT_SCHEDULED, ApplicationStatus.SITE_VISIT_DONE)
 SUBMITTED_MESSAGE = "This checklist was submitted; its findings can no longer change."
+
+
+@dataclass(frozen=True)
+class ChecklistFacts:
+    """What the workflow guards need to know about the current visit's checklist (US-060, US-063)."""
+
+    started: bool
+    complete: bool
+    open_clarifications: int
+    answered_clarifications: int
+    all_open_answered: bool
+
+
+NO_CHECKLIST = ChecklistFacts(False, False, 0, 0, False)
 
 
 def schema_out() -> ChecklistSchemaOut:
@@ -143,11 +159,25 @@ class ChecklistService:
             submitted_at=row.submitted_at,
         )
 
-    def started(self, app: Application) -> bool:
-        """True once a checklist exists for the current visit: closes the transitional route from
-        Site Visit Done straight to approval (STATE_MACHINE.md, US-079)."""
+    def facts(self, app: Application) -> ChecklistFacts:
+        """The guard facts for the current visit's checklist: `complete` opens the automatic hop after
+        submit; the clarification counts drive the post-site edges (US-063 to US-066)."""
         row = self.checklists.current_for(app.id)
-        return row is not None and row.visit_no == self._current_visit_no(app)
+        if row is None or row.visit_no != self._current_visit_no(app):
+            return NO_CHECKLIST
+        items = self.checklists.items_for(row.id)
+        open_items = sum(1 for i in items if i.clarification_status == ClarificationStatus.OPEN)
+        answered = sum(1 for i in items if i.clarification_status == ClarificationStatus.ANSWERED)
+        return ChecklistFacts(
+            started=True,
+            complete=row.status == ChecklistStatus.SUBMITTED,
+            open_clarifications=open_items,
+            answered_clarifications=answered,
+            all_open_answered=open_items == 0 and answered > 0,
+        )
+
+    def started(self, app: Application) -> bool:
+        return self.facts(app).started
 
     # Officer actions -----------------------------------------------------------------------------
 
@@ -222,6 +252,98 @@ class ChecklistService:
         row.last_save_id = body.save_id
         row.updated_at = self.now()
         self.db.commit()
+        return self._out(row)
+
+    def submit(self, officer: User, application_id: uuid.UUID) -> ChecklistOut:
+        """Freeze the findings and move the case (US-063, FR-040): every item assessed, every
+        unsatisfactory or flagged item commented (422 listing the keys); from Site Visit Scheduled the
+        officer's hop to Site Visit Done is recorded first, then the system hop to Awaiting Post-Site
+        Clarification; round-1 requests are created and released for the flagged items; one
+        notification tells the operator how many items need them."""
+        from app.services.workflow import WorkflowService  # noqa: PLC0415 - the services call each other
+
+        app = self.applications.get_for(officer, application_id, for_update=True)
+        if app.status not in SITE_VISIT_STATES:
+            raise Conflict("The checklist can be submitted while the case is in a site-visit state.")
+        row = self.checklists.get(app.id, self._current_visit_no(app))
+        if row is None:
+            raise NotFound("No checklist exists for this visit yet.")
+        if row.status == ChecklistStatus.SUBMITTED:
+            raise Conflict("This checklist was already submitted.")
+        items = self.checklists.items_for(row.id)
+        problems: dict[str, str] = {}
+        for i in items:
+            if i.result == ChecklistResult.NOT_ASSESSED:
+                problems[i.item_key] = "Assess this item."
+            elif (i.result == ChecklistResult.UNSATISFACTORY or i.needs_clarification) and not (
+                i.comment or ""
+            ).strip():
+                problems[i.item_key] = "Add a comment: the operator will read it."
+        if problems:
+            word = "item needs" if len(problems) == 1 else "items need"
+            raise ValidationFailed(
+                f"{len(problems)} {word} attention before submit.",
+                details={"fields": problems, "items": list(problems)},
+            )
+        now = self.now()
+        workflow = WorkflowService(self.db)
+        if app.status == ApplicationStatus.SITE_VISIT_SCHEDULED:
+            # The officer's own hop first, audited as such; the operator hears once, below.
+            workflow.apply(app, ApplicationStatus.SITE_VISIT_DONE, officer, note=None, notify_operator=False)
+        row.status = ChecklistStatus.SUBMITTED
+        row.submitted_by_id = officer.id
+        row.submitted_at = now
+        row.updated_at = now
+        row.version += 1
+        flagged = [i for i in items if i.needs_clarification]
+        for i in flagged:
+            self.checklists.add(
+                ClarificationRequest(
+                    item_id=i.id,
+                    round_no=1,
+                    author_id=officer.id,
+                    message=(i.comment or "").strip(),
+                    released_at=now,
+                    created_at=now,
+                )
+            )
+            i.clarification_status = ClarificationStatus.OPEN
+        counts = counts_for(items)
+        self.audit.record(
+            application_id=app.id,
+            actor_id=officer.id,
+            event_type="checklist.submitted",
+            payload={
+                "visit_no": row.visit_no,
+                "total": counts.total,
+                "satisfactory": counts.total - counts.unsatisfactory - counts.not_applicable,
+                "unsatisfactory": counts.unsatisfactory,
+                "not_applicable": counts.not_applicable,
+                "flagged_keys": [i.item_key for i in flagged],
+            },
+        )
+        self.db.flush()
+        n = len(flagged)
+        body = (
+            f"The licensing officer completed the site visit and needs more information on {n} "
+            f"{'item' if n == 1 else 'items'}. Open the application to answer."
+            if n
+            else (
+                "The site visit is recorded; nothing is needed from you while the officer "
+                "finalises the assessment."
+            )
+        )
+
+        workflow.apply(
+            app,
+            ApplicationStatus.AWAITING_POST_SITE_CLARIFICATION,
+            officer,
+            note=None,
+            actor=Actor.SYSTEM,
+            operator_body=body,
+        )
+        self.db.commit()
+        workflow.notifications.flush_sent()
         return self._out(row)
 
     # Helpers -------------------------------------------------------------------------------------

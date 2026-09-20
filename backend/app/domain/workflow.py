@@ -25,7 +25,6 @@ class TransitionContext:
     is_complete: bool = False
     has_note: bool = False
     # Use case 3 (v0.4.0, US-079): the checklist and the clarification items of the current visit.
-    checklist_started: bool = False  # a checklist exists for this visit (draft or submitted)
     checklist_complete: bool = False  # every item assessed, every flagged or unsatisfactory item commented
     open_clarification_count: int = 0  # items waiting for the operator (or drafted, not yet sent)
     answered_clarification_count: int = 0  # items the operator answered that the officer has not decided
@@ -66,12 +65,6 @@ def _needs_checklist_complete(ctx: TransitionContext) -> str | None:
     if ctx.checklist_complete:
         return None
     return "Assess every item and comment on each flagged or unsatisfactory item before submitting."
-
-
-def _needs_no_checklist(ctx: TransitionContext) -> str | None:
-    # Transitional (Sprint 4): the direct route to approval stays only while no checklist exists for
-    # the visit; US-063 removes the edge once the checklist screen ships.
-    return None if not ctx.checklist_started else "Submit the site visit checklist to move on."
 
 
 def _needs_open_clarification(ctx: TransitionContext) -> str | None:
@@ -169,10 +162,6 @@ TRANSITIONS: tuple[Transition, ...] = (
         Actor.SYSTEM,
         _needs_checklist_complete,
         "Checklist submitted",
-    ),
-    # Transitional: kept while no checklist exists for the visit; removed by US-063.
-    Transition(
-        S.SITE_VISIT_DONE, S.PENDING_APPROVAL, Actor.OFFICER, _needs_no_checklist, "Route to approval"
     ),
     Transition(
         S.AWAITING_POST_SITE_CLARIFICATION,

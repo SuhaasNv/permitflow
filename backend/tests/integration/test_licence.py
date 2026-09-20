@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.models import AuditEvent, Licence, Notification
 from app.models.enums import Role
 from tests.factories import login, make_user
-from tests.journeys import arrange_visit, transition, under_review
+from tests.journeys import to_pending_approval, transition, under_review
 
 
 def _preview(client: TestClient, h: dict[str, str], app_id: str) -> int:
@@ -23,10 +23,7 @@ def _licence(client: TestClient, h: dict[str, str], app_id: str) -> int:
 
 
 def _to_pending_approval(client: TestClient, off: dict[str, str], op: dict[str, str], app_id: str) -> None:
-    transition(client, off, app_id, "site_visit_scheduled")
-    arrange_visit(client, off, op, app_id)
-    for target in ("site_visit_done", "pending_approval"):
-        transition(client, off, app_id, target)
+    to_pending_approval(client, off, op, app_id)
 
 
 def test_preview_then_approve_issues_and_serves_the_licence(client: TestClient, db: Session) -> None:
