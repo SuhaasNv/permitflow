@@ -11,7 +11,7 @@ from app.domain import completeness as completeness_rules
 from app.domain.enums import ApplicationStatus, DocumentType, FeedbackResolution, VerificationStatus
 from app.domain.form_schema import SECTIONS
 from app.domain.labels import officer_label, tone_for
-from app.domain.workflow import Actor, TransitionContext, available_actions
+from app.domain.workflow import Actor, actor_for_role, available_actions
 from app.models import Application, ApplicationRevision, Document, Feedback, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.documents import DocumentRepository
@@ -34,6 +34,7 @@ from app.services.compare import CompareService
 from app.services.feedback import restorable, target_label
 from app.services.licence import LicenceService, licence_view
 from app.services.operator_view import LICENCE_TITLE
+from app.services.workflow import WorkflowService
 
 _NOTE_REQUIRED_TARGETS = {ApplicationStatus.REJECTED}
 
@@ -74,7 +75,9 @@ class OfficerViewService:
             raise NotFound("Application not found.")
         feedback = self.feedback.list_for(app.id)
         open_count = sum(1 for f in feedback if f.resolution == FeedbackResolution.OPEN)
-        ctx = TransitionContext(open_feedback_count=open_count, has_note=False)
+        ctx = WorkflowService(self.db).build_context(app, open_feedback_count=open_count, has_note=False)
+        # The viewer's own actor: an officer sees the officer edges, an admin none (read-only, ADR-014).
+        actor = actor_for_role(viewer.role) if viewer is not None else Actor.OFFICER
         actions = [
             ActionOut(
                 target=str(a["target"].value if hasattr(a["target"], "value") else a["target"]),
@@ -83,7 +86,7 @@ class OfficerViewService:
                 reason=(str(a["reason"]) if a["reason"] else None),
                 requires_note=a["target"] in _NOTE_REQUIRED_TARGETS,
             )
-            for a in available_actions(app.status, Actor.OFFICER, ctx)
+            for a in available_actions(app.status, actor, ctx)
         ]
         # Reject's guard needs a note the UI collects first; show it enabled with the requirement flagged.
         for a in actions:

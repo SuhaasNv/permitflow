@@ -8,7 +8,7 @@ Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC
 |---------|-----------|--------------|-------------------------|
 | Operator | `operator` | Business seeking a licence; creates, submits and resubmits applications; sees only own applications and operator-facing status labels | Operator dashboard (my applications) |
 | Licensing Officer | `officer` | Reviews applications, gives contextual feedback, moves status, compares revisions, reads audit trails | Review queue |
-| Admin | `admin` | Oversees the platform: throughput by status, stuck applications, AI verification health, cross-application audit feed; manages users (create, change role, deactivate); read-only on applications; not in the assessment brief, added by product decision (see `SCOPE.md`) | Operations dashboard |
+| Admin | `admin` | Oversees the platform: throughput by status, stuck applications, AI verification health, cross-application audit feed; manages users (change role, deactivate, reactivate; accounts are created by script); read-only on applications; not in the assessment brief, added by product decision (see `SCOPE.md`) | Operations dashboard |
 
 ---
 
@@ -183,15 +183,62 @@ Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC
 
 ---
 
-## UC3: On-Site Assessment & Post-Site Clarification (DEFERRED)
+## UC3: On-Site Assessment & Post-Site Clarification (v0.4.0)
 
-Deferred per `SCOPE.md`. Intended use cases, for completeness of the traceability matrix:
+Deferred at v0.3.0; designed and planned on 20 Sep 2026 (`docs/05-planning/RELEASE_PLAN_V0_4_0.md` section 4, stories US-060 to US-066 and US-084). The post-site states are read the brief's way: the operator answers in Awaiting Post-Site Clarification and Pending Post-Site Resubmission, the officer reviews in Post-Site Clarification Resubmitted (`SCOPE.md` assumption 18).
 
-- **UC3-A** Officer captures the site-visit checklist (draft save, per-item comments, mark "Need Further Clarification"); on submit the case moves to `awaiting_post_site_clarification`.
-- **UC3-B** Operator sees only flagged items with the officer's comment, responds per item and uploads supporting documents; case moves to `post_site_clarification_resubmitted`.
-- **UC3-C** Multiple clarification rounds per item with a full per-item audit trail.
+### UC3-0 Arrange the site visit (US-084)
+**Actor:** Officer, Operator
+**Preconditions:** Application in `under_review` with no open feedback.
+**Main flow:**
+1. Officer clicks Mark site visit scheduled and gives a date, a slot (morning or afternoon) and an optional note; the case moves to `site_visit_scheduled`; the operator is notified with the date.
+2. Operator accepts, or proposes another date and slot with a reason.
+3. Officer accepts the operator's date, keeps the original or proposes a third; the operator is told which date stands.
+4. Either side may reschedule a confirmed visit before its date, with a reason.
+5. Officer marks the site visit done once the visit is confirmed.
+**Alternate flows:**
+- 2a. No reply for three working days: the officer confirms alone; the operator was told this when the date was proposed.
+- 2b. A date in the past, on a non-working day, or fewer than two working days ahead for the operator: 422 naming the rule.
+**Expected outcome:** one confirmed date and slot, every round on record, the checklist opened against that visit.
 
-The post-site states and transitions exist in the state machine and are unit-tested; screens and the checklist data model are not built.
+### UC3-A Capture the site visit checklist (US-060 to US-063)
+**Actor:** Officer
+**Preconditions:** Application in `site_visit_scheduled` or `site_visit_done`; the visit confirmed.
+**Main flow:**
+1. Officer opens the checklist for the visit (created on first open); seventeen items in five sections, every item Not assessed.
+2. On site, on a tablet, the officer records a result and a comment per item and flags the items that need clarification; the draft saves as they go and survives a poor connection.
+3. Officer submits (marking the visit done in the same step when it was still scheduled); the findings freeze; the case moves to `awaiting_post_site_clarification` on its own; the flagged items are released to the operator with the officer's comments; the operator is notified once with the count.
+**Alternate flows:**
+- 2a. Another session saved the checklist: the page merges the officer's unsaved input over the newer copy, never silently.
+- 3a. An item not assessed, or a flagged or unsatisfactory item without a comment: 422 listing the item keys.
+- 3b. Nothing flagged: the case still moves; the officer routes to approval from there.
+**Expected outcome:** an immutable inspection record and the operator asked only about the flagged items.
+
+### UC3-B Answer the flagged items (US-064, US-065)
+**Actor:** Operator
+**Preconditions:** Application in `awaiting_post_site_clarification` or `pending_post_site_resubmission` with released items.
+**Main flow:**
+1. Operator sees only the flagged items, each with the officer's comment; the rest of the checklist is absent from the response by construction.
+2. Operator answers each item in writing and attaches up to three supporting files per item (the document rules: allowlist, magic bytes, 10 MB).
+3. Operator sends the responses; the case moves to `post_site_clarification_resubmitted`; officers are notified.
+**Alternate flows:**
+- 3a. An item unanswered: 422 listing the keys; the page keeps every typed response.
+- 3b. The officer withdrew an item a moment before: it is excluded from the requirement.
+**Expected outcome:** every open item answered in one round, attachments stored under the document rules.
+
+### UC3-C Rounds and the per-item trail (US-066)
+**Actor:** Officer, Operator
+**Preconditions:** Application in `post_site_clarification_resubmitted`.
+**Main flow:**
+1. Officer reviews each answered item: Mark clarified, or Still needs clarification with a new message (the item reopens for the next round, not yet sent).
+2. Officer requests another round (needs at least one open item): the new requests are released, the case moves to `pending_post_site_resubmission`, the operator is notified with the count.
+3. UC3-B repeats; rounds are counted per item and unlimited.
+4. Once nothing is open or answered, the officer routes to approval.
+**Alternate flows:**
+- 1a. Withdraw an item that no longer matters.
+- 4a. Reject with a note, or the operator withdraws, from any post-site state: the threads stay as they are; an unsent answer shows as a draft never sent.
+- 4b. Return to review after approval routing and a second visit: a new checklist for visit 2; visit 1 stays readable.
+**Expected outcome:** every request, answer, file and decision on the item's own trail with timestamps, and in the audit trail.
 
 ---
 
@@ -208,7 +255,7 @@ Not in the assessment brief; added as a product decision (SHOULD HAVE in `SCOPE.
 2. Sees counts of applications by internal status, applications with no activity for more than 7 days, and today's submissions/resubmissions.
 3. Sees AI verification health: runs in the last 24 h, failure/unavailable rate, average latency, provider in use.
 4. Sees the cross-application audit feed (latest 50 events) and can open any application read-only (officer view, no actions).
-5. Manages users: sees the directory (name, email, role, active, created, last active), creates a user with a role, changes a role, deactivates or reactivates a user. Each change is audited; the last active admin cannot be demoted or deactivated.
+5. Manages users: sees the directory (name, email, role, active, protected, created), changes a role, deactivates or reactivates a user. Each change is audited; the last active admin cannot be demoted or deactivated; the seeded demonstration accounts and the admin's own account cannot be changed; accounts are created by script (FR-030 as amended).
 
 **Alternative / error flows**
 - 1a. Operator or officer opens `/admin/*` → 403.

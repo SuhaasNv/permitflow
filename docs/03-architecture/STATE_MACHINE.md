@@ -29,7 +29,7 @@ Visibility rule: the operator API never returns the internal code; it returns `s
 
 ## Transitions
 
-Guards are evaluated by the service with a `TransitionContext` (`open_feedback_count`, `has_changes_to_flagged_targets`, `is_complete`, `has_note`) so the machine itself stays pure. `open_feedback_count` counts items with resolution `open` only; `addressed` items do not block a site visit (the officer is expected to resolve them, and the UI warns, but the workflow does not force it).
+Guards are evaluated by the service with a `TransitionContext` (`open_feedback_count`, `has_changes_to_flagged_targets`, `is_complete`, `has_note`, and since US-079 the use case 3 fields `checklist_started`, `checklist_complete`, `open_clarification_count`, `answered_clarification_count`, `all_open_items_answered`) so the machine itself stays pure. `WorkflowService.build_context` builds it once for a transition and for the case view's `actions[]`; the viewer's own actor decides which edges are listed (`actor_for_role`: none for an admin, so the list is empty). `open_feedback_count` counts items with resolution `open` only; `addressed` items do not block a site visit (the officer is expected to resolve them, and the UI warns, but the workflow does not force it).
 
 | From | To | Allowed actor | Guard | Trigger in MVP |
 |------|----|---------------|-------|----------------|
@@ -43,22 +43,27 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `under_review` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `pending_pre_site_resubmission` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject (abandoned or unsalvageable application; prevents stuck cases) |
 | `pending_pre_site_resubmission` | `pre_site_resubmitted` | operator (owner) | `has_changes_to_flagged_targets` | Operator clicks Resubmit |
-| `site_visit_scheduled` | `site_visit_done` | officer | none | Officer clicks Mark site visit done |
+| `site_visit_scheduled` | `site_visit_done` | officer | none (US-084 adds `visit_confirmed`) | Officer clicks Mark site visit done |
 | `site_visit_scheduled` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `site_visit_done` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
-| `site_visit_done` | `awaiting_post_site_clarification` | system | checklist submitted (UC3) | Not reachable in MVP (UC3 deferred); transition exists and is tested |
-| `site_visit_done` | `pending_approval` | officer | none | Officer clicks Route to approval (MVP assumption: no checklist) |
-| `awaiting_post_site_clarification` | `pending_post_site_resubmission` | officer | none | UC3 (deferred) |
-| `awaiting_post_site_clarification` | `pending_approval` | officer | none | UC3 (deferred) |
-| `pending_post_site_resubmission` | `post_site_clarification_resubmitted` | operator (owner) | none | UC3 (deferred) |
-| `post_site_clarification_resubmitted` | `awaiting_post_site_clarification` | officer | none | UC3 (deferred) |
-| `post_site_clarification_resubmitted` | `pending_approval` | officer | none | UC3 (deferred) |
+| `site_visit_done` | `awaiting_post_site_clarification` | system | `checklist_complete` (every item assessed, every flagged or unsatisfactory item commented) | The checklist submit service (US-063); the flagged items are released to the operator in the same transaction |
+| `site_visit_done` | `pending_approval` | officer | `checklist_started = false` (transitional, Sprint 4: open only while no checklist exists for the visit; US-063 removes the edge) | Officer clicks Route to approval |
+| `awaiting_post_site_clarification` | `post_site_clarification_resubmitted` | operator (owner) | `all_open_items_answered` | Operator clicks Send responses (round 1, US-065) |
+| `awaiting_post_site_clarification` | `pending_approval` | officer | no item `open` or `answered` | Officer clicks Route to approval (a checklist with nothing flagged, or everything withdrawn) |
+| `awaiting_post_site_clarification` | `rejected` | officer | `has_note` | Officer clicks Reject (US-079) |
+| `pending_post_site_resubmission` | `post_site_clarification_resubmitted` | operator (owner) | `all_open_items_answered` | Operator clicks Send responses (round 2 onwards) |
+| `pending_post_site_resubmission` | `rejected` | officer | `has_note` | Officer clicks Reject (US-079) |
+| `post_site_clarification_resubmitted` | `pending_post_site_resubmission` | officer | `open_clarification_count ≥ 1` | Officer clicks Request another round (US-066) |
+| `post_site_clarification_resubmitted` | `pending_approval` | officer | no item `open` or `answered` | Officer clicks Route to approval |
+| `post_site_clarification_resubmitted` | `rejected` | officer | `has_note` | Officer clicks Reject (US-079) |
 | `pending_approval` | `approved` | officer | none (note optional) | Officer clicks Approve; side effect: the licence certificate is issued in the same transaction (`licence.issued`, US-051) |
 | `pending_approval` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `pending_approval` | `under_review` | officer | none | Officer clicks Return to review (US-031 follow-up, 19 Sep 2026): something noticed at the decision step is handled with feedback or a resubmission instead of a rejection |
 | any post-submission, non-terminal state | `withdrawn` | operator (owner) | none (reason optional) | Operator clicks Withdraw application (US-038); `POST /applications/{id}/withdraw` |
 
 Everything not listed is invalid and returns HTTP 409 `invalid_transition` with `details.allowed` for the caller's role. Role mismatches on a listed transition also return 409 (`details.kind = "forbidden"`): the transition table encodes the actor, and the role-gated routers already answered 403 before a wrong role could reach it. The `admin` role has no transitions: it is read-only on applications.
+
+**Reading of the three post-site states (US-079, 20 Sep 2026; SCOPE.md assumption 18).** The brief's officer label for `pending_post_site_resubmission` is "Awaiting Post-Site Resubmission": the officer waits for the operator. By the same grammar "Awaiting Post-Site Clarification" is the officer waiting for the operator's clarification, and the brief goes from "On checklist submission, case automatically moves to Pending Post-Site Clarification" straight to "Operator sees ONLY the items flagged". So the operator answers in `awaiting_post_site_clarification` (round 1) and in `pending_post_site_resubmission` (later rounds); the officer reviews the answers in `post_site_clarification_resubmitted`. Before US-079 the table carried both readings at once (an officer edge from `awaiting` to `pending_post_site_resubmission` and "Request another round" back to `awaiting`); those two edges are gone, the operator edge from `awaiting` is new, and Reject is allowed from all three states.
 
 Terminal states: `approved`, `rejected`, `withdrawn`.
 
@@ -111,7 +116,7 @@ Terminal states: `approved`, `rejected`, `withdrawn`.
 |-------|-------------------|-------|
 | `draft` | yes | all sections and documents |
 | `pending_pre_site_resubmission` | yes | only sections/document types with `open` feedback |
-| `pending_post_site_resubmission` | yes (UC3, deferred) | only flagged checklist items |
+| `awaiting_post_site_clarification`, `pending_post_site_resubmission` | no sections or documents (`editability.py` returns empty sets); the operator answers the released clarification items through the clarification service (US-065) | the flagged checklist items only |
 | all others | no | none |
 
 ## Side effects per transition (service layer)
@@ -121,10 +126,10 @@ Terminal states: `approved`, `rejected`, `withdrawn`.
 | `→ application_received` | create Revision 1; copy `draft_data`; snapshot current document ids; audit `revision.submitted`, `status.changed`; notify all officers (kind `submitted`) |
 | `→ pre_site_resubmitted` | create Revision N+1; mark feedback whose target changed as `addressed` (audit `feedback.addressed`); audit `revision.submitted`, `status.changed`; notify all officers (kind `resubmitted`) |
 | `→ pending_pre_site_resubmission` | set `released_to_operator_at` on every `open` feedback item (audit `feedback.released`); audit `status.changed`; notify operator |
-| any officer transition | audit `status.changed`; notify operator `status_changed` with the operator label |
+| any officer or system transition | audit `status.changed` (`trigger` = `officer` or `system`, the acting user as actor); the operator is notified `status_changed` with the operator label for every target in `WorkflowService.NOTIFY_OPERATOR` (every officer or system target); the caller may pass the body when it carries facts the service does not know (the count of flagged items at checklist submit) |
 | `→ approved` / `→ rejected` | store `decision_note` (the `status.changed` audit payload carries `has_note`); on approval, issue the licence and audit `licence.issued` (ADR-010) |
 
-## Built (Sprint 2)
+## Built (Sprint 2; the post-site edges amended in Sprint 4, US-079)
 
 Every transition in the table is exercised by `backend/tests/unit/test_workflow.py`; the officer edges run through `services/workflow.py`, the operator edges through `services/submission.py` and `services/resubmission.py`. Side effects marked in the table above for `→ pending_pre_site_resubmission` (release) and `→ pre_site_resubmitted` (Revision N+1, addressed, notify officers) are implemented and covered by `tests/integration/test_feedback.py` and `test_resubmission.py`.
 

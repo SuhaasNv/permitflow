@@ -139,8 +139,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /officer/applications/{id}/feedback/{fid}/withdraw | officer | open → withdrawn; 409 unless `under_review` and open; `{fid}` must belong to `{id}`; audit `feedback.withdrawn` (built, US-023) |
 | POST | /officer/applications/{id}/documents/{doc_id}/verify | officer | re-run the AI check; same rules and audit as the operator re-run; returns the officer view (built, US-022) |
 | GET | /officer/applications/{id}/audit | officer | append-only audit trail with actor name and role, plain-language summary (`domain/audit_labels.py`) and payload, chronological (built, US-029) |
-| GET | /admin/overview (planned, US-070) | admin | counts by status, idle applications, today's submissions |
-| GET | /admin/ai-health (planned, US-071) | admin | verification runs (24 h), outcome counts, failure rate, latency, provider |
+| GET | /admin/overview (planned, US-070, absorbs US-071) | admin | counts by status (drafts as one row), idle applications, today's submissions and resubmissions, document-check health over 24 h, runs today against the platform quota; Singapore calendar day |
 | GET | /admin/audit-feed (planned, US-072) | admin | latest 50 audit events across applications |
 | GET | /admin/users (planned, US-073) | admin | user directory |
 | PATCH | /admin/users/{id} (planned, US-073) | admin | change `role` and/or `is_active`; audit `user.role_changed` / `user.deactivated` / `user.reactivated`; 409 when it would remove the last active admin |

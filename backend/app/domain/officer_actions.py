@@ -19,10 +19,12 @@ _ACTIONS: dict[S, NextAction] = {
     S.PENDING_PRE_SITE_RESUBMISSION: NextAction("Waiting on operator", False),
     S.PRE_SITE_RESUBMITTED: NextAction("Review resubmission", True),
     S.SITE_VISIT_SCHEDULED: NextAction("Record site visit", True),
-    S.SITE_VISIT_DONE: NextAction("Continue", True),
-    S.AWAITING_POST_SITE_CLARIFICATION: NextAction("Continue", True),
+    S.SITE_VISIT_DONE: NextAction("Submit checklist", True),
+    # Post-site states (v0.4.0): the operator answers in the two "awaiting" states; the officer
+    # reviews the answers in the resubmitted state (SCOPE.md assumption 18).
+    S.AWAITING_POST_SITE_CLARIFICATION: NextAction("Waiting on operator", False),
     S.PENDING_POST_SITE_RESUBMISSION: NextAction("Waiting on operator", False),
-    S.POST_SITE_CLARIFICATION_RESUBMITTED: NextAction("Review clarification", True),
+    S.POST_SITE_CLARIFICATION_RESUBMITTED: NextAction("Review responses", True),
     S.PENDING_APPROVAL: NextAction("Decide", True),
     S.APPROVED: NextAction("View", False),
     S.REJECTED: NextAction("View", False),
