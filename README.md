@@ -2,17 +2,17 @@
 
 ## Live: [permitflow.space](https://permitflow.space)
 
-![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/13-debrief/video/permitflow-launch-poster.jpg)
+![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/14-debrief/video/permitflow-launch-poster.jpg)
 
 https://github.com/user-attachments/assets/942739f7-e2bd-4360-b525-ecf960a7e796
 
-*Launch video, 70 seconds. The narrated walkthrough (4 min 36 s) and the technical video (4 min) are in `docs/13-debrief/video/`.*
+*Launch video, 70 seconds. The narrated walkthrough (4 min 36 s) and the technical video (4 min) are in `docs/14-debrief/video/`.*
 
 A regulatory licensing platform built for a 3-day full-stack assessment. An operator (the business owner, or an agent applying for the business) applies for a Food Establishment Licence through a guided form with checked uploads; a licensing officer reviews the submission, leaves feedback tied to a section or a document, and requests a resubmission in which only the flagged parts reopen. Every status change, feedback round and decision is audited; approval issues a licence certificate. An advisory AI verifier reads each uploaded document against the form before submission. It never decides anything.
 
 **Try it:** production, v0.3.0, at https://permitflow.space (one example application waiting in the officer's queue); development at https://dev.permitflow.space. Demo accounts below. Local setup takes about ten minutes.
 
-**Ten minutes to review it:** the technical deck's handout PDF in `docs/13-debrief/technical-deck/`, then `SCOPE.md`, then `docs/11-reviews/ASSESSMENT_TRACEABILITY.md` (every line of the brief mapped to code, test and evidence).
+**Ten minutes to review it:** the technical deck's handout PDF in `docs/14-debrief/technical-deck/`, then `SCOPE.md`, then `docs/11-reviews/ASSESSMENT_TRACEABILITY.md` (every line of the brief mapped to code, test and evidence).
 
 ## Run locally
 
@@ -65,7 +65,7 @@ A modular monolith (`api → services → domain / repositories → models`, `do
 ```
 backend/   FastAPI + SQLAlchemy 2 + Alembic
 frontend/  React + TypeScript + Vite
-docs/      01-discovery … 13-debrief, one README per folder; docs/README.md is the index
+docs/      01-discovery … 14-debrief, one README per folder; docs/README.md is the index
 ```
 
 ## Security
@@ -96,7 +96,7 @@ cd frontend && npm run e2e          # Playwright against the running stack (back
 
 ## Observability
 
-`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. `docker compose --profile observability up -d` runs Prometheus with six alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same two services run on Railway, Grafana at https://grafana.dev.permitflow.space. Details and what is still missing (alert routing, exporters): `docs/09-operations/OPERATIONS.md`, Observability.
+`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. `docker compose --profile observability up -d` runs Prometheus with six alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same two services run on Railway, Grafana at https://grafana.dev.permitflow.space. Details, every metric, the dashboard and what is still missing (alert routing, exporters): `docs/13-observability/OBSERVABILITY.md`.
 
 ## AI verification
 
@@ -108,7 +108,7 @@ Claude Code (Claude Opus 5 for most sessions, Claude Fable 5.1 for some) in the 
 
 Every story ran the full suites, `ruff`, `mypy --strict` and `tsc --strict`, and a browser check at three widths before it moved to Done; every reviewer finding was reproduced before a fix; I read every diff before a commit and every push needed my yes. Where the AI was wrong is written down: invented enum values and a valid verdict on an expired certificate, a scope-creeping story, a transition the state machine did not allow, a scratch file in a commit, UTC licence dates, a harness fault first blamed on the model.
 
-The full record, with the prompts grouped by the decision they carry, what was discarded and how the debrief videos were made: `AI_USAGE.md`. Slides 16 to 19 of the technical deck cover the same ground.
+The full record, with the prompts grouped by the decision they carry, what was discarded and how the debrief videos were made: `AI_USAGE.md`. Slides 17 to 20 of the technical deck cover the same ground.
 
 ## Release notes
 

@@ -39,7 +39,7 @@ Rules:
 | feedback | feedback | `create(officer, id, target, message, template_key)`, `resolve`, `withdraw`, `list`, `templates()` |
 | notifications | notifications | `notify(user_ids, kind, application, ...)`, `list(user)`, `mark_read` |
 | audit | audit_events | `record(application_id, actor, event_type, payload)`, `list(application_id)`, `purge_draft(application_id)` |
-| metrics (US-077) | none (reads `applications` through its repository for the by-status gauge) | `refresh_gauges(db)`; the counters live in `core/metrics.py` and are incremented by the services where the events happen (verification finished, quota refused, transition committed) and by the outermost middleware (every request, every 429); `infra/ai/openai_provider.py` counts the tokens the API reports |
+| metrics (US-077) | none (reads `applications` through its repository for the by-status gauge) | `refresh_gauges(db)`; the counters live in `core/metrics.py` and are incremented by the services where the events happen (verification finished, quota refused, transition committed) and by the outermost middleware (every request, every 429); `infra/ai/openai_provider.py` counts the tokens the API reports; `docs/13-observability/OBSERVABILITY.md` |
 | admin (planned, v0.4.0, US-070 to US-073) | none (would read other modules' tables through their repositories; writes users through the auth module's service) | `overview()`, `ai_health()`, `audit_feed()`, `users()`, `update_user(role, is_active)`: not built; only the role value and `AdminUser` in `api/deps.py` exist |
 
 Cross-module writes go through services, never across repositories.

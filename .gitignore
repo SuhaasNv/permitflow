@@ -31,11 +31,11 @@ uploads/
 .vscode/
 *.log
 
-# Assessment brief and other office docs never enter the repo (the decks under docs/13-debrief/ are the exception)
+# Assessment brief and other office docs never enter the repo (the decks under docs/14-debrief/ are the exception)
 *.docx
 *.pptx
 *.xlsx
-!docs/13-debrief/**/*.pptx
+!docs/14-debrief/**/*.pptx
 
 # Runtime data, partial uploads, coverage and generated prototype output
 data/
