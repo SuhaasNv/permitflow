@@ -55,7 +55,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Planning
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-083 (US-059 the debrief material, US-074 the post-release review, US-075 the final check before submission, US-076 the fixes after the cold review, US-077 the observability layer; US-078 to US-083 the v0.4.0 support stories; US-060 to US-066 and US-070 to US-073 with their v0.4.0 acceptance criteria), 1:1 with Notion |
+| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-090 (US-059 the debrief material, US-074 the post-release review, US-075 the final check before submission, US-076 the fixes after the cold review, US-077 the observability layer; US-078 to US-084 the v0.4.0 support and appointment stories, US-085 to US-090 the non-functional set; US-060 to US-066 and US-070 to US-073 with their v0.4.0 acceptance criteria), 1:1 with Notion |
 | `05-planning/SPRINTS.md` | written | Three one-day sprints for the assessment, the close ritual, the cut order; Sprints 4 to 8 for v0.4.0 (20 Sep) |
 | `05-planning/RELEASE_PLAN_V0_4_0.md` | written (20 Sep, after the submission) | The v0.4.0 plan: use case 3 and the admin panel, five sprints on `dev`, production frozen; the state table, entities, API, screens, dialog copy, tests, documents by hat, release ritual, the ten decisions and the record of the three reviews that reshaped it |
 | `05-planning/KANBAN.md` | written | Flow, WIP limits, story-to-day mapping |

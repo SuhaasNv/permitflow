@@ -32,6 +32,19 @@ Status: proposed on 20 September 2026 (Sunday), revised the same evening after t
 | V17 | The per-client limiter keys on the real caller behind the Railway edge (readiness row 25), before the checklist's autosave lands on `dev`, so a tablet session cannot refuse every other visitor | US-082 | readiness row 25 |
 | V24 | The site visit is arranged inside the case: the officer proposes a date and slot, the operator accepts or counters with a reason, the officer decides, either side can reschedule before the date, the officer can confirm after three working days of silence, and the visit is marked done only once confirmed; every round on record (owner's product decision, 20 Sep) | US-084 | beyond the brief (the brief has the status only) |
 
+### Non-functional requirements (added 20 Sep 2026 at the owner's request: controlled development, not only features)
+
+Each has a number in `REQUIREMENTS.md` (NFR-008 to NFR-018), a story with a measurable acceptance criterion and a sprint. None is optional except US-089.
+
+| Story | Concern | Budget or rule | Sprint |
+|-------|---------|----------------|--------|
+| US-085 | Attachment limits, storage, image metadata | 3 files per response, 10 MB each, 150 MB per application; EXIF stripped on upload | 6 |
+| US-086 | Latency under load | checklist save p95 300 ms, admin overview 500 ms, activity feed 200 ms at 10,000 applications and 100,000 audit rows; k6 script committed | 8 |
+| US-087 | Poor connections and phone performance | retry with backoff, offline notice within 1 s, nothing lost while the tab is open; respond page under 250 KB gzipped JavaScript, first paint under 2.5 s on throttled 4G | 6 |
+| US-088 | Accessibility | axe gate over the eight new screens, 44 px targets, keyboard checklist | 7 |
+| US-089 | Observability and storage | counters for checklists, rounds and attachment bytes; storage gauge; alert at 80 % of the volume; `/queue` post-site counts (was V16) | 7 |
+| US-090 | Time zone | every new date in Singapore time, stored UTC, tests around midnight | 5 |
+
 ### COMMITTED, first in the cut order (the admin epic)
 
 Committed to v0.4.0 by product decision; if time forces a cut it ships as v0.5.0 and the release notes say so. It runs after UC3 because UC3 is the brief's open question and because the admin's read-only case page must cover the clarification rail UC3 adds.
@@ -47,7 +60,7 @@ Committed to v0.4.0 by product decision; if time forces a cut it ships as v0.5.0
 
 | # | Feature | Cut to |
 |---|---------|--------|
-| V16 | Post-site states on the Grafana dashboard queue row and in the Telegram `/queue` reply, with `permitflow_checklists_submitted_total` and `permitflow_clarification_rounds_total` | the `permitflow_applications{status}` gauge already carries the three states; the counters are dropped |
+| V16 | Now US-089 (non-functional table above) | the `permitflow_applications{status}` gauge already carries the three states; the counters are dropped |
 | V18 | Server-provided `phase`, `outcome` and `can_resolve` on the officer case response (readiness row 22); the minimal operator-side field is already part of US-064 | stays a readiness row |
 | V23 | Inline image thumbnails and a filename row for PDFs in the clarification thread, so the officer does not download blind | filename rows only |
 

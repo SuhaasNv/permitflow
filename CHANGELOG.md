@@ -2,6 +2,11 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Non-functional requirements for v0.4.0 (20 Sep 2026, owner's request)
+
+- `REQUIREMENTS.md` NFR-008 to NFR-018: checklist save latency, attachment limits and a 150 MB storage budget per application, image metadata stripped on upload, admin read latency at 10,000 applications, poor-connection behaviour, phone performance of the respond page, storage observed with an alert, the accessibility gate over the new screens, Singapore time for every new date, use case 3 on the dashboard, bounded audit growth.
+- Six stories with measurable acceptance criteria and a sprint each: US-085 (limits, budget, metadata; Sprint 6), US-086 (k6 load check and indexes; Sprint 8), US-087 (retry with backoff, offline notice, size and paint budgets; Sprint 6), US-088 (accessibility gate, 44 px targets, keyboard checklist; Sprint 7), US-089 (counters, storage gauge, volume alert, `/queue`; Sprint 7, was V16), US-090 (Asia/Singapore everywhere new, tests around midnight; Sprint 5). On the board and in `SPRINTS.md` and the release plan.
+
 ## US-079 State machine and workflow amendments (20 Sep 2026, Sprint 4)
 
 - `domain/workflow.py`: the post-site edges read the brief's way (SCOPE.md assumption 18): a new operator edge `awaiting_post_site_clarification → post_site_clarification_resubmitted` (guard: every open item answered); `post_site_clarification_resubmitted → pending_post_site_resubmission` replaces the edge back to `awaiting`; the officer edge `awaiting → pending_post_site_resubmission` is gone; both routes to approval from the post-site states are guarded by "nothing open or answered"; the system edge from `site_visit_done` needs a complete checklist; Reject is allowed from the three post-site states; the direct route `site_visit_done → pending_approval` survives Sprint 4 behind a `checklist_started = false` guard and goes with US-063. `TransitionContext` gains the five use case 3 fields; `available_actions` answers an empty list for a viewer without an actor.
