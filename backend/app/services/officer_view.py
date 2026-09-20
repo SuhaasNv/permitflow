@@ -11,8 +11,10 @@ from app.domain import completeness as completeness_rules
 from app.domain.enums import ApplicationStatus, DocumentType, FeedbackResolution, VerificationStatus
 from app.domain.form_schema import SECTIONS
 from app.domain.labels import officer_label, tone_for
+from app.domain.phase import outcome_for, phase_for
 from app.domain.workflow import Actor, actor_for_role, available_actions
 from app.models import Application, ApplicationRevision, Document, Feedback, User, VerificationRun
+from app.models.enums import Role
 from app.repositories.applications import ApplicationRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
@@ -36,7 +38,7 @@ from app.schemas.site_visit import SiteVisitOut
 from app.services.checklist import ChecklistService
 from app.services.clarification import ClarificationService
 from app.services.compare import CompareService
-from app.services.feedback import restorable, target_label
+from app.services.feedback import resolvable_in, restorable, target_label
 from app.services.licence import LicenceService, licence_view
 from app.services.operator_view import LICENCE_TITLE
 from app.services.site_visit import SiteVisitService
@@ -112,6 +114,7 @@ class OfficerViewService:
             self.users,
             changed=(changed_sections, changed_docs, previous_no),
             viewer_id=viewer.id if viewer else None,
+            viewer_role=viewer.role if viewer else Role.OFFICER,
             licence=licence_view(LicenceService(self.db).for_application(app.id)),
             site_visit=SiteVisitService(self.db).officer_view(app),
             checklist=ChecklistService(self.db).summary(app),
@@ -131,6 +134,7 @@ def _assemble(
     users: UserRepository,
     changed: tuple[set[str], set[DocumentType], int | None] = (set(), set(), None),
     viewer_id: uuid.UUID | None = None,
+    viewer_role: Role = Role.OFFICER,
     licence: LicenceView | None = None,
     site_visit: SiteVisitOut | None = None,
     checklist: ChecklistSummaryOut | None = None,
@@ -212,6 +216,13 @@ def _assemble(
             ),
             resolved_at=f.resolved_at,
             can_undo=viewer_id is not None and restorable(f, app.status, viewer_id, now),
+            can_resolve=(
+                viewer_id is not None
+                and viewer_role == Role.OFFICER
+                and f.resolution in (FeedbackResolution.OPEN, FeedbackResolution.ADDRESSED)
+                and f.released_to_operator_at is not None
+                and resolvable_in(app.status)
+            ),
         )
         for f in feedback
     ]
@@ -224,6 +235,8 @@ def _assemble(
         reference_no=app.reference_no,
         licence_title=LICENCE_TITLE,
         status=app.status.value,
+        phase=phase_for(app.status),
+        outcome=outcome_for(app.status),
         status_label=officer_label(app.status),
         status_tone=tone_for(app.status),
         applicant=ApplicantOut(id=applicant.id, full_name=applicant.full_name, email=applicant.email),

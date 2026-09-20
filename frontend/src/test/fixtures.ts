@@ -182,6 +182,8 @@ export function officerView(over: Partial<OfficerApplication> = {}): OfficerAppl
     status: 'pre_site_resubmitted',
     status_label: 'Pre-Site Resubmitted',
     status_tone: 'info',
+    phase: 'pre_site',
+    outcome: null,
     applicant: { id: 'u1', full_name: 'Tan Wei Ling', email: 'operator@permitflow.example.sg' },
     business_name: 'Kopi & Kaya Toast House Pte. Ltd.',
     premises_summary: '10 Jalan Besar #01-12',

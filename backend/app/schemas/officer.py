@@ -127,6 +127,9 @@ class FeedbackOut(BaseModel):
     resolved_at: datetime | None
     # True while the calling officer can undo their own withdraw or resolve (US-039).
     can_undo: bool = False
+    # True while this item can be marked resolved: open or addressed, released, and the case with the
+    # office (US-083); the screen no longer recomputes the rule from the status.
+    can_resolve: bool = False
 
 
 class FeedbackIn(BaseModel):
@@ -153,6 +156,10 @@ class OfficerApplicationOut(BaseModel):
     status: str
     status_label: str
     status_tone: str
+    # US-083: the stage (draft, pre_site, site_visit, post_site, decision, decided) and how it ended
+    # (approved, rejected, withdrawn, or null); the screens branch on these, never on label strings.
+    phase: str
+    outcome: str | None
     applicant: ApplicantOut
     business_name: str | None
     premises_summary: str | None

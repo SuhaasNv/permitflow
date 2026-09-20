@@ -231,6 +231,11 @@ class FeedbackService:
         return item
 
 
+def resolvable_in(status: ApplicationStatus) -> bool:
+    """Feedback is resolved while the case is with the office (US-083 serves it per item)."""
+    return status in _RESOLVABLE_STATES
+
+
 def restorable(item: Feedback, status: ApplicationStatus, officer_id: uuid.UUID, now: datetime) -> bool:
     """The officer who decided may undo while the window is open and the state still allows it."""
     if item.previous_resolution is None or item.resolved_at is None or item.resolved_by != officer_id:

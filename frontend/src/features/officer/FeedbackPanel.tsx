@@ -45,9 +45,6 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
   const resolve = useResolveFeedback(view.id)
   const restore = useRestoreFeedback(view.id)
   const reopen = useReopenFeedback(view.id)
-  const canResolve =
-    !readOnly &&
-    ['under_review', 'pre_site_resubmitted', 'site_visit_scheduled', 'site_visit_done', 'pending_approval'].includes(view.status)
   // An administrator never edits: the composer and the item controls stay off whatever the status.
   const editable = view.feedback_editable && !readOnly
   const toast = useToast()
@@ -196,7 +193,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                           {f.author_name} · {formatDateTime(f.created_at)}
                         </span>
                         {/* Resolve only what the operator has seen; an unsent draft can only be withdrawn (US-039). */}
-                        {(f.resolution === 'addressed' || f.resolution === 'open') && canResolve && f.released_to_operator_at ? (
+                        {f.can_resolve && !readOnly ? (
                           <button
                             type="button"
                             className="whitespace-nowrap py-1 font-semibold text-success hover:underline"
