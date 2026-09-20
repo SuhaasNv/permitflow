@@ -46,6 +46,10 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
   const [progress, setProgress] = useState<{ name: string; fraction: number } | null>(null)
   const attempt = useRef(0)
   const timer = useRef<number | null>(null)
+  // One save in flight at a time; an edit made meanwhile is saved once the first settles, so a slow
+  // first answer can never land after, and over, a newer one (review finding, 21 Sep).
+  const inFlight = useRef(false)
+  const again = useRef(false)
   const saved = useRef(latest?.message ?? '')
   const textRef = useRef(text)
   textRef.current = text
@@ -84,18 +88,35 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
   const saveText = () => {
     const value = textRef.current.trim()
     if (!value || value === saved.current) return
+    if (inFlight.current) {
+      again.current = true
+      return
+    }
+    inFlight.current = true
+    const settle = () => {
+      inFlight.current = false
+      if (again.current) {
+        again.current = false
+        saveText()
+      }
+    }
     respond.mutate(
       { itemId: item.item_id, message: value },
       {
         onSuccess: () => {
           attempt.current = 0
           setRetrying(null)
+          saved.current = value
+          settle()
         },
         onError: (e) => {
           if (isTransient(e)) {
+            inFlight.current = false
+            again.current = false
             later('save', saveText)
             return
           }
+          settle()
           setRetrying(null)
           const fields = e instanceof AppError && e.status === 422 ? e.details?.fields : null
           const msg =

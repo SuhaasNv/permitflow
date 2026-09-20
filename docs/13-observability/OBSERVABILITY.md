@@ -10,7 +10,7 @@ What the platform tells about itself, how it is collected, what the dashboard an
 |-------|-------|-----------------|---------------|
 | Structured request logs | Sprint 1 (US-006) | One JSON line per request: request id, method, path, status, duration; verification runs log their outcome, provider, model and latency | stdout, Railway's log viewer |
 | LangSmith traces | Sprint 3 (US-055) | One trace per OpenAI check with the document type, text length, tokens and latency; inputs hidden by default | LangSmith, off without a key |
-| Prometheus metrics | 20 Sep (US-077) | Counters and histograms below, scraped every 15 s | Prometheus, drawn by Grafana, watched by six alert rules; alerts, an hourly digest and command replies on Telegram |
+| Prometheus metrics | 20 Sep (US-077) | Counters and histograms below, scraped every 15 s | Prometheus, drawn by Grafana, watched by seven alert rules; alerts, an hourly digest and command replies on Telegram |
 
 Logs answer "what happened to this request"; traces answer "what did the model see and say"; metrics answer "is the platform healthy right now and what is it costing". None of the three carries document text, a personal name or an id in a metric label.
 

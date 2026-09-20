@@ -208,7 +208,9 @@ describe('clarification after the site visit, operator side (US-064)', () => {
       items: [
         {
           ...onlyOpen.items[0]!,
-          responses: [{ id: 'r1', round_no: 1, message: 'Regraded on 23 Sep.', created_at: '2026-09-25T01:00:00Z', sent_at: null, attachments: [] }],
+          responses: [
+            { id: 'r1', round_no: 1, message: 'Regraded on 23 Sep.', created_at: '2026-09-25T01:00:00Z', sent_at: null, attachments: [] },
+          ],
         },
       ],
     }
@@ -232,6 +234,47 @@ describe('clarification after the site visit, operator side (US-064)', () => {
     vi.useRealTimers()
   })
 
+  it('never lets a slow first save land over a newer answer: one save in flight, the edit queued', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    vi.spyOn(api, 'getApplication').mockResolvedValue(afterVisit)
+    const onlyOpen: ClarificationView = { ...view, items: [view.items[0]!], resolved_count: 0 }
+    vi.spyOn(clarApi, 'getClarifications').mockResolvedValue(onlyOpen)
+    const answeredWith = (message: string): ClarificationView => ({
+      ...onlyOpen,
+      items: [
+        {
+          ...onlyOpen.items[0]!,
+          responses: [{ id: 'r1', round_no: 1, message, created_at: '2026-09-25T01:00:00Z', sent_at: null, attachments: [] }],
+        },
+      ],
+    })
+    let release: (() => void) | null = null
+    const respond = vi
+      .spyOn(clarApi, 'respondToClarification')
+      .mockImplementationOnce(
+        (_id, _item, message) =>
+          new Promise((resolve) => {
+            release = () => resolve(answeredWith(message))
+          }),
+      )
+      .mockImplementation(async (_id, _item, message) => answeredWith(message))
+    renderAt('/app/applications/a1/clarification')
+    const field = await screen.findByLabelText(/Your answer/)
+    await userEvent.type(field, 'Draft one')
+    await userEvent.tab()
+    await waitFor(() => expect(respond).toHaveBeenCalledTimes(1))
+    // a second edit while the first save is still in flight: no second request yet
+    await userEvent.click(field)
+    await userEvent.type(field, ', more detail')
+    await userEvent.tab()
+    expect(respond).toHaveBeenCalledTimes(1)
+    release!()
+    // the first settles, the queued edit goes out with the newest text, and the newest text stays
+    await waitFor(() => expect(respond).toHaveBeenCalledTimes(2))
+    expect(respond).toHaveBeenLastCalledWith('a1', 'i1', 'Draft one, more detail')
+    await waitFor(() => expect(field).toHaveValue('Draft one, more detail'))
+  })
+
   it('shows the offline notice while the browser is offline and clears it when back (US-087)', async () => {
     const { act } = await import('@testing-library/react')
     vi.spyOn(api, 'getApplication').mockResolvedValue(afterVisit)
@@ -244,7 +287,9 @@ describe('clarification after the site visit, operator side (US-064)', () => {
     expect(await screen.findByText('You are offline: answers and files wait here until you reconnect')).toBeInTheDocument()
     onLine.mockReturnValue(true)
     act(() => window.dispatchEvent(new Event('online')))
-    await waitFor(() => expect(screen.queryByText('You are offline: answers and files wait here until you reconnect')).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.queryByText('You are offline: answers and files wait here until you reconnect')).not.toBeInTheDocument(),
+    )
   })
 
   it('with nothing released the page says so', async () => {

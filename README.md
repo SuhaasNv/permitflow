@@ -84,7 +84,7 @@ cd frontend && npm test && npm run lint && npm run typecheck && npm run build
 cd frontend && npm run e2e          # Playwright against the running stack (backend :8000 with AI_PROVIDER=mock, Vite :3000)
 ```
 
-850 backend cases from 249 test functions on a real PostgreSQL (the state-machine sweep alone is 597), 222 frontend tests, twelve Playwright specs (the journey, ten scenarios, the accessibility gate), 246 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
+854 backend cases from 253 test functions on a real PostgreSQL (the state-machine sweep alone is 597), 226 frontend tests, twelve Playwright specs (the journey, ten scenarios, the accessibility gate), 246 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
 
 ## Environment variables
 
@@ -100,7 +100,7 @@ cd frontend && npm run e2e          # Playwright against the running stack (back
 
 ## Observability
 
-`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. `docker compose --profile observability up -d` runs Prometheus with six alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same services run on Railway, Grafana at https://grafana.dev.permitflow.space, and Telegram carries the alerts, an hourly digest per environment and a command bot (`/status`, `/cost`, `/queue`). Details, every metric, the dashboard and what is still missing: `docs/13-observability/OBSERVABILITY.md`.
+`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. `docker compose --profile observability up -d` runs Prometheus with seven alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same services run on Railway, Grafana at https://grafana.dev.permitflow.space, and Telegram carries the alerts, an hourly digest per environment and a command bot (`/status`, `/cost`, `/queue`). Details, every metric, the dashboard and what is still missing: `docs/13-observability/OBSERVABILITY.md`.
 
 ## AI verification
 

@@ -320,6 +320,11 @@ export function ChecklistPage() {
             toast.push({ title: 'Could not save the checklist', body: e.message, tone: 'error' })
             saveId.current = null
             markDirty(false)
+            // The server copy is what stands now (submitted elsewhere): drop the local edits so the
+            // refetch is what the page shows (review finding, 21 Sep).
+            work.current = null
+            setEdits(null)
+            touched.current.clear()
             void checklist.refetch()
             return
           }
@@ -546,8 +551,8 @@ export function ChecklistPage() {
     <>
       <Breadcrumb
         items={[
-          { label: 'Review queue', to: '/officer/queue' },
-          { label: view.reference_no, to: `/officer/applications/${id}` },
+          adminView ? { label: 'Overview', to: '/admin/overview' } : { label: 'Review queue', to: '/officer/queue' },
+          { label: view.reference_no, to: casePath },
           { label: 'Site visit checklist' },
         ]}
       />

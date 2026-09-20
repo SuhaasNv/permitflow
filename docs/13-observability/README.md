@@ -4,7 +4,7 @@ Written 20 Sep 2026 (US-077), after the debrief decks were reviewed and observab
 
 | Document | What it holds |
 |----------|---------------|
-| `OBSERVABILITY.md` | The three telemetry layers (logs, traces, metrics), the metrics endpoint and its token, every metric family with its labels and where it is incremented, the Grafana dashboard row by row, the six alert rules and the objective they encode, Telegram (alerts, the hourly digest, the command bot), the local Compose profile, the three Railway services and their variables, the security controls (T23), what is still missing |
+| `OBSERVABILITY.md` | The three telemetry layers (logs, traces, metrics), the metrics endpoint and its token, every metric family with its labels and where it is incremented, the Grafana dashboard row by row, the seven alert rules and the objective they encode, Telegram (alerts, the hourly digest, the command bot), the local Compose profile, the three Railway services and their variables, the security controls (T23), what is still missing |
 | `grafana-dashboard.png`, `grafana-checks.png`, `grafana-cost-queue.png` | The dashboard as rendered on 20 Sep from a local run with the live model: header and API health; document checks; cost and queue |
 | `telegram.png` | The Telegram chat on 20 Sep: Grafana's hourly digest and the bot's answers |
 

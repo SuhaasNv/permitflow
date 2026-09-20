@@ -180,13 +180,12 @@ export function AdminUsersPage() {
       ) : (
         <section className="pf-surface overflow-hidden" aria-label="Directory">
           <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2.5 sm:px-4">
-            <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label="Filter by role">
+            <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Filter by role">
               {FILTERS.map((f) => (
                 <button
                   key={f.key}
                   type="button"
-                  role="tab"
-                  aria-selected={filter === f.key}
+                  aria-pressed={filter === f.key}
                   onClick={() => setFilter(f.key)}
                   className={cn(
                     'inline-flex h-10 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors duration-[var(--dur-fast)] sm:h-8',

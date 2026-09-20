@@ -2,9 +2,13 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Review fixes after the v0.4.0 build (21 Sep 2026)
+
+- Three Sonnet reviewers (backend, frontend, document drift) read the whole diff. Fixed: two devices signing in to a fresh account at the same instant could both get a session (the user row is the lock now, with a two-thread test); a slow first save of a clarification answer could land over a newer one (one save in flight, the edit queued); the checklist kept an officer's local entries after a "submitted elsewhere" refusal instead of showing what stands; the administrator's checklist breadcrumb led to the officer's queue; two N+1 queries in the clarification service; the users page's filter announced tab semantics it did not implement. Documents: the admin module and dependency rows in ARCHITECTURE, the audit event list and ChecklistItem's extra-finding fields in DOMAIN_MODEL, "seven alert rules" everywhere, test counts.
+
 ## Sprints 4 to 7 closed, Sprint 8 in progress (21 Sep 2026)
 
-The five planned one-day sprints ran as one long session across 20 and 21 September 2026, the owner reviewing from a phone and answering questions between stories; the close ritual was run once for the four of them at the end, story by story against the Definition of Done, and the Notion board reflects it. Numbers at close: backend 850 test cases from 249 functions (95 % statements), frontend 225 tests (82 % statements), 12 Playwright specs (the journey, ten scenarios, the accessibility gate with 11 tests), 246 API-level edge checks, 14 ADRs, two new threat rows (T26, T27), production untouched on v0.3.0.
+The five planned one-day sprints ran as one long session across 20 and 21 September 2026, the owner reviewing from a phone and answering questions between stories; the close ritual was run once for the four of them at the end, story by story against the Definition of Done, and the Notion board reflects it. Numbers at close: backend 854 test cases from 253 functions (95 % statements), frontend 226 tests (82 % statements), 12 Playwright specs (the journey, ten scenarios, the accessibility gate with 11 tests), 246 API-level edge checks, 14 ADRs, two new threat rows (T26, T27), production untouched on v0.3.0.
 
 ### Sprint 4: "Agree the shape"
 

@@ -85,7 +85,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `../CHANGELOG.md` | written (Sprints 1 to 3 closed; v0.3.0 released 19 Sep) | Milestones, sprint closes with Shipped / Slipped / Retro |
 | `../README.md` | written | What it is, stack and why, hosts, setup, demo accounts, security, tests, CI, deployment, AI verification, AI Usage, What I would do next |
 | `01-discovery/README.md` to `13-observability/README.md` | written (20 Sep) | A README per folder: purpose, document index, reading order, related folders |
-| `13-observability/OBSERVABILITY.md` and `13-observability/README.md` | written (20 Sep) | The observability layer: logs, traces and Prometheus metrics; the endpoint and its token; every metric family; the Grafana dashboard; six alert rules; local profile and Railway services; T23; what is missing. Three dashboard renders beside it |
+| `13-observability/OBSERVABILITY.md` and `13-observability/README.md` | written (20 Sep) | The observability layer: logs, traces and Prometheus metrics; the endpoint and its token; every metric family; the Grafana dashboard; seven alert rules; local profile and Railway services; T23; what is missing. Three dashboard renders beside it |
 | `14-debrief/README.md` | written (19 Sep) | The pitch deck and the technical deck (pptx and handout PDF), the launch video, the narrated walkthrough and the technical video (videos in Git LFS) |
 
 ## Review history
