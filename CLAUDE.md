@@ -70,6 +70,7 @@ Then prompt the user with a one-line status: what is Done, what is next, and any
 - A story that adds or changes a screen starts with its artboards on the prototype canvas, drawn from the shipped product (take fresh screenshots of the development environment: shell, fonts, tokens, spacing), not from the design documents alone. The owner reviews the artboards and says yes before any code for that screen is written.
 - The prototype generator lives in `docs/04-design/prototype-src/`; artboards are regenerated from it, never edited by hand. The canvas fonts are the product's own files uploaded as assets, so weights render as they ship.
 - Nothing merges into `dev` before the story is whole (rule 10 above). Nothing is pushed without a yes in that turn. The owner may be away on Remote Control: post the link and the one-line question, then wait.
+- **`main` is frozen while Xtremax assesses the submission (owner's rule, 20 Sep 2026):** no pull request into `main`, no tag, no production deploy, no hotfix, until the owner lifts the freeze in so many words. Everything for v0.4.0 lands on `dev` and shows on the development environment only. A request that would touch `main` is answered with this rule, not carried out.
 
 ## 5. Sprint close (end of each day, or when the user says the sprint is over)
 

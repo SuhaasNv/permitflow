@@ -383,7 +383,7 @@ Coverage thresholds (backend 80, frontend 80) stay in force; frontend coverage s
 7. Rollback: the migrations add tables and one nullable column and reuse the existing notification kinds, so `sha-714a159` can read every row v0.4.0 writes; the previous pin and the same job restore it. The one thing a rollback cannot undo is a case already in a post-site state, which the old code shows with its labels and no checklist screen; `OPERATIONS.md` says so.
 8. `OPERATIONS.md` image row, memory and `CHANGELOG.md` updated the same hour.
 
-Recommended timing: after the Xtremax process concludes, unless a reviewer asks to see the site visit or the admin panel live, in which case the development environment already shows it.
+Timing, fixed by the owner on 20 Sep 2026: `main` is frozen while Xtremax assesses the submission. No pull request, tag or production deploy until the owner lifts the freeze in so many words; a reviewer who asks to see the site visit or the admin panel is pointed at the development environment.
 
 ## 10. Risks and how the plan handles them
 
