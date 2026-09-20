@@ -22,6 +22,7 @@ from app.repositories.audit import AuditRepository
 from app.repositories.feedback import FeedbackRepository
 from app.services.licence import LicenceService
 from app.services.notifications import NotificationService
+from app.services.site_visit import SiteVisitService
 
 
 class WorkflowService:
@@ -53,12 +54,41 @@ class WorkflowService:
             raise ValidationFailed(
                 "Unknown status.", details={"fields": {"target": "Unknown status."}}
             ) from exc
-        acting = actor if actor is not None else actor_for_role(actor_user.role)
-        if acting is None:
-            raise Forbidden("Not available for your role.")
         app = self.applications.get_for(actor_user, application_id, for_update=True)
         if app.version != expected_version:
             raise VersionConflict("This application changed since you opened it. Reload to see the latest.")
+        licence_key = self.apply(
+            app, new_status, actor_user, note=note, actor=actor, operator_body=operator_body
+        )
+        try:
+            self.db.commit()
+        except Exception:
+            # The PDF was written before the commit; without the row it would be an orphan on the volume.
+            if licence_key is not None:
+                get_storage().delete(licence_key)
+            raise
+        acting = actor if actor is not None else actor_for_role(actor_user.role)
+        metrics.TRANSITIONS.labels(app.status.value, acting.value if acting else "system").inc()
+        self.notifications.flush_sent()
+        self.db.refresh(app)
+        return app
+
+    def apply(
+        self,
+        app: Application,
+        new_status: ApplicationStatus,
+        actor_user: User,
+        *,
+        note: str | None,
+        actor: Actor | None = None,
+        operator_body: str | None = None,
+    ) -> str | None:
+        """Move an already locked `app` to `new_status` without committing: guards, side effects, the
+        audit row and the operator's notification. Returns the licence storage key when one was issued,
+        so the caller can remove the PDF if its commit fails."""
+        acting = actor if actor is not None else actor_for_role(actor_user.role)
+        if acting is None:
+            raise Forbidden("Not available for your role.")
         note = (note or "").strip() or None
         ctx = self.build_context(
             app,
@@ -88,6 +118,9 @@ class WorkflowService:
                     event_type="feedback.released",
                     payload={"feedback_ids": released},
                 )
+        if resolved == ApplicationStatus.SITE_VISIT_DONE:
+            # The confirmed appointment is over (US-084); the guard made sure one exists.
+            SiteVisitService(self.db).mark_done(app, datetime.now(UTC))
         # A note is stored only with a decision and ignored for other targets (TransitionIn says so).
         note = note if resolved in (ApplicationStatus.APPROVED, ApplicationStatus.REJECTED) else None
         if note is not None:
@@ -120,29 +153,20 @@ class WorkflowService:
                 f"{app.reference_no}: {operator_label(resolved)}",
                 operator_body or _operator_body(resolved, note, licence_no),
             )
-        try:
-            self.db.commit()
-        except Exception:
-            # The PDF was written before the commit; without the row it would be an orphan on the volume.
-            if licence_key is not None:
-                get_storage().delete(licence_key)
-            raise
-        metrics.TRANSITIONS.labels(resolved.value, acting.value).inc()
-        self.notifications.flush_sent()
-        self.db.refresh(app)
-        return app
+        return licence_key
 
     def build_context(
         self, app: Application, *, open_feedback_count: int, has_note: bool
     ) -> TransitionContext:
         """The guard context for `app`, the same for a transition and for the case view's `actions[]`.
-        The use case 3 part is fixed until the checklist and clarification services land (US-060 to
-        US-066): no checklist exists for any visit, so the transitional route from Site Visit Done to
-        approval stays open and every post-site guard sees no items."""
-        del app
+        The appointment part reads the current site visit (US-084). The checklist part is fixed until
+        the checklist and clarification services land (US-060 to US-066): no checklist exists for any
+        visit, so the transitional route from Site Visit Done to approval stays open and every post-site
+        guard sees no items."""
         return TransitionContext(
             open_feedback_count=open_feedback_count,
             has_note=has_note,
+            visit_confirmed=SiteVisitService(self.db).visit_confirmed(app),
             checklist_started=False,
             checklist_complete=False,
             open_clarification_count=0,

@@ -74,3 +74,25 @@ class NotificationKind(enum.StrEnum):
     SUBMITTED = "submitted"
     RESUBMITTED = "resubmitted"
     STATUS_CHANGED = "status_changed"
+
+
+class SiteVisitStatus(enum.StrEnum):
+    """The appointment inside Site Visit Scheduled (US-084): who it waits on, or that it is fixed."""
+
+    PROPOSED = "proposed"  # waiting on the operator
+    COUNTER_PROPOSED = "counter_proposed"  # waiting on the officer
+    CONFIRMED = "confirmed"
+    DONE = "done"
+
+
+class SiteVisitSlot(enum.StrEnum):
+    MORNING = "morning"  # 09:00 to 12:00
+    AFTERNOON = "afternoon"  # 14:00 to 17:00
+
+
+class SiteVisitProposalOutcome(enum.StrEnum):
+    PENDING = "pending"  # waiting for the other side
+    ACCEPTED = "accepted"  # became the confirmed date
+    KEPT = "kept"  # the officer kept this date over the operator's counter-proposal
+    DECLINED = "declined"  # the other side chose a different date
+    SUPERSEDED = "superseded"  # replaced by a later proposal from the same side

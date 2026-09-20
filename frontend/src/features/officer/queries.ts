@@ -15,6 +15,8 @@ import {
   transitionApplication,
   withdrawFeedback,
 } from '@/api/officer'
+import type { DateInput, DecideInput, ProposeInput } from '@/api/siteVisit'
+import { confirmSiteVisitWithoutReply, decideSiteVisit, proposeSiteVisit, rescheduleSiteVisitAsOfficer } from '@/api/siteVisit'
 import { isCheckStale } from '@/features/operator/queries'
 
 export const officerKeys = {
@@ -125,4 +127,38 @@ export function useRestoreFeedback(id: string) {
 
 export function useAuditTrail(id: string, enabled: boolean) {
   return useQuery({ queryKey: officerKeys.audit(id), queryFn: () => getAuditTrail(id), enabled, staleTime: 10_000 })
+}
+
+// Site visit appointment (US-084). Every call returns the refreshed case, like a transition.
+
+export function useProposeSiteVisit(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: ProposeInput) => proposeSiteVisit(id, body),
+    onSuccess: (view) => afterCaseChange(qc, id, view),
+  })
+}
+
+export function useDecideSiteVisit(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: DecideInput) => decideSiteVisit(id, body),
+    onSuccess: (view) => afterCaseChange(qc, id, view),
+  })
+}
+
+export function useConfirmSiteVisitWithoutReply(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => confirmSiteVisitWithoutReply(id),
+    onSuccess: (view) => afterCaseChange(qc, id, view),
+  })
+}
+
+export function useRescheduleSiteVisitAsOfficer(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: DateInput) => rescheduleSiteVisitAsOfficer(id, body),
+    onSuccess: (view) => afterCaseChange(qc, id, view),
+  })
 }

@@ -41,6 +41,7 @@ const submitted: ApplicationView = {
   can_delete: false,
   withdrawal_reason: null,
   licence: null,
+  site_visit: null,
   created_at: '2026-09-18T00:00:00Z',
   updated_at: '2026-09-18T00:00:00Z',
 }

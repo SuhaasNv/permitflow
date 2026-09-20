@@ -39,11 +39,11 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `pre_site_resubmitted` | `under_review` | officer | none | Officer clicks Start review |
 | `pre_site_resubmitted` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `under_review` | `pending_pre_site_resubmission` | officer | `open_feedback_count ≥ 1` | Officer clicks Request resubmission |
-| `under_review` | `site_visit_scheduled` | officer | `open_feedback_count = 0` | Officer clicks Mark site visit scheduled (status only: no appointment is booked, UC3 deferred) |
+| `under_review` | `site_visit_scheduled` | officer | `open_feedback_count = 0` | Officer clicks Mark site visit scheduled: the proposal dialog asks for the date and slot and `POST /officer/applications/{id}/site-visit` runs this transition and records the proposal in one transaction (US-084) |
 | `under_review` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `pending_pre_site_resubmission` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject (abandoned or unsalvageable application; prevents stuck cases) |
 | `pending_pre_site_resubmission` | `pre_site_resubmitted` | operator (owner) | `has_changes_to_flagged_targets` | Operator clicks Resubmit |
-| `site_visit_scheduled` | `site_visit_done` | officer | none (US-084 adds `visit_confirmed`) | Officer clicks Mark site visit done |
+| `site_visit_scheduled` | `site_visit_done` | officer | `visit_confirmed` (the current SiteVisit is `confirmed`: the operator accepted, the officer decided a counter, or confirmed after three working days of silence; US-084) | Officer clicks Mark site visit done; the visit row becomes `done` in the same transaction |
 | `site_visit_scheduled` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `site_visit_done` | `rejected` | officer | `has_note` (a note is required) | Officer clicks Reject |
 | `site_visit_done` | `awaiting_post_site_clarification` | system | `checklist_complete` (every item assessed, every flagged or unsatisfactory item commented) | The checklist submit service (US-063); the flagged items are released to the operator in the same transaction |
@@ -127,6 +127,7 @@ Terminal states: `approved`, `rejected`, `withdrawn`.
 | `→ pre_site_resubmitted` | create Revision N+1; mark feedback whose target changed as `addressed` (audit `feedback.addressed`); audit `revision.submitted`, `status.changed`; notify all officers (kind `resubmitted`) |
 | `→ pending_pre_site_resubmission` | set `released_to_operator_at` on every `open` feedback item (audit `feedback.released`); audit `status.changed`; notify operator |
 | any officer or system transition | audit `status.changed` (`trigger` = `officer` or `system`, the acting user as actor); the operator is notified `status_changed` with the operator label for every target in `WorkflowService.NOTIFY_OPERATOR` (every officer or system target); the caller may pass the body when it carries facts the service does not know (the count of flagged items at checklist submit) |
+| `→ site_visit_done` | mark the current SiteVisit `done` (`done_at`); the appointment stays readable on both sides (US-084) |
 | `→ approved` / `→ rejected` | store `decision_note` (the `status.changed` audit payload carries `has_note`); on approval, issue the licence and audit `licence.issued` (ADR-010) |
 
 ## Built (Sprint 2; the post-site edges amended in Sprint 4, US-079)

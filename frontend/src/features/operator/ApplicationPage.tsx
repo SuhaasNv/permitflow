@@ -15,6 +15,7 @@ import { formatDate } from '@/lib/format'
 import { ApplicationHeader } from './ApplicationHeader'
 import { CompletionCard } from './CompletionCard'
 import { FeedbackNotice, targetHref } from './FeedbackNotice'
+import { SiteVisitCard } from './SiteVisitCard'
 import { applicationKeys, useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
 
 const ArrowIcon = (
@@ -227,6 +228,11 @@ export function ApplicationPage() {
                 : 'Every flagged item has been changed. Press Resubmit to send your changes back to the licensing office.'
               : view.resubmit.reason}
           </Alert>
+        </div>
+      ) : null}
+      {view.site_visit ? (
+        <div className="mb-6">
+          <SiteVisitCard view={view} />
         </div>
       ) : null}
       {view.feedback.length > 0 ? (

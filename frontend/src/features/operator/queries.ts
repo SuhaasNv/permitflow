@@ -10,6 +10,8 @@ import {
   submitApplication,
 } from '@/api/applications'
 import { getFormSchema } from '@/api/formSchema'
+import type { DateInput } from '@/api/siteVisit'
+import { acceptSiteVisit, counterSiteVisit, rescheduleSiteVisitAsOperator } from '@/api/siteVisit'
 import { updateSection } from '@/api/sections'
 
 export const applicationKeys = {
@@ -116,5 +118,33 @@ export function useDeleteDraft(id: string) {
     // The detail query is left alone: the page navigates away and the cache entry is garbage-collected.
     // Removing it here would make the still-mounted page refetch a row that is gone (404).
     onSuccess: () => void qc.invalidateQueries({ queryKey: applicationKeys.all }),
+  })
+}
+
+// Site visit appointment (US-084): the reply lands on the application view and the list's Needs your response.
+
+function afterVisitChange(qc: ReturnType<typeof useQueryClient>, id: string, view: unknown) {
+  qc.setQueryData(applicationKeys.detail(id), view)
+  void qc.invalidateQueries({ queryKey: applicationKeys.all })
+}
+
+export function useAcceptSiteVisit(id: string) {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: () => acceptSiteVisit(id), onSuccess: (view) => afterVisitChange(qc, id, view) })
+}
+
+export function useCounterSiteVisit(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: DateInput) => counterSiteVisit(id, body),
+    onSuccess: (view) => afterVisitChange(qc, id, view),
+  })
+}
+
+export function useRescheduleSiteVisit(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: DateInput) => rescheduleSiteVisitAsOperator(id, body),
+    onSuccess: (view) => afterVisitChange(qc, id, view),
   })
 }

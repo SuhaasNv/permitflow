@@ -16,6 +16,7 @@ from app.schemas.applications import (
     WithdrawIn,
 )
 from app.schemas.compare import CompareOut
+from app.schemas.site_visit import SiteVisitCounterIn, SiteVisitRescheduleIn
 from app.services.applications import ApplicationService
 from app.services.compare import CompareService
 from app.services.documents import DocumentService, content_disposition
@@ -23,6 +24,7 @@ from app.services.draft_deletion import DraftDeletionService
 from app.services.licence import LicenceService, licence_view
 from app.services.operator_view import document_view, operator_view, summary
 from app.services.resubmission import ResubmissionService
+from app.services.site_visit import SiteVisitService
 from app.services.submission import SubmissionService
 from app.services.verification import VerificationService, run_verification
 from app.services.withdrawal import WithdrawalService
@@ -47,6 +49,7 @@ def _view(service: ApplicationService, app: Application) -> ApplicationOperatorV
             for r in service.revisions.list_for(app.id)
         ],
         licence=licence_view(LicenceService(service.db).for_application(app.id)),
+        site_visit=SiteVisitService(service.db).operator_view(app),
     )
 
 
@@ -55,8 +58,14 @@ def list_applications(user: OperatorUser, db: DbSession) -> list[ApplicationSumm
     service = ApplicationService(db)
     apps = service.list_for(user)
     present, revisions = service.list_stats(apps)
+    awaiting = SiteVisitService(db).awaits_operator([a.id for a in apps])
     return [
-        summary(a, present_types=present.get(a.id, set()), revision_count=revisions.get(a.id, 0))
+        summary(
+            a,
+            present_types=present.get(a.id, set()),
+            revision_count=revisions.get(a.id, 0),
+            visit_awaits_operator=a.id in awaiting,
+        )
         for a in apps
     ]
 
@@ -132,6 +141,40 @@ def withdraw_application(
     409 for drafts and decided applications."""
     app = WithdrawalService(db).withdraw(user, application_id, body.reason)
     return _view(ApplicationService(db), app)
+
+
+@router.post("/{application_id}/site-visit/accept", response_model=ApplicationOperatorView)
+def accept_site_visit(
+    application_id: uuid.UUID, user: OperatorUser, db: DbSession
+) -> ApplicationOperatorView:
+    """Accept the date and slot the officer proposed (US-084); officers are told."""
+    SiteVisitService(db).accept(user, application_id)
+    service = ApplicationService(db)
+    return _view(service, service.get_for(user, application_id))
+
+
+@router.post("/{application_id}/site-visit/counter", response_model=ApplicationOperatorView)
+def counter_site_visit(
+    application_id: uuid.UUID, user: OperatorUser, db: DbSession, body: SiteVisitCounterIn
+) -> ApplicationOperatorView:
+    """Propose another date and slot with a reason; the officer decides."""
+    SiteVisitService(db).counter(
+        user, application_id, visit_date=body.date, slot=body.slot, reason=body.reason
+    )
+    service = ApplicationService(db)
+    return _view(service, service.get_for(user, application_id))
+
+
+@router.post("/{application_id}/site-visit/reschedule", response_model=ApplicationOperatorView)
+def reschedule_site_visit(
+    application_id: uuid.UUID, user: OperatorUser, db: DbSession, body: SiteVisitRescheduleIn
+) -> ApplicationOperatorView:
+    """Ask to move a confirmed visit before its date (reason required); the officer decides."""
+    SiteVisitService(db).reschedule(
+        user, application_id, visit_date=body.date, slot=body.slot, reason=body.reason
+    )
+    service = ApplicationService(db)
+    return _view(service, service.get_for(user, application_id))
 
 
 @router.patch("/{application_id}/sections/{key}", response_model=ApplicationOperatorView)

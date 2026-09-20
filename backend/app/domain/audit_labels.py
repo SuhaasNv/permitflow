@@ -63,5 +63,28 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
             return f"Licence {p.get('licence_no', '')} issued, valid to {p.get('valid_to', '')}"
         case "feedback.restored":
             return f"Feedback on {p.get('target', '')} restored to {p.get('to', '')} (undo)"
+        case "site_visit.proposed":
+            return f"Site visit proposed: {_visit(p)} (round {p.get('round', '')})"
+        case "site_visit.counter_proposed":
+            return f"Operator proposed another visit date (round {p.get('round', '')})"
+        case "site_visit.confirmed":
+            return f"Site visit confirmed: {_visit(p)}{_HOW.get(str(p.get('how')), '')}"
+        case "site_visit.rescheduled":
+            return (
+                f"Site visit reschedule asked by the {p.get('by', '')}: {_visit(p)} "
+                f"(round {p.get('round', '')})"
+            )
         case _:
             return event_type
+
+
+_HOW = {
+    "accepted_by_operator": " (accepted by the operator)",
+    "accepted_operator_date": " (the operator's date)",
+    "kept_original_date": " (original date kept)",
+    "confirmed_without_reply": " (no reply within three working days)",
+}
+
+
+def _visit(p: dict[str, Any]) -> str:
+    return f"{p.get('date', '')}, {p.get('slot', '')}".strip(", ")

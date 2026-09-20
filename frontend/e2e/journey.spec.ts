@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
+import { acceptVisit, proposeVisit } from './helpers.js'
+
 const PASSWORD = process.env.SEED_PASSWORD ?? 'PermitFlow!2026'
 const OPERATOR = 'operator@permitflow.example.sg'
 const OFFICER = 'officer@permitflow.example.sg'
@@ -155,8 +157,12 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
   await page.locator('dialog[open]').getByRole('button', { name: 'Start review' }).click()
   await page.getByRole('button', { name: 'Mark resolved' }).click()
   await expect(page.locator('aside').getByText('Resolved', { exact: true }).first()).toBeVisible()
+  // The visit is arranged first (US-084): the officer proposes, the operator accepts, then it can be marked done.
+  await proposeVisit(page)
+  await expect(page.getByRole('button', { name: 'Mark site visit done' })).toBeDisabled()
+  await acceptVisit(appUrl.split('/').pop() ?? '')
+  await page.reload()
   for (const [action, confirm] of [
-    ['Mark site visit scheduled', 'Mark scheduled'],
     ['Mark site visit done', 'Mark done'],
     ['Route to approval', 'Route to approval'],
   ] as const) {

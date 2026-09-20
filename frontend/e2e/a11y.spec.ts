@@ -2,7 +2,7 @@ import { AxeBuilder } from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
-import { OFFICER, OPERATOR, openCase, seedPendingResubmission, seedUnderReview, signIn, signOut } from './helpers.js'
+import { OFFICER, OPERATOR, openCase, seedPendingResubmission, seedUnderReview, seedVisitProposed, signIn, signOut } from './helpers.js'
 
 /**
  * Accessibility gate (US-057): axe-core (WCAG 2.0/2.1/2.2 A and AA rules) on every screen a person can
@@ -117,5 +117,31 @@ test('phone width (390) keeps the same standard, tap targets included', async ({
     await page.waitForLoadState('networkidle')
     found.push(...(await violations(page, `390 ${path}`)))
   }
+  expectNone(found)
+})
+
+test('site visit screens (US-084) have no axe violations at 1280 and 390', async ({ page }) => {
+  const app = await seedVisitProposed()
+  const found: string[] = []
+  await signIn(page, OPERATOR)
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    await page.goto(app.url)
+    await page.locator('section[aria-labelledby="visit-title"]').waitFor()
+    await page.waitForLoadState('networkidle')
+    found.push(...(await violations(page, `${width} operator visit card`)))
+  }
+  await page.setViewportSize({ width: 1280, height: 844 })
+  await signOut(page)
+  await signIn(page, OFFICER)
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    await page.goto(`/officer/applications/${app.id}`)
+    await page.locator('section[aria-labelledby="visit-title"]').waitFor()
+    await page.waitForLoadState('networkidle')
+    found.push(...(await violations(page, `${width} officer visit panel`)))
+  }
+  await page.setViewportSize({ width: 1280, height: 844 })
+  await page.getByRole('button', { name: 'Confirm without a reply' }).waitFor()
   expectNone(found)
 })

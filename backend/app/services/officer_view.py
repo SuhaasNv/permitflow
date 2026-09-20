@@ -30,10 +30,12 @@ from app.schemas.officer import (
     RevisionOut,
     VerificationSummaryOut,
 )
+from app.schemas.site_visit import SiteVisitOut
 from app.services.compare import CompareService
 from app.services.feedback import restorable, target_label
 from app.services.licence import LicenceService, licence_view
 from app.services.operator_view import LICENCE_TITLE
+from app.services.site_visit import SiteVisitService
 from app.services.workflow import WorkflowService
 
 _NOTE_REQUIRED_TARGETS = {ApplicationStatus.REJECTED}
@@ -107,6 +109,7 @@ class OfficerViewService:
             changed=(changed_sections, changed_docs, previous_no),
             viewer_id=viewer.id if viewer else None,
             licence=licence_view(LicenceService(self.db).for_application(app.id)),
+            site_visit=SiteVisitService(self.db).officer_view(app),
         )
 
 
@@ -123,6 +126,7 @@ def _assemble(
     changed: tuple[set[str], set[DocumentType], int | None] = (set(), set(), None),
     viewer_id: uuid.UUID | None = None,
     licence: LicenceView | None = None,
+    site_visit: SiteVisitOut | None = None,
 ) -> OfficerApplicationOut:
     now = datetime.now(UTC)
     form = current.form_data if current else app.draft_data
@@ -242,6 +246,7 @@ def _assemble(
         actions=actions,
         decision_note=app.decision_note,
         withdrawal_reason=app.withdrawal_reason,
+        site_visit=site_visit,
         licence=licence,
         version=app.version,
         created_at=app.created_at,

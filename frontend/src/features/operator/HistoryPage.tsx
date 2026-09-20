@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom'
 import { compareMyRevisions } from '@/api/applications'
 import { AppError } from '@/api/client'
 import { displayValue } from '@/features/operator/SectionSummary'
+import { VisitRounds } from '@/features/shared/SiteVisit'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
 import { formatDateTime } from '@/lib/format'
@@ -155,6 +156,28 @@ export function HistoryPage() {
           ) : (
             <p className="text-sm text-text-3">No feedback from the licensing office yet.</p>
           )}
+
+          {view.site_visit ? (
+            <section className="pf-surface overflow-hidden" aria-labelledby="visit-history-title">
+              <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4 sm:px-7">
+                <h2 id="visit-history-title" className="text-[13px] font-semibold uppercase tracking-[0.06em] text-text-3">
+                  Site visit
+                </h2>
+                <StatusBadge
+                  label={view.site_visit.status_label}
+                  tone={view.site_visit.status === 'confirmed' || view.site_visit.status === 'done' ? 'success' : 'info'}
+                />
+                <span className="text-xs text-text-3">
+                  Visit {view.site_visit.visit_no} · {view.site_visit.rounds.length}{' '}
+                  {view.site_visit.rounds.length === 1 ? 'round' : 'rounds'}
+                </span>
+              </div>
+              <div className="px-5 py-5 sm:px-7">
+                <p className="mb-4 text-sm font-semibold">{view.site_visit.when}</p>
+                <VisitRounds rounds={view.site_visit.rounds} reader="operator" />
+              </div>
+            </section>
+          ) : null}
         </div>
         <aside className="text-[13px] leading-[19px] text-text-2 lg:pt-1">
           <p>

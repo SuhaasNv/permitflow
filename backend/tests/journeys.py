@@ -103,6 +103,32 @@ def transition(client: TestClient, off: Headers, app_id: str, target: str, note:
     return r.json()
 
 
+def next_working_day(days_ahead: int = 3) -> str:
+    """An ISO date `days_ahead` working days from today in Singapore: valid for both sides' rules."""
+    from app.domain.site_visit import add_working_days, today_in_singapore
+
+    return add_working_days(today_in_singapore(), days_ahead).isoformat()
+
+
+def propose_visit(
+    client: TestClient, off: Headers, app_id: str, *, date: str | None = None, slot: str = "morning"
+) -> dict:  # type: ignore[type-arg]
+    """The officer proposes the visit (US-084); from Under Review this also moves the case."""
+    version = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()["version"]
+    body = {"date": date or next_working_day(), "slot": slot, "expected_version": version}
+    r = client.post(f"/api/v1/officer/applications/{app_id}/site-visit", headers=off, json=body)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def arrange_visit(client: TestClient, off: Headers, op: Headers, app_id: str) -> dict:  # type: ignore[type-arg]
+    """Officer proposes, operator accepts: the case is Site Visit Scheduled with a confirmed date."""
+    propose_visit(client, off, app_id)
+    r = client.post(f"/api/v1/applications/{app_id}/site-visit/accept", headers=op)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
 def under_review(client: TestClient, db: Session) -> tuple[str, Headers, Headers, int]:
     app_id, op, off = submitted(client, db)
     view = transition(client, off, app_id, "under_review")

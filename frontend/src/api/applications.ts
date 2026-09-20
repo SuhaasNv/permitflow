@@ -1,5 +1,6 @@
 import { request } from './client'
 import type { DocumentView } from './documents'
+import type { SiteVisitOperator } from './siteVisit'
 import type { Tone } from '@/features/shared/StatusBadge'
 
 export interface ApplicationSummary {
@@ -101,6 +102,8 @@ export interface ApplicationView {
   withdrawal_reason: string | null
   /** Issued on approval (US-051). */
   licence: LicenceView | null
+  /** The site visit appointment once the officer proposes one (US-084). */
+  site_visit: SiteVisitOperator | null
   created_at: string
   updated_at: string
 }

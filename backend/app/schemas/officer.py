@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.schemas.applications import LicenceView
+from app.schemas.site_visit import SiteVisitOut
 
 
 class QueueItemOut(BaseModel):
@@ -173,6 +174,8 @@ class OfficerApplicationOut(BaseModel):
     decision_note: str | None
     # Operator's reason when they withdrew (US-038).
     withdrawal_reason: str | None
+    # The site visit appointment (US-084): present once a date was proposed for the current visit.
+    site_visit: SiteVisitOut | None = None
     licence: LicenceView | None = None
     version: int
     created_at: datetime

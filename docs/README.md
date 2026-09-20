@@ -19,7 +19,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `03-architecture/ARCHITECTURE.md` | written | Layers, modules, API surface, request flows, boundaries |
 | `03-architecture/DOMAIN_MODEL.md` | written | Entities, verification vocabulary, issue codes, invariants |
 | `03-architecture/STATE_MACHINE.md` | written | 12 states + draft + withdrawn, labels, transitions (incl. Return to review), guards, feedback rules |
-| `03-architecture/decisions/README.md` + `ADR-001` to `ADR-012` | written (index with "chose X over Y because Z" per ADR; 003, 006, 007, 009, 011 amended as built; 010, 011 and 012 added 19 Sep) | Architecture decision records |
+| `03-architecture/decisions/README.md` + `ADR-001` to `ADR-013` | written (index with "chose X over Y because Z" per ADR; 003, 006, 007, 009, 011 amended as built; 010, 011 and 012 added 19 Sep; 013 added 20 Sep for the site visit appointment) | Architecture decision records |
 | `03-architecture/diagrams/views/*.png` | written (19 Sep) | Solution architecture, branching, deployment and CI/CD views used in the technical deck; generated from prompts written against the code and rated before use (`AI_USAGE.md`, Debrief material) |
 
 ## Design (UI/UX phase, 17–18 Sep 2026)
