@@ -114,7 +114,10 @@ function ReviewRail({
   const rest = view.actions.filter((a) => a !== primary)
   return (
     <aside className="order-first flex flex-col gap-5 lg:order-none lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-104px)] lg:self-start lg:overflow-y-auto">
-      {view.site_visit !== null || view.status === 'site_visit_scheduled' ? <SiteVisitPanel view={view} onPropose={onPropose} /> : null}
+      {view.site_visit !== null || view.status === 'site_visit_scheduled' ? (
+        // Keyed by case so a half-typed date on one case never reappears on the next.
+        <SiteVisitPanel key={view.id} view={view} onPropose={onPropose} />
+      ) : null}
       <section className="pf-surface" aria-labelledby="review-title">
         <div className={cn('px-5 pt-5', view.actions.length === 0 && 'pb-5')}>
           <h2 id="review-title" className="text-[17px] font-semibold leading-6">

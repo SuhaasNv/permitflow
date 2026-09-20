@@ -63,7 +63,7 @@ function DateForm({ title, submitLabel, reasonLabel, reasonRequired, busy, error
       aria-label={title}
     >
       <h3 className="text-sm font-semibold">{title}</h3>
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
         <Field
           label="Date"
           type="date"
@@ -73,7 +73,7 @@ function DateForm({ title, submitLabel, reasonLabel, reasonRequired, busy, error
           value={date}
           error={show('date')}
           help={show('date') ? undefined : 'A working day, from tomorrow.'}
-          className="w-[200px]"
+          className="sm:w-[200px]"
           onChange={(e) => {
             setDate(e.target.value)
             setLocal((l) => ({ ...l, date: '' }))
@@ -89,7 +89,7 @@ function DateForm({ title, submitLabel, reasonLabel, reasonRequired, busy, error
         maxLength={500}
         onChange={(e) => {
           setText(e.target.value)
-          setLocal((l) => ({ ...l, reason: '' }))
+          setLocal((l) => ({ ...l, reason: '', note: '' }))
         }}
         placeholder="Shown to the operator."
       />
@@ -119,6 +119,7 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
   const [slot, setSlot] = useState<SiteVisitSlot>('morning')
   const [note, setNote] = useState('')
   const [dateError, setDateError] = useState<string | null>(null)
+  const [noteTouched, setNoteTouched] = useState(false)
   const bounds = dateBounds()
   const serverErrors = fieldErrorsOf(propose.error)
   const conflict = propose.error instanceof AppError && propose.error.status === 409 ? propose.error.message : null
@@ -127,6 +128,7 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
     setSlot('morning')
     setNote('')
     setDateError(null)
+    setNoteTouched(false)
     propose.reset()
   }
   const confirm = () => {
@@ -134,6 +136,7 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
       setDateError('Choose a date.')
       return
     }
+    setNoteTouched(false)
     propose.mutate(
       { date, slot, note: note.trim() || null, expected_version: view.version },
       {
@@ -171,7 +174,7 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
           {propose.error.message}
         </Alert>
       ) : null}
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
         <Field
           label="Date"
           type="date"
@@ -181,7 +184,7 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
           value={date}
           error={dateError ?? serverErrors.date}
           help={dateError || serverErrors.date ? undefined : 'A working day, from tomorrow.'}
-          className="w-[200px]"
+          className="sm:w-[200px]"
           onChange={(e) => {
             setDate(e.target.value)
             setDateError(null)
@@ -192,9 +195,12 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
       <TextAreaField
         label="Note for the operator"
         value={note}
-        error={serverErrors.note}
+        error={noteTouched ? undefined : serverErrors.note}
         maxLength={500}
-        onChange={(e) => setNote(e.target.value)}
+        onChange={(e) => {
+          setNote(e.target.value)
+          setNoteTouched(true)
+        }}
         placeholder="What to have ready on the premises, who should be there."
       />
     </Dialog>
