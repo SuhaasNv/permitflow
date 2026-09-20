@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.settings import get_settings
 from app.domain.enums import Role, VerificationStatus
@@ -214,6 +215,8 @@ def _finish(
         },
     )
     db.commit()
+    metrics.VERIFICATION_RUNS.labels(status.value, provider).inc()
+    metrics.VERIFICATION_SECONDS.labels(provider).observe(run.latency_ms / 1000)
     logger.info(
         "verification_completed",
         extra={

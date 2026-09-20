@@ -111,7 +111,9 @@ class RequestLimiter:
 
     def check(self, request: Request) -> int | None:
         path = request.url.path
-        if path.endswith("/health") or path.endswith("/healthz"):
+        # Health checks and the metrics scrape are exempt: the deploy gate and the monitor must keep
+        # answering while a client is being refused (the scrape is bearer-token protected, US-077).
+        if path.endswith(("/health", "/healthz", "/metrics")):
             return None
         key = client_key(request, self.trusted_proxies)
         bucket = self.login if path.endswith("/auth/login") and request.method == "POST" else self.general

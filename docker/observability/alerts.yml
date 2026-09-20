@@ -1,0 +1,48 @@
+# Alert rules for PermitFlow (US-077). The service-level objective: 99.5 % of API requests answer under
+# 500 ms, a document check finishes within three minutes, and 5xx answers stay below 1 % over five minutes.
+# Alerts fire inside Prometheus; routing them to a channel (Alertmanager, email, Slack) is the next step.
+groups:
+  - name: permitflow
+    rules:
+      - alert: PermitFlowApiDown
+        expr: up{job="permitflow-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "The API's /metrics has not answered for two minutes"
+      - alert: PermitFlowApiErrorBurst
+        expr: |
+          sum(rate(permitflow_http_requests_total{status=~"5.."}[5m]))
+            / sum(rate(permitflow_http_requests_total[5m])) > 0.01
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "More than 1 % of API answers are 5xx over five minutes"
+      - alert: PermitFlowApiSlow
+        expr: |
+          histogram_quantile(0.995, sum by (le) (rate(permitflow_http_request_seconds_bucket[10m]))) > 0.5
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "The 99.5th percentile of API latency is above 500 ms"
+      - alert: PermitFlowChecksFailing
+        expr: |
+          sum(rate(permitflow_verification_runs_total{outcome=~"failed|unavailable"}[30m]))
+            / sum(rate(permitflow_verification_runs_total[30m])) > 0.2
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "More than 20 % of document checks fail or are unavailable"
+      - alert: PermitFlowChecksSlow
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(permitflow_verification_run_seconds_bucket[30m]))) > 180
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "The 95th percentile of document check time is above three minutes"
+      - alert: PermitFlowRateLimiting
+        expr: rate(permitflow_rate_limited_total[5m]) > 1
+        for: 10m
+        labels: { severity: info }
+        annotations:
+          summary: "The per-client limiter is refusing more than one request a second"

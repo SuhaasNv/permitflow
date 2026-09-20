@@ -33,6 +33,53 @@ services:
       db:
         condition: service_healthy
 
+  # Observability (US-077): `docker compose --profile observability up -d`. Prometheus scrapes the API's
+  # /metrics (bearer token METRICS_TOKEN from .env; target host.docker.internal:8000 for a backend on the
+  # host, backend:8000 with the full profile) and Grafana serves the provisioned dashboard on :3001.
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: permitflow-prometheus
+    profiles: ["observability"]
+    env_file: .env
+    environment:
+      METRICS_TARGET: ${METRICS_TARGET:-host.docker.internal:8000}
+      METRICS_SCHEME: ${METRICS_SCHEME:-http}
+      ENVIRONMENT_LABEL: ${ENVIRONMENT_LABEL:-local}
+    entrypoint: ["/bin/sh", "/etc/prometheus/start.sh"]
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./docker/observability/prometheus-start.sh:/etc/prometheus/start.sh:ro
+      - ./docker/observability/prometheus.local.yml:/etc/prometheus/prometheus.tpl.yml:ro
+      - ./docker/observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus:/prometheus
+
+  grafana:
+    image: grafana/grafana-oss:12.1.0
+    container_name: permitflow-grafana
+    profiles: ["observability"]
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-permitflow}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./docker/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+    depends_on:
+      - prometheus
+
 volumes:
   pgdata:
   uploads:
+  prometheus:
+  grafana:

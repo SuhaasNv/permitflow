@@ -55,6 +55,11 @@ class ApplicationRepository:
         )
         return [(row[0], row[1]) for row in self.db.execute(stmt)]
 
+    def count_by_status(self) -> dict[ApplicationStatus, int]:
+        """Applications per status, one query (the `/metrics` gauge, US-077)."""
+        stmt = select(Application.status, func.count()).group_by(Application.status)
+        return {row[0]: int(row[1]) for row in self.db.execute(stmt)}
+
     def count_drafts(self, operator_id: uuid.UUID) -> int:
         """Open drafts an operator holds (US-058 quota)."""
         stmt = select(func.count()).where(

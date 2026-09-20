@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 
-from app.api.v1 import applications, auth, form_schema, health, notifications, officer
+from app.api.v1 import applications, auth, form_schema, health, metrics, notifications, officer
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
+api_router.include_router(metrics.router, tags=["metrics"])
 api_router.include_router(auth.router, tags=["auth"])
 api_router.include_router(form_schema.router, tags=["form"])
 api_router.include_router(applications.router, tags=["applications"])
