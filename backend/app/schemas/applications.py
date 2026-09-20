@@ -7,6 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.site_visit import SiteVisitOperatorView
+
 
 class SectionView(BaseModel):
     key: str
@@ -149,6 +151,8 @@ class ApplicationOperatorView(BaseModel):
     can_delete: bool = False
     licence: LicenceView | None = None
     withdrawal_reason: str | None = None
+    # The site visit appointment (US-084): present once the officer proposed a date.
+    site_visit: SiteVisitOperatorView | None = None
     created_at: datetime
     updated_at: datetime
 

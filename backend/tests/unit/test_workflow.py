@@ -29,6 +29,7 @@ ALL_OK = TransitionContext(
     open_clarification_count=1,
     answered_clarification_count=0,
     all_open_items_answered=True,
+    visit_confirmed=True,
 )
 VALID = {(t.source, t.target, t.actor) for t in TRANSITIONS}
 
@@ -201,6 +202,14 @@ def test_guards() -> None:
 
     with pytest.raises(TransitionError):
         transition(S.UNDER_REVIEW, S.REJECTED, Actor.OFFICER, TransitionContext(has_note=False))
+
+    # the visit is marked done only once the appointment is confirmed (US-084)
+    with pytest.raises(TransitionError) as e:
+        transition(S.SITE_VISIT_SCHEDULED, S.SITE_VISIT_DONE, Actor.OFFICER, TransitionContext())
+    assert "Confirm the visit date" in e.value.message
+    assert transition(
+        S.SITE_VISIT_SCHEDULED, S.SITE_VISIT_DONE, Actor.OFFICER, TransitionContext(visit_confirmed=True)
+    )
 
 
 def test_available_actions_reports_disabled_reasons() -> None:

@@ -1,7 +1,7 @@
 """Build the operator-facing view of an application from the aggregate."""
 
 from app.domain import completeness as completeness_rules
-from app.domain.enums import ApplicationStatus, DocumentType, VerificationStatus
+from app.domain.enums import ApplicationStatus, DocumentType, SiteVisitStatus, VerificationStatus
 from app.domain.form_schema import SECTIONS
 from app.domain.labels import operator_label, tone_for
 from app.domain.officer_actions import next_action
@@ -20,6 +20,7 @@ from app.schemas.applications import (
     SectionView,
     VerificationView,
 )
+from app.schemas.site_visit import SiteVisitOperatorView
 
 LICENCE_TITLE = "Food Establishment Licence"
 
@@ -37,7 +38,9 @@ _EXPLANATIONS: dict[ApplicationStatus, str] = {
     ApplicationStatus.PRE_SITE_RESUBMITTED: (
         "Your changes were sent to the licensing office. You will be notified when the review continues."
     ),
-    ApplicationStatus.SITE_VISIT_SCHEDULED: "An officer will contact you to arrange a visit to the premises.",
+    ApplicationStatus.SITE_VISIT_SCHEDULED: (
+        "A site visit is being arranged. The date and slot are on this page once the officer proposes them."
+    ),
     ApplicationStatus.SITE_VISIT_DONE: (
         "The site visit is complete. The licensing office is finalising its assessment."
     ),
@@ -76,7 +79,11 @@ def _present_types(app: Application, present: set[DocumentType] | None) -> set[D
 
 
 def summary(
-    app: Application, *, present_types: set[DocumentType] | None = None, revision_count: int = 0
+    app: Application,
+    *,
+    present_types: set[DocumentType] | None = None,
+    revision_count: int = 0,
+    visit_awaits_operator: bool = False,
 ) -> ApplicationSummaryOut:
     comp = completeness_rules.compute(app.draft_data, _present_types(app, present_types))
     business = (app.draft_data.get("business") or {}).get("business_name")
@@ -91,7 +98,7 @@ def summary(
         premises_summary=premises if isinstance(premises, str) and premises else None,
         percent=comp.percent,
         revision_count=revision_count,
-        needs_operator_action=_needs_operator(app.status),
+        needs_operator_action=_needs_operator(app.status) or visit_awaits_operator,
         created_at=app.created_at,
         updated_at=app.updated_at,
     )
@@ -149,6 +156,7 @@ def operator_view(
     resubmit: ResubmitReadiness | None = None,
     revisions: list[RevisionSummaryView] | None = None,
     licence: LicenceView | None = None,
+    site_visit: SiteVisitOperatorView | None = None,
 ) -> ApplicationOperatorView:
     documents = documents or []
     docs_by_type = {d.document_type: (d, r) for d, r in documents}
@@ -201,7 +209,8 @@ def operator_view(
             missing=list(comp.missing),
         ),
         revision_count=revision_count,
-        needs_operator_action=_needs_operator(app.status),
+        needs_operator_action=_needs_operator(app.status)
+        or (site_visit is not None and site_visit.status == SiteVisitStatus.PROPOSED.value),
         feedback=feedback or [],
         resubmit=resubmit,
         revisions=revisions or [],
@@ -214,6 +223,7 @@ def operator_view(
         can_delete=app.status == ApplicationStatus.DRAFT,
         withdrawal_reason=app.withdrawal_reason if app.status == ApplicationStatus.WITHDRAWN else None,
         licence=licence,
+        site_visit=site_visit,
         created_at=app.created_at,
         updated_at=app.updated_at,
     )

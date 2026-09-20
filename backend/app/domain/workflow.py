@@ -30,6 +30,7 @@ class TransitionContext:
     open_clarification_count: int = 0  # items waiting for the operator (or drafted, not yet sent)
     answered_clarification_count: int = 0  # items the operator answered that the officer has not decided
     all_open_items_answered: bool = False  # every open item carries a response in this round
+    visit_confirmed: bool = False  # the site visit appointment is confirmed (US-084)
 
 
 Guard = Callable[[TransitionContext], str | None]  # returns a failure reason or None
@@ -55,6 +56,10 @@ def _needs_flagged_change(ctx: TransitionContext) -> str | None:
 
 def _needs_note(ctx: TransitionContext) -> str | None:
     return None if ctx.has_note else "A note is required for this decision."
+
+
+def _needs_visit_confirmed(ctx: TransitionContext) -> str | None:
+    return None if ctx.visit_confirmed else "Confirm the visit date with the operator first."
 
 
 def _needs_checklist_complete(ctx: TransitionContext) -> str | None:
@@ -147,7 +152,13 @@ TRANSITIONS: tuple[Transition, ...] = (
         _needs_flagged_change,
         "Resubmit",
     ),
-    Transition(S.SITE_VISIT_SCHEDULED, S.SITE_VISIT_DONE, Actor.OFFICER, None, "Mark site visit done"),
+    Transition(
+        S.SITE_VISIT_SCHEDULED,
+        S.SITE_VISIT_DONE,
+        Actor.OFFICER,
+        _needs_visit_confirmed,
+        "Mark site visit done",
+    ),
     # Use case 3 (v0.4.0). The brief's grammar decides whose turn each post-site state is: after the
     # checklist is submitted the operator answers (Awaiting Post-Site Clarification, round 1); the
     # officer reviews in Post-Site Clarification Resubmitted; later rounds use Pending Post-Site
