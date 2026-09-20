@@ -60,6 +60,7 @@ A modular monolith: a FastAPI + SQLAlchemy 2 + Pydantic v2 backend on PostgreSQL
 | C7 | The owner's domain for both environments: `permitflow.space` and `api.permitflow.space` (production), `dev.permitflow.space` and `api.dev.permitflow.space` (development), Railway TLS · **done 19 Sep (US-052)**: development live on the domain, production live since v0.3.0 (19 Sep) |
 | C8 | Legal, privacy and accessibility review: policy pages, demonstration notices, self-hosted fonts, axe gate in CI, contrast fix · **done 19 Sep (US-057)**, `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` |
 | C5 | Operator withdraws a submitted application with an optional reason · **done 19 Sep (US-038)**: new terminal status, officers notified, audited |
+| C9 | Observability layer: Prometheus metrics from the API behind a token, Grafana dashboard (API health, document checks and their cost, queue), six alert rules on the SLO; local Compose profile and two Railway services on the owner's domain · **built 20 Sep (US-077)** on its own branch, beyond the brief; alert routing (Alertmanager to a channel), nginx and Postgres exporters remain planned |
 
 ## DEFERRED / MOCKED
 

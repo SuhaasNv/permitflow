@@ -9,7 +9,7 @@ The engineering design: written 17 Sep 2026 before the code (solutioning phase) 
 | `DOMAIN_MODEL.md` | Entities and their fields as named in code, the verification vocabulary and issue codes, invariants and ownership rules |
 | `STATE_MACHINE.md` | The twelve statuses of the brief plus `draft` and `withdrawn`, the label per role, the transition table (source, target, actor, guard) and the feedback rules; the specification that `backend/app/domain/workflow.py` implements and `test_workflow.py` sweeps |
 | `decisions/` | Architecture decision records ADR-001 to ADR-012, with an index that gives "chose X over Y because Z" per record |
-| `diagrams/views/` | The four rendered views used in the technical deck: solution architecture, branching, deployment, CI/CD pipeline |
+| `diagrams/views/` | The four rendered views used in the technical deck: solution architecture (with the observability group since 20 Sep), branching, deployment (with the two monitoring services), CI/CD pipeline |
 
 Reading order for a newcomer: `ARCHITECTURE.md` (ten minutes), then `STATE_MACHINE.md`, then the ADR index. `SOLUTIONING.md` is the long form of why; `DOMAIN_MODEL.md` is the reference while reading the models and repositories.
 

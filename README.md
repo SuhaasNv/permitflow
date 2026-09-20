@@ -80,7 +80,7 @@ cd frontend && npm test && npm run lint && npm run typecheck && npm run build
 cd frontend && npm run e2e          # Playwright against the running stack (backend :8000 with AI_PROVIDER=mock, Vite :3000)
 ```
 
-759 backend cases from 170 test functions on a real PostgreSQL (the state-machine sweep alone is 588), 158 frontend tests, eight Playwright specs (the journey, six scenarios, the accessibility gate), 166 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
+763 backend cases from 174 test functions on a real PostgreSQL (the state-machine sweep alone is 588), 158 frontend tests, eight Playwright specs (the journey, six scenarios, the accessibility gate), 166 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
 
 ## Environment variables
 
@@ -93,6 +93,10 @@ cd frontend && npm run e2e          # Playwright against the running stack (back
 `main` is production, `dev` is integration, one branch per story merged with `--no-ff`; `main` is protected and receives only pull requests from `dev` with seven green checks (`docs/09-operations/BRANCHING.md`).
 
 `ci.yml` runs seven blocking jobs on every push and pull request: backend, frontend, end to end with the accessibility gate, secret scan, the six-stage AI gate (`ai-gate.yml`, on the mock provider), dependency and code audit, images. `ai-eval.yml` runs the same golden and fairness sets against the real model nightly and on changes to the AI path. Images are built once and pushed to GHCR; a merge to `dev` deploys the development environment automatically; production is pinned to a release image and deployed by hand behind the owner's approval, with health gates after every rollout. Environments, secrets, migrations and rollback by layer: `docs/09-operations/OPERATIONS.md`.
+
+## Observability
+
+`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. `docker compose --profile observability up -d` runs Prometheus with six alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same two services run on Railway, Grafana at https://grafana.dev.permitflow.space. Details and what is still missing (alert routing, exporters): `docs/09-operations/OPERATIONS.md`, Observability.
 
 ## AI verification
 
@@ -118,5 +122,5 @@ Each item has a row with severity in `docs/11-reviews/PRODUCTION_READINESS_REVIE
 2. A worker for the AI checks (Redis or a Postgres `SKIP LOCKED` queue) so checks survive deploys and scale apart from the API; ADR-004 has one call site to change.
 3. Object storage with signed URLs and a virus scan, a backup and restore drill, a retention policy.
 4. httpOnly cookie sessions with CSRF protection, CSP nonces, the rate windows in Redis or at the edge.
-5. Observability: a `/metrics` endpoint on the API, Prometheus scraping the API, nginx and Postgres, Grafana dashboards and alerts on an SLO; request logs and AI traces are the only telemetry today (readiness row 24).
+5. Observability, second half: route the alerts (Alertmanager to email or Slack), nginx and Postgres exporters, one Prometheus per environment, a runbook per alert (readiness row 24).
 6. AI assurance beyond 14 golden cases: a labelled set grown from officer overrides, a red-team suite, calibrated confidence, in-region tracing, a multilingual injection classifier, Project Moonshot as the Singapore assurance evidence (`docs/07-ai/AI_ASSURANCE.md`, Limits).

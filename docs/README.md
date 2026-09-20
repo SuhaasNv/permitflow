@@ -42,7 +42,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Security
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `06-security/THREAT_MODEL.md` | written | Threats T1 to T22, planned controls, validation, production gaps |
+| `06-security/THREAT_MODEL.md` | written | Threats T1 to T23 (T23 the metrics endpoint, 20 Sep), planned controls, validation, production gaps |
 
 ## AI
 | Document | Status | Purpose |
@@ -55,7 +55,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Planning
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-076 (US-059 the debrief material, US-074 the post-release review, US-075 the final check before submission, US-076 the fixes after the cold review), 1:1 with Notion |
+| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-077 (US-059 the debrief material, US-074 the post-release review, US-075 the final check before submission, US-076 the fixes after the cold review, US-077 the observability layer), 1:1 with Notion |
 | `05-planning/SPRINTS.md` | written | Three one-day sprints, sprint DoD, close ritual, cut order |
 | `05-planning/KANBAN.md` | written | Flow, WIP limits, story-to-day mapping |
 | `05-planning/notion/*.png` | written (19 Sep) | The Notion board after the release: the workspace page, the Epics table, the Stories table |
