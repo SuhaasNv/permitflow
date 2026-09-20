@@ -68,3 +68,19 @@ def test_unhandled_error_carries_cors_headers_and_request_id(monkeypatch) -> Non
         assert r.status_code == 503
         assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
         assert r.json()["error"]["code"] == "unavailable"
+
+
+def test_preflight_allows_every_verb_the_frontend_uses(client: TestClient) -> None:
+    """The checklist draft save is a PUT (US-060): the browser's preflight must allow it, as it allows
+    the PATCH of a section and the DELETE of a draft."""
+    for verb in ("PUT", "PATCH", "DELETE", "POST"):
+        r = client.options(
+            "/api/v1/officer/applications/00000000-0000-0000-0000-000000000000/checklist",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": verb,
+                "Access-Control-Request-Headers": "authorization,content-type",
+            },
+        )
+        assert r.status_code == 200, (verb, r.status_code, r.text)
+        assert verb in r.headers.get("access-control-allow-methods", "")

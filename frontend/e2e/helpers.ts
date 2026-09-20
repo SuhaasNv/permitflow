@@ -227,3 +227,10 @@ export async function seedVisitProposed(): Promise<Seeded> {
   })
   return seeded
 }
+
+/** Under review, the visit proposed and accepted (Site Visit Scheduled, confirmed): the checklist can open. */
+export async function seedVisitConfirmed(): Promise<Seeded> {
+  const seeded = await seedVisitProposed()
+  await acceptVisit(seeded.id)
+  return seeded
+}
