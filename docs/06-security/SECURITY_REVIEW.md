@@ -1,6 +1,6 @@
 # Security review: the owner's hardening checklist and the four abuse scenarios
 
-Story US-058, 19 September 2026. The owner's brief was a twelve-item hardening checklist followed by four concrete attacks ("how I would ruin your life"): hammer the sign-in endpoint until it falls over, fill the database with garbage sign-ups, hit the most expensive endpoint until the API bill explodes, and scrape everything unnoticed. This document takes each item and each attack, says what the code did before this story, what it does now, and where the evidence is. It complements the threat model (`THREAT_MODEL.md`, T1 to T22), which is organised by threat; this one is organised by the owner's questions.
+Story US-058, 19 September 2026. The owner's brief was a twelve-item hardening checklist followed by four concrete attacks to design against: hammer the sign-in endpoint until it fails, fill the database with junk sign-ups, call the most expensive endpoint in a loop until the API bill is enormous, and scrape everything unnoticed. This document takes each item and each attack, says what the code did before this story, what it does now, and where the evidence is. It complements the threat model (`THREAT_MODEL.md`, T1 to T22), which is organised by threat; this one is organised by the owner's questions.
 
 Reviewed by an engineer against the code, with the tools named in each row. It is not a penetration test.
 

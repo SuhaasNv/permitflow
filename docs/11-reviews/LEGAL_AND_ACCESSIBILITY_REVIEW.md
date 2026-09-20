@@ -1,6 +1,6 @@
 # Legal, privacy and accessibility review
 
-Story US-057, 19 September 2026. The owner's brief: a checklist of legal, privacy and accessibility items, with the instruction to say honestly what applies and to make no mistakes. This document takes every item on that checklist, says whether it applies to PermitFlow, what was done, and where the evidence is. Where an item does not apply, it says why rather than pretending it was done.
+Story US-057, 19 September 2026. The owner's brief: a checklist of legal, privacy and accessibility items, with the instruction to say honestly what applies and to work carefully. This document takes every item on that checklist, says whether it applies to PermitFlow, what was done, and where the evidence is. Where an item does not apply, it says why rather than pretending it was done.
 
 Written by an engineer, not a lawyer. It is a good-faith reading of the law as it applies to a demonstration; before any real deployment a Singapore-qualified adviser should review the policies and the transfer arrangements.
 
