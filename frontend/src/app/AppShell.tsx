@@ -9,6 +9,7 @@ import { Logo } from '@/features/shared/Logo'
 import { NotificationsBell } from '@/features/shared/NotificationsBell'
 import { hasUnsaved, setUnsaved } from '@/lib/unsaved'
 import { cn } from '@/lib/cn'
+import { formatDateTime } from '@/lib/format'
 import { sessionWarning } from '@/lib/session'
 
 interface NavItem {
@@ -126,7 +127,7 @@ export function AppShell() {
           <span
             role="status"
             className={cn('ml-auto tabular-nums', warning.level === 'urgent' ? 'font-semibold text-white' : 'text-[#e6c8cc]')}
-            title={`Signed in until ${new Date(expiresAt).toLocaleString()}. Sign in again to continue afterwards.`}
+            title={`Signed in until ${formatDateTime(expiresAt)} (Singapore time). Sign in again to continue afterwards.`}
           >
             {warning.text}
           </span>
