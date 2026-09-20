@@ -13,4 +13,4 @@ The engineering design: written 17 Sep 2026 before the code (solutioning phase) 
 
 Reading order for a newcomer: `ARCHITECTURE.md` (ten minutes), then `STATE_MACHINE.md`, then the ADR index. `SOLUTIONING.md` is the long form of why; `DOMAIN_MODEL.md` is the reference while reading the models and repositories.
 
-Related: security controls in `../06-security/`, the AI module in `../07-ai/`, the frontend structure in `../04-design/FRONTEND_ARCHITECTURE.md`, deployment in `../09-operations/`.
+Related: security controls in `../06-security/`, the AI module in `../07-ai/`, the frontend structure in `../04-design/FRONTEND_ARCHITECTURE.md`, the observability layer in `../13-observability/`, deployment in `../09-operations/`.

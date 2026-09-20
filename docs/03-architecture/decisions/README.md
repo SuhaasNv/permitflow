@@ -46,6 +46,8 @@ Each line below is the decision in one breath: chose X over Y because Z.
 - 009: frontend types hand-written rather than generated from OpenAPI; the delivery half of the decision moved to 011.
 - 011: the AI checks moved from a `ci.yml` job into the reusable six-stage `ai-gate.yml` (US-056); a separate live evaluation workflow runs nightly and on AI changes (US-054); the dependency audit is blocking and `bandit` was added, and the image job waits for it (US-058).
 
+- 011, 20 Sep: the observability layer (US-077) adds three Railway services (Prometheus, Grafana, the Telegram bot) from public images with their configuration in variables, so the "Railway never builds" rule holds without a new image; `docs/13-observability/OBSERVABILITY.md`.
+
 ## In a debrief
 
 Name three: 003 (the workflow is a table you can test exhaustively), 006 (the AI is boxed in: schema, rules, no authority) and 011 (build once, promote by tag, a person approves production). Point at this page for the rest.

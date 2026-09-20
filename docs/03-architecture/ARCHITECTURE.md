@@ -188,6 +188,7 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 - Request logging middleware: request id, method, path, status, duration, user id; request id echoed in `X-Request-ID`.
 - Verification logs: run id, provider, model, latency, outcome, `raw_output_valid`.
 - `/health`: database ping (503 on failure). AI provider configuration is never reported publicly; the planned admin AI-health endpoint (US-071) would carry it.
+- Metrics (US-077): `core/metrics.py` holds the Prometheus counters and histograms, the outermost middleware counts every answer, the services increment their own events, `api/v1/metrics.py` renders them behind a bearer token. Prometheus scrapes them every 15 s; Grafana draws one dashboard (API health, document checks, cost, queue); six alert rules and an hourly digest reach Telegram, where a small bot also answers `/status` and friends. The layer in full, with the Railway services: `../13-observability/OBSERVABILITY.md`.
 
 ## Deployment
 

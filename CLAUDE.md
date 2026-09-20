@@ -13,7 +13,7 @@ There is one developer on this project, so Claude is responsible for all of the 
 | Developer | Modular monolith rules (§6), typed code, conventional commits, no secrets |
 | QA engineer | Tests per layer for every story; the critical journey stays green; `docs/08-testing/TEST_STRATEGY.md` and `docs/10-uat/UAT_PLAN.md` kept current; UAT executed before calling anything shipped |
 | Security engineer | Threat model controls implemented as designed; authorization test for every endpoint; `THREAT_MODEL.md` amended when a control changes |
-| DevOps | `.env.example`, Docker Compose, CI workflow, Railway deployment, `docs/09-operations/OPERATIONS.md` |
+| DevOps | `.env.example`, Docker Compose, CI workflow, Railway deployment, `docs/09-operations/OPERATIONS.md`; the observability layer (`docker/observability/`, `docs/13-observability/OBSERVABILITY.md`): a new metric, rule, dashboard row or Telegram command is documented there in the same change, and the dashboard and alerting files are regenerated from their generators, never edited by hand |
 | Technical writer | `README.md`, `CHANGELOG.md`, `RELEASE_NOTES.md` (an entry per release, in the users' words, before the tag), `AI_USAGE.md`, `docs/README.md` index status ("written" / "to be written") kept truthful |
 | Reviewer | Before declaring a sprint or the project done, re-read the brief's acceptance criteria and check `docs/11-reviews/ASSESSMENT_TRACEABILITY.md` |
 
@@ -31,6 +31,7 @@ If a session ends mid-story, leave a "Handover" line in `CHANGELOG.md` (what is 
 | Story DoD | `docs/05-planning/DEFINITION_OF_DONE.md` |
 | Domain model, state machine, architecture, ADRs | `docs/03-architecture/` |
 | Threat model | `docs/06-security/THREAT_MODEL.md` |
+| Observability: metrics, dashboard, alerts, Telegram, the monitoring services on Railway | `docs/13-observability/OBSERVABILITY.md` |
 | UI design: screens, design system, states, components, frontend architecture | `docs/04-design/` (prototype: link in `docs/04-design/README.md`) |
 
 If code and docs disagree, fix one of them in the same change. Never leave a doc describing something the code does not do.
