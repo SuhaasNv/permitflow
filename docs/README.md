@@ -75,7 +75,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `11-reviews/FINAL_REVIEW.md` | written (19 Sep) | What was built, the decisions to defend, trade-offs, what the AI got wrong, what to show in the debrief |
 | `11-reviews/ISSUES_AND_MITIGATIONS.md` | written (19 Sep) | Every issue found across the reviews and run-throughs, its risk, mitigation and evidence; what was kept as a decision |
 | `06-security/SECURITY_REVIEW.md` | written (19 Sep) | The owner's hardening checklist and four abuse scenarios, before and after US-058, with tests and what production adds |
-| `12-demo/documents/README.md` and `12-demo/documents/with_issues/NOTES.md` | written | The three generated document sets (clean, with planted issues, second business), how to regenerate them, the planted values |
+| `12-demo/documents/README.md` and `12-demo/documents/with_issues/NOTES.md` | written | The three document sets as PDFs (clean, with planted issues, second business), the form values they agree with, the planted values |
 | `04-design/prototype-src/README.md` | written | How the clickable prototype was generated |
 | `11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` | written (19 Sep) | The owner's legal, privacy and accessibility checklist answered item by item with evidence; laws considered; risks flagged; contrast computation (US-057) |
 | `../RELEASE_NOTES.md` | written (20 Sep) | What each version brings, in the users' words, newest first, with what comes next (v0.4.0: the admin panel and use case 3) |
