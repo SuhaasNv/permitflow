@@ -9,6 +9,7 @@ import {
   withdrawApplication,
   submitApplication,
 } from '@/api/applications'
+import { getClarifications } from '@/api/clarification'
 import { getFormSchema } from '@/api/formSchema'
 import type { DateInput } from '@/api/siteVisit'
 import { acceptSiteVisit, counterSiteVisit, rescheduleSiteVisitAsOperator } from '@/api/siteVisit'
@@ -146,5 +147,15 @@ export function useRescheduleSiteVisit(id: string) {
   return useMutation({
     mutationFn: (body: DateInput) => rescheduleSiteVisitAsOperator(id, body),
     onSuccess: (view) => afterVisitChange(qc, id, view),
+  })
+}
+
+/** The flagged items with the officer's questions (US-064); refetches on focus so a new round shows. */
+export function useClarifications(id: string, enabled = true) {
+  return useQuery({
+    queryKey: [...applicationKeys.detail(id), 'clarifications'] as const,
+    queryFn: () => getClarifications(id),
+    enabled,
+    refetchOnWindowFocus: true,
   })
 }

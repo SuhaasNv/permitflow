@@ -203,6 +203,8 @@ describe('site visit checklist (US-060, US-061)', () => {
     expect(within(groups[0]!).getByRole('button', { name: /^Satisfactory$/ })).toHaveAttribute('aria-pressed', 'true')
     await vi.advanceTimersByTimeAsync(retryDelay(1) + 10)
     expect(save).toHaveBeenCalledTimes(2)
+    // the retry carries the same save id, so a save whose reply was lost is recognised server-side
+    expect(save.mock.calls[1]![1].save_id).toBe(save.mock.calls[0]![1].save_id)
     await vi.advanceTimersByTimeAsync(retryDelay(2) + 10)
     expect(save).toHaveBeenCalledTimes(3)
     await vi.advanceTimersByTimeAsync(10)

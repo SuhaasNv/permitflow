@@ -131,6 +131,7 @@ export function applicationView(over: Partial<ApplicationView> = {}): Applicatio
     withdrawal_reason: null,
     licence: null,
     site_visit: null,
+    clarification: null,
     created_at: '2026-09-19T00:50:00Z',
     updated_at: '2026-09-19T01:10:00Z',
     ...over,

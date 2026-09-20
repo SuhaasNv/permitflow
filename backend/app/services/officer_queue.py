@@ -59,7 +59,7 @@ class OfficerQueueService:
                 )
             if app.status == ApplicationStatus.SITE_VISIT_SCHEDULED:
                 # While the appointment is being arranged the row says whose move it is (US-084).
-                if visit is None:
+                if visit is None or visit.status == SiteVisitStatus.DONE:
                     action = NextAction("Propose a visit date", True)
                 elif visit.status == SiteVisitStatus.PROPOSED:
                     action = NextAction("Waiting on operator", False)

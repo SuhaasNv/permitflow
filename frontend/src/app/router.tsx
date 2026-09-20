@@ -15,6 +15,7 @@ import { DocumentsPage } from '@/features/operator/DocumentsPage'
 import { FormPage } from '@/features/operator/FormPage'
 import { ReviewPage } from '@/features/operator/ReviewPage'
 import { SubmittedPage } from '@/features/operator/SubmittedPage'
+import { ClarificationPage } from '@/features/operator/ClarificationPage'
 import { HistoryPage } from '@/features/operator/HistoryPage'
 import { OperatorDashboardPage } from '@/features/operator/DashboardPage'
 import { ApplicationsPage } from '@/features/operator/ApplicationsPage'
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
           { path: '/app/applications/:id/review', element: <ReviewPage /> },
           { path: '/app/applications/:id/submitted', element: <SubmittedPage /> },
           { path: '/app/applications/:id/history', element: <HistoryPage /> },
+          { path: '/app/applications/:id/clarification', element: <ClarificationPage /> },
           { path: '/app/applications/:id/form', element: <FormPage /> },
           {
             path: '/app/applications/:id/form/:sectionKey',

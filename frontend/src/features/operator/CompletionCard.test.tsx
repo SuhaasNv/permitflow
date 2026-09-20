@@ -47,6 +47,7 @@ const view: ApplicationView = {
   withdrawal_reason: null,
   licence: null,
   site_visit: null,
+  clarification: null,
   created_at: '2026-09-18T00:00:00Z',
   updated_at: '2026-09-18T00:00:00Z',
 }

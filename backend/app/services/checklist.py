@@ -20,7 +20,13 @@ from app.domain.checklist_schema import (
     POSITION,
     SECTIONS,
 )
-from app.domain.enums import ApplicationStatus, ChecklistResult, ChecklistStatus, ClarificationStatus
+from app.domain.enums import (
+    ApplicationStatus,
+    ChecklistResult,
+    ChecklistStatus,
+    ClarificationStatus,
+    SiteVisitStatus,
+)
 from app.domain.workflow import Actor
 from app.models import Application, Checklist, ChecklistItem, ClarificationRequest, User
 from app.repositories.applications import ApplicationRepository
@@ -350,7 +356,15 @@ class ChecklistService:
 
     def _current_visit_no(self, app: Application) -> int:
         visit = self.visits.current_for(app.id)
-        if visit is not None:
+        # A done visit stays current through Site Visit Done and the post-site states (its checklist is
+        # the record). Only a case scheduled again before a new date is proposed must not be handed the
+        # frozen record of the last visit: there the next number applies.
+        scheduled_again = (
+            visit is not None
+            and visit.status == SiteVisitStatus.DONE
+            and app.status == ApplicationStatus.SITE_VISIT_SCHEDULED
+        )
+        if visit is not None and not scheduled_again:
             return visit.visit_no
         # A case scheduled through the API before a date was proposed: the next number on record.
         latest = self.checklists.current_for(app.id)
