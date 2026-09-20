@@ -59,9 +59,18 @@ The brief, in one paragraph: build a regulatory licensing platform with two role
 
 ## Use case 3: site-visit checklist
 
-| Acceptance criterion | Status | Note |
-|----------------------|--------|------|
-| Checklist capture, draft save, per-item "Need Further Clarification", automatic move to Awaiting Post-Site Clarification, operator sees only flagged items, per-item response with uploads, multiple rounds with audit | Deferred | `SCOPE.md`; the three post-site statuses, their transitions and labels exist and are unit-tested (`test_workflow.py`); stories US-060 to US-066 recorded Not started on the board |
+Deferred from the v0.3.0 submission (the three post-site statuses and their transitions existed and were unit-tested); built on `dev` on 20 and 21 September 2026 as v0.4.0, production untouched until the owner releases it.
+
+| Acceptance criterion | Status | Implementation | Tests | Evidence |
+|----------------------|--------|----------------|-------|----------|
+| Checklist capture with predefined items | Met | Seventeen items in five sections (`domain/checklist_schema.py`), one checklist per visit, the visit arranged inside the case first (US-084, ADR-013) | `test_checklist.py`, `test_site_visit.py` | Scenario 07, 08 |
+| Draft save | Met | Idempotent autosave 1.5 s after the last touch, `version` and `save_id`, a keepalive save when the tab hides, retry with backoff, the draft continued on the next device (US-061, US-093) | `test_checklist.py`, `ChecklistPage.test.tsx`, Scenario 09 | Scenario 08 |
+| Per-item "Need Further Clarification" | Met | The flag with a required comment per item; the officer's own findings and a second finding on an item (US-062, US-092) | `test_checklist.py` | Scenario 08 |
+| Automatic move to Awaiting Post-Site Clarification | Met | The submit records the visit done and moves the case in one request; round 1 released to the operator; one notification (US-063) | `test_checklist.py`, `test_workflow.py` | Scenario 08 |
+| Operator sees only the flagged items, in operator words | Met | `ClarificationService` builds the operator view from released, non-withdrawn requests only; no result, no internal status, no officer name (US-064) | `test_clarification.py` (the view, the invisible requests) | Scenario 08 |
+| Per-item response with uploads | Met | Text saved on blur, up to three files with the document rules, photos stored without camera data, a storage budget per application, Send as one transition (US-065, US-085) | `test_clarification.py`, `test_storage_budget.py` | Scenario 08 |
+| Multiple rounds with a complete audit trail | Met | Clarified, still needs clarification, another round, withdraw; every step an audit row; the operator's history and the officer's rail show every round (US-066) | `test_clarification.py` (two rounds, five rounds, a race, reject mid-round) | Scenario 04, 08 |
+| Post-site statuses and labels as the brief lists them | Met verbatim | `domain/labels.py`; Awaiting Post-Site Clarification, Awaiting Post-Site Resubmission, Post-Site Clarification Resubmitted with the operator's labels | `test_labels.py` | |
 
 ## Beyond the brief (product decisions, all marked in SCOPE.md)
 

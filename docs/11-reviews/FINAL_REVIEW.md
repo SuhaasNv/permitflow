@@ -53,3 +53,15 @@ The first live verifier run invented enum values and missed an expired certifica
 ## Status of the deliverables
 
 README (setup, stack, demo accounts, security, tests, CI, deployment, AI verification, AI Usage, What I would do next), `SCOPE.md`, `AI_USAGE.md`, `CHANGELOG.md`, `docs/08-testing/TEST_STRATEGY.md`, `docs/07-ai/AI_EVALUATION.md`, `docs/09-operations/OPERATIONS.md`, `docs/10-uat/UAT_PLAN.md`, `docs/11-reviews/PRODUCTION_READINESS_REVIEW.md`, `docs/11-reviews/ASSESSMENT_TRACEABILITY.md`, `docs/11-reviews/ISSUES_AND_MITIGATIONS.md` and this file exist and describe what is in the repository. The index in `docs/README.md` marks each as written.
+
+## Addendum, 21 September 2026: v0.4.0 on `dev`
+
+Written after the submission, about the work that followed it. Everything in this addendum lives on `dev` and the development environment; production still serves the submitted v0.3.0 (`sha-714a159`) and will until the owner runs the release ritual (US-081).
+
+**What was built.** Use case 3 as the brief describes it, plus the pieces the brief leaves implicit: the site visit arranged inside the case (US-084), the checklist with autosave and the officer's own findings (US-060 to US-063, US-092), the operator's clarification with evidence and unlimited rounds (US-064 to US-066), a storage budget with photos stored without camera data (US-085), one live session per account with continuity from the last save (US-093), the administrator's overview, activity feed, read-only case and user management (US-070, US-072, US-073), the dashboard row and alert for use case 3 (US-089), the accessibility gate over every new screen (US-088), the poor-connection behaviour and a bundle budget (US-087), latency budgets measured on a scratch database of 10,000 applications (US-086), and the case response carrying its stage (US-083). Fourteen ADRs; T26 and T27 in the threat model.
+
+**What the reviews found.** The accessibility gate found two real defects the tests had missed: controls of 37.5 px on touch widths (the root font is 15 px) and a submitted checklist that answered 409 once the case moved past the visit. The load run found the overview at 2.8 s before its idle list became one grouped query (312 ms after). The Sonnet review passes on the site visit and the clarification found nine defects listed in `CHANGELOG.md` under US-092, all fixed before the merge.
+
+**What I would defend.** Reusing the officer's read routes and screens for the administrator under a read-only context (ADR-014) instead of a second API: one read model, one authorization test per endpoint, the server never offering an administrator a transition. The session model over a stateless token: revocation on the next request is what "one device at a time" means, and the cost was every test helper signing in with `take_over`.
+
+**What remains for the release.** The acceptance scenarios U13 to U18 on the development environment need `dev` deployed there, which needs the owner's push; the two-caller limiter check (US-082) waits for the same deploy; the release ritual (US-081) is the owner's call after the Xtremax process.

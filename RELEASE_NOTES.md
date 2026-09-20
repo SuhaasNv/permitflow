@@ -8,11 +8,28 @@ Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for 
 
 ## Coming next
 
-**v0.4.0: use case 3 and the admin panel.** Planned on 20 September 2026 after the submission (`docs/05-planning/RELEASE_PLAN_V0_4_0.md`), built on the development environment sprint by sprint; production keeps v0.3.0 until the release. Working version on `dev`: `0.4.0-dev`.
+**v0.4.0: use case 3 and the admin panel, built and waiting for the release.** Built on `dev` on 20 and 21 September 2026 (`docs/05-planning/RELEASE_PLAN_V0_4_0.md`); production keeps v0.3.0 until the owner runs the release ritual after the Xtremax process. Working version on `dev`: `0.4.0-dev`. The entry below is what the release will say.
 
-*Use case 3, the site visit, first.* Once a visit is scheduled the officer opens the inspection checklist on a tablet (seventeen items grounded in the Singapore Food Agency's public food shop requirements), records a result and a comment per item, saves it as a draft between rooms even on a poor connection, and marks the items that need clarification. Submitting the checklist moves the case to Pending Post-Site Clarification on its own and sends the flagged items to the operator. The operator sees only those items with the officer's comment on each, answers them one by one, attaches photos or documents from a phone, and sends the round; the officer marks each item clarified or asks again, and several rounds per item are kept with every message, file and timestamp. A second site visit gets its own checklist. Stories US-060 to US-066.
+## v0.4.0, not yet released: the site visit, the clarification and the office's own view
 
-*The admin panel, after that.* A read-only oversight view for the licensing office: applications by status, the ones that have gone quiet, today's submissions, the health of the automatic document checks, a feed of recent activity across every application, and a user directory where an administrator can change a role or deactivate an account (every change audited; the last active administrator cannot be removed; the demonstration accounts cannot be touched). Stories US-070 to US-073. If time runs short this half moves to v0.5.0.
+**New for licensing officers**
+- Arrange the site visit inside the case: propose a date and a morning or afternoon slot, see the operator accept or propose another date, keep or accept, ask to move a confirmed visit; six proposals at most per visit; every round on the record.
+- The inspection checklist on a tablet: seventeen items in five sections, a result and a comment each, saved as a draft as you go (also when the lid closes or the connection drops), the items that need clarification flagged, findings of your own added where the template has none, and a submit that records the visit done and sends the flagged items to the operator in one step.
+- The clarification rounds on the case: read each answer with its evidence, mark an item clarified, ask again, withdraw a question, request another round, route to approval when nothing is open.
+- One device at a time: your account is signed in on one device; a second sign-in tells you where it is and lets you sign that device out and continue where the draft was last saved.
+
+**New for operators**
+- Answer the flagged items after the visit: the officer's comment on each item in plain words, a text answer per item, up to three files (a photo from the phone camera included, stored without its camera data), one Send when every item is answered, and the whole history of rounds on the application.
+- Answers and files wait through a lost connection and go the moment it returns; every date and time is Singapore time.
+
+**New for the licensing office (administrators)**
+- An operations overview: every status with its count, the applications idle for more than seven days, today's submissions and rounds, and the health of the automatic document checks against the daily quota.
+- The activity feed across every application and every account change, and any case readable exactly as the officer sees it, without a single control.
+- Users: change a role, deactivate or reactivate an account, add an account; the demonstration accounts are protected; the last active administrator cannot be removed.
+
+**Also**
+- Each application has 150 MB of storage room across its documents, evidence and licence; the pages say how much is left before a file is chosen.
+- The accessibility gate covers every new screen; every control on the checklist and the respond page is at least 44 px on a phone or a tablet.
 
 ---
 

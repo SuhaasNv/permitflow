@@ -73,9 +73,9 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `11-reviews/EDGE_CASE_REVIEW.md` | written (Sprint 2) | Three devil's-advocate reviews: every finding, its fix or its plan |
 | `11-reviews/BUG_HUNT_REVIEW.md` | written (19 Sep) | Three parallel bug hunts (backend, frontend, seams): 39 findings (36 fixed, 3 kept as decisions); browser run-through findings R1 to R12 |
 | `11-reviews/LAYOUT_AUDIT.md` | written (19 Sep) | Layout audit at 390, 820, 1024, 1280 and 1440; findings tracked as US-043 and US-044 |
-| `11-reviews/PRODUCTION_READINESS_REVIEW.md` | written (19 Sep) | Twenty-two gaps with severity, what is in place, what production would need; go/no-go |
-| `11-reviews/ASSESSMENT_TRACEABILITY.md` | written (19 Sep) | The brief decoded; every deliverable and acceptance criterion → implementation → test → evidence |
-| `11-reviews/FINAL_REVIEW.md` | written (19 Sep) | What was built, the decisions to defend, trade-offs, what the AI got wrong, what to show in the debrief |
+| `11-reviews/PRODUCTION_READINESS_REVIEW.md` | written (19 Sep; rows 1, 15, 22 and 25 closed 21 Sep with v0.4.0) | Twenty-five gaps with severity, what is in place, what production would need; go/no-go |
+| `11-reviews/ASSESSMENT_TRACEABILITY.md` | written (19 Sep; use case 3 written as built 21 Sep) | The brief decoded; every deliverable and acceptance criterion → implementation → test → evidence |
+| `11-reviews/FINAL_REVIEW.md` | written (19 Sep; v0.4.0 addendum 21 Sep) | What was built, the decisions to defend, trade-offs, what the AI got wrong, what to show in the debrief |
 | `11-reviews/ISSUES_AND_MITIGATIONS.md` | written (19 Sep) | Every issue found across the reviews and run-throughs, its risk, mitigation and evidence; what was kept as a decision |
 | `06-security/SECURITY_REVIEW.md` | written (19 Sep) | The owner's hardening checklist and four abuse scenarios, before and after US-058, with tests and what production adds |
 | `12-demo/documents/README.md` and `12-demo/documents/with_issues/NOTES.md` | written | The three document sets as PDFs (clean, with planted issues, second business), the form values they agree with, the planted values |

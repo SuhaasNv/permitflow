@@ -2,6 +2,69 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Sprints 4 to 7 closed, Sprint 8 in progress (21 Sep 2026)
+
+The five planned one-day sprints ran as one long session across 20 and 21 September 2026, the owner reviewing from a phone and answering questions between stories; the close ritual was run once for the four of them at the end, story by story against the Definition of Done, and the Notion board reflects it. Numbers at close: backend 850 test cases from 249 functions (95 % statements), frontend 225 tests (82 % statements), 12 Playwright specs (the journey, ten scenarios, the accessibility gate with 11 tests), 246 API-level edge checks, 14 ADRs, two new threat rows (T26, T27), production untouched on v0.3.0.
+
+### Sprint 4: "Agree the shape"
+
+| Story | Outcome |
+|-------|---------|
+| US-078 Design pass | Done (sixteen artboards approved by the owner, 20 Sep evening) |
+| US-079 Workflow amendments | Done |
+| US-082 Limiter behind the edge | Built (`CLIENT_IP_HEADER`); the two-caller check on the development environment waits for the next deploy of `dev` |
+| US-084 Site visit appointment | Done (pulled forward at the owner's request) |
+| US-090 Singapore time | Done |
+
+Retro: the design pass paid for itself; every screen was built from an approved artboard and none was redrawn. What slowed us: the state machine reading of the post-site statuses took three reviews to settle.
+
+### Sprint 5: "The officer inspects"
+
+| Story | Outcome |
+|-------|---------|
+| US-060, US-061, US-062, US-063 Checklist | Done |
+| US-064 Operator view of the flagged items | Done |
+| US-092 Extra findings on the checklist | Done (added at the owner's question) |
+
+Retro: the autosave took two review rounds (rapid taps lost edits until the refs were written synchronously); the second visit rule (a done visit is not reused) came from a reviewer, not a test. Nothing slipped.
+
+### Sprint 6: "The operator clarifies"
+
+| Story | Outcome |
+|-------|---------|
+| US-065 Responses with evidence | Done |
+| US-066 Rounds | Done |
+| US-093 One live session per account | Done (added at the owner's request) |
+| US-085 Storage budget and photos without camera data | Done |
+| US-087 Poor connection | Slipped to Sprint 7: sessions and storage came first at the owner's request; done there |
+
+Retro: a session model changed every test helper (sign in with `take_over`), which is the cost of a rule that holds everywhere. What to change: run the UAT script and Playwright one at a time; they share the demonstration accounts and one revokes the other.
+
+### Sprint 7: "The office can see itself"
+
+| Story | Outcome |
+|-------|---------|
+| US-070 Overview (absorbs US-071) | Done |
+| US-072 Activity feed and read-only case | Done |
+| US-073 Users (with account creation at the owner's request) | Done |
+| US-088 Accessibility gate over the new screens | Done (found two real defects) |
+| US-089 Use case 3 and storage on the dashboard | Done |
+| US-087 Poor connection (from Sprint 6) | Done |
+
+Retro: the gate earned its keep (37.5 px controls, a checklist unreadable after the visit); the read-only case through a context was one afternoon, a separate admin API would have been a day. What to change: measure before promising a latency budget (Sprint 8 found the overview at 2.8 s).
+
+### Sprint 8: "Release v0.4.0 honestly" (in progress)
+
+| Story | Outcome |
+|-------|---------|
+| US-086 Latency budgets under load | Done |
+| US-083 Phase, outcome, can_resolve | Done |
+| US-080 Acceptance and documents | Documents in progress; the UAT on the development environment waits for the owner's push and deploy of `dev` |
+| US-082 Two-caller check on development | Waits for the same deploy |
+| US-081 Release v0.4.0 | On the owner's go, after the Xtremax process |
+
+`SCOPE.md` re-read at the close: V1 to V26 built except the release itself; the parked v0.5.0 list unchanged.
+
 ## US-086 Latency budgets under load (21 Sep 2026, Sprint 8)
 
 - A load kit (`scripts/load/`: a scratch seed of 10,000 applications and 100,000 audit rows, a k6 script and a threaded runner for a machine without k6) and the indexes the admin reads need. Measured on the scratch database: checklist save p95 18 ms, admin overview p95 312 ms, activity feed p95 46 ms, every budget met; the overview's idle list had to become one grouped query to get there (2.8 s before).
