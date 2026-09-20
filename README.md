@@ -104,7 +104,7 @@ Claude Code (Claude Opus 5 for most sessions, Claude Fable 5.1 for some) in the 
 
 Every story ran the full suites, `ruff`, `mypy --strict` and `tsc --strict`, and a browser check at three widths before it moved to Done; every reviewer finding was reproduced before a fix; I read every diff before a commit and every push needed my yes. Where the AI was wrong is written down: invented enum values and a valid verdict on an expired certificate, a scope-creeping story, a transition the state machine did not allow, a scratch file in a commit, UTC licence dates, a harness fault first blamed on the model.
 
-The full record, with the prompts grouped by the decision they carry, what was discarded and how the debrief videos were made: `AI_USAGE.md`. Slides 15 to 17 of the technical deck cover the same ground.
+The full record, with the prompts grouped by the decision they carry, what was discarded and how the debrief videos were made: `AI_USAGE.md`. Slides 16 to 19 of the technical deck cover the same ground.
 
 ## Release notes
 
@@ -118,4 +118,5 @@ Each item has a row with severity in `docs/11-reviews/PRODUCTION_READINESS_REVIE
 2. A worker for the AI checks (Redis or a Postgres `SKIP LOCKED` queue) so checks survive deploys and scale apart from the API; ADR-004 has one call site to change.
 3. Object storage with signed URLs and a virus scan, a backup and restore drill, a retention policy.
 4. httpOnly cookie sessions with CSRF protection, CSP nonces, the rate windows in Redis or at the edge.
-5. AI assurance beyond 14 golden cases: a labelled set grown from officer overrides, a red-team suite, calibrated confidence, in-region tracing, a multilingual injection classifier, Project Moonshot as the Singapore assurance evidence (`docs/07-ai/AI_ASSURANCE.md`, Limits).
+5. Observability: a `/metrics` endpoint on the API, Prometheus scraping the API, nginx and Postgres, Grafana dashboards and alerts on an SLO; request logs and AI traces are the only telemetry today (readiness row 24).
+6. AI assurance beyond 14 golden cases: a labelled set grown from officer overrides, a red-team suite, calibrated confidence, in-region tracing, a multilingual injection classifier, Project Moonshot as the Singapore assurance evidence (`docs/07-ai/AI_ASSURANCE.md`, Limits).
