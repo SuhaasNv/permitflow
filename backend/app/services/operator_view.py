@@ -1,7 +1,7 @@
 """Build the operator-facing view of an application from the aggregate."""
 
 from app.domain import completeness as completeness_rules
-from app.domain.enums import ApplicationStatus, DocumentType
+from app.domain.enums import ApplicationStatus, DocumentType, VerificationStatus
 from app.domain.form_schema import SECTIONS
 from app.domain.labels import operator_label, tone_for
 from app.domain.officer_actions import next_action
@@ -97,6 +97,20 @@ def summary(
     )
 
 
+# Reasons an operator may see: the daily quota (so the slot can say why) and why their own file could not
+# be read. Provider and infrastructure codes (`provider_not_configured`, `storage_error`, ...) describe our
+# configuration, not their document, and are collapsed to `unavailable` (the officer sees the real code).
+_OPERATOR_REASONS = frozenset({"daily_limit_reached", "interrupted"})
+
+
+def _operator_reason(run: VerificationRun) -> str | None:
+    if run.error_reason is None:
+        return None
+    if run.status == VerificationStatus.UNREADABLE or run.error_reason in _OPERATOR_REASONS:
+        return run.error_reason
+    return "unavailable"
+
+
 def document_view(
     doc: Document, run: VerificationRun | None, replaces: Document | None = None
 ) -> DocumentView:
@@ -108,7 +122,7 @@ def document_view(
             summary=run.summary,
             issues=[{k: v for k, v in i.items() if k != "evidence"} for i in run.issues],
             missing_information=list(run.missing_information),
-            error_reason=run.error_reason,
+            error_reason=_operator_reason(run),
             requested_at=run.created_at,
             finished_at=run.finished_at,
         )

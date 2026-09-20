@@ -8,7 +8,7 @@ import { AppError } from '@/api/client'
 import * as formApi from '@/api/formSchema'
 import * as sectionsApi from '@/api/sections'
 import { AppProviders } from '@/app/providers'
-import { applicationView, formSchema, respondingView, sectionView } from '@/test/fixtures'
+import { applicationView, formSchema, respondingView, sectionView, slotView } from '@/test/fixtures'
 import { FormPage } from './FormPage'
 
 function renderAt(path: string) {
@@ -101,6 +101,33 @@ describe('FormPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save and go to resubmit' }))
     expect(await screen.findByText(/This application changed since you opened it/)).toBeInTheDocument()
     await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(1))
+  })
+
+  it('keeps the form and the typed text when a background refetch fails', async () => {
+    // A running check makes the page poll every 2 s; the poll then fails with a 429 (not retried).
+    const checking = slotView('floor_plan', {
+      document: { ...slotView('floor_plan').document!, verification: { ...slotView('floor_plan').document!.verification!, status: 'running', requested_at: new Date().toISOString(), finished_at: null } },
+    })
+    const draft = applicationView({
+      status_label: 'Draft',
+      status_tone: 'neutral',
+      can_edit: true,
+      revision_count: 0,
+      revisions: [],
+      sections: [sectionView('business', { editable: true }), sectionView('premises', { editable: true, data: {} })],
+      document_slots: [slotView('business_profile'), checking],
+    })
+    const get = vi
+      .spyOn(appsApi, 'getApplication')
+      .mockResolvedValueOnce(draft)
+      .mockRejectedValue(new AppError(429, { code: 'rate_limited', message: 'Too many requests.' }))
+    renderAt('/app/applications/app-1/form/premises')
+    expect(await screen.findByRole('heading', { name: 'Premises' })).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText(/Postal code/), '208788')
+    await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(1), { timeout: 5_000 })
+    expect(screen.getByRole('heading', { name: 'Premises' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Postal code/)).toHaveValue('208788')
+    expect(screen.queryByRole('button', { name: /Try again/ })).not.toBeInTheDocument()
   })
 
   it('shows Not found for an unknown application', async () => {

@@ -32,6 +32,8 @@ export function NotificationsBell({ role }: { role: Role }) {
 
   useEffect(() => {
     if (!open) return
+    // A dialog receives focus when it opens: the first action inside it, falling back to the first item.
+    ref.current?.querySelector<HTMLElement>('[role="dialog"] button')?.focus()
     const close = () => {
       setOpen(false)
       // Return focus to the bell so keyboard users are not dropped on the page body.

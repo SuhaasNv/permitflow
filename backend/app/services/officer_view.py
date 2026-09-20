@@ -41,7 +41,8 @@ _FEEDBACK_LOCK: dict[ApplicationStatus, str] = {
     ApplicationStatus.APPLICATION_RECEIVED: "Start the review to add feedback.",
     ApplicationStatus.PRE_SITE_RESUBMITTED: "Start the review of this resubmission to add feedback.",
     ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION: (
-        "Feedback is frozen while the operator responds; it reopens when they resubmit."
+        "Feedback is frozen while the operator responds; it reopens when you start the review of their "
+        "resubmission."
     ),
     ApplicationStatus.APPROVED: "This application is decided.",
     ApplicationStatus.REJECTED: "This application is decided.",
@@ -257,5 +258,6 @@ def _verification(run: VerificationRun | None) -> OfficerVerificationOut | None:
         error_reason=run.error_reason,
         provider=run.provider,
         model=run.model,
+        requested_at=run.created_at,
         finished_at=run.finished_at,
     )

@@ -134,7 +134,7 @@ describe('downloads', () => {
   })
 
   it('downloads a document with the original name and revokes the object URL afterwards', async () => {
-    fetchMock.mockResolvedValue(new Response(new Blob(['%PDF']), { status: 200 }))
+    fetchMock.mockResolvedValue(new Response('%PDF', { status: 200 }))
     await downloadDocument('app-1', 'doc-1', 'plan.pdf')
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/documents\/doc-1\/download$/)
     expect((fetchMock.mock.calls[0][1]!.headers as Record<string, string>).Authorization).toBe('Bearer tok')
@@ -144,7 +144,7 @@ describe('downloads', () => {
   })
 
   it('names the licence file after the licence number and explains 404 and 409', async () => {
-    fetchMock.mockResolvedValueOnce(new Response(new Blob(['%PDF']), { status: 200 }))
+    fetchMock.mockResolvedValueOnce(new Response('%PDF', { status: 200 }))
     await downloadLicence('app-1', 'FEL-2026-000005')
     expect(clicks).toEqual(['FEL-2026-000005.pdf'])
 

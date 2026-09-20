@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,6 +7,7 @@ import { AppError } from '@/api/client'
 import * as docsApi from '@/api/documents'
 import type { DocumentView, UploadResult } from '@/api/documents'
 import { AppProviders } from '@/app/providers'
+import { CHECK_STALE_MS } from '../queries'
 import { DocumentSlot } from './DocumentSlot'
 
 const now = new Date()
@@ -173,6 +174,32 @@ describe('DocumentSlot', () => {
     )
     expect(screen.getByRole('button', { name: 'Re-run check' })).toBeInTheDocument()
     expect(screen.getByText('Replace file')).toBeInTheDocument()
+  })
+
+  it('wakes up on its own when a running check crosses the staleness window', async () => {
+    vi.useFakeTimers()
+    try {
+      const requested = new Date(Date.now() - (CHECK_STALE_MS - 1_000)).toISOString()
+      render(
+        <AppProviders>
+          <DocumentSlot
+            applicationId="app-1"
+            slot={slot(doc({}, { status: 'running', finished_at: null, requested_at: requested }))}
+            index={1}
+            canDelete
+            onUploaded={vi.fn()}
+            onDeleted={vi.fn()}
+          />
+        </AppProviders>,
+      )
+      expect(screen.queryByRole('button', { name: 'Re-run check' })).not.toBeInTheDocument()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000)
+      })
+      expect(screen.getByRole('button', { name: 'Re-run check' })).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('re-runs through the API and hands the fresh view up; a 409 shows in the slot', async () => {

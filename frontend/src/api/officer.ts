@@ -55,6 +55,7 @@ export interface OfficerVerification {
   error_reason: string | null
   provider: string
   model: string | null
+  requested_at: string
   finished_at: string | null
 }
 

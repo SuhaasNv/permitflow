@@ -120,3 +120,54 @@ def test_api_answers_carry_the_hardening_headers(client: TestClient) -> None:
     # The interactive docs (non-production only) load Swagger from a CDN and are exempt from the CSP.
     docs = client.get("/api/docs")
     assert docs.status_code == 200 and "Content-Security-Policy" not in docs.headers
+
+
+def test_quota_refusals_do_not_count_toward_the_quota(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A refused attempt is stored `unavailable` but must not extend the applicant's lock-out: only runs
+    that could have reached the model are counted, so capacity returns a day after the last real run."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.repositories.documents import DocumentRepository
+    from app.services.quotas import DAILY_LIMIT_REASON
+
+    gen = _settings(monkeypatch, AI_RUNS_PER_USER_PER_DAY="1")
+    next(gen)
+    user = make_user(db, "op@example.sg", Role.OPERATOR)
+    db.commit()
+    h = login(client, "op@example.sg")
+    app_id = draft(client, h)
+    upload(client, h, app_id, "business_profile", "a.pdf", PDF)
+    for dtype in ("floor_plan", "tenancy_agreement"):
+        refused = upload(client, h, app_id, dtype, f"{dtype}.pdf", PDF).json()
+        assert refused["document"]["verification"]["error_reason"] == "daily_limit_reached"
+    since = datetime.now(UTC) - timedelta(days=1)
+    repo = DocumentRepository(db)
+    assert repo.count_runs_since(since, operator_id=user.id) == 3
+    assert repo.count_runs_since(since, operator_id=user.id, exclude_reason=DAILY_LIMIT_REASON) == 1
+    next(gen, None)
+
+
+def test_oversized_upload_is_refused_by_the_middleware_with_cors_headers(
+    client: TestClient, db: Session
+) -> None:
+    """The Content-Length gate answers inside CORS, so a browser can read the refusal (T7)."""
+    make_user(db, "op@example.sg", Role.OPERATOR)
+    db.commit()
+    h = login(client, "op@example.sg")
+    app_id = draft(client, h)
+    r = client.post(
+        f"/api/v1/applications/{app_id}/documents",
+        headers={
+            **h,
+            "Origin": "http://localhost:3000",
+            "Content-Length": str(50 * 1024 * 1024),
+            "Content-Type": "multipart/form-data; boundary=x",
+        },
+        content=b"",
+    )
+    assert r.status_code == 400
+    assert r.json()["error"]["details"]["reason"] == "too_large"
+    assert r.json()["error"]["details"]["request_id"]
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"

@@ -217,6 +217,7 @@ export function officerView(over: Partial<OfficerApplication> = {}): OfficerAppl
           error_reason: null,
           provider: 'mock',
           model: 'mock-1',
+          requested_at: '2026-09-19T02:50:00Z',
           finished_at: '2026-09-19T02:50:10Z',
         },
       },
