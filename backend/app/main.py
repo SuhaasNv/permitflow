@@ -20,6 +20,7 @@ from app.core.logging import configure_logging, request_logging_middleware
 from app.core.metrics import RATE_LIMITED, metrics_middleware
 from app.core.rate_limit import RequestLimiter
 from app.core.settings import get_settings
+from app.core.version import APP_VERSION
 from app.domain.uploads import too_large_message
 
 logger = logging.getLogger("permitflow")
@@ -72,7 +73,7 @@ def create_app() -> FastAPI:
     expose_docs = settings.app_env != "production"
     app = FastAPI(
         title="PermitFlow API",
-        version="0.4.0-rc.1",
+        version=APP_VERSION,
         lifespan=lifespan,
         docs_url="/api/docs" if expose_docs else None,
         openapi_url="/api/openapi.json" if expose_docs else None,

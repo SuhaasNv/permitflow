@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core import settings as settings_module
+from app.core.version import APP_VERSION, BUILD_COMMIT
 from app.models.enums import Role
 from tests.factories import login, make_user
 from tests.journeys import complete_draft
@@ -79,6 +80,8 @@ def test_metrics_report_requests_transitions_checks_and_gauges(
     assert _sample(body, "permitflow_applications", status="draft") == 1.0
     assert _sample(body, "permitflow_applications", status="application_received") == 1.0
     assert "permitflow_verification_run_seconds_bucket" in body
+    # the build the scrape comes from, for the bot and the digest (the commit is "local" outside an image)
+    assert _sample(body, "permitflow_build_info", version=APP_VERSION, commit=BUILD_COMMIT) == 1.0
     # the scrape does not count itself
     assert _sample(body, "permitflow_http_requests_total", route="/api/v1/metrics") is None
 

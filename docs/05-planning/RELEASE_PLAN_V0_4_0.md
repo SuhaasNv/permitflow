@@ -387,7 +387,7 @@ Coverage thresholds (backend 80, frontend 80) stay in force; frontend coverage s
 
 ## 9. Release ritual (US-081, only on the owner's go)
 
-1. `dev` green; Sprint 8 close done; `RELEASE_NOTES.md` has the v0.4.0 entry; version set to `0.4.0` in `frontend/package.json` (and its lockfile), `backend/pyproject.toml` (and `uv.lock`) and `backend/app/main.py`, and the `dev` notice removed from `README.md`, in one `chore:` commit on `dev`.
+1. `dev` green; Sprint 8 close done; `RELEASE_NOTES.md` has the v0.4.0 entry; version set to `0.4.0` in `frontend/package.json` (and its lockfile), `backend/pyproject.toml` (and `uv.lock`) and `backend/app/core/version.py`, and the `dev` notice removed from `README.md`, in one `chore:` commit on `dev`.
 2. Pull request `dev` into `main`; seven checks green; merge (no attribution lines in the body).
 3. Tag `v0.4.0` on the merge commit; CI writes the `:v0.4.0` image tags.
 4. Stage the production source change to `sha-<merge>` (staged, per environment, never a live connect), review the staged change, accept the deploy.

@@ -84,9 +84,12 @@ def digest(env):
         ("J", f'sum(permitflow_applications{{{e}, status=~"pending_pre_site_resubmission|awaiting_post_site_clarification|pending_post_site_resubmission"}}) or vector(0)'),
     ]
     data = [query(r, x, 3600) for r, x in qs] + [reduce(r + "r", r) for r, _ in qs]
+    # the build answering in this environment: its version and commit ride as labels of K (owner's request, 21 Sep)
+    data += [query("K", f'max by (version, commit) (permitflow_build_info{{{e}}})'), reduce("Kr", "K")]
     # the environment exists when Prometheus has a target for it; otherwise the rule stays quiet (NoData -> OK)
     data += [query("Z", f'count(up{{job="permitflow-api", {e}}})'), reduce("Zr", "Z"), threshold("C", "Zr", "gt", 0)]
     v = lambda r, fmt: f"{{{{ printf \"{fmt}\" (index $values \"{r}r\").Value }}}}"
+    build = ('{{ with (index $values "Kr") }}{{ index .Labels "version" }} ({{ index .Labels "commit" }}){{ else }}n/a{{ end }}')
     return {"uid": f"pf-digest-{env}", "title": f"PermitFlow hourly digest ({env})", "condition": "C", "data": data,
             "for": "0s", "labels": {"severity": "info", "kind": "digest", "environment": env},
             "annotations": {
@@ -95,6 +98,7 @@ def digest(env):
                 "requests_per_minute": v("D", "%.0f"), "p995_ms": v("E", "%.0f"), "checks": v("F", "%.0f"),
                 "spend_usd": v("G", "%.3f"), "applications": v("H", "%.0f"),
                 "waiting_officer": v("I", "%.0f"), "waiting_operator": v("J", "%.0f"),
+                "build": build,
             },
             "noDataState": "OK", "execErrState": "OK", "isPaused": False}
 
@@ -103,7 +107,7 @@ rules_doc = {"apiVersion": 1, "deleteRules": [{"orgId": 1, "uid": "pf-digest"}],
                                           "rules": incidents + [digest(e) for e in ENVIRONMENTS]}]}
 
 SECTION = '''{{- range .Alerts }}{{ if and (eq .Labels.kind "digest") (eq .Labels.environment "ENV") }}
-<b>ENVTITLE</b>  ·  API {{ .Annotations.api }}
+<b>ENVTITLE</b>  ·  API {{ .Annotations.api }}  ·  version <b>{{ .Annotations.build }}</b>
 Requests  <b>{{ .Annotations.requests_per_minute }}</b> / min   ·   p99.5  <b>{{ .Annotations.p995_ms }}</b> ms
 Checks  <b>{{ .Annotations.checks }}</b>   ·   spend  <b>USD {{ .Annotations.spend_usd }}</b>
 Applications  <b>{{ .Annotations.applications }}</b>   ·   officer's turn  <b>{{ .Annotations.waiting_officer }}</b>   ·   operator's turn  <b>{{ .Annotations.waiting_operator }}</b>

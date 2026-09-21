@@ -76,10 +76,20 @@ def cost_expr(e: str) -> str:
             f' + sum(increase(permitflow_openai_tokens_total{{{e}, kind="completion"}}[1h])) * {PRICE_OUT}) / 1e6')
 
 
+def build_of(env: str) -> str:
+    """The version and commit the API in this environment reports (permitflow_build_info), or n/a."""
+    rows = prom_series(f'max by (version, commit) (permitflow_build_info{{environment="{env}"}})')
+    if not rows:
+        return "n/a"
+    m = rows[-1][0]
+    return f"{m.get('version', '?')}  ({m.get('commit', '?')})"
+
+
 def section_status(env: str) -> str:
     e = f'environment="{env}"'
     up = prom(f'min(up{{job="permitflow-api", {e}}})')
     api = "n/a" if up is None else ("up" if up >= 1 else "DOWN")
+    build = build_of(env)
     rpm = prom(f'sum(rate(permitflow_http_requests_total{{{e}}}[5m])) * 60')
     p995 = prom(f'histogram_quantile(0.995, sum by (le) (rate(permitflow_http_request_seconds_bucket{{{e}}}[5m]))) * 1000')
     err = prom(f'sum(rate(permitflow_http_requests_total{{{e}, status=~"5.."}}[5m])) / sum(rate(permitflow_http_requests_total{{{e}}}[5m]))')
@@ -91,7 +101,7 @@ def section_status(env: str) -> str:
     quiet = not rpm  # no request in the last five minutes: latency and error share have no meaning
     traffic = ("Requests  <b>0</b> / min   ·   <i>quiet for five minutes</i>" if quiet else
                f"Requests  <b>{n(rpm)}</b> / min   ·   p99.5  <b>{n(p995)}</b> ms   ·   5xx  <b>{n((err or 0) * 100, '%.1f')} %</b>")
-    return (f"<b>{env.capitalize()}</b>  ·  API {api}\n{traffic}\n"
+    return (f"<b>{env.capitalize()}</b>  ·  API {api}  ·  version <b>{build}</b>\n{traffic}\n"
             f"Checks (1 h)  <b>{n(checks, none='0')}</b>   ·   spend  <b>USD {n(spend, '%.3f', '0.000')}</b>\n"
             f"Applications  <b>{n(apps)}</b>   ·   officer's turn  <b>{n(officer)}</b>   ·   operator's turn  <b>{n(operator)}</b>")
 
