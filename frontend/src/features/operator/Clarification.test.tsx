@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
 
 import * as api from '@/api/applications'
+import { AppError } from '@/api/client'
 import * as clarApi from '@/api/clarification'
 import type { ClarificationView } from '@/api/clarification'
 import { AppProviders } from '@/app/providers'
@@ -290,6 +291,47 @@ describe('clarification after the site visit, operator side (US-064)', () => {
     await waitFor(() =>
       expect(screen.queryByText('You are offline: answers and files wait here until you reconnect')).not.toBeInTheDocument(),
     )
+  })
+
+  it('a send refused with 409 (the officer withdrew the question) reloads the list and the header line', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const answered: ClarificationView = {
+      ...view,
+      can_send: true,
+      resolved_count: 0,
+      items: [
+        {
+          ...view.items[0]!,
+          responses: [
+            { id: 'r1', round_no: 1, message: 'Regraded on 23 Sep.', created_at: '2026-09-25T01:00:00Z', sent_at: null, attachments: [] },
+          ],
+        },
+      ],
+    }
+    const withdrawn: ClarificationView = { ...answered, items: [], open_count: 0, can_respond: false, can_send: false }
+    vi.spyOn(clarApi, 'getClarifications').mockResolvedValueOnce(answered).mockResolvedValue(withdrawn)
+    vi.spyOn(api, 'getApplication')
+      .mockResolvedValueOnce(afterVisit)
+      .mockResolvedValue({
+        ...afterVisit,
+        status_explanation: 'The site visit is recorded. The licensing office is finalising its assessment.',
+        needs_operator_action: false,
+        clarification: { can_respond: false, open_count: 0, answered_count: 0, round: 1 },
+      })
+    const sendSpy = vi
+      .spyOn(clarApi, 'sendClarifications')
+      .mockRejectedValue(new AppError(409, { code: 'conflict', message: 'Nothing is waiting to be sent.' }))
+    renderAt('/app/applications/a1/clarification')
+    expect(await screen.findByText('The licensing officer needs more information on 2 items after the site visit.')).toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('button', { name: 'Send responses' }))
+    await userEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Send your answers?' })).getByRole('button', { name: 'Send responses' }),
+    )
+    await waitFor(() => expect(sendSpy).toHaveBeenCalledWith('a1'))
+    expect(await screen.findByText('This application changed since you opened it. Showing the latest.')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Nothing needs your response yet' })).toBeInTheDocument()
+    expect(await screen.findByText('The site visit is recorded. The licensing office is finalising its assessment.')).toBeInTheDocument()
+    expect(screen.queryByText('The licensing officer needs more information on 2 items after the site visit.')).not.toBeInTheDocument()
   })
 
   it('with nothing released the page says so', async () => {

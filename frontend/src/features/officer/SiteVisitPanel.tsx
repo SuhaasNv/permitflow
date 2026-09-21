@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { AppError } from '@/api/client'
@@ -13,7 +14,7 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import type { Tone } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { formatDate, formatDateTime } from '@/lib/format'
-import { useConfirmSiteVisitWithoutReply, useDecideSiteVisit, useProposeSiteVisit, useRescheduleSiteVisitAsOfficer } from './queries'
+import { officerKeys, useConfirmSiteVisitWithoutReply, useDecideSiteVisit, useProposeSiteVisit, useRescheduleSiteVisitAsOfficer } from './queries'
 import { useReadOnly } from './readOnly'
 
 const TONE: Record<string, Tone> = { proposed: 'neutral', counter_proposed: 'warning', confirmed: 'success', done: 'success' }
@@ -223,10 +224,18 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
   const confirm = useConfirmSiteVisitWithoutReply(view.id)
   const reschedule = useRescheduleSiteVisitAsOfficer(view.id)
   const toast = useToast()
+  const queryClient = useQueryClient()
   const [form, setForm] = useState<'propose' | 'reschedule' | null>(null)
   const busy = decide.isPending || confirm.isPending || reschedule.isPending
   const fail = (title: string) => (e: Error) => {
     if (Object.keys(fieldErrorsOf(e)).length) return
+    // A 409 means the visit moved under us (another officer or device decided it, the operator replied):
+    // reload the case so the rail shows what stands, never the raw server reason (UAT, 21 Sep).
+    if (e instanceof AppError && e.status === 409) {
+      toast.push({ title, body: 'This application changed since you opened it. Showing the latest.', tone: 'error' })
+      void queryClient.invalidateQueries({ queryKey: officerKeys.case(view.id) })
+      return
+    }
     toast.push({ title, body: e.message, tone: 'error' })
   }
   const settle = (action: 'accept_operator' | 'keep_original') =>

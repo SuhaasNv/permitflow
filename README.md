@@ -84,7 +84,7 @@ cd frontend && npm test && npm run lint && npm run typecheck && npm run build
 cd frontend && npm run e2e          # Playwright against the running stack (backend :8000 with AI_PROVIDER=mock, Vite :3000)
 ```
 
-854 backend cases from 253 test functions on a real PostgreSQL (the state-machine sweep alone is 597), 226 frontend tests, twelve Playwright specs (the journey, ten scenarios, the accessibility gate), 246 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
+854 backend cases from 253 test functions on a real PostgreSQL (the state-machine sweep alone is 597), 229 frontend tests, twelve Playwright specs (the journey, ten scenarios, the accessibility gate), 246 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
 
 ## Environment variables
 
