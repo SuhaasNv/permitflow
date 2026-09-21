@@ -86,8 +86,10 @@ function initials(name: string): string {
     .join('')
 }
 
-/** Masthead, top bar, collapsible side rail (232 → 64 px) on desktop, bottom tab bar on phones, route-keyed content transition. */
-export function AppShell() {
+/** Masthead, top bar, collapsible side rail (232 → 64 px) on desktop, bottom tab bar on phones, route-keyed content transition.
+ * Routes render through the Outlet; a page that lives outside the role groups (the policies, read while signed in)
+ * passes itself as children so it sits in the same shell and follows the rail (owner's request, 21 Sep). */
+export function AppShell({ children }: { children?: ReactNode }) {
   const { user, expiresAt, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -253,7 +255,7 @@ export function AppShell() {
         </nav>
         <main id="main" tabIndex={-1} className="min-w-0 flex-1 pb-24 outline-none md:pb-0">
           <div key={pageKey} className="pf-enter mx-auto w-full max-w-[1360px] px-4 py-6 sm:px-8 sm:py-8 lg:px-10">
-            <Outlet />
+            {children ?? <Outlet />}
           </div>
           {/* New pages open at the top; Back and Forward return to the remembered position. */}
           <ScrollRestoration />

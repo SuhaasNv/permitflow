@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import * as authApi from '@/api/auth'
 
 import { AuthProvider } from '@/features/auth/AuthContext'
 import { PolicyPage } from './PolicyPage'
@@ -39,7 +41,10 @@ function storeSession(role: 'operator' | 'officer') {
 }
 
 describe('PolicyPage (US-057)', () => {
-  afterEach(() => sessionStorage.clear())
+  afterEach(() => {
+    sessionStorage.clear()
+    vi.restoreAllMocks()
+  })
 
   it.each(['privacy', 'terms', 'cookies'] as const)('renders the %s policy with every section', (slug) => {
     renderAt(`/${slug}`)
@@ -55,13 +60,22 @@ describe('PolicyPage (US-057)', () => {
   })
 
   it.each([
-    ['operator', 'Back to dashboard', '/app/dashboard'],
-    ['officer', 'Back to queue', '/officer/queue'],
-  ] as const)('leads a signed-in %s back into the app instead of to the sign-in page', (role, label, href) => {
+    ['operator', 'Dashboard', '/app/dashboard'],
+    ['officer', 'Queue', '/officer/queue'],
+  ] as const)('signed in as %s, the policy opens inside the app shell with the rail, not the public frame', async (role, label, href) => {
     storeSession(role)
+    vi.spyOn(authApi, 'me').mockResolvedValue({ id: '1', email: `${role}@permitflow.example.sg`, full_name: 'Demo', role })
     renderAt('/privacy')
-    expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', href)
+    // the shell, once the restored session is re-validated: the role's rail links and Sign out are there,
+    // the public Sign in button is not
+    expect((await screen.findAllByRole('link', { name: label }))[0]).toHaveAttribute('href', href)
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: POLICIES.privacy.title })).toBeInTheDocument()
+    // the section list on the left links to every section
+    for (const section of POLICIES.privacy.sections) {
+      expect(screen.getByRole('link', { name: section.heading })).toHaveAttribute('href', expect.stringMatching(/^#/))
+    }
   })
 
   it('names the operator, links the repository, and says it is not a government service', () => {

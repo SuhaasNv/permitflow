@@ -444,7 +444,9 @@ def test_two_rounds_resolve_reopen_withdraw_and_route_to_approval(client: TestCl
     assert kinds.index("clarification.reopened") < kinds.index("clarification.released")
 
 
-def test_every_round_two_question_withdrawn_leaves_the_officer_an_exit(client: TestClient, db: Session) -> None:
+def test_every_round_two_question_withdrawn_leaves_the_officer_an_exit(
+    client: TestClient, db: Session
+) -> None:
     """Round 2 with one question, withdrawn before the operator answers: the operator has nothing to
     send (409), the rail says so, the queue row is the officer's move, and Route to approval is open
     from Pending Post-Site Resubmission (found in the two-device UAT run, 21 Sep)."""
@@ -459,7 +461,10 @@ def test_every_round_two_question_withdrawn_leaves_the_officer_an_exit(client: T
         ]
     }
     for key in ("coved_edges", "chiller_temperature"):
-        assert client.post(OFF_URL.format(app_id, threads[key]["item_id"], "resolve"), headers=off).status_code == 200
+        assert (
+            client.post(OFF_URL.format(app_id, threads[key]["item_id"], "resolve"), headers=off).status_code
+            == 200
+        )
     r = client.post(
         OFF_URL.format(app_id, threads["floor_trap_graded"]["item_id"], "reopen"),
         headers=off,
@@ -482,7 +487,11 @@ def test_every_round_two_question_withdrawn_leaves_the_officer_an_exit(client: T
     assert case["clarification"]["turn"] == "Round 2, nothing open: route to approval or reject"
     actions = {a["target"]: a for a in case["actions"]}
     assert actions["pending_approval"]["enabled"] is True and actions["rejected"]["enabled"] is True
-    row = next(i for i in client.get("/api/v1/officer/applications", headers=off).json()["items"] if i["id"] == app_id)
+    row = next(
+        i
+        for i in client.get("/api/v1/officer/applications", headers=off).json()["items"]
+        if i["id"] == app_id
+    )
     assert row["officer_turn"] is True and row["next_action"] == "Route to approval"
     view = transition(client, off, app_id, "pending_approval")
     assert view["status"] == "pending_approval"

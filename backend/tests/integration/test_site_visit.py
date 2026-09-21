@@ -269,17 +269,26 @@ def test_a_proposal_whose_date_has_passed_is_never_confirmed_and_can_be_moved(
     r = client.post(
         f"/api/v1/officer/applications/{app_id}/site-visit/reschedule",
         headers=off,
-        json={"date": next_working_day(3), "slot": "afternoon", "reason": "The first date lapsed unanswered."},
+        json={
+            "date": next_working_day(3),
+            "slot": "afternoon",
+            "reason": "The first date lapsed unanswered.",
+        },
     )
     assert r.status_code == 200, r.text
     visit = r.json()["site_visit"]
-    assert visit["status"] == "proposed" and [p["outcome"] for p in visit["rounds"]] == ["declined", "pending"]
+    assert visit["status"] == "proposed" and [p["outcome"] for p in visit["rounds"]] == [
+        "declined",
+        "pending",
+    ]
     # and the operator can now accept the new date
     r = client.post(f"/api/v1/applications/{app_id}/site-visit/accept", headers=op)
     assert r.status_code == 200 and r.json()["site_visit"]["status"] == "confirmed"
 
 
-def test_an_expired_counter_proposal_cannot_be_accepted_by_the_officer(client: TestClient, db: Session) -> None:
+def test_an_expired_counter_proposal_cannot_be_accepted_by_the_officer(
+    client: TestClient, db: Session
+) -> None:
     app_id, op, off, _ = under_review(client, db)
     propose_visit(client, off, app_id, date=next_working_day(6))
     r = client.post(
@@ -293,12 +302,16 @@ def test_an_expired_counter_proposal_cannot_be_accepted_by_the_officer(client: T
     counter.date = today_in_singapore() - timedelta(days=1)
     db.commit()
     r = client.post(
-        f"/api/v1/officer/applications/{app_id}/site-visit/decide", headers=off, json={"action": "accept_operator"}
+        f"/api/v1/officer/applications/{app_id}/site-visit/decide",
+        headers=off,
+        json={"action": "accept_operator"},
     )
     assert r.status_code == 409 and "passed" in r.json()["error"]["message"]
     # the officer's own date is still ahead: keeping it works
     r = client.post(
-        f"/api/v1/officer/applications/{app_id}/site-visit/decide", headers=off, json={"action": "keep_original"}
+        f"/api/v1/officer/applications/{app_id}/site-visit/decide",
+        headers=off,
+        json={"action": "keep_original"},
     )
     assert r.status_code == 200 and r.json()["site_visit"]["status"] == "confirmed"
 

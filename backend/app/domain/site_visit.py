@@ -5,7 +5,6 @@ Dates are Singapore working days (Monday to Friday; public holidays are not mode
 accepted simplification recorded in SCOPE.md). Times are the two slots the licensing office inspects in.
 """
 
-from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -95,11 +94,3 @@ def format_visit(d: date, slot: SiteVisitSlot) -> str:
 def short_visit(d: date, slot: SiteVisitSlot) -> str:
     """\"Tue 22 Sep, morning\" for notifications and the queue."""
     return f"{d.strftime('%a')} {d.day} {d.strftime('%b')}, {SLOT_LABELS[slot]}"
-
-
-@dataclass(frozen=True)
-class VisitState:
-    """What the workflow guard needs to know about the current visit."""
-
-    exists: bool
-    confirmed: bool

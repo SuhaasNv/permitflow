@@ -72,7 +72,7 @@ def create_app() -> FastAPI:
     expose_docs = settings.app_env != "production"
     app = FastAPI(
         title="PermitFlow API",
-        version="0.4.0-dev",
+        version="0.4.0-rc.1",
         lifespan=lifespan,
         docs_url="/api/docs" if expose_docs else None,
         openapi_url="/api/openapi.json" if expose_docs else None,

@@ -8,9 +8,9 @@ Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for 
 
 ## Coming next
 
-**v0.4.0: use case 3 and the admin panel, built and waiting for the release.** Built on `dev` on 20 and 21 September 2026 (`docs/05-planning/RELEASE_PLAN_V0_4_0.md`); production keeps v0.3.0 until the owner runs the release ritual after the Xtremax process. Working version on `dev`: `0.4.0-dev`. The entry below is what the release will say.
+**v0.4.0: use case 3 and the admin panel, built, reviewed and waiting for the release.** Built on `dev` on 20 and 21 September 2026 (`docs/05-planning/RELEASE_PLAN_V0_4_0.md`), reviewed twice on 21 September, and tagged on `dev` as the release candidate `v0.4.0-rc.1` for the development environment; production keeps v0.3.0 until the owner runs the release ritual after the Xtremax process, when the same commit line becomes `v0.4.0` on `main`. The entry below is what the release will say.
 
-## v0.4.0, not yet released: the site visit, the clarification and the office's own view
+## v0.4.0 (release candidate `v0.4.0-rc.1` on the development environment, 21 September 2026; production release to follow): the site visit, the clarification and the office's own view
 
 **New for licensing officers**
 - Arrange the site visit inside the case: propose a date and a morning or afternoon slot, see the operator accept or propose another date, keep or accept, ask to move a confirmed visit; six proposals at most per visit; every round on the record.
