@@ -64,7 +64,7 @@ The first three are protected: no administrator can change their role or deactiv
 
 FastAPI, SQLAlchemy 2, Alembic and Pydantic v2 on PostgreSQL 16; React 19, TypeScript strict, Vite, Tailwind, TanStack Query, React Hook Form and Zod; pytest on a real database, vitest, Playwright; GitHub Actions, images on GHCR, Railway with two environments. Why each: `docs/03-architecture/decisions/ADR-009-stack-and-delivery-pipeline.md`.
 
-A modular monolith (`api → services → domain / repositories → models`, `domain/` pure Python) with the state machine as a data table (`backend/app/domain/workflow.py`), same-transaction audit rows, immutable revision snapshots and the AI behind a provider interface. The layering is enforced by a test (`backend/tests/unit/test_layering.py`). Start with `docs/03-architecture/ARCHITECTURE.md` and `STATE_MACHINE.md`; the twelve ADRs are indexed in `docs/03-architecture/decisions/README.md`.
+A modular monolith (`api → services → domain / repositories → models`, `domain/` pure Python) with the state machine as a data table (`backend/app/domain/workflow.py`), same-transaction audit rows, immutable revision snapshots and the AI behind a provider interface. The layering is enforced by a test (`backend/tests/unit/test_layering.py`). Start with `docs/03-architecture/ARCHITECTURE.md` and `STATE_MACHINE.md`; the fourteen ADRs are indexed in `docs/03-architecture/decisions/README.md`.
 
 ```
 backend/   FastAPI + SQLAlchemy 2 + Alembic

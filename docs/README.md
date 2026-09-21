@@ -42,7 +42,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Security
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `06-security/THREAT_MODEL.md` | written | Threats T1 to T23 (T23 the metrics endpoint, 20 Sep), planned controls, validation, production gaps |
+| `06-security/THREAT_MODEL.md` | written | Threats T1 to T27 (T23 the metrics endpoint, 20 Sep; T24 to T27 the appointment, the checklist, the clarification rounds and the shared sign-in, 21 Sep), planned controls, validation, production gaps |
 
 ## AI
 | Document | Status | Purpose |
@@ -55,7 +55,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 ## Planning
 | Document | Status | Purpose |
 |----------|--------|---------|
-| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-090 (US-059 the debrief material, US-074 the post-release review, US-075 the final check before submission, US-076 the fixes after the cold review, US-077 the observability layer; US-078 to US-084 the v0.4.0 support and appointment stories, US-085 to US-090 the non-functional set; US-060 to US-066 and US-070 to US-073 with their v0.4.0 acceptance criteria), 1:1 with Notion |
+| `05-planning/USER_STORIES.md` | written | Stories US-000 to US-093 (US-059 the debrief material, US-074 the post-release review, US-075 the final check before submission, US-076 the fixes after the cold review, US-077 the observability layer; US-078 to US-084 the v0.4.0 support and appointment stories, US-085 to US-090 the non-functional set, US-091 parked for v0.5.0, US-092 the extra findings, US-093 one session per account; US-060 to US-066 and US-070 to US-073 with their v0.4.0 acceptance criteria), 1:1 with Notion |
 | `05-planning/SPRINTS.md` | written | Three one-day sprints for the assessment, the close ritual, the cut order; Sprints 4 to 8 for v0.4.0 (20 Sep) |
 | `05-planning/RELEASE_PLAN_V0_4_0.md` | written (20 Sep, after the submission) | The v0.4.0 plan: use case 3 and the admin panel, five sprints on `dev`, production frozen; the state table, entities, API, screens, dialog copy, tests, documents by hat, release ritual, the ten decisions and the record of the three reviews that reshaped it |
 | `05-planning/KANBAN.md` | written | Flow, WIP limits, story-to-day mapping |
@@ -67,19 +67,20 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | Document | Status | Purpose |
 |----------|--------|---------|
 | `08-testing/TEST_STRATEGY.md` | written (19 Sep) | Layers, what each layer protects, how to run |
-| `10-uat/UAT_PLAN.md` | written (19 Sep) | Twelve acceptance scenarios, environments and accounts, the record of every run (local, development, CI, production after v0.3.0) |
+| `10-uat/UAT_PLAN.md` | written (19 Sep; U13 to U16 and runs 4 and the route smoke test added 20 and 21 Sep) | Sixteen acceptance scenarios, environments and accounts, the record of every run (local, development, CI, production after v0.3.0, the two-device run), the edge-case driver |
 | `09-operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
 | `09-operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |
 | `11-reviews/EDGE_CASE_REVIEW.md` | written (Sprint 2) | Three devil's-advocate reviews: every finding, its fix or its plan |
 | `11-reviews/BUG_HUNT_REVIEW.md` | written (19 Sep) | Three parallel bug hunts (backend, frontend, seams): 39 findings (36 fixed, 3 kept as decisions); browser run-through findings R1 to R12 |
 | `11-reviews/LAYOUT_AUDIT.md` | written (19 Sep) | Layout audit at 390, 820, 1024, 1280 and 1440; findings tracked as US-043 and US-044 |
-| `11-reviews/PRODUCTION_READINESS_REVIEW.md` | written (19 Sep; rows 1, 15, 22 and 25 closed 21 Sep with v0.4.0) | Twenty-five gaps with severity, what is in place, what production would need; go/no-go |
+| `11-reviews/PRODUCTION_READINESS_REVIEW.md` | written (19 Sep; rows 1, 15, 22 and 25 closed 21 Sep with v0.4.0; row 26 the stability review) | Twenty-six gaps with severity, what is in place, what production would need; go/no-go |
 | `11-reviews/ASSESSMENT_TRACEABILITY.md` | written (19 Sep; use case 3 written as built 21 Sep) | The brief decoded; every deliverable and acceptance criterion → implementation → test → evidence |
 | `11-reviews/FINAL_REVIEW.md` | written (19 Sep; v0.4.0 addendum 21 Sep) | What was built, the decisions to defend, trade-offs, what the AI got wrong, what to show in the debrief |
 | `11-reviews/ISSUES_AND_MITIGATIONS.md` | written (19 Sep) | Every issue found across the reviews and run-throughs, its risk, mitigation and evidence; what was kept as a decision |
 | `06-security/SECURITY_REVIEW.md` | written (19 Sep) | The owner's hardening checklist and four abuse scenarios, before and after US-058, with tests and what production adds |
 | `12-demo/documents/README.md` and `12-demo/documents/with_issues/NOTES.md` | written | The three document sets as PDFs (clean, with planted issues, second business), the form values they agree with, the planted values |
 | `04-design/prototype-src/README.md` | written | How the clickable prototype was generated |
+| `04-design/prototype-src/v0-4-0/README.md` | written (20 Sep) | The v0.4.0 artboards' generator (`build.py`) and how to regenerate them |
 | `11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md` | written (19 Sep) | The owner's legal, privacy and accessibility checklist answered item by item with evidence; laws considered; risks flagged; contrast computation (US-057) |
 | `../RELEASE_NOTES.md` | written (20 Sep) | What each version brings, in the users' words, newest first, with what comes next (v0.4.0: the admin panel and use case 3) |
 | `../CHANGELOG.md` | written (Sprints 1 to 3 closed; v0.3.0 released 19 Sep) | Milestones, sprint closes with Shipped / Slipped / Retro |
