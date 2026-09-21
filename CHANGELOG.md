@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## The build named in Telegram (21 Sep 2026, afternoon)
+
+Owner's request: the Telegram messages say which version runs. The API exposes `permitflow_build_info{version, commit}` (the version from `app/core/version.py`, the one place it lives now; the commit baked into the image by CI as `GIT_SHA`); the bot's `/status`, `/dev` and `/prod` carry "version 0.4.0-rc.1 (8cf669f)" per environment, and the hourly digest's section per environment reads the same from a query whose labels the annotation uses. Grafana's rules and templates regenerated; the Railway variables refreshed.
+
 ## v0.4.0-rc.1 on the development environment (21 Sep 2026, midday)
 
 `dev` pushed (89 commits, everything since the submission), CI green after one accessibility fix on the new policy layout, deployed to the development environment by the pipeline, seeded (the administrator and the spare officer), checked live (13 checks, `UAT_PLAN.md` 12:15 record), the Prometheus rules re-set by environment, the release candidate tagged `v0.4.0-rc.1` on that commit. Production and `main` stay on v0.3.0. The policy pages open inside the app shell when signed in and follow the side rail. `AI_USAGE.md` carries the day's prompts.

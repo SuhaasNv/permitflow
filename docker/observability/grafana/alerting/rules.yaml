@@ -550,6 +550,26 @@ groups:
         reducer: last
         settings:
           mode: dropNN
+    - refId: K
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: K
+        expr: max by (version, commit) (permitflow_build_info{environment="development"})
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: Kr
+      datasourceUid: __expr__
+      model:
+        refId: Kr
+        type: reduce
+        expression: K
+        reducer: last
+        settings:
+          mode: dropNN
     - refId: Z
       relativeTimeRange:
         from: 600
@@ -605,6 +625,7 @@ groups:
       applications: '{{ printf "%.0f" (index $values "Hr").Value }}'
       waiting_officer: '{{ printf "%.0f" (index $values "Ir").Value }}'
       waiting_operator: '{{ printf "%.0f" (index $values "Jr").Value }}'
+      build: '{{ with (index $values "Kr") }}{{ index .Labels "version" }} ({{ index .Labels "commit" }}){{ else }}n/a{{ end }}'
     noDataState: OK
     execErrState: OK
     isPaused: false
@@ -772,6 +793,26 @@ groups:
         reducer: last
         settings:
           mode: dropNN
+    - refId: K
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: K
+        expr: max by (version, commit) (permitflow_build_info{environment="production"})
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: Kr
+      datasourceUid: __expr__
+      model:
+        refId: Kr
+        type: reduce
+        expression: K
+        reducer: last
+        settings:
+          mode: dropNN
     - refId: Z
       relativeTimeRange:
         from: 600
@@ -827,6 +868,7 @@ groups:
       applications: '{{ printf "%.0f" (index $values "Hr").Value }}'
       waiting_officer: '{{ printf "%.0f" (index $values "Ir").Value }}'
       waiting_operator: '{{ printf "%.0f" (index $values "Jr").Value }}'
+      build: '{{ with (index $values "Kr") }}{{ index .Labels "version" }} ({{ index .Labels "commit" }}){{ else }}n/a{{ end }}'
     noDataState: OK
     execErrState: OK
     isPaused: false
@@ -994,6 +1036,26 @@ groups:
         reducer: last
         settings:
           mode: dropNN
+    - refId: K
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: K
+        expr: max by (version, commit) (permitflow_build_info{environment="local"})
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: Kr
+      datasourceUid: __expr__
+      model:
+        refId: Kr
+        type: reduce
+        expression: K
+        reducer: last
+        settings:
+          mode: dropNN
     - refId: Z
       relativeTimeRange:
         from: 600
@@ -1049,6 +1111,7 @@ groups:
       applications: '{{ printf "%.0f" (index $values "Hr").Value }}'
       waiting_officer: '{{ printf "%.0f" (index $values "Ir").Value }}'
       waiting_operator: '{{ printf "%.0f" (index $values "Jr").Value }}'
+      build: '{{ with (index $values "Kr") }}{{ index .Labels "version" }} ({{ index .Labels "commit" }}){{ else }}n/a{{ end }}'
     noDataState: OK
     execErrState: OK
     isPaused: false
