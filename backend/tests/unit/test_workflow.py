@@ -153,7 +153,13 @@ def test_clarification_guards() -> None:
             Actor.OFFICER,
             TransitionContext(open_clarification_count=0),
         )
-    for src in (S.AWAITING_POST_SITE_CLARIFICATION, S.POST_SITE_CLARIFICATION_RESUBMITTED):
+    # ... from every state the operator answers in or the officer reviews in, so a round whose
+    # questions were all withdrawn never leaves Reject as the only move (UAT, 21 Sep)
+    for src in (
+        S.AWAITING_POST_SITE_CLARIFICATION,
+        S.PENDING_POST_SITE_RESUBMISSION,
+        S.POST_SITE_CLARIFICATION_RESUBMITTED,
+    ):
         for ctx in (
             TransitionContext(open_clarification_count=1),
             TransitionContext(answered_clarification_count=1),

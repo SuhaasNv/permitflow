@@ -13,6 +13,7 @@ import { cn } from '@/lib/cn'
 import { formatBytes, formatDateTime } from '@/lib/format'
 import { useReopenClarification, useResolveClarification, useWithdrawClarification } from './queries'
 import { useReadOnly } from './readOnly'
+import { useCaseRefusal } from './refusal'
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
   open: { label: 'Open', tone: 'warning' },
@@ -42,7 +43,8 @@ function Thread({ view, thread, n }: { view: OfficerApplication; thread: Clarifi
   const status = STATUS[thread.status] ?? { label: thread.status, tone: 'neutral' as Tone }
   const current = thread.requests.at(-1)
   const earlier = thread.requests.slice(0, -1)
-  const fail = (title: string) => (e: Error) => toast.push({ title, body: e.message, tone: 'error' })
+  // A 409 (the item moved under us: another officer decided it, the operator answered): reload, shared sentence.
+  const fail = useCaseRefusal(view.id)
 
   const renderRound = (q: ClarificationThread['requests'][number]) => (
     <li key={q.id} className="flex gap-3">

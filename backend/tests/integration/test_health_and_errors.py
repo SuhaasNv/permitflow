@@ -14,6 +14,7 @@ def test_health_ok(client: TestClient) -> None:
 
 def test_health_503_when_database_down(client: TestClient, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setattr(health_module, "database_is_reachable", lambda: False)
+    monkeypatch.setattr(health_module, "_probe", None)  # the 2 s cache would hand back the last answer
     r = client.get("/api/v1/health")
     assert r.status_code == 503
     assert r.json() == {

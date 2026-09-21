@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
@@ -390,6 +390,75 @@ describe('site visit checklist (US-060, US-061)', () => {
     const groups = await screen.findAllByRole('group', { name: 'Result' })
     await user.click(within(groups[0]!).getByRole('button', { name: /^Satisfactory$/ }))
     expect(save).not.toHaveBeenCalled()
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.advanceTimersByTimeAsync(10)
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save.mock.calls[0]![2]).toBe(true)
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
+    vi.useRealTimers()
+  })
+
+  it('leaving by a link inside the debounce sends the last entries with keepalive', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.spyOn(checklistApi, 'openChecklist').mockResolvedValue(draft)
+    const save = vi.spyOn(checklistApi, 'saveChecklist').mockResolvedValue({ ...draft, version: 4 })
+    renderAt('/officer/applications/a1/checklist')
+    const groups = await screen.findAllByRole('group', { name: 'Result' })
+    // fireEvent, not userEvent: a tapped button on an iPad never takes focus, so no blur can rescue the tap
+    fireEvent.click(within(groups[0]!).getByRole('button', { name: /^Satisfactory$/ }))
+    expect(save).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('link', { name: 'Back to the case' }))
+    await vi.advanceTimersByTimeAsync(10)
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save.mock.calls[0]![1].items[0]!.result).toBe('satisfactory')
+    expect(save.mock.calls[0]![2]).toBe(true)
+    vi.useRealTimers()
+  })
+
+  it('hiding the page while a save is in flight still sends the newer entries with keepalive, as a new batch', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(checklistApi, 'openChecklist').mockResolvedValue(draft)
+    let release: (c: Checklist) => void = () => undefined
+    const save = vi
+      .spyOn(checklistApi, 'saveChecklist')
+      .mockImplementationOnce(() => new Promise<Checklist>((resolve) => (release = resolve)))
+      .mockResolvedValue({ ...draft, version: 5 })
+    renderAt('/officer/applications/a1/checklist')
+    const groups = await screen.findAllByRole('group', { name: 'Result' })
+    await user.click(within(groups[0]!).getByRole('button', { name: /^Satisfactory$/ }))
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS + 30)
+    expect(save).toHaveBeenCalledTimes(1) // hangs
+    await user.click(within(groups[1]!).getByRole('button', { name: /^Satisfactory$/ }))
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.advanceTimersByTimeAsync(10)
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(save.mock.calls[1]![2]).toBe(true)
+    expect(save.mock.calls[1]![1].items[1]!.result).toBe('satisfactory')
+    // a touch after the first save went out is a new batch: never the in-flight id
+    expect(save.mock.calls[1]![1].save_id).not.toBe(save.mock.calls[0]![1].save_id)
+    release({ ...draft, version: 4 })
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
+    vi.useRealTimers()
+  })
+
+  it('a keepalive body over the browser cap goes as a plain fetch instead', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vi.spyOn(checklistApi, 'openChecklist').mockResolvedValue(draft)
+    const save = vi.spyOn(checklistApi, 'saveChecklist').mockResolvedValue({ ...draft, version: 4 })
+    renderAt('/officer/applications/a1/checklist')
+    const groups = await screen.findAllByRole('group', { name: 'Result' })
+    await user.click(within(groups[0]!).getByRole('button', { name: /^Unsatisfactory$/ }))
+    // 2,000 three-byte characters in one comment is already over 60 KB once JSON-encoded x 3 items? no:
+    // one comment of 2,000 CJK characters is 6 KB; the page-wide cap is what matters, so paste a long one
+    // into each of the three comments through a flag on every item
+    for (const g of groups) await user.click(within(g).getByRole('button', { name: /^Unsatisfactory$/ }))
+    const long = '漢'.repeat(2000)
+    for (const box of screen.getAllByLabelText(/Comment/)) fireEvent.change(box, { target: { value: long } })
+    // three comments of 6 KB each are under the cap: keepalive stays on
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
     document.dispatchEvent(new Event('visibilitychange'))
     await vi.advanceTimersByTimeAsync(10)

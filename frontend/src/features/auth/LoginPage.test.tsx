@@ -10,14 +10,15 @@ import * as auth from './AuthContext'
 import { AuthProvider } from './AuthContext'
 import { LoginPage } from './LoginPage'
 
-function renderLogin() {
+function renderLogin(from?: string) {
   return render(
     <AppProviders>
       <AuthProvider>
-        <MemoryRouter initialEntries={['/login']}>
+        <MemoryRouter initialEntries={[from ? { pathname: '/login', state: { from } } : '/login']}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/officer/queue" element={<div>Officer home</div>} />
+            <Route path="/officer/applications/:id" element={<div>Officer case</div>} />
             <Route path="/app/dashboard" element={<div>Operator home</div>} />
           </Routes>
         </MemoryRouter>
@@ -60,6 +61,42 @@ describe('LoginPage', () => {
     await userEvent.type(screen.getByLabelText(/Password/), 'pw')
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     await waitFor(() => expect(screen.getByText('Officer home')).toBeInTheDocument())
+  })
+
+  it('returns to the page the session ended on when it is inside the role\'s area, else home', async () => {
+    const officer = {
+      access_token: 't',
+      token_type: 'bearer' as const,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+      user: { id: '1', email: 'o@x.sg', full_name: 'Rahim bin Abdullah', role: 'officer' as const },
+    }
+    vi.spyOn(authApi, 'login').mockResolvedValue(officer)
+    const { unmount } = renderLogin('/officer/applications/x')
+    await userEvent.type(screen.getByLabelText(/Email address/), 'o@x.sg')
+    await userEvent.type(screen.getByLabelText(/Password/), 'pw')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(screen.getByText('Officer case')).toBeInTheDocument())
+    unmount()
+    sessionStorage.clear()
+    // a path from another role's area never carries over
+    renderLogin('/app/applications/x')
+    await userEvent.type(screen.getByLabelText(/Email address/), 'o@x.sg')
+    await userEvent.type(screen.getByLabelText(/Password/), 'pw')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(screen.getByText('Officer home')).toBeInTheDocument())
+  })
+
+  it('a stored session that ran out while the tab was closed is explained on the sign-in page', () => {
+    sessionStorage.setItem(
+      'permitflow.session',
+      JSON.stringify({
+        token: 't',
+        expiresAt: new Date(Date.now() - 1000).toISOString(),
+        user: { id: '1', email: 'o@x.sg', full_name: 'Rahim bin Abdullah', role: 'officer' },
+      }),
+    )
+    renderLogin()
+    expect(screen.getByText(/Your session (ended|expired)/)).toBeInTheDocument()
   })
 
   it('shows the generic message on 401', async () => {

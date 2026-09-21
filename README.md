@@ -57,7 +57,7 @@ The first three are protected: no administrator can change their role or deactiv
 `SCOPE.md` is the decision record: what is built, simplified, mocked and deferred, and every assumption made where the brief is ambiguous.
 
 - Use cases 1 and 2 are complete: sectioned form with validation and draft save, drag-and-drop uploads with a live AI check per document, submission as an immutable revision, officer queue and case view with the AI findings, feedback tied to a section or a document with templates, resubmission in which only the flagged parts reopen, revision compare, resolution tracking, role-specific status labels, notifications, audit trail, licence certificate on approval.
-- Use case 3 (site-visit checklist) is deferred; its three statuses and transitions exist in the state machine and are tested, the checklist screens are not built.
+- Use case 3 is built on `dev` (v0.4.0, not yet released): the site-visit appointment with rounds, the officer's checklist with autosave and extra findings, the clarification rounds with evidence, one live session per account, the storage budget, and the administrator's overview, activity feed, read-only case and user management. Production still serves v0.3.0, where use case 3 stops at the statuses and transitions.
 - Beyond the brief: withdrawal, draft deletion, feedback undo and reopen, a public landing page, policy pages, an accessibility gate.
 
 ## Stack and architecture
@@ -84,7 +84,7 @@ cd frontend && npm test && npm run lint && npm run typecheck && npm run build
 cd frontend && npm run e2e          # Playwright against the running stack (backend :8000 with AI_PROVIDER=mock, Vite :3000)
 ```
 
-854 backend cases from 253 test functions on a real PostgreSQL (the state-machine sweep alone is 597), 229 frontend tests, twelve Playwright specs (the journey, ten scenarios, the accessibility gate), 246 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
+859 backend cases from 258 test functions on a real PostgreSQL (the state-machine sweep alone is 597), 238 frontend tests, thirteen Playwright specs (the journey, eleven scenarios, the accessibility gate), 246 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
 
 ## Environment variables
 
@@ -122,7 +122,7 @@ v0.3.0 (19 September 2026) is the version at https://permitflow.space. Next, v0.
 
 Each item has a row with severity in `docs/11-reviews/PRODUCTION_READINESS_REVIEW.md`.
 
-1. Use case 3: the checklist model, the officer's capture screen with draft save, per-item clarification, the operator's targeted response. The statuses and transitions already exist. About 1.5 days.
+1. Release v0.4.0 (use case 3, sessions, storage, the administrator) from `dev` once the assessment process allows it: the release ritual, the seed on each environment, the dev UAT record.
 2. A worker for the AI checks (Redis or a Postgres `SKIP LOCKED` queue) so checks survive deploys and scale apart from the API; ADR-004 has one call site to change.
 3. Object storage with signed URLs and a virus scan, a backup and restore drill, a retention policy.
 4. httpOnly cookie sessions with CSRF protection, CSP nonces, the rate windows in Redis or at the edge.

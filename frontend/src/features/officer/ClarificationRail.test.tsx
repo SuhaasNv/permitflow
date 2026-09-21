@@ -128,6 +128,30 @@ describe('clarification rail (US-066)', () => {
     expect(screen.getByRole('button', { name: 'Route to approval' })).toBeDisabled()
   })
 
+  it('a 409 on Mark clarified (another officer decided it first) reloads the case with the shared sentence', async () => {
+    const { AppError } = await import('@/api/client')
+    const decided = {
+      ...resubmitted,
+      clarification: {
+        ...clarification,
+        answered_count: 0,
+        resolved_count: 1,
+        items: [thread({ status: 'resolved', can_resolve: false, can_reopen: false })],
+      },
+    }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValueOnce(resubmitted).mockResolvedValue(decided)
+    const resolve = vi
+      .spyOn(api, 'resolveClarification')
+      .mockRejectedValue(new AppError(409, { code: 'conflict', message: 'Only an answered item can be marked clarified.' }))
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Mark clarified' }))
+    await waitFor(() => expect(resolve).toHaveBeenCalledWith('a1', 'i1'))
+    expect(await screen.findByText('This application changed since you opened it. Showing the latest.')).toBeInTheDocument()
+    expect(screen.queryByText('Only an answered item can be marked clarified.')).not.toBeInTheDocument()
+    expect(await screen.findByText('0 open · 0 answered · 1 clarified')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mark clarified' })).not.toBeInTheDocument()
+  })
+
   it('Mark clarified posts the resolve; Still needs clarification drafts a question and shows Not sent yet', async () => {
     const resolve = vi.spyOn(api, 'resolveClarification').mockResolvedValue({
       ...resubmitted,

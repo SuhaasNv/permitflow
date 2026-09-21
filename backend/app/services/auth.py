@@ -34,6 +34,7 @@ REVOKED_MESSAGES = {
     "taken_over": "Your session ended: this account signed in on another device.",
     "signed_out": "You signed out. Sign in again to continue.",
     "idle": "Your session ended after {minutes} minutes without activity. Sign in again to continue.",
+    "deactivated": "Your account was deactivated by an administrator.",
 }
 
 

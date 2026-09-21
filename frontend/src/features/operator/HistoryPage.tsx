@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { skipToken, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -22,8 +22,8 @@ export function HistoryPage() {
   const [pair, setPair] = useState<[number, number] | null>(null)
   const compare = useQuery({
     queryKey: ['my-compare', id, pair],
-    queryFn: () => compareMyRevisions(id, pair![0], pair![1]),
-    enabled: pair !== null,
+    // skipToken instead of `enabled` plus a non-null assertion: the query is typed as never running without a pair.
+    queryFn: pair ? () => compareMyRevisions(id, pair[0], pair[1]) : skipToken,
     staleTime: Infinity,
   })
 

@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 
 from app.api.v1.router import api_router
+from app.core.body_limit import BodyLimitMiddleware
 from app.core.errors import AppError
 from app.core.logging import configure_logging, request_logging_middleware
 from app.core.metrics import RATE_LIMITED, metrics_middleware
@@ -114,25 +115,14 @@ def create_app() -> FastAPI:
             return response
         return await call_next(request)
 
-    # An oversized upload is refused from its Content-Length here, before FastAPI reads the multipart body
-    # (T4): a route dependency would run only after the form was parsed and spooled to disk.
-    upload_limit = settings.upload_max_bytes + _MULTIPART_OVERHEAD
-
-    @app.middleware("http")
-    async def reject_oversized_upload(
-        request: Request, call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
-        if request.method == "POST" and request.url.path.endswith("/documents"):
-            raw = request.headers.get("content-length")
-            if raw and raw.isdigit() and int(raw) > upload_limit:
-                return _error_response(
-                    request,
-                    400,
-                    "bad_request",
-                    too_large_message(settings.upload_max_bytes),
-                    details={"reason": "too_large"},
-                )
-        return await call_next(request)
+    # Every request body is bounded from its headers before FastAPI reads it (T4): the two multipart
+    # routes at the upload cap plus the form overhead, every other route at the JSON cap, and a chunked
+    # body without a length refused outright (review finding, 21 Sep).
+    app.add_middleware(
+        BodyLimitMiddleware,
+        upload_limit=settings.upload_max_bytes + _MULTIPART_OVERHEAD,
+        upload_message=too_large_message(settings.upload_max_bytes),
+    )
 
     app.add_middleware(
         CORSMiddleware,

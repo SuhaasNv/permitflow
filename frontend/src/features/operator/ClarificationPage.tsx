@@ -1,4 +1,4 @@
-import { useIsMutating } from '@tanstack/react-query'
+import { useIsMutating, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -19,7 +19,7 @@ import { useToast } from '@/features/shared/Toast'
 import { isTransient, retryDelay, tabHidden, useOnline } from '@/lib/connection'
 import { formatBytes, formatDateTime } from '@/lib/format'
 import { ApplicationHeader } from './ApplicationHeader'
-import { useApplication, useAttach, useClarifications, useRemoveAttachment, useRespond, useSendClarifications } from './queries'
+import { applicationKeys, useApplication, useAttach, useClarifications, useRemoveAttachment, useRespond, useSendClarifications } from './queries'
 
 const TONE: Record<string, Tone> = {
   'Waiting for your response': 'warning',
@@ -36,6 +36,7 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
   const attach = useAttach(appId)
   const remove = useRemoveAttachment(appId)
   const toast = useToast()
+  const queryClient = useQueryClient()
   // The answer of the current round only; earlier rounds are shown read-only under their question.
   const latest = item.responses.find((r) => r.round_no === item.round_no) ?? null
   const [text, setText] = useState(latest?.message ?? '')
@@ -46,6 +47,8 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
   const [progress, setProgress] = useState<{ name: string; fraction: number } | null>(null)
   const attempt = useRef(0)
   const timer = useRef<number | null>(null)
+  // The upload waiting for its retry: the reconnect and visibility handlers below run it.
+  const pendingUpload = useRef<(() => void) | null>(null)
   // One save in flight at a time; an edit made meanwhile is saved once the first settles, so a slow
   // first answer can never land after, and over, a newer one (review finding, 21 Sep).
   const inFlight = useRef(false)
@@ -73,6 +76,7 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
   const later = (kind: 'save' | 'upload', run: () => void) => {
     attempt.current += 1
     setRetrying(kind)
+    pendingUpload.current = kind === 'upload' ? run : null
     if (timer.current !== null) window.clearTimeout(timer.current)
     // No timer while the tab is hidden or offline: the visibility or online change tries again.
     if (tabHidden() || !navigator.onLine) {
@@ -118,6 +122,12 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
           }
           settle()
           setRetrying(null)
+          if (e instanceof AppError && e.status === 409) {
+            // The question was withdrawn or the round moved on: show what stands, not the server reason.
+            toast.push({ title: 'Could not save your answer', body: 'This application changed since you opened it. Showing the latest.', tone: 'error' })
+            void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(appId) }) // the list is keyed under it
+            return
+          }
           const fields = e instanceof AppError && e.status === 422 ? e.details?.fields : null
           const msg =
             fields && typeof fields === 'object' && 'message' in fields ? String((fields as Record<string, unknown>).message) : e.message
@@ -127,10 +137,12 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
     )
   }
 
-  // Back online, or back in front, with an answer still unsaved: try at once.
+  // Back online, or back in front, with an answer still unsaved or a file still unsent: try at once.
   useEffect(() => {
     const again = () => {
-      if (retrying === 'save' && !tabHidden() && navigator.onLine && timer.current === null) saveText()
+      if (tabHidden() || !navigator.onLine || timer.current !== null) return
+      if (retrying === 'save') saveText()
+      if (retrying === 'upload') pendingUpload.current?.() // (review finding, 21 Sep)
     }
     if (online) again()
     document.addEventListener('visibilitychange', again)
@@ -162,6 +174,7 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
         onSuccess: (r) => {
           attempt.current = 0
           setRetrying(null)
+          pendingUpload.current = null
           setProgress(null)
           if (r.unchanged) toast.push({ title: 'No change', body: `${file.name} is already attached.`, tone: 'info' })
         },
@@ -366,7 +379,8 @@ export function ClarificationPage() {
   const open = c.items.filter((i) => i.status === 'Waiting for your response')
   const unanswered = open.filter((i) => !(i.responses.at(-1)?.message ?? '').trim())
   const base = `/app/applications/${id}`
-  const doSend = () =>
+  const doSend = () => {
+    if (saving) return // a blur and a tap can land in the same task; the answer goes first
     send.mutate(undefined, {
       onSuccess: (next) => {
         setConfirming(false)
@@ -388,6 +402,7 @@ export function ClarificationPage() {
         toast.push({ title: 'Could not send', body: e.message, tone: 'error' })
       },
     })
+  }
 
   return (
     <>
@@ -471,7 +486,7 @@ export function ClarificationPage() {
                     )
                   })}
                   <ItemAnswer
-                    key={`${item.round_no}-${item.responses.find((r) => r.round_no === item.round_no)?.id ?? 'none'}`}
+                    key={`${item.item_id}-${item.round_no}`}
                     appId={id}
                     item={item}
                     storage={view.storage}
@@ -503,7 +518,7 @@ export function ClarificationPage() {
         open={confirming}
         title="Send your answers?"
         confirmLabel="Send responses"
-        busy={send.isPending}
+        busy={send.isPending || saving}
         onConfirm={doSend}
         onCancel={() => setConfirming(false)}
       >

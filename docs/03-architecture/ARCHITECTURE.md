@@ -38,6 +38,10 @@ Rules:
 | verification | verification_runs | `enqueue(document_id)`, `run_verification(document_id)`, `latest(document_id)`, `rerun` |
 | feedback | feedback | `create(officer, id, target, message, template_key)`, `resolve`, `withdraw`, `list`, `templates()` |
 | notifications | notifications | `notify(user_ids, kind, application, ...)`, `list(user)`, `mark_read` |
+| site_visit (US-084) | site_visits, site_visit_proposals | `propose`, `decide`, `confirm_without_reply`, `reschedule`, `accept`, `counter`; `officer_view`, `operator_view` |
+| checklist (US-060 to US-063, US-092) | checklists, checklist_items | `create_or_get`, `save(version, save_id)`, `submit` (the officer hop and the system hop in one transaction) |
+| clarification (US-064 to US-066, US-085) | clarification_requests, clarification_responses, clarification_attachments | `officer_view`, `operator_view`, `respond`, `attach`, `remove_attachment`, `send`, `resolve`, `reopen`, `withdraw`, `release_next_round`; uploads through `services/uploads.receive` |
+| sessions (US-093, in `auth`) | user_sessions | `authenticate(..., device, take_over)`, `current_user(user_id, session_id)`, `sign_out`, `live_count` |
 | audit | audit_events | `record(application_id, actor, event_type, payload)`, `list(application_id)`, `purge_draft(application_id)` |
 | metrics (US-077) | none (reads `applications` through its repository for the by-status gauge) | `refresh_gauges(db)`; the counters live in `core/metrics.py` and are incremented by the services where the events happen (verification finished, quota refused, transition committed) and by the outermost middleware (every request, every 429); `infra/ai/openai_provider.py` counts the tokens the API reports; `docs/13-observability/OBSERVABILITY.md` |
 | admin (built 21 Sep 2026, US-070 to US-073) | none: reads other modules' tables through their repositories (`AuditRepository.feed`, `idle_applications`; `ApplicationRepository.count_by_status`; `DocumentRepository.runs_since`), writes users through `UserRepository` | `AdminOverviewService.overview()`, `AdminFeedService.feed()`, `AdminUserService.directory()`, `change(role, is_active)`, `create()`; the officer read services serve the admin's case view with the viewer's actor (ADR-014) |
@@ -170,7 +174,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /notifications | any | own notifications (newest first, 50) plus `unread_count` (built, US-025) |
 | POST | /notifications/{id}/read | any | mark read; another user's id is 404 (built, US-025) |
 | POST | /notifications/read-all | any | mark every own notification read (built, US-025) |
-| GET | /metrics | bearer token (`METRICS_TOKEN`); 404 when no token is configured; exempt from the rate limit | Prometheus text format: `permitflow_http_requests_total`, `permitflow_http_request_seconds`, `permitflow_rate_limited_total`, `permitflow_verification_runs_total`, `permitflow_verification_run_seconds`, `permitflow_quota_refusals_total`, `permitflow_transitions_total`, `permitflow_applications` (gauge), `permitflow_openai_tokens_total`; route templates and enum values as labels, never ids or text (US-077) |
+| GET | /metrics | bearer token (`METRICS_TOKEN`); 404 when no token is configured; exempt from the rate limit | Prometheus text format: `permitflow_http_requests_total`, `permitflow_http_request_seconds`, `permitflow_rate_limited_total`, `permitflow_verification_runs_total`, `permitflow_verification_run_seconds`, `permitflow_quota_refusals_total`, `permitflow_transitions_total`, `permitflow_applications` (gauge), `permitflow_openai_tokens_total`, `permitflow_sessions_active` (gauge), `permitflow_checklists_submitted_total`, `permitflow_clarification_rounds_total`, `permitflow_attachment_bytes_total`, `permitflow_storage_bytes` (gauge); route templates and enum values as labels, never ids or text (US-077, US-089, US-093) |
 | GET | /health | public | `{status, database}`; 503 when the database ping fails, with the standard `error` object beside the status fields; provider details are not exposed publicly (the planned admin AI-health endpoint, US-071, would report them) |
 
 All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail": …}` bodies for 401/403/422 are replaced by explicit exception handlers so every error uses the standard shape (REL-001).
@@ -181,7 +185,7 @@ All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail":
 frontend/src
   api/            hand-written types mirroring app/schemas + thin fetch client (auth header, error mapping)
   app/            router, providers (QueryClient, Auth), AppShell
-  features/       auth, landing, legal, operator, officer, admin (placeholder only, v0.4.0), shared
+  features/       auth, landing, legal, operator, officer, admin (overview, activity, users; the officer's case and checklist under ReadOnlyProvider), shared
   lib/            zodFromSchema, format, search, session, unsaved, cn
   styles/         index.css (tokens, Tailwind theme), fonts.css
 ```
@@ -203,7 +207,7 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 - Ownership: `ApplicationRepository.get_for(user, id)` applies `operator_id` filter for operators; raises `NotFound`.
 - Editability: `domain.editability.editable_targets(status, open_feedback)` used by section update and document upload.
 - Transition role and guards: `domain.workflow`.
-- Response shaping: `ApplicationOperatorView` vs `ApplicationOfficerView`.
+- Response shaping: `ApplicationOperatorView` vs `OfficerApplicationOut`.
 
 ## Observability
 

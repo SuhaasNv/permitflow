@@ -114,6 +114,32 @@ def test_an_unreadable_image_is_refused_and_nothing_is_kept(client: TestClient, 
     assert view["storage"]["used_bytes"] == 0
 
 
+def test_a_decompression_bomb_is_refused_before_it_is_decoded(client: TestClient, db: Session) -> None:
+    """A 45-megapixel PNG of a few kilobytes: refused as unreadable from its header, never decoded
+    (Pillow's own ceiling only warned below 80 megapixels; review finding, 21 Sep)."""
+    import tracemalloc
+
+    from app.infra.images import MAX_PIXELS, ImageUnreadableError, strip_metadata
+
+    out = BytesIO()
+    Image.new("1", (6800, 6700)).save(out, "PNG", optimize=True)  # 45.6 MP, one bit per pixel on the wire
+    bomb = out.getvalue()
+    assert 6800 * 6700 > MAX_PIXELS and len(bomb) < 50_000
+    tracemalloc.start()
+    try:
+        strip_metadata(bomb, ".png")
+    except ImageUnreadableError:
+        pass
+    else:
+        raise AssertionError("the bomb was decoded")
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    assert peak < 5_000_000  # the pixels were never allocated
+    h, app_id = _operator(client, db)
+    r = _upload(client, h, app_id, "floor_plan", "bomb.png", bomb, "image/png")
+    assert r.status_code == 400 and r.json()["error"]["details"]["reason"] == "unreadable_image"
+
+
 def test_budget_refuses_the_file_that_would_pass_it_and_names_the_room(
     client: TestClient,
     db: Session,

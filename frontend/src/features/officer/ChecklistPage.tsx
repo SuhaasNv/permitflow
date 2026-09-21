@@ -41,6 +41,8 @@ function useMediaQuery(query: string): boolean {
 
 /** Autosave waits this long after the last touch; a blur or Save draft goes at once. */
 export const AUTOSAVE_DELAY_MS = 1500
+/** Below the browsers' 64 KiB keepalive cap, with room for headers. */
+export const KEEPALIVE_LIMIT_BYTES = 60_000
 export { retryDelay }
 
 /** Their saved copy with my touched items on top: nothing typed here is thrown away (US-061). */
@@ -231,13 +233,6 @@ export function ChecklistPage() {
   const saveId = useRef<string | null>(null)
 
   useEffect(() => guardUnload(), [])
-  useEffect(
-    () => () => {
-      setUnsaved(false)
-      if (timer.current !== null) window.clearTimeout(timer.current)
-    },
-    [],
-  )
   useEffect(() => {
     if (checklist.data) {
       server.current = checklist.data
@@ -269,13 +264,22 @@ export function ChecklistPage() {
   const flush = (keepalive = false) => {
     const items = current()
     const version = versionRef.current
-    if (!items || version === null || !dirtyRef.current || inFlight.current) return
+    if (!items || version === null || !dirtyRef.current) return
+    // A save in flight: the next debounce picks the new entries up (onSuccess reschedules). The
+    // keepalive save on hide or unmount goes anyway, as a new batch: the in-flight request is what
+    // the browser drops on unload, and a later version conflict merges harmlessly (review, 21 Sep).
+    if (inFlight.current && !keepalive) return
     if (!navigator.onLine) return // the online event schedules the save
     const sent = new Set(touched.current)
+    if (inFlight.current) saveId.current = null
     inFlight.current = true
     saveId.current ??= crypto.randomUUID()
+    const body = { items: toInput(items), version, save_id: saveId.current }
+    // Browsers cap a keepalive body at 64 KiB; long comments in a wide script can pass it, and a
+    // refused keepalive save would be lost with the tab. Over the line, a plain fetch is the better bet.
+    const fits = !keepalive || new Blob([JSON.stringify(body)]).size <= KEEPALIVE_LIMIT_BYTES
     save.mutate(
-      { items: toInput(items), version, save_id: saveId.current, keepalive },
+      { ...body, keepalive: keepalive && fits },
       {
         onSettled: () => {
           inFlight.current = false
@@ -358,6 +362,12 @@ export function ChecklistPage() {
     return () => {
       document.removeEventListener('visibilitychange', onHide)
       window.removeEventListener('pagehide', onHide)
+      // Leaving by a link inside the debounce (Back to the case, the bottom tab): the last taps go
+      // now, with keepalive, instead of dying with the timer (review finding, 21 Sep).
+      setUnsaved(false)
+      if (timer.current !== null) window.clearTimeout(timer.current)
+      timer.current = null
+      if (dirtyRef.current) flush(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- flush is a plain function reading refs
   }, [])
@@ -481,7 +491,9 @@ export function ChecklistPage() {
     const base = current() ?? findings
     const next = { ...base, [key]: { ...base[key], ...patch } }
     work.current = next
-    if (!inFlight.current) saveId.current = null // a new batch of entries gets its own id
+    // A new batch of entries gets its own id, even while a save is in flight: a retry that reused
+    // the in-flight id would be answered by the server's replay without the new entry (review, 21 Sep).
+    saveId.current = null
     setEdits(next)
     touched.current.add(key)
     markDirty(true)

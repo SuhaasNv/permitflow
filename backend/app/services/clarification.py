@@ -11,9 +11,10 @@ from typing import BinaryIO
 from sqlalchemy.orm import Session
 
 from app.core import metrics
-from app.core.errors import BadRequest, Conflict, NotFound, ValidationFailed
+from app.core.errors import BadRequest, Conflict, InvalidTransition, NotFound, ValidationFailed
 from app.domain.checklist_schema import ITEM_BY_KEY, item_title
 from app.domain.enums import ApplicationStatus, ClarificationStatus, NotificationKind
+from app.domain.operator_errors import refusal
 from app.domain.uploads import (
     UploadRejected,
     canonical_content_type,
@@ -367,13 +368,18 @@ class ClarificationService:
                 payload={"item_key": item.item_key, "round": request.round_no},
             )
         self.db.flush()
-        WorkflowService(self.db).apply(
-            app,
-            ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED,
-            operator,
-            note=None,
-            actor=Actor.OPERATOR,
-        )
+        try:
+            WorkflowService(self.db).apply(
+                app,
+                ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED,
+                operator,
+                note=None,
+                actor=Actor.OPERATOR,
+            )
+        except InvalidTransition as exc:
+            # Not reachable through the flows above (every open item carries a released request), kept so
+            # a later change never hands an operator the workflow's internal `allowed` list (review, 21 Sep).
+            raise InvalidTransition(refusal(app.status, "send")) from exc
         n = len(to_send)
         self.notifications.notify_officers(
             app,
@@ -494,6 +500,9 @@ class ClarificationService:
         round_no = max((t.round_no for t in threads), default=0)
         if app.status == ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED:
             turn = f"Round {round_no}, your turn"
+        elif app.status in OPERATOR_TURN_STATES and counts["open"] == 0 and counts["answered"] == 0:
+            # Every question withdrawn: the operator has nothing to send; the next move is the officer's.
+            turn = f"Round {round_no}, nothing open: route to approval or reject"
         elif app.status in OPERATOR_TURN_STATES:
             turn = f"Round {round_no}, waiting on operator"
         else:

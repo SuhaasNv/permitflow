@@ -124,6 +124,19 @@ async function call<T>(headers: Headers, path: string, init: RequestInit = {}): 
   return r.status === 204 ? (undefined as T) : ((await r.json()) as T)
 }
 
+/** Puts the spare officer back to its seeded shape (officer, active) through the API, whatever the
+ * scenario left behind: an assertion failing between the change and the restore must not leave the
+ * shared demo account deactivated on a persistent environment (review finding, 21 Sep). */
+export async function restoreSpareAccount(): Promise<void> {
+  const admin = await login(ADMIN)
+  const { users } = await call<{ users: { id: string; email: string; role: string; is_active: boolean }[] }>(admin, '/admin/users')
+  const spare = users.find((u) => u.email === SPARE)
+  if (!spare) return
+  if (!spare.is_active) await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ is_active: true }) })
+  if (spare.role !== 'officer') await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ role: 'officer' }) })
+  await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: admin })
+}
+
 export interface Seeded {
   id: string
   reference: string

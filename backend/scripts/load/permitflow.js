@@ -6,6 +6,12 @@ import http from 'k6/http'
 import { check } from 'k6'
 
 const BASE = __ENV.BASE || 'http://localhost:8001/api/v1'
+// Only a local API or a host set aside for load runs: the demo credentials are the same everywhere,
+// so nothing else stands between a mistyped BASE and a run against a live environment (review, 21 Sep).
+const HOST = new URL(BASE).hostname
+if (!(HOST === 'localhost' || HOST === '127.0.0.1' || HOST.includes('load') || HOST.includes('scratch'))) {
+  throw new Error(`refusing: ${BASE} is not a local or scratch host`)
+}
 const APP = __ENV.APP
 const PASSWORD = __ENV.SEED_PASSWORD || 'PermitFlow!2026'
 

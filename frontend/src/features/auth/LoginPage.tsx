@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 
+import type { Role } from '@/api/auth'
 import { login } from '@/api/auth'
 import { AppError } from '@/api/client'
 import { Alert } from '@/features/shared/Alert'
@@ -46,7 +47,8 @@ function endedCopy(reason: EndedReason, at: string | null, message: string | nul
     case 'signed_out':
       return 'You signed out. Sign in again to continue.'
     default:
-      return 'Your session is no longer valid. Sign in again to continue.'
+      // A reason the page has no words for (an account deactivated by an administrator): the server's sentence.
+      return message ?? 'Your session is no longer valid. Sign in again to continue.'
   }
 }
 
@@ -69,7 +71,18 @@ export function LoginPage() {
     defaultValues: { email: '', password: '' },
   })
 
-  if (ready && user) return <Navigate to={homeFor(user.role)} replace />
+  // Where a signed-in person goes: back to the page the session ended on when it is inside this role's
+  // own area, else the role's home. One rule for the render-time redirect and the post-sign-in one:
+  // the session commit re-renders this page before the explicit navigation lands, so the redirect
+  // below must carry the same target or it wins with the home page (review finding, 21 Sep).
+  const from = (location.state as { from?: string } | null)?.from
+  const landing = (role: Role) => {
+    const home = homeFor(role)
+    const area = home.split('/')[1] ?? ''
+    return from && from.startsWith(`/${area}/`) ? from : home
+  }
+
+  if (ready && user) return <Navigate to={landing(user.role)} replace />
 
   const attempt = async (values: FormValues, takeOver: boolean) => {
     setServerError(null)
@@ -77,11 +90,7 @@ export function LoginPage() {
       const response = await login(values.email, values.password, takeOver)
       setOtherDevice(null)
       signIn(response)
-      const from = (location.state as { from?: string } | null)?.from
-      const home = homeFor(response.user.role)
-      const area = home.split('/')[1] ?? ''
-      // Only return to a path inside this role's own area; a stale path from another role lands on home.
-      navigate(from && from.startsWith(`/${area}/`) ? from : home, { replace: true })
+      navigate(landing(response.user.role), { replace: true })
     } catch (error) {
       if (error instanceof AppError && error.status === 409 && error.code === 'session_active') {
         // Another device holds this account (US-093): offer to sign it out, with the password kept in the form.

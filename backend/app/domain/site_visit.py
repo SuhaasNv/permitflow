@@ -32,6 +32,8 @@ REPLY_WORKING_DAYS = 3
 # the operator accepts, the officer accepts the operator's date or keeps the original.
 MAX_ROUNDS = 6
 ROUND_LIMIT_REASON = "No more dates can be proposed for this visit."
+# A date that has arrived cannot be confirmed any more: whoever holds the move proposes another one.
+PAST_DATE_REASON = "This date has passed; propose another one."
 
 
 def rounds_left(proposal_count: int) -> int:

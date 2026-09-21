@@ -30,7 +30,7 @@ def decode_cursor(value: str) -> tuple[datetime, uuid.UUID]:
     try:
         stamp, raw_id = value.rsplit(",", 1)
         return EPOCH + timedelta(microseconds=int(stamp)), uuid.UUID(raw_id)
-    except ValueError as exc:
+    except (ValueError, OverflowError) as exc:  # a 43-digit stamp overflows timedelta (review, 21 Sep)
         raise BadRequest("The cursor is not one this feed issued.", details={"reason": "bad_cursor"}) from exc
 
 

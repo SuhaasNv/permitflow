@@ -1,9 +1,14 @@
 import { expect, test } from '@playwright/test'
 
-import { ADMIN, SPARE, seedUnderReview, signIn, signOut } from '../helpers.js'
+import { ADMIN, SPARE, restoreSpareAccount, seedUnderReview, signIn, signOut } from '../helpers.js'
 
 /** The administrator (US-070, US-072, US-073): the overview with live numbers, a case read without a
  * single control, the activity feed with a user row, and the spare account changed and restored. */
+// Whatever happens between the change and the restore below, the spare account ends as seeded.
+test.afterEach(async () => {
+  await restoreSpareAccount()
+})
+
 test('admin: overview, read-only case, activity feed, user management restored at the end', async ({ page }) => {
   const app = await seedUnderReview()
   await signIn(page, ADMIN)

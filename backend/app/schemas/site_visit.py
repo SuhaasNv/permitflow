@@ -1,5 +1,6 @@
-"""The site visit appointment (US-084) as each role sees it. The operator view carries no internal
-status code and no officer-only wording; the officer view carries the decision controls."""
+"""The site visit appointment (US-084) as each role sees it. The operator view carries no application
+status code and no officer-only wording (the appointment's own state names, `proposed`, `counter_proposed`,
+`confirmed`, `done`, are allowed: threat model T24); the officer view carries the decision controls."""
 
 import datetime as dt
 

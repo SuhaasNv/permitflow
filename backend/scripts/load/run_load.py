@@ -12,6 +12,7 @@ import concurrent.futures as cf
 import os
 import statistics
 import time
+from urllib.parse import urlparse
 
 import httpx
 
@@ -22,6 +23,12 @@ def percentile(values: list[float], fraction: float) -> float:
     ordered = sorted(values)
     index = max(0, min(len(ordered) - 1, round(fraction * len(ordered) + 0.5) - 1))
     return ordered[index]
+
+
+def local_target(base: str) -> bool:
+    """Only a local API or a host set aside for load runs is ever driven by this script."""
+    host = urlparse(base).hostname or ""
+    return host in ("localhost", "127.0.0.1", "::1") or "load" in host or "scratch" in host
 
 
 def login(client: httpx.Client, base: str, email: str, password: str) -> dict[str, str]:
@@ -37,6 +44,10 @@ def main() -> int:
     parser.add_argument("--seconds", type=int, default=20)
     parser.add_argument("--vus", type=int, default=5)
     args = parser.parse_args()
+    if not local_target(args.base):
+        # The demo credentials are the same everywhere, so nothing else stands between a mistyped base
+        # and a load run against a live environment (review finding, 21 Sep).
+        raise SystemExit(f"refusing: {args.base} is not a local host or one named for load runs")
     password = os.environ.get("SEED_PASSWORD", "PermitFlow!2026")
     with httpx.Client(timeout=30) as c:
         officer = login(c, args.base, "officer@permitflow.example.sg", password)

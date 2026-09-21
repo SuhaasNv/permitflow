@@ -444,6 +444,50 @@ def test_two_rounds_resolve_reopen_withdraw_and_route_to_approval(client: TestCl
     assert kinds.index("clarification.reopened") < kinds.index("clarification.released")
 
 
+def test_every_round_two_question_withdrawn_leaves_the_officer_an_exit(client: TestClient, db: Session) -> None:
+    """Round 2 with one question, withdrawn before the operator answers: the operator has nothing to
+    send (409), the rail says so, the queue row is the officer's move, and Route to approval is open
+    from Pending Post-Site Resubmission (found in the two-device UAT run, 21 Sep)."""
+    from tests.journeys import transition
+
+    app_id, op, off = _submitted(client, db)
+    _answer_all(client, op, app_id)
+    threads = {
+        t["key"]: t
+        for t in client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()["clarification"][
+            "items"
+        ]
+    }
+    for key in ("coved_edges", "chiller_temperature"):
+        assert client.post(OFF_URL.format(app_id, threads[key]["item_id"], "resolve"), headers=off).status_code == 200
+    r = client.post(
+        OFF_URL.format(app_id, threads["floor_trap_graded"]["item_id"], "reopen"),
+        headers=off,
+        json={"message": "Please send a photo once the floor is regraded."},
+    )
+    assert r.status_code == 200, r.text
+    view = transition(client, off, app_id, "pending_post_site_resubmission")
+    assert view["clarification"]["turn"] == "Round 2, waiting on operator"
+    # the officer withdraws the only open question of round 2
+    r = client.post(OFF_URL.format(app_id, threads["floor_trap_graded"]["item_id"], "withdraw"), headers=off)
+    assert r.status_code == 200, r.text
+    # the operator: nothing to send, and the page says so
+    r = client.post(f"/api/v1/applications/{app_id}/clarifications/send", headers=op)
+    assert r.status_code == 409 and r.json()["error"]["message"] == "Nothing needs your response."
+    mine = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    assert mine["open_count"] == 0 and mine["can_respond"] is False and mine["can_send"] is False
+    # the officer: the rail and the queue row say it is their move, and Route to approval is enabled
+    case = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    assert case["status"] == "pending_post_site_resubmission"
+    assert case["clarification"]["turn"] == "Round 2, nothing open: route to approval or reject"
+    actions = {a["target"]: a for a in case["actions"]}
+    assert actions["pending_approval"]["enabled"] is True and actions["rejected"]["enabled"] is True
+    row = next(i for i in client.get("/api/v1/officer/applications", headers=off).json()["items"] if i["id"] == app_id)
+    assert row["officer_turn"] is True and row["next_action"] == "Route to approval"
+    view = transition(client, off, app_id, "pending_approval")
+    assert view["status"] == "pending_approval"
+
+
 def test_five_rounds_lose_nothing(client: TestClient, db: Session) -> None:
     from tests.journeys import transition
 

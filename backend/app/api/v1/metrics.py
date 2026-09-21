@@ -22,7 +22,8 @@ def scrape(request: Request, db: DbSession) -> Response:
         raise NotFound("Not found.")
     header = request.headers.get("authorization", "")
     scheme, _, presented = header.partition(" ")
-    if scheme.lower() != "bearer" or not secrets.compare_digest(presented, token):
+    # Bytes, not str: compare_digest raises on non-ASCII text, which would be a 500 on an unlimited route.
+    if scheme.lower() != "bearer" or not secrets.compare_digest(presented.encode(), token.encode()):
         raise Unauthorized("A metrics token is required.")
     refresh_gauges(db)
     body, content_type = metrics.render()

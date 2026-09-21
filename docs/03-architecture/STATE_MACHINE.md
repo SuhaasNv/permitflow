@@ -51,6 +51,7 @@ Guards are evaluated by the service with a `TransitionContext` (`open_feedback_c
 | `awaiting_post_site_clarification` | `pending_approval` | officer | no item `open` or `answered` | Officer clicks Route to approval (a checklist with nothing flagged, or everything withdrawn) |
 | `awaiting_post_site_clarification` | `rejected` | officer | `has_note` | Officer clicks Reject (US-079) |
 | `pending_post_site_resubmission` | `post_site_clarification_resubmitted` | operator (owner) | `all_open_items_answered` | Operator clicks Send responses (round 2 onwards) |
+| `pending_post_site_resubmission` | `pending_approval` | officer | no item `open` or `answered` | Officer clicks Route to approval after withdrawing every question of a later round (found in the two-device UAT run, 21 Sep 2026: without this edge the case sat with Reject as its only move) |
 | `pending_post_site_resubmission` | `rejected` | officer | `has_note` | Officer clicks Reject (US-079) |
 | `post_site_clarification_resubmitted` | `pending_post_site_resubmission` | officer | `open_clarification_count ≥ 1` | Officer clicks Request another round (US-066) |
 | `post_site_clarification_resubmitted` | `pending_approval` | officer | no item `open` or `answered` | Officer clicks Route to approval |
