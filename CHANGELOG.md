@@ -4,7 +4,7 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 
 ## The build named in Telegram (21 Sep 2026, afternoon)
 
-Owner's request: the Telegram messages say which version runs. The API exposes `permitflow_build_info{version, commit}` (the version from `app/core/version.py`, the one place it lives now; the commit baked into the image by CI as `GIT_SHA`); the bot's `/status`, `/dev` and `/prod` carry "version 0.4.0-rc.1 (8cf669f)" per environment, and the hourly digest's section per environment reads the same from a query whose labels the annotation uses. Grafana's rules and templates regenerated; the Railway variables refreshed.
+Owner's request: the Telegram messages say which version runs. The API exposes `permitflow_build_info{version, commit}` (the version from `app/core/version.py`, the one place it lives now; the commit baked into the image by CI as `GIT_SHA`); the bot's `/status`, `/dev` and `/prod` carry "version 0.4.0-rc.1 (8cf669f)" per environment, and the hourly digest's section per environment reads the same from a query whose labels the annotation uses. Grafana's rules and templates regenerated; the Railway variables refreshed. The same afternoon a digest arrived as raw template text (Prometheus had been restarting during that evaluation, so the values were missing): every digest annotation now guards its value and prints "n/a" for that hour instead.
 
 ## v0.4.0-rc.1 on the development environment (21 Sep 2026, midday)
 

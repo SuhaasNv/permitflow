@@ -617,14 +617,14 @@ groups:
       environment: development
     annotations:
       summary: PermitFlow, the last hour, development
-      api: '{{ if ge (index $values "Ar").Value 1.0 }}up{{ else }}DOWN{{ end }}'
-      requests_per_minute: '{{ printf "%.0f" (index $values "Dr").Value }}'
-      p995_ms: '{{ printf "%.0f" (index $values "Er").Value }}'
-      checks: '{{ printf "%.0f" (index $values "Fr").Value }}'
-      spend_usd: '{{ printf "%.3f" (index $values "Gr").Value }}'
-      applications: '{{ printf "%.0f" (index $values "Hr").Value }}'
-      waiting_officer: '{{ printf "%.0f" (index $values "Ir").Value }}'
-      waiting_operator: '{{ printf "%.0f" (index $values "Jr").Value }}'
+      api: '{{ with (index $values "Ar") }}{{ if ge .Value 1.0 }}up{{ else }}DOWN{{ end }}{{ else }}n/a{{ end }}'
+      requests_per_minute: '{{ with (index $values "Dr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      p995_ms: '{{ with (index $values "Er") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      checks: '{{ with (index $values "Fr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      spend_usd: '{{ with (index $values "Gr") }}{{ printf "%.3f" .Value }}{{ else }}n/a{{ end }}'
+      applications: '{{ with (index $values "Hr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      waiting_officer: '{{ with (index $values "Ir") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      waiting_operator: '{{ with (index $values "Jr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
       build: '{{ with (index $values "Kr") }}{{ index .Labels "version" }} ({{ index .Labels "commit" }}){{ else }}n/a{{ end }}'
     noDataState: OK
     execErrState: OK
@@ -860,14 +860,14 @@ groups:
       environment: production
     annotations:
       summary: PermitFlow, the last hour, production
-      api: '{{ if ge (index $values "Ar").Value 1.0 }}up{{ else }}DOWN{{ end }}'
-      requests_per_minute: '{{ printf "%.0f" (index $values "Dr").Value }}'
-      p995_ms: '{{ printf "%.0f" (index $values "Er").Value }}'
-      checks: '{{ printf "%.0f" (index $values "Fr").Value }}'
-      spend_usd: '{{ printf "%.3f" (index $values "Gr").Value }}'
-      applications: '{{ printf "%.0f" (index $values "Hr").Value }}'
-      waiting_officer: '{{ printf "%.0f" (index $values "Ir").Value }}'
-      waiting_operator: '{{ printf "%.0f" (index $values "Jr").Value }}'
+      api: '{{ with (index $values "Ar") }}{{ if ge .Value 1.0 }}up{{ else }}DOWN{{ end }}{{ else }}n/a{{ end }}'
+      requests_per_minute: '{{ with (index $values "Dr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      p995_ms: '{{ with (index $values "Er") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      checks: '{{ with (index $values "Fr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      spend_usd: '{{ with (index $values "Gr") }}{{ printf "%.3f" .Value }}{{ else }}n/a{{ end }}'
+      applications: '{{ with (index $values "Hr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      waiting_officer: '{{ with (index $values "Ir") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      waiting_operator: '{{ with (index $values "Jr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
       build: '{{ with (index $values "Kr") }}{{ index .Labels "version" }} ({{ index .Labels "commit" }}){{ else }}n/a{{ end }}'
     noDataState: OK
     execErrState: OK
@@ -1103,14 +1103,14 @@ groups:
       environment: local
     annotations:
       summary: PermitFlow, the last hour, local
-      api: '{{ if ge (index $values "Ar").Value 1.0 }}up{{ else }}DOWN{{ end }}'
-      requests_per_minute: '{{ printf "%.0f" (index $values "Dr").Value }}'
-      p995_ms: '{{ printf "%.0f" (index $values "Er").Value }}'
-      checks: '{{ printf "%.0f" (index $values "Fr").Value }}'
-      spend_usd: '{{ printf "%.3f" (index $values "Gr").Value }}'
-      applications: '{{ printf "%.0f" (index $values "Hr").Value }}'
-      waiting_officer: '{{ printf "%.0f" (index $values "Ir").Value }}'
-      waiting_operator: '{{ printf "%.0f" (index $values "Jr").Value }}'
+      api: '{{ with (index $values "Ar") }}{{ if ge .Value 1.0 }}up{{ else }}DOWN{{ end }}{{ else }}n/a{{ end }}'
+      requests_per_minute: '{{ with (index $values "Dr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      p995_ms: '{{ with (index $values "Er") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      checks: '{{ with (index $values "Fr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      spend_usd: '{{ with (index $values "Gr") }}{{ printf "%.3f" .Value }}{{ else }}n/a{{ end }}'
+      applications: '{{ with (index $values "Hr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      waiting_officer: '{{ with (index $values "Ir") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
+      waiting_operator: '{{ with (index $values "Jr") }}{{ printf "%.0f" .Value }}{{ else }}n/a{{ end }}'
       build: '{{ with (index $values "Kr") }}{{ index .Labels "version" }} ({{ index .Labels "commit" }}){{ else }}n/a{{ end }}'
     noDataState: OK
     execErrState: OK

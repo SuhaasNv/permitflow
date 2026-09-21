@@ -88,13 +88,16 @@ def digest(env):
     data += [query("K", f'max by (version, commit) (permitflow_build_info{{{e}}})'), reduce("Kr", "K")]
     # the environment exists when Prometheus has a target for it; otherwise the rule stays quiet (NoData -> OK)
     data += [query("Z", f'count(up{{job="permitflow-api", {e}}})'), reduce("Zr", "Z"), threshold("C", "Zr", "gt", 0)]
-    v = lambda r, fmt: f"{{{{ printf \"{fmt}\" (index $values \"{r}r\").Value }}}}"
+    # Every annotation guards its value: when a query has no result for an evaluation (Prometheus mid-restart,
+    # as on 21 Sep), Grafana keeps an annotation it cannot expand as the raw template text, and the message
+    # printed `{{ printf ... }}` instead of numbers. With the guard the number reads "n/a" for that hour.
+    v = lambda r, fmt: f'{{{{ with (index $values "{r}r") }}}}{{{{ printf "{fmt}" .Value }}}}{{{{ else }}}}n/a{{{{ end }}}}'
     build = ('{{ with (index $values "Kr") }}{{ index .Labels "version" }} ({{ index .Labels "commit" }}){{ else }}n/a{{ end }}')
     return {"uid": f"pf-digest-{env}", "title": f"PermitFlow hourly digest ({env})", "condition": "C", "data": data,
             "for": "0s", "labels": {"severity": "info", "kind": "digest", "environment": env},
             "annotations": {
                 "summary": f"PermitFlow, the last hour, {env}",
-                "api": "{{ if ge (index $values \"Ar\").Value 1.0 }}up{{ else }}DOWN{{ end }}",
+                "api": '{{ with (index $values "Ar") }}{{ if ge .Value 1.0 }}up{{ else }}DOWN{{ end }}{{ else }}n/a{{ end }}',
                 "requests_per_minute": v("D", "%.0f"), "p995_ms": v("E", "%.0f"), "checks": v("F", "%.0f"),
                 "spend_usd": v("G", "%.3f"), "applications": v("H", "%.0f"),
                 "waiting_officer": v("I", "%.0f"), "waiting_operator": v("J", "%.0f"),
