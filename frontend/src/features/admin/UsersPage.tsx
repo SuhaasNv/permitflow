@@ -166,7 +166,7 @@ export function AdminUsersPage() {
         }
       />
       {users.isPending ? (
-        <div className="pf-surface overflow-hidden" aria-busy="true" aria-label="Loading users">
+        <div className="pf-surface overflow-hidden" role="status" aria-busy="true" aria-label="Loading users">
           {[0, 1, 2].map((i) => (
             <div key={i} className="grid grid-cols-[minmax(0,1fr)_150px_200px] gap-4 border-b border-line px-5 py-4 last:border-b-0">
               <Skeleton className="h-4 w-2/5" />

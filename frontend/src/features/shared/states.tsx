@@ -160,7 +160,7 @@ export function Skeleton({ className = '' }: { className?: string }) {
 /** Header skeleton shared by the application screens (eyebrow, title, subtitle). */
 export function PageSkeleton({ children, label }: { children?: ReactNode; label: string }) {
   return (
-    <div className="flex flex-col gap-6" aria-busy="true" aria-label={label}>
+    <div className="flex flex-col gap-6" role="status" aria-busy="true" aria-label={label}>
       <div className="flex flex-col gap-2.5">
         <Skeleton className="h-3 w-40" />
         <Skeleton className="h-8 w-2/5" />

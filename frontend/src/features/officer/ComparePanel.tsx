@@ -85,7 +85,7 @@ export function ComparePanel({ view }: { view: OfficerApplication }) {
       {from === to ? (
         <p className="px-5 py-6 text-sm text-text-2 sm:px-7">Pick two different revisions.</p>
       ) : compare.isPending ? (
-        <div className="flex flex-col gap-3 px-5 py-6 sm:px-7" aria-busy="true" aria-label="Loading comparison">
+        <div className="flex flex-col gap-3 px-5 py-6 sm:px-7" role="status" aria-busy="true" aria-label="Loading comparison">
           <Skeleton className="h-4 w-1/3" />
           <Skeleton className="h-24" />
         </div>
