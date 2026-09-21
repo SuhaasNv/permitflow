@@ -29,13 +29,14 @@ function PolicyBody({ slug }: { slug: PolicySlug }) {
     <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-x-14">
       <aside className="mb-8 lg:mb-0">
         <div className="lg:sticky lg:top-6">
-          <nav aria-label="Policies" className="flex flex-wrap gap-x-5 gap-y-2 text-sm lg:flex-col lg:gap-y-2.5">
+          <nav aria-label="Policies" className="flex flex-wrap gap-x-5 gap-y-1 text-sm lg:flex-col lg:gap-y-0">
             {SLUGS.map((s) => (
               <Link
                 key={s}
                 to={`/${s}`}
                 aria-current={s === slug ? 'page' : undefined}
-                className={s === slug ? 'font-semibold text-text no-underline' : 'text-text-2 no-underline hover:text-text'}
+                // Every link at least 24 px tall (the accessibility gate's target-size rule) with a little air between rows.
+                className={`inline-flex min-h-7 items-center no-underline ${s === slug ? 'font-semibold text-text' : 'text-text-2 hover:text-text'}`}
               >
                 {POLICIES[s].title}
               </Link>
@@ -43,10 +44,10 @@ function PolicyBody({ slug }: { slug: PolicySlug }) {
           </nav>
           <nav aria-label="On this page" className="mt-6 hidden lg:block">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-3">On this page</p>
-            <ol className="mt-2 flex flex-col gap-1.5 text-[13px] leading-[18px]">
+            <ol className="mt-1 flex flex-col text-[13px] leading-[18px]">
               {policy.sections.map((section) => (
                 <li key={section.heading}>
-                  <a href={`#${anchorOf(section.heading)}`} className="text-text-2 no-underline hover:text-text">
+                  <a href={`#${anchorOf(section.heading)}`} className="inline-flex min-h-7 items-center py-1 text-text-2 no-underline hover:text-text">
                     {section.heading}
                   </a>
                 </li>
