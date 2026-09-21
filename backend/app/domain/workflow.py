@@ -184,6 +184,16 @@ TRANSITIONS: tuple[Transition, ...] = (
         _needs_all_answered,
         "Send responses",
     ),
+    # Every question of a later round withdrawn: the operator has nothing to send, so the officer
+    # needs the same exit as from round 1, or the case would sit with Reject as its only move
+    # (found in the two-device UAT run, 21 Sep).
+    Transition(
+        S.PENDING_POST_SITE_RESUBMISSION,
+        S.PENDING_APPROVAL,
+        Actor.OFFICER,
+        _needs_nothing_open,
+        "Route to approval",
+    ),
     Transition(
         S.POST_SITE_CLARIFICATION_RESUBMITTED,
         S.PENDING_POST_SITE_RESUBMISSION,

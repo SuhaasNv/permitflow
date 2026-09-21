@@ -112,6 +112,10 @@ class WindowLimiter(_Window):
             return None
 
 
+# The deploy gate's probe and the monitor's scrape, by exact path: a 404 URL ending in /health is limited.
+EXEMPT_PATHS = frozenset({"/api/v1/health", "/api/v1/healthz", "/api/v1/metrics"})
+
+
 class RequestLimiter:
     """The two request buckets the middleware consults, replaceable on `app.state` in tests."""
 
@@ -127,7 +131,7 @@ class RequestLimiter:
         path = request.url.path
         # Health checks and the metrics scrape are exempt: the deploy gate and the monitor must keep
         # answering while a client is being refused (the scrape is bearer-token protected, US-077).
-        if path.endswith(("/health", "/healthz", "/metrics")):
+        if path in EXEMPT_PATHS:
             return None
         key = client_key(request, self.trusted_proxies, self.client_ip_header)
         bucket = self.login if path.endswith("/auth/login") and request.method == "POST" else self.general

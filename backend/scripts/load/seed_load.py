@@ -47,8 +47,11 @@ EVENTS = [
 
 def main() -> None:
     url = os.environ.get("DATABASE_URL", "")
-    if "load" not in url and "scratch" not in url:
-        raise SystemExit("refusing: DATABASE_URL must name a load or scratch database")
+    # The database name itself, not any substring of the URL: a host that happens to contain "load"
+    # must not pass (review finding, 21 Sep).
+    name = url.rsplit("/", 1)[-1].split("?", 1)[0]
+    if not (name.endswith(("_load", "_scratch")) or name in ("load", "scratch")):
+        raise SystemExit("refusing: DATABASE_URL must name a database ending in _load or _scratch")
     rng = random.Random(86)
     now = datetime.now(UTC)
     with session_factory()() as db:

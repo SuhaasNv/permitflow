@@ -15,6 +15,7 @@ import type { Tone } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { officerKeys, useConfirmSiteVisitWithoutReply, useDecideSiteVisit, useProposeSiteVisit, useRescheduleSiteVisitAsOfficer } from './queries'
+import { MOVED_ON, useCaseRefusal } from './refusal'
 import { useReadOnly } from './readOnly'
 
 const TONE: Record<string, Tone> = { proposed: 'neutral', counter_proposed: 'warning', confirmed: 'success', done: 'success' }
@@ -117,6 +118,7 @@ export interface ProposeVisitDialogProps {
 export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogProps) {
   const propose = useProposeSiteVisit(view.id)
   const toast = useToast()
+  const queryClient = useQueryClient()
   const [date, setDate] = useState('')
   const [slot, setSlot] = useState<SiteVisitSlot>('morning')
   const [note, setNote] = useState('')
@@ -125,7 +127,6 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
   const [touched, setTouched] = useState<{ date: boolean; note: boolean }>({ date: false, note: false })
   const bounds = dateBounds()
   const serverErrors = fieldErrorsOf(propose.error)
-  const conflict = propose.error instanceof AppError && propose.error.status === 409 ? propose.error.message : null
   const reset = () => {
     setDate('')
     setSlot('morning')
@@ -148,6 +149,16 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
           onClose()
           toast.push({ title: 'Site visit proposed', body: 'The operator has been asked to accept the date.', tone: 'success' })
         },
+        onError: (e) => {
+          // The case moved under the dialog (another device proposed, the status changed): close it and
+          // reload; a rule of the appointment itself (the round cap) keeps its own sentence (review, 21 Sep).
+          if (e instanceof AppError && e.status === 409) {
+            reset()
+            onClose()
+            toast.push({ title: 'Could not propose the visit', body: e.code === 'version_conflict' ? MOVED_ON : e.message, tone: 'error' })
+            void queryClient.invalidateQueries({ queryKey: officerKeys.case(view.id) })
+          }
+        },
       },
     )
   }
@@ -168,11 +179,7 @@ export function ProposeVisitDialog({ open, view, onClose }: ProposeVisitDialogPr
         can confirm the visit yourself.
         {view.status === 'under_review' ? ' The case moves to Site Visit Scheduled now.' : ''}
       </p>
-      {conflict ? (
-        <Alert tone="warning" title="Could not propose the visit">
-          {conflict}
-        </Alert>
-      ) : propose.error && !serverErrors.date && !serverErrors.note ? (
+      {propose.error && !serverErrors.date && !serverErrors.note ? (
         <Alert tone="error" title="Could not propose the visit">
           {propose.error.message}
         </Alert>
@@ -224,20 +231,11 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
   const confirm = useConfirmSiteVisitWithoutReply(view.id)
   const reschedule = useRescheduleSiteVisitAsOfficer(view.id)
   const toast = useToast()
-  const queryClient = useQueryClient()
   const [form, setForm] = useState<'propose' | 'reschedule' | null>(null)
   const busy = decide.isPending || confirm.isPending || reschedule.isPending
-  const fail = (title: string) => (e: Error) => {
-    if (Object.keys(fieldErrorsOf(e)).length) return
-    // A 409 means the visit moved under us (another officer or device decided it, the operator replied):
-    // reload the case so the rail shows what stands, never the raw server reason (UAT, 21 Sep).
-    if (e instanceof AppError && e.status === 409) {
-      toast.push({ title, body: 'This application changed since you opened it. Showing the latest.', tone: 'error' })
-      void queryClient.invalidateQueries({ queryKey: officerKeys.case(view.id) })
-      return
-    }
-    toast.push({ title, body: e.message, tone: 'error' })
-  }
+  // A 409 means the visit moved under us (another officer or device decided it, the operator replied):
+  // reload the case so the rail shows what stands, never the raw server reason (UAT, 21 Sep).
+  const fail = useCaseRefusal(view.id)
   const settle = (action: 'accept_operator' | 'keep_original') =>
     decide.mutate(
       { action },
@@ -333,7 +331,7 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
                 ) : null}
               </div>
             ) : null}
-            {visit.status === 'confirmed' && form === null && !readOnly ? (
+            {(visit.status === 'confirmed' || (visit.status === 'proposed' && visit.can_reschedule)) && form === null && !readOnly ? (
               <div className="flex flex-col gap-1">
                 <Button
                   variant="secondary"
@@ -342,7 +340,7 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
                   title={visit.round_limit_reason ?? undefined}
                   onClick={() => setForm('reschedule')}
                 >
-                  Request a different date
+                  {visit.status === 'proposed' ? 'Propose another date' : 'Request a different date'}
                 </Button>
                 {!visit.can_reschedule && visit.round_limit_reason ? (
                   <p className="text-xs leading-[17px] text-text-3">{visit.round_limit_reason}</p>
@@ -377,7 +375,7 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
             ) : null}
             {form === 'reschedule' ? (
               <DateForm
-                title="Request a different date"
+                title={visit.status === 'proposed' ? 'Propose another date' : 'Request a different date'}
                 submitLabel="Propose the new date"
                 reasonLabel="Reason"
                 reasonRequired

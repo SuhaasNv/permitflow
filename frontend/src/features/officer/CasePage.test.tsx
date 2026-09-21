@@ -449,6 +449,57 @@ describe('OfficerCasePage', () => {
     expect(await screen.findByRole('button', { name: 'Withdraw' })).toBeInTheDocument()
   })
 
+  it('a 409 on Withdraw (the case moved under the officer) reloads the case with the shared sentence', async () => {
+    const draftItem = {
+      id: 'f1',
+      target_type: 'section' as const,
+      section_key: 'business',
+      document_type: null,
+      target_label: 'Business details',
+      message: 'Please confirm the UEN.',
+      template_key: null,
+      resolution: 'open' as const,
+      raised_in_revision: 1,
+      author_name: 'Rahim',
+      created_at: '2026-09-19T01:00:00Z',
+      released_to_operator_at: null,
+      addressed_in_revision: null,
+      resolved_at: null,
+      can_undo: false,
+      can_resolve: false,
+    }
+    const underReview = {
+      ...view,
+      status: 'under_review',
+      status_label: 'Under Review',
+      feedback_editable: true,
+      feedback_locked_reason: null,
+      actions: [],
+      open_feedback_count: 1,
+      feedback: [draftItem],
+    }
+    // the other officer requested the resubmission meanwhile: the item is released, the case moved on
+    const movedOn = {
+      ...underReview,
+      status: 'pending_pre_site_resubmission',
+      status_label: 'Pending Pre-Site Resubmission',
+      feedback_editable: false,
+      feedback_locked_reason: 'The operator is working on the flagged parts.',
+      feedback: [{ ...draftItem, released_to_operator_at: '2026-09-19T02:00:00Z' }],
+    }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValueOnce(underReview).mockResolvedValue(movedOn)
+    const withdraw = vi
+      .spyOn(api, 'withdrawFeedback')
+      .mockRejectedValue(new AppError(409, { code: 'conflict', message: 'Feedback can be withdrawn only while the application is Under Review.' }))
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Withdraw' }))
+    await waitFor(() => expect(withdraw).toHaveBeenCalledWith('a1', 'f1'))
+    expect(await screen.findByText('This application changed since you opened it. Showing the latest.')).toBeInTheDocument()
+    expect(screen.queryByText('Feedback can be withdrawn only while the application is Under Review.')).not.toBeInTheDocument()
+    expect(await screen.findByText('Pending Pre-Site Resubmission')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Withdraw' })).not.toBeInTheDocument())
+  })
+
   it('offers Mark resolved only when the server says the item can be resolved (US-083)', async () => {
     const released = {
       ...view,

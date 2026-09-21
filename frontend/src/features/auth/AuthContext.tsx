@@ -75,6 +75,19 @@ function readStored(): StoredSession | null {
   }
 }
 
+/** A stored session that ran out while the tab was closed: the sign-in page should say so, the way the
+ * in-tab timer does, instead of a bare form (review finding, 21 Sep). */
+function storedExpired(): boolean {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return false
+    const s = JSON.parse(raw) as Partial<StoredSession>
+    return typeof s.expiresAt === 'string' && new Date(s.expiresAt).getTime() <= Date.now()
+  } catch {
+    return false
+  }
+}
+
 function writeStored(session: StoredSession | null): void {
   try {
     if (session) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session))
@@ -88,7 +101,7 @@ function writeStored(session: StoredSession | null): void {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<StoredSession | null>(() => readStored())
   const [ready, setReady] = useState(false)
-  const [ended, setEnded] = useState<Ended>(NOT_ENDED)
+  const [ended, setEnded] = useState<Ended>(() => (storedExpired() ? { reason: 'expired', at: null, message: null } : NOT_ENDED))
 
   useEffect(() => {
     setTokenProvider(() => session?.token ?? null)

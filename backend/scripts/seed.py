@@ -45,7 +45,12 @@ def main() -> None:
                     )
                 )
                 created += 1
-            elif existing.is_protected != protected:
+            else:
+                # A rerun is the documented reset: role, active flag and protection go back to the
+                # seed's values (a scenario that changed the spare account and failed before restoring
+                # it is repaired here; review finding, 21 Sep). The password is left alone.
+                existing.role = role
+                existing.is_active = True
                 existing.is_protected = protected
         db.commit()
     print(f"seeded {created} new user(s); {len(SEED_USERS)} total in the seed list")

@@ -19,6 +19,7 @@ import {
   useWithdrawFeedback,
 } from './queries'
 import { useReadOnly } from './readOnly'
+import { useCaseRefusal } from './refusal'
 
 const UNDO_MS = 10_000
 
@@ -48,6 +49,8 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
   // An administrator never edits: the composer and the item controls stay off whatever the status.
   const editable = view.feedback_editable && !readOnly
   const toast = useToast()
+  // A 409 (the case moved under us: the operator withdrew, another officer decided): reload, shared sentence.
+  const refused = useCaseRefusal(view.id)
   const [composingRequested, setComposing] = useState(false)
   const [target, setTarget] = useState('')
   const [templateKey, setTemplateKey] = useState('')
@@ -69,7 +72,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
         onClick: () =>
           restore.mutate(feedbackId, {
             onSuccess: () => toast.push({ title: 'Undone', body: 'The item is back where it was.', tone: 'neutral' }),
-            onError: (e) => toast.push({ title: 'Could not undo', body: e.message, tone: 'error' }),
+            onError: refused('Could not undo'),
           }),
       },
     })
@@ -201,7 +204,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                             onClick={() =>
                               resolve.mutate(f.id, {
                                 onSuccess: () => offerUndo('Marked resolved', `${f.target_label} is resolved.`, f.id),
-                                onError: (e) => toast.push({ title: 'Could not resolve', body: e.message, tone: 'error' }),
+                                onError: refused('Could not resolve'),
                               })
                             }
                           >
@@ -218,7 +221,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                             onClick={() =>
                               reopen.mutate(f.id, {
                                 onSuccess: () => offerUndo('Marked not fixed', `${f.target_label} is open again for the next round.`, f.id),
-                                onError: (e) => toast.push({ title: 'Could not reopen', body: e.message, tone: 'error' }),
+                                onError: refused('Could not reopen'),
                               })
                             }
                           >
@@ -233,7 +236,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                             onClick={() =>
                               withdraw.mutate(f.id, {
                                 onSuccess: () => offerUndo('Feedback withdrawn', `${f.target_label} item removed.`, f.id),
-                                onError: (e) => toast.push({ title: 'Could not withdraw', body: e.message, tone: 'error' }),
+                                onError: refused('Could not withdraw'),
                               })
                             }
                           >

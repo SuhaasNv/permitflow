@@ -120,6 +120,9 @@ def receive(storage: FileStorage, key: str, ext: str, stream: BinaryIO, usage: S
                 "The image could not be read. Send it again, or save it as a PDF.",
                 details={"reason": "unreadable_image"},
             ) from exc
+        if len(data) > limit:
+            # Re-encoding can grow a file that was just under the cap on the wire (a level-9 PNG).
+            raise BadRequest(too_large_message(limit), details={"reason": "too_large"})
         if len(data) > usage.remaining_bytes:
             raise budget_error(usage)
         try:

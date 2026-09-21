@@ -303,6 +303,13 @@ def test_role_change_and_deactivation_take_effect_on_the_next_request(
     )
     r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={"is_active": True})
     assert r.status_code == 200
+    # the deactivation ended the live session: the old token stays dead after the reactivation, with the
+    # reason, and a fresh sign-in needs no take-over (review finding, 21 Sep)
+    r = client.get(f"{API}/officer/applications", headers=sp)
+    assert r.status_code == 401 and r.json()["error"]["code"] == "session_revoked"
+    assert r.json()["error"]["details"]["reason"] == "deactivated"
+    r = client.post(f"{API}/auth/login", json={"email": "spare@example.sg", "password": DEFAULT_PASSWORD})
+    assert r.status_code == 200, r.text
     events = [
         e
         for e in db.scalars(select(AuditEvent).order_by(AuditEvent.created_at))

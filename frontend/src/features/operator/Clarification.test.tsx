@@ -274,6 +274,64 @@ describe('clarification after the site visit, operator side (US-064)', () => {
     await waitFor(() => expect(respond).toHaveBeenCalledTimes(2))
     expect(respond).toHaveBeenLastCalledWith('a1', 'i1', 'Draft one, more detail')
     await waitFor(() => expect(field).toHaveValue('Draft one, more detail'))
+    // the first save landing must not remount the field: same element, still in the document
+    await waitFor(() => expect(screen.getByLabelText(/Your answer/)).toBe(field))
+    expect(field.isConnected).toBe(true)
+  })
+
+  it('a file that failed while offline is sent when the connection returns (US-087)', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const { act } = await import('@testing-library/react')
+    const { AppError } = await import('@/api/client')
+    vi.spyOn(api, 'getApplication').mockResolvedValue(afterVisit)
+    const answered: ClarificationView = {
+      ...view,
+      can_send: true,
+      resolved_count: 0,
+      items: [
+        {
+          ...view.items[0]!,
+          responses: [
+            { id: 'r1', round_no: 1, message: 'Regraded on 23 Sep.', created_at: '2026-09-25T01:00:00Z', sent_at: null, attachments: [] },
+          ],
+        },
+      ],
+    }
+    vi.spyOn(clarApi, 'getClarifications').mockResolvedValue(answered)
+    const onLine = vi.spyOn(navigator, 'onLine', 'get')
+    onLine.mockReturnValue(false)
+    const attach = vi
+      .spyOn(clarApi, 'attachToResponse')
+      .mockRejectedValueOnce(new AppError(0, { code: 'network_error', message: 'Could not reach the server.' }))
+      .mockResolvedValue({ view: answered, unchanged: false })
+    renderAt('/app/applications/a1/clarification')
+    const input = (await screen.findByRole('button', { name: 'Choose a file' })) && (document.querySelector('input[type=file][multiple]') as HTMLInputElement)
+    await userEvent.upload(input, new File(['x'], 'floor.jpg', { type: 'image/jpeg' }))
+    await waitFor(() => expect(attach).toHaveBeenCalledTimes(1))
+    // offline: no timer, the file waits
+    onLine.mockReturnValue(true)
+    act(() => window.dispatchEvent(new Event('online')))
+    await waitFor(() => expect(attach).toHaveBeenCalledTimes(2))
+  })
+
+  it('an answer save refused with 409 shows the shared sentence and reloads, never the server reason', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const { AppError } = await import('@/api/client')
+    vi.spyOn(api, 'getApplication').mockResolvedValue(afterVisit)
+    const onlyOpen: ClarificationView = { ...view, items: [view.items[0]!], resolved_count: 0 }
+    const withdrawn: ClarificationView = { ...onlyOpen, items: [], open_count: 0, can_respond: false }
+    const list = vi.spyOn(clarApi, 'getClarifications').mockResolvedValueOnce(onlyOpen).mockResolvedValue(withdrawn)
+    vi.spyOn(clarApi, 'respondToClarification').mockRejectedValue(
+      new AppError(409, { code: 'conflict', message: 'This item is not waiting for your response.' }),
+    )
+    renderAt('/app/applications/a1/clarification')
+    const field = await screen.findByLabelText(/Your answer/)
+    await userEvent.type(field, 'Too late.')
+    await userEvent.tab()
+    expect(await screen.findByText('This application changed since you opened it. Showing the latest.')).toBeInTheDocument()
+    expect(screen.queryByText('This item is not waiting for your response.')).not.toBeInTheDocument()
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
+    expect(await screen.findByRole('heading', { name: 'Nothing needs your response yet' })).toBeInTheDocument()
   })
 
   it('shows the offline notice while the browser is offline and clears it when back (US-087)', async () => {

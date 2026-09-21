@@ -3,14 +3,18 @@ photo was taken into the file; the licensing record needs the picture, not the l
 kitchen. EXIF, XMP, IPTC and text chunks are dropped; the ICC profile is kept so colours stay right; the
 EXIF orientation is applied to the pixels first so the picture does not turn on its side."""
 
+import warnings
 from io import BytesIO
 from typing import Any
 
 from PIL import Image, ImageOps, JpegImagePlugin, UnidentifiedImageError
 
-# Pillow refuses images past twice this and warns from it; 40 megapixels is generous for a phone photo
-# and keeps the re-encode of a decompression bomb from taking the worker with it.
-Image.MAX_IMAGE_PIXELS = 40_000_000
+# 40 megapixels is generous for a phone photo (a 12 MP camera is a third of it). Pillow's own setting
+# only warns at this figure and refuses at twice it, and the warning let an 80-megapixel PNG of a few
+# hundred kilobytes decode to 600 MB in the worker (review finding, 21 Sep): the size in the header is
+# checked here before a single pixel is decoded, and the warning is an error as a second fence.
+MAX_PIXELS = 40_000_000
+Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 
 _FORMATS = {".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG"}
 
@@ -27,7 +31,14 @@ def strip_metadata(data: bytes, ext: str) -> bytes:
     """Return the image re-encoded with only its pixels and colour profile."""
     fmt = _FORMATS[ext]
     try:
-        with Image.open(BytesIO(data)) as source:
+        # The filter is scoped here, not module-wide: a test runner or a library resets global filters.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            source = Image.open(BytesIO(data))
+        with source:
+            width, height = source.size
+            if width * height > MAX_PIXELS:
+                raise ImageUnreadableError(f"{width}x{height} is more than {MAX_PIXELS} pixels")
             source.load()
             icc = source.info.get("icc_profile")
             image = ImageOps.exif_transpose(source) or source
@@ -50,8 +61,14 @@ def strip_metadata(data: bytes, ext: str) -> bytes:
             else:
                 image.save(out, "PNG", icc_profile=icc, optimize=False)
             return out.getvalue()
-    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError) as exc:
+    except (
+        UnidentifiedImageError,
+        Image.DecompressionBombError,
+        Image.DecompressionBombWarning,
+        OSError,
+        ValueError,
+    ) as exc:
         raise ImageUnreadableError(str(exc)) from exc
 
 
-__all__ = ["ImageUnreadableError", "is_image", "strip_metadata"]
+__all__ = ["MAX_PIXELS", "ImageUnreadableError", "is_image", "strip_metadata"]

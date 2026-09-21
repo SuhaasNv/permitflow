@@ -20,6 +20,7 @@ from app.domain.enums import (
     SiteVisitStatus,
 )
 from app.domain.site_visit import (
+    PAST_DATE_REASON,
     ROUND_LIMIT_REASON,
     date_problem,
     earliest_date,
@@ -84,11 +85,20 @@ class SiteVisitService:
         proposals = self.visits.proposals_for(visit.id)
         last_officer = next((p for p in reversed(proposals) if p.author_role == Role.OFFICER.value), None)
         deadline = reply_deadline(last_officer.created_at, visit.date) if last_officer else None
+        today = self.today()
+        expired = visit.status == SiteVisitStatus.PROPOSED and visit.date <= today
         can_confirm = (
-            visit.status == SiteVisitStatus.PROPOSED and deadline is not None and self.today() >= deadline
+            visit.status == SiteVisitStatus.PROPOSED
+            and deadline is not None
+            and today >= deadline
+            and not expired
         )
         left = rounds_left(len(proposals))
-        reschedulable = visit.status == SiteVisitStatus.CONFIRMED and visit.date > self.today() and left > 0
+        # A confirmed visit still ahead can be moved; so can a proposal the operator let expire (its date
+        # arrived unanswered), which is otherwise a dead end (review finding, 21 Sep).
+        reschedulable = (
+            (visit.status == SiteVisitStatus.CONFIRMED and visit.date > today) or expired
+        ) and left > 0
         return SiteVisitOut(
             visit_no=visit.visit_no,
             status=visit.status.value,
@@ -103,9 +113,13 @@ class SiteVisitService:
                 None
                 if can_confirm
                 else (
-                    f"Available from {deadline.strftime('%-d %b %Y')} if the operator has not replied."
-                    if visit.status == SiteVisitStatus.PROPOSED and deadline
-                    else "Only for a proposal the operator has left unanswered."
+                    PAST_DATE_REASON
+                    if expired
+                    else (
+                        f"Available from {deadline.strftime('%-d %b %Y')} if the operator has not replied."
+                        if visit.status == SiteVisitStatus.PROPOSED and deadline
+                        else "Only for a proposal the operator has left unanswered."
+                    )
                 )
             ),
             original=self._original(visit, proposals),
@@ -134,7 +148,7 @@ class SiteVisitService:
             when=format_visit(visit.date, visit.slot),
             note=visit.note,
             reply_by=deadline if visit.status == SiteVisitStatus.PROPOSED else None,
-            can_accept=visit.status == SiteVisitStatus.PROPOSED,
+            can_accept=visit.status == SiteVisitStatus.PROPOSED and visit.date > self.today(),
             can_counter=visit.status == SiteVisitStatus.PROPOSED and left > 0,
             can_reschedule=reschedulable,
             earliest_date=earliest_date(self.today(), by_operator=True),
@@ -248,6 +262,7 @@ class SiteVisitService:
         )
         now = self.now()
         if action == "accept_operator":
+            self._refuse_past(counter.date)
             self._settle(counter, SiteVisitProposalOutcome.ACCEPTED, now)
             if open_officer:
                 self._settle(open_officer, SiteVisitProposalOutcome.DECLINED, now)
@@ -259,6 +274,7 @@ class SiteVisitService:
                 f"The licensing officer accepted your date: {format_visit(visit.date, visit.slot)}.",
             )
         elif action == "keep_original":
+            self._refuse_past(visit.date)
             self._settle(counter, SiteVisitProposalOutcome.DECLINED, now)
             if open_officer:
                 self._settle(open_officer, SiteVisitProposalOutcome.KEPT, now)
@@ -309,6 +325,7 @@ class SiteVisitService:
         deadline = reply_deadline(last.created_at, visit.date)
         if self.today() < deadline:
             raise Conflict(f"The operator has until {deadline.strftime('%-d %b %Y')} to reply.")
+        self._refuse_past(visit.date)
         now = self.now()
         self._settle(last, SiteVisitProposalOutcome.ACCEPTED, now)
         self._confirm(visit, officer, visit.date, visit.slot, now)
@@ -341,12 +358,25 @@ class SiteVisitService:
         if problem:
             raise ValidationFailed("Some fields need attention.", details={"fields": {"date": problem}})
         app = self.applications.get_for(user, application_id, for_update=True)
-        visit = self._current(app, SiteVisitStatus.CONFIRMED, "Only a confirmed visit can be rescheduled.")
-        if visit.date <= self.today():
-            raise Conflict("The visit date has arrived; it can no longer be rescheduled.")
+        if app.status != ApplicationStatus.SITE_VISIT_SCHEDULED:
+            raise Conflict("The site visit can be arranged only while the appointment is still open.")
+        visit = self.visits.current_for(app.id)
+        if visit is None:
+            raise NotFound("No site visit has been proposed.")
+        expired = visit.status == SiteVisitStatus.PROPOSED and visit.date <= self.today()
+        if visit.status == SiteVisitStatus.CONFIRMED:
+            if visit.date <= self.today():
+                raise Conflict("The visit date has arrived; it can no longer be rescheduled.")
+        elif not expired:
+            raise Conflict("Only a confirmed visit, or a proposal whose date has passed, can be rescheduled.")
         proposals = self.visits.proposals_for(visit.id)
         self._check_rounds(proposals)
         now = self.now()
+        if expired:
+            # The unanswered proposal lapsed with its date: settled as declined, and the round moves on.
+            for p in proposals:
+                if p.outcome == SiteVisitProposalOutcome.PENDING:
+                    self._settle(p, SiteVisitProposalOutcome.DECLINED, now)
         role = Role.OPERATOR if by_operator else Role.OFFICER
         visit.status = SiteVisitStatus.COUNTER_PROPOSED if by_operator else SiteVisitStatus.PROPOSED
         visit.confirmed_at, visit.confirmed_by_id = None, None
@@ -386,6 +416,7 @@ class SiteVisitService:
     def accept(self, operator: User, application_id: uuid.UUID) -> SiteVisit:
         app = self.applications.get_for(operator, application_id, for_update=True)
         visit = self._current(app, SiteVisitStatus.PROPOSED, "There is no proposal waiting for your reply.")
+        self._refuse_past(visit.date)
         proposals = self.visits.proposals_for(visit.id)
         now = self.now()
         self._settle(proposals[-1], SiteVisitProposalOutcome.ACCEPTED, now)
@@ -446,13 +477,19 @@ class SiteVisitService:
 
     def _current(self, app: Application, expected: SiteVisitStatus, message: str) -> SiteVisit:
         if app.status != ApplicationStatus.SITE_VISIT_SCHEDULED:
-            raise Conflict("The site visit can be arranged only while the case is Site Visit Scheduled.")
+            # Role-neutral: the operator's label for this status differs from the officer's (review, 21 Sep).
+            raise Conflict("The site visit can be arranged only while the appointment is still open.")
         visit = self.visits.current_for(app.id)
         if visit is None:
             raise NotFound("No site visit has been proposed.")
         if visit.status != expected:
             raise Conflict(message)
         return visit
+
+    def _refuse_past(self, visit_date: date) -> None:
+        """A date that has arrived is never confirmed (review finding, 21 Sep): the other side proposes."""
+        if visit_date <= self.today():
+            raise Conflict(PAST_DATE_REASON)
 
     @staticmethod
     def _check_rounds(proposals: list[SiteVisitProposal]) -> None:

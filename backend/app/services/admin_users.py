@@ -4,6 +4,7 @@ with no application; the rules that keep the platform usable are enforced under 
 
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -13,6 +14,7 @@ from app.models import User
 from app.models.enums import Role
 from app.repositories.audit import AuditRepository
 from app.repositories.concurrency import DeadlockError, deadlock_as_error
+from app.repositories.sessions import SessionRepository
 from app.repositories.users import UserRepository
 from app.schemas.admin import AdminUserOut, AdminUsersOut
 
@@ -44,6 +46,7 @@ class AdminUserService:
         self.db = db
         self.users = UserRepository(db)
         self.audit = AuditRepository(db)
+        self.sessions = SessionRepository(db)
 
     def directory(self, caller: User) -> AdminUsersOut:
         rows = self.users.list_all()
@@ -104,6 +107,10 @@ class AdminUserService:
                 payload={"user_id": str(target.id), "email": target.email},
             )
             target.is_active = change.is_active
+            if not change.is_active:
+                # The live session ends with the account, so a reactivation inside the idle window never
+                # revives a token issued before it, and a sign-in meanwhile meets no ghost (review, 21 Sep).
+                self.sessions.revoke_live(target.id, datetime.now(UTC), "deactivated")
         self.db.commit()
 
     def create(self, caller: User, *, email: str, full_name: str, role: Role, password: str) -> AdminUserOut:

@@ -120,6 +120,55 @@ def test_oversized_content_length_is_rejected_before_the_body(client: TestClient
     assert r.json()["error"]["details"]["reason"] == "too_large"
 
 
+def test_every_body_is_bounded_before_it_is_read(client: TestClient, db: Session) -> None:
+    """Review finding, 21 Sep: FastAPI reads a body before the route's dependencies run, so the cap has
+    to sit in front of the router: JSON routes at 256 KiB, the two multipart routes at the upload cap,
+    a chunked body without a length refused, and all of it before authentication."""
+    from app.core.body_limit import JSON_BODY_LIMIT
+
+    limit = get_settings().upload_max_bytes
+    # unauthenticated, JSON, one byte over the cap: refused from the header, never buffered
+    r = client.patch(
+        "/api/v1/applications/00000000-0000-0000-0000-000000000000/sections/premises",
+        headers={"Content-Type": "application/json", "Content-Length": str(JSON_BODY_LIMIT + 1)},
+        content=b"",
+    )
+    assert r.status_code == 413 and r.json()["error"]["code"] == "payload_too_large"
+    assert "request_id" in r.json()["error"]["details"]
+    # the public sign-in route too
+    r = client.post(
+        "/api/v1/auth/login",
+        headers={"Content-Type": "application/json", "Content-Length": str(JSON_BODY_LIMIT * 4)},
+        content=b"",
+    )
+    assert r.status_code == 413
+    # the attachment route follows the upload cap, like documents
+    r = client.post(
+        "/api/v1/applications/00000000-0000-0000-0000-000000000000/clarifications/responses/"
+        "00000000-0000-0000-0000-000000000000/attachments",
+        headers={"Content-Length": str(limit * 5), "Content-Type": "multipart/form-data; boundary=x"},
+        content=b"",
+    )
+    assert r.status_code == 400 and r.json()["error"]["details"]["reason"] == "too_large"
+    # a chunked body carries no length: 411, whatever the route
+
+    def chunks():  # type: ignore[no-untyped-def]
+        yield b'{"email": "x@y.sg", "password": "p"}'
+
+    r = client.post("/api/v1/auth/login", headers={"Content-Type": "application/json"}, content=chunks())
+    assert r.status_code == 411 and r.json()["error"]["code"] == "length_required"
+    # an honest body under the cap goes through as before
+    make_user(db, "op@example.sg", Role.OPERATOR)
+    h = login(client, "op@example.sg")
+    app_id = _draft(client, h)
+    r = client.patch(
+        f"/api/v1/applications/{app_id}/sections/premises",
+        headers=h,
+        json={"address_line_1": "x" * 2000, "postal_code": "208787"},
+    )
+    assert r.status_code in (200, 422)
+
+
 def test_rejected_upload_leaves_no_part_file(client: TestClient, db: Session, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     make_user(db, "op@example.sg", Role.OPERATOR)
     h = login(client, "op@example.sg")

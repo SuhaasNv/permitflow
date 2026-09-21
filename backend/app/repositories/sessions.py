@@ -33,6 +33,16 @@ class SessionRepository:
         )
         return self.db.scalar(stmt)
 
+    def revoke_live(self, user_id: uuid.UUID, now: datetime, reason: str) -> int:
+        """Every unrevoked session of one user ends now with the reason (deactivation, US-073)."""
+        rows = self.db.scalars(
+            select(UserSession).where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
+        ).all()
+        for row in rows:
+            row.revoked_at = now
+            row.revoked_reason = reason
+        return len(rows)
+
     def count_live(self, now: datetime, idle: timedelta) -> int:
         stmt = select(func.count()).where(
             UserSession.revoked_at.is_(None),

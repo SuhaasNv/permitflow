@@ -156,6 +156,9 @@ export function SiteVisitCard({ view }: { view: ApplicationView }) {
           </p>
         ) : null}
 
+        {visit.status === 'proposed' && !visit.can_accept ? (
+          <p className="text-[13px] leading-[18px] text-text-2">This date has passed and can no longer be accepted; propose another one below.</p>
+        ) : null}
         {visit.can_accept ? (
           <div className="flex">
             <Button size="lg" className="w-full sm:w-auto" disabled={busy} onClick={() => setAcceptOpen(true)}>
