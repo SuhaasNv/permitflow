@@ -4,13 +4,17 @@ What each version of PermitFlow brings, written for the people who use it. Newes
 
 Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for fixes on a release, `v0.4.0` for the two epics below, `v0.4.0-rc.N` for a release candidate tagged on `dev` for the development environment before the release.
 
+Format: the product reads this file at build time for its What's new page (the version number in the corner opens it; `frontend/src/features/releases/notes.ts`), so the lines keep four shapes. A release heading is `## vX.Y.Z, D Month YYYY (optional note): title`; a bold line such as `**New for operators**` opens an audience block and the bullets under it belong to it; text before the first block is the release's introduction; `## Coming next` holds the plan. Inline, only backticks, bold and bare links are rendered. A heading of another shape fails the frontend tests.
+
 ---
 
 ## Coming next
 
-**v0.4.0: use case 3 and the admin panel, built, reviewed and waiting for the release.** Built on `dev` on 20 and 21 September 2026 (`docs/05-planning/RELEASE_PLAN_V0_4_0.md`), reviewed twice on 21 September, and tagged on `dev` as the release candidate `v0.4.0-rc.1` for the development environment; production keeps v0.3.0 until the owner runs the release ritual after the Xtremax process, when the same commit line becomes `v0.4.0` on `main`. The entry below is what the release will say.
+**v0.4.0 reaches production once the assessment is over.** Until then it runs on the development environment as the release candidate v0.4.0-rc.2; production stays on v0.3.0. The build record is in `CHANGELOG.md` and the plan in `docs/05-planning/RELEASE_PLAN_V0_4_0.md`.
 
-## v0.4.0 (release candidate `v0.4.0-rc.1` on the development environment, 21 September 2026; production release to follow): the site visit, the clarification and the office's own view
+**v0.5.0, planned:** an administrator can raise the daily quota for automatic checks from the overview; officers can be assigned cases; a public page to verify a licence by its number; email notifications; the automatic check reads clarification photos.
+
+## v0.4.0, 21 September 2026 (release candidate v0.4.0-rc.2 on the development environment; production release to follow): the site visit, the clarification and the office's own view
 
 **New for licensing officers**
 - Arrange the site visit inside the case: propose a date and a morning or afternoon slot, see the operator accept or propose another date, keep or accept, ask to move a confirmed visit; six proposals at most per visit; every round on the record.
@@ -30,6 +34,7 @@ Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for 
 **Also**
 - Each application has 150 MB of storage room across its documents, evidence and licence; the pages say how much is left before a file is chosen.
 - The accessibility gate covers every new screen; every control on the checklist and the respond page is at least 44 px on a phone or a tablet.
+- The version number in the corner opens What's new: this page, with your own changes first and every earlier release below; the word New sits beside the version until you have read it once.
 - Reviewed twice before release (a code review on 21 Sep and a stability review of the whole build with a smoke test of every route the same morning): a case can no longer end with Reject as the only move after every question of a round is withdrawn, a visit date that has passed cannot be confirmed, the last taps on the checklist are saved when you leave the page by a link, and typing while an answer saves no longer loses what you typed.
 
 ---

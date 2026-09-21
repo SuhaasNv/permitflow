@@ -51,7 +51,7 @@ export function AdminActivityPage() {
         meta={<span>Append-only. Nothing here can be edited or removed.</span>}
       />
       {feed.isPending ? (
-        <div className="pf-surface flex flex-col gap-3 px-5 py-6" aria-busy="true" aria-label="Loading activity">
+        <div className="pf-surface flex flex-col gap-3 px-5 py-6" role="status" aria-busy="true" aria-label="Loading activity">
           <Skeleton className="h-4 w-1/2" />
           <Skeleton className="h-4 w-2/3" />
           <Skeleton className="h-4 w-1/3" />

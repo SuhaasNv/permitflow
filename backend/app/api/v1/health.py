@@ -3,6 +3,8 @@ import time
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
+from app.core.settings import get_settings
+from app.core.version import APP_VERSION, BUILD_COMMIT
 from app.infra.db import database_is_reachable
 
 router = APIRouter()
@@ -26,11 +28,16 @@ def probe_database() -> bool:
 
 @router.get("/health")
 def health() -> JSONResponse:
-    """Liveness + database readiness (REL-006). Never exposes provider configuration."""
+    """Liveness + database readiness (REL-006), and which build answers: the version, the commit CI baked
+    into the image and the environment, the same three the metrics and Telegram name (US-094; the What's
+    new page heads with them). Never exposes provider configuration."""
     db_ok = probe_database()
     body: dict[str, object] = {
         "status": "ok" if db_ok else "degraded",
         "database": "ok" if db_ok else "unreachable",
+        "version": APP_VERSION,
+        "commit": BUILD_COMMIT,
+        "environment": get_settings().app_env,
     }
     if not db_ok:
         # Same error body as every other failure (REL-001); the status fields stay for the deploy gate.

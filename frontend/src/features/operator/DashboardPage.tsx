@@ -57,7 +57,7 @@ function Group({ title, hint, tone, count, children }: { title: string; hint: st
 
 function DashboardSkeleton() {
   return (
-    <div className="flex flex-col gap-8" aria-busy="true" aria-label="Loading dashboard">
+    <div className="flex flex-col gap-8" role="status" aria-busy="true" aria-label="Loading dashboard">
       <div className="flex flex-col gap-3">
         <Skeleton className="h-4 w-40" />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">

@@ -38,6 +38,7 @@ TONES = {
 FONT_SANS = "/_blob/5be9a8ff2fce72ada39cecc7b881da40"
 FONT_MONO = "/_blob/4a8962c75cbd7d2b1073efbaead3d5f9"
 SANS = "'Public Sans', system-ui, sans-serif"
+APP_VERSION, BUILD_COMMIT, BUILD_ENV = "v0.4.0-rc.2", "eed3045", "development"
 MONO = "'IBM Plex Mono', ui-monospace, monospace"
 
 
@@ -304,18 +305,35 @@ def initials(name: str) -> str:
     return (parts[0][0] + parts[-1][0]).upper() if len(parts) > 1 else name[:2].upper()
 
 
+def version_chip(seen: bool, dark: bool = False) -> str:
+    """The version as a link to What's new (US-094): mono chip plus the link's own words, "New" until the page has
+    been read once, then "What's new" (on the dark phone strip the chip alone, padded to the strip's full height)."""
+    fg, line, label_color = ("#D9DEE5", "#6B7684", "#FFFFFF") if dark else (TEXT3, LINE_STRONG, TEXT2)
+    chip_ = div(st(display="inline-flex", align_items="center", height="16px", padding="0 6px", border=f"1px solid {line}", border_radius="4px", font_family=MONO, font_size="10px", color=fg, white_space="nowrap"), APP_VERSION, "span")
+    if not seen:
+        label = div(st(font_size="11px", font_weight=600, color="#FFFFFF" if dark else PRIMARY), "New", "span")
+    elif dark:
+        label = ""
+    else:
+        label = div(st(font_size="12px", font_weight=500, color=label_color, text_decoration="underline", text_underline_offset="2px", white_space="nowrap"), "What's new", "span")
+    return div(st(display="inline-flex", align_items="center", gap="6px", min_height="28px" if dark else "24px", padding="0 8px" if dark else "0", margin="0 -8px 0 0" if dark else "0", text_decoration="none", border_radius="4px", white_space="nowrap"),
+               chip_ + label, "a", href="#", aria_label=f"Version {APP_VERSION[1:]}, what's new")
+
+
 def shell(width: int, height: int, role: str, active: str, content: str, nav: str = "full", overlay: str = "") -> str:
     """App shell as shipped (frontend/src/app/AppShell.tsx): masthead 28, top bar 56, side nav 232 with its own footer, or the bottom tab bar on phones."""
     phone = nav == "phone"
-    masthead = div(st(height="28px", background=INK, color="#AEB6C2", display="flex", align_items="center", padding="0 16px" if phone else "0 24px", font_size="12px", gap="8px", white_space="nowrap", overflow="hidden"),
-                   text("Secure licensing portal", 12, 16, 600, "#FFFFFF", "", "span") + ("" if phone else text("· Food Establishments Unit", 12, 16, 400, "#AEB6C2", "", "span")), role="region", aria_label="Portal notice")
+    masthead = div(st(height="28px", flex_shrink=0, background=INK, color="#AEB6C2", display="flex", align_items="center", padding="0 16px" if phone else "0 24px", font_size="12px", gap="8px", white_space="nowrap", overflow="hidden"),
+                   text("Secure licensing portal", 12, 16, 600, "#FFFFFF", "", "span") + ("" if phone else text("· Food Establishments Unit", 12, 16, 400, "#AEB6C2", "", "span"))
+                   # On a phone there is no rail footer, so the version (and its What's new link) sits at the right of the masthead (US-094).
+                   + (div(st(margin_left="auto"), version_chip(seen=active == "What's new", dark=True), "span") if phone else ""), role="region", aria_label="Portal notice")
     bell = div(st(position="relative", width="40px", height="40px", display="flex", align_items="center", justify_content="center", border_radius="6px", color=TEXT2, border="none", background="transparent", cursor="pointer"), icon(IC["bell"], 18)
                + div(st(position="absolute", top="4px", right="4px", min_width="18px", height="18px", border_radius="999px", background=PRIMARY, color="#FFFFFF", font_size="10px", font_weight=700, display="flex", align_items="center", justify_content="center", padding="0 4px", border="2px solid #FFFFFF", box_sizing="border-box"), "2"), "button", type="button", aria_label="Notifications, 2 unread")
     avatar = div(st(width="32px", height="32px", border_radius="999px", background=INK, color="#FFFFFF", font_size="11px", font_weight=600, letter_spacing="0.04em", display="flex", align_items="center", justify_content="center", flex_shrink=0), initials(USERS[role]), "span")
     user = div(st(display="flex", align_items="center", gap="10px"), avatar + ("" if phone else div(st(display="flex", flex_direction="column"), text(USERS[role], 13, 16, 600) + text(ROLE_LABEL[role], 12, 16, 400, TEXT3))))
     signout = div(st(height="32px", padding="0 12px", border_radius="6px", font_size="13px", font_weight=600, color=TEXT2, border="none", background="transparent", cursor="pointer", font_family=SANS), "Sign out", "button", type="button")
     brand = logo(phone)
-    topbar = div(st(height="56px", background="rgba(255,255,255,0.95)", border_bottom=f"1px solid {LINE}", display="flex", align_items="center", gap="12px", padding="0 12px" if phone else "0 24px", box_sizing="border-box"),
+    topbar = div(st(height="56px", flex_shrink=0, background="rgba(255,255,255,0.95)", border_bottom=f"1px solid {LINE}", display="flex", align_items="center", gap="12px", padding="0 12px" if phone else "0 24px", box_sizing="border-box"),
                  ("" if phone else div(st(width="40px", height="40px", display="flex", align_items="center", justify_content="center", color=TEXT2, border="none", background="transparent", cursor="pointer"), icon(IC["menu"], 18), "button", type="button", aria_label="Collapse navigation"))
                  + brand + div(st(margin_left="auto", display="flex", align_items="center", gap="4px"), bell + user + signout), "header")
     sidenav = ""
@@ -334,9 +352,8 @@ def shell(width: int, height: int, role: str, active: str, content: str, nav: st
             items += div(st(display="flex", align_items="center", gap="12px", height="40px", padding="0 11px", border_radius="6px", background=SURFACE3 if on else "transparent",
                             color=TEXT if on else TEXT2, font_size="14px", font_weight=600 if on else 500, text_decoration="none"),
                          icon(IC[ic], 18) + escape(label), "a", href="#", aria_current="page" if on else "false")
-        version = div(st(display="inline-flex", align_items="center", height="16px", padding="0 6px", border=f"1px solid {LINE}", border_radius="4px", font_family=MONO, font_size="10px", color=TEXT3), "v0.4.0-dev", "span")
         nav_footer = div(st(margin_top="auto", padding="16px 12px 20px", display="flex", flex_direction="column", gap="4px", font_size="12px", color=TEXT3),
-                         div(st(display="flex", align_items="center", gap="8px"), text("PermitFlow", 12, 16, 500, TEXT2, "", "span") + version)
+                         text("PermitFlow", 12, 16, 500, TEXT2) + version_chip(seen=active == "What's new")
                          + text("Fictional assessment product", 12, 16, 400, TEXT3)
                          + div(st(display="flex", gap="12px", margin_top="4px"), div(st(color=TEXT3, text_decoration="none"), "Privacy", "a", href="#") + div(st(color=TEXT3, text_decoration="none"), "Terms", "a", href="#")))
         sidenav = div(st(width="232px", flex_shrink=0, background=SURFACE, border_right=f"1px solid {LINE}", padding="12px 12px 0", box_sizing="border-box", display="flex", flex_direction="column", gap="2px"), items + nav_footer, "nav", aria_label="Main")
@@ -799,7 +816,9 @@ def build_admin_overview(width: int, height: int) -> str:
                                     def_list([("Submissions", "2"), ("Resubmissions", "1"), ("Checklists submitted", "1"), ("Clarification rounds", "1")])
                                     + div(st(display="flex", flex_direction="column", gap="6px"), div(st(display="flex", justify_content="space-between"), text("Document checks against the platform quota", 13, 18, 500) + text("41 of 1,000", 13, 18, 400, TEXT3, "font-variant-numeric: tabular-nums")) + bar(41 / 1000, "info", 6))),
                        text("Singapore calendar day", 12, 16, 400, TEXT3, "", "span"))
-    grid = div(st(display="grid", grid_template_columns="repeat(2, minmax(0, 1fr))", gap="20px", align_items="start"), status_table + div(st(display="flex", flex_direction="column", gap="20px"), health + quota))
+    # The build that answers, the same three values Telegram and Grafana name (US-094): metadata text, no card.
+    build_line = div(st(display="flex", gap="6px", align_items="center", padding="0 4px"), text("Build", 13, 18, 400, TEXT3, "", "span") + mono(f"{APP_VERSION} ({BUILD_COMMIT})", 12, TEXT2) + text(f"· {BUILD_ENV} · What's new", 13, 18, 400, TEXT3, "", "span"))
+    grid = div(st(display="grid", grid_template_columns="repeat(2, minmax(0, 1fr))", gap="20px", align_items="start"), status_table + div(st(display="flex", flex_direction="column", gap="20px"), health + quota + build_line))
     content = hdr + strip + grid + idle
     return page("Admin overview", width, height, shell(width, height, "admin", "Overview", content))
 
@@ -975,6 +994,144 @@ def build_operator_confirmed(width: int, height: int) -> str:
     return page("Site visit confirmed", width, height, shell(width, height, "operator", "My applications", content, nav="phone" if phone else "full"))
 
 
+
+# What's new (S-44, US-094): the notes come from the repository's RELEASE_NOTES.md, the file the product itself reads.
+
+import re
+
+NOTES_PATH = Path(__file__).resolve().parents[4] / "RELEASE_NOTES.md"
+RELEASE_RE = re.compile(r"^## (v\d+\.\d+\.\d+), (\d{1,2} [A-Z][a-z]+ \d{4})(?: \(([^)]*)\))?: (.+)$")
+
+
+def parse_notes() -> tuple[list[str], list[dict[str, object]]]:
+    coming: list[str] = []
+    releases: list[dict[str, object]] = []
+    section = "preamble"
+    block: dict[str, object] | None = None
+    for line in NOTES_PATH.read_text(encoding="utf-8").splitlines():
+        line = line.rstrip()
+        if not line or line == "---":
+            continue
+        if line.startswith("## "):
+            block = None
+            if line.strip() == "## Coming next":
+                section = "coming"
+                continue
+            m = RELEASE_RE.match(line)
+            assert m, line
+            releases.append({"version": m.group(1), "date": m.group(2), "note": m.group(3), "title": m.group(4), "intro": [], "blocks": []})
+            section = "release"
+            continue
+        if section == "preamble":
+            continue
+        if section == "coming":
+            coming.append(line)
+            continue
+        rel = releases[-1]
+        h = re.match(r"^\*\*([^*]+)\*\*\s*(.*)$", line)
+        if h:
+            block = {"heading": h.group(1).strip(), "note": h.group(2).strip(), "items": [], "paragraphs": []}
+            rel["blocks"].append(block)  # type: ignore[union-attr]
+            continue
+        if line.startswith("- "):
+            assert block is not None, line
+            block["items"].append(line[2:].strip())  # type: ignore[union-attr]
+        elif block is not None:
+            block["paragraphs"].append(line)  # type: ignore[union-attr]
+        else:
+            rel["intro"].append(line)  # type: ignore[union-attr]
+    return coming, releases
+
+
+def audience_of(heading: str) -> str:
+    h = heading.lower()
+    if "operator" in h:
+        return "operator"
+    if "officer" in h:
+        return "officer"
+    if "administrator" in h or "licensing office" in h:
+        return "admin"
+    return "everyone"
+
+
+def inline(s: str, size: int = 15, line: int = 22, color: str = TEXT) -> str:
+    """`code`, **bold** and bare links, as the page renders them."""
+    out = ""
+    for part in re.split(r"(`[^`]+`|\*\*[^*]+\*\*|https?://[^\s),]+)", s):
+        if not part:
+            continue
+        if part.startswith("`"):
+            out += div(st(font_family=MONO, font_size=f"{size - 2}px", background=SURFACE3, padding="0 4px", border_radius="4px"), escape(part[1:-1]), "span")
+        elif part.startswith("**"):
+            out += div(st(font_weight=600), escape(part[2:-2]), "span")
+        elif part.startswith("http"):
+            out += div(st(color=PRIMARY, text_decoration="underline"), escape(part), "a", href=part)
+        else:
+            out += escape(part)
+    return div(st(font_size=f"{size}px", line_height=f"{line}px", color=color, margin=0), out)
+
+
+def notes_block(b: dict[str, object], open_: bool, phone: bool, kicker: str = "") -> str:
+    heading = str(b["heading"])
+    count = len(b["items"])  # type: ignore[arg-type]
+    if not open_:
+        # Folded: a disclosure row with the count; the chevron turns when open.
+        # Folded: a bounded disclosure row (surface, hairline, radius) with the count and a chevron.
+        return div(st(display="flex", align_items="center", justify_content="space-between", gap="12px", width="100%", min_height="48px", padding="0 14px", border=f"1px solid {LINE}", border_radius="8px", background=SURFACE, text_align="left", font_family=SANS, cursor="pointer", margin_top="8px"),
+                   text(heading, 15, 22, 600, TEXT) + div(st(display="flex", align_items="center", gap="8px", color=TEXT3), mono(str(count), 12, TEXT3) + icon(IC["chevron"], 16, TEXT2)), "button", type="button", aria_expanded="false")
+    head = (text(kicker, 12, 16, 600, TEXT3, "text-transform: uppercase; letter-spacing: 0.08em") if kicker else "") + div(st(display="flex", align_items="baseline", gap="8px", flex_wrap="wrap"), text(heading, 17 if phone else 20, 24 if phone else 28, 600, TEXT, "", "h3") + (inline(str(b["note"]), 13, 18, TEXT3) if b["note"] else ""))
+    paras = "".join(inline(p_, 15, 22, TEXT2) for p_ in b["paragraphs"])  # type: ignore[union-attr]
+    items = div(st(display="flex", flex_direction="column", gap="8px", padding_left="20px", margin="8px 0 0"), "".join(div(st(font_size="15px", line_height="22px", color=TEXT), inline(str(i)), "li") for i in b["items"]), "ul")  # type: ignore[union-attr]
+    return div(st(display="flex", flex_direction="column", gap="6px", padding="20px 0 4px"), head + paras + items)
+
+
+def build_whats_new(width: int, height: int, role: str) -> str:
+    phone = width < 600
+    coming, releases = parse_notes()
+    current = releases[0]
+    reader = None if role == "admin" else role
+    hdr = page_header("What's new", "What each version changed, in the words of the people who use PermitFlow. Your own changes come first.", eyebrow="Releases")
+    build_line = div(st(display="flex", align_items="center", gap="8px", flex_wrap="wrap"),
+                     text("This build", 13, 18, 500, TEXT2, "", "span") + mono(f"{APP_VERSION} ({BUILD_COMMIT})", 13, TEXT) + text(f"· {BUILD_ENV} environment · {current['date']}", 13, 18, 400, TEXT3, "", "span"))
+    # Left: Coming next pinned, then every release newest first; the running build marked with a label and a dot.
+    rows = ""
+    for i, r in enumerate(releases):
+        on = i == 0
+        mark = badge("This build", "info", "md") if on else ""
+        rows += div(st(display="flex", flex_direction="column", gap="2px", min_height="44px", justify_content="center", padding="6px 10px", border_radius="6px", background=SURFACE3 if on else "transparent", text_decoration="none", min_width=0),
+                    div(st(display="flex", gap="8px", align_items="baseline", white_space="nowrap"), mono(str(r["version"]), 13, TEXT if on else TEXT2) + text(str(r["date"]), 12, 16, 400, TEXT3, "", "span"))
+                    + text(str(r["title"]).capitalize(), 13, 18, 500 if on else 400, TEXT if on else TEXT2, "white-space: nowrap; overflow: hidden; text-overflow: ellipsis")
+                    + (div(st(padding_top="4px"), mark) if mark else ""),
+                    "a", href="#", aria_current="page" if on else "false")
+    coming_panel = div(st(background=SURFACE, border=f"1px solid {LINE}", border_radius="10px", padding="14px 16px", display="flex", flex_direction="column", gap="6px"),
+                       text("Coming next", 12, 16, 600, TEXT3, "text-transform: uppercase; letter-spacing: 0.08em") + div(st(display="flex", flex_direction="column", gap="8px"), "".join(inline(c, 13, 18, TEXT2) for c in coming)))
+    # The releases come first so "This build" leads the column; Coming next follows (critique, 21 Sep).
+    if phone:
+        chips = div(st(display="flex", gap="4px", overflow_x="auto", padding="2px 0", margin="0 -16px", padding_left="16px"), "".join(chip(str(r["version"]), i == 0, href="#") for i, r in enumerate(releases)), "nav", aria_label="Releases")
+        left = chips
+    else:
+        left = div(st(display="flex", flex_direction="column", gap="20px", position="sticky", top="24px"), div(st(display="flex", flex_direction="column", gap="2px"), text("Releases", 12, 16, 600, TEXT3, "text-transform: uppercase; letter-spacing: 0.08em; padding: 0 10px 6px") + rows, "nav", aria_label="Releases") + coming_panel)
+    # Right: the selected release, the reader's own block first, the others folded, the shared blocks open.
+    blocks = current["blocks"]  # type: ignore[assignment]
+    own = [b for b in blocks if audience_of(str(b["heading"])) == reader] if reader else [b for b in blocks if audience_of(str(b["heading"])) != "everyone"]  # type: ignore[union-attr]
+    others = [b for b in blocks if audience_of(str(b["heading"])) not in (reader, "everyone")] if reader else []  # type: ignore[union-attr]
+    shared = [b for b in blocks if audience_of(str(b["heading"])) == "everyone"]  # type: ignore[union-attr]
+    title = div(st(display="flex", flex_direction="column", gap="6px"),
+                div(st(display="flex", gap="10px", align_items="baseline", flex_wrap="wrap"), mono(str(current["version"]), 15, TEXT2) + text(str(current["date"]), 13, 18, 400, TEXT3, "", "span"))
+                + text(str(current["title"]).capitalize(), 24 if phone else 28, 30 if phone else 36, 600, TEXT, "letter-spacing: -0.015em", "h2")
+                + (text(str(current["note"]).capitalize() + ".", 13, 18, 400, TEXT3) if current["note"] else "")
+                + "".join(inline(i_, 15, 22, TEXT2) for i_ in current["intro"]))  # type: ignore[union-attr]
+    body = title + "".join(notes_block(b, True, phone, "For you" if reader else "") for b in own)
+    if others:
+        body += div(st(margin_top="24px"), text("Also in this release", 12, 16, 600, TEXT3, "text-transform: uppercase; letter-spacing: 0.08em; padding: 0 4px") + "".join(notes_block(b, False, phone) for b in others))
+    body += "".join(notes_block(b, True, phone, "For everyone") for b in shared)
+    article = div(st(max_width="760px", min_width=0), body, "article")
+    if phone:
+        content = hdr + build_line + left + article + coming_panel
+    else:
+        content = hdr + build_line + div(st(display="grid", grid_template_columns="280px minmax(0, 1fr)", gap="48px", align_items="start"), left + article)
+    return page("What's new", width, height, shell(width, height, role, "What's new", content, nav="phone" if phone else "full"))
+
 # Canvas ----------------------------------------------------------------------------------------
 
 BOARDS: list[tuple[str, str, int, int, str, int]] = [
@@ -995,6 +1152,9 @@ BOARDS: list[tuple[str, str, int, int, str, int]] = [
     ("S33-Operator-Appointment.dc.html", "S-33 Operator: visit proposed (1280)", 1280, 1150, "operator-appointment-1280", 3),
     ("S34-Officer-Counter.dc.html", "S-34 Officer: the operator's counter-proposal", 1280, 1300, "officer-counter", 3),
     ("S33-Operator-Confirmed-Phone.dc.html", "S-33 Operator: visit confirmed (390)", 390, 1200, "operator-confirmed-390", 3),
+    ("S44-Whats-New.dc.html", "S-44 What's new, officer signed in (1280)", 1280, 1700, "whats-new-officer", 4),
+    ("S44-Whats-New-Phone.dc.html", "S-44 What's new, operator on a phone (390)", 390, 2350, "whats-new-operator-390", 4),
+    ("S44-Whats-New-Admin.dc.html", "S-44 What's new, administrator (every block open)", 1280, 2100, "whats-new-admin", 4),
 ]
 
 
@@ -1029,6 +1189,12 @@ def build(board: str, w: int, h: int) -> str:
         return build_officer_counter(w, h)
     if board == "operator-confirmed-390":
         return build_operator_confirmed(w, h)
+    if board == "whats-new-officer":
+        return build_whats_new(w, h, "officer")
+    if board == "whats-new-operator-390":
+        return build_whats_new(w, h, "operator")
+    if board == "whats-new-admin":
+        return build_whats_new(w, h, "admin")
     raise KeyError(board)
 
 
@@ -1051,6 +1217,7 @@ def main(out: Path) -> None:
         "row-operator": {"x": 0, "y": int(boards["S18-Respond-Phone.dc.html"]["y"]) - 300, "text": "Operator: answer only the flagged items", "kind": "title1", "maxW": 3400},  # type: ignore[call-overload]
         "row-admin": {"x": 0, "y": int(boards["S40-Admin-Overview.dc.html"]["y"]) - 300, "text": "Admin: overview, activity, users, read-only case", "kind": "title1", "maxW": 5400},  # type: ignore[call-overload]
         "row-visit": {"x": 0, "y": int(boards["S32-Schedule-Dialog.dc.html"]["y"]) - 300, "text": "Site visit appointment: propose, accept or counter, confirm (US-084)", "kind": "title1", "maxW": 4600},  # type: ignore[call-overload]
+        "row-whats-new": {"x": 0, "y": int(boards["S44-Whats-New.dc.html"]["y"]) - 300, "text": "What's new behind the version number: the reader's own changes first, every release below (US-094, v0.4.0-rc.2)", "kind": "title1", "maxW": 4600},  # type: ignore[call-overload]
     }
     canvas = {
         "v": 3,

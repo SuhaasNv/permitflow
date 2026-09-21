@@ -95,6 +95,8 @@ Reuse first: every new screen is assembled from the rows above (`ReviewRail`'s s
 | `StatusCountTable` | officer status, count (tabular), bar per row; drafts as one aggregate row | S-40 |
 | `ActivityFeed` | `AuditTrail` across applications with a case column (link or "no case") and a ghost "Show older activity" button | S-42 |
 | `UsersTable` | name and email, role, Active or Deactivated badge plus Protected tag, created, Change role and Deactivate or Reactivate with `title` reasons on the caller's own row and protected rows | S-41 |
+| `VersionChip` | the version as a link to What's new: mono chip plus the link's words, "New" until the page is read once per browser, then "What's new"; `rail` (rail footer, landing footer) and `strip` (the dark portal strip on phones and when the rail is collapsed) variants | every frame (US-094) |
+| `ReleasesPage` | the notes from `RELEASE_NOTES.md` (parsed by `notes.ts`): build line, releases list with "This build", Coming next, the reader's own block open under "For you", the other audiences as native `details` rows with a count, the shared block under "For everyone" | S-44 (US-094) |
 
 ## Motion tokens
 

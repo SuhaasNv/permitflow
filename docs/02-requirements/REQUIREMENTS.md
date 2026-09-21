@@ -131,6 +131,7 @@ Scope status per requirement is tracked in `SCOPE.md` and, at the end, in `docs/
 | UX-006 | Officer diff view uses side-by-side or inline field comparison with changed fields visually marked. |
 | UX-007 | Layouts work at 390 px, 1024 px and 1280 px widths without horizontal scroll (the design phase moved the checkpoints from 375/768 to the phone and tablet widths in `docs/04-design/`). |
 | UX-008 | Interactive elements are keyboard reachable and have visible focus; colour is never the only signal. |
+| UX-009 | The version number in every frame (rail footer, phone top strip, landing footer) opens a What's new page that reads `RELEASE_NOTES.md` at build time: newest release first, the reader's own audience block first, the running build named (version, commit, environment) and marked in the list (US-094, v0.4.0-rc.2). |
 
 ## 7. Reliability and error-handling requirements
 

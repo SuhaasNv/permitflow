@@ -4,7 +4,7 @@ the metrics, the Telegram bot and the hourly digest can say which build answers 
 
 import os
 
-APP_VERSION = "0.4.0-rc.1"
+APP_VERSION = "0.4.0-rc.2"
 BUILD_COMMIT = (os.environ.get("GIT_SHA") or "")[:7] or "local"
 
 __all__ = ["APP_VERSION", "BUILD_COMMIT"]

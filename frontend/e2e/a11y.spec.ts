@@ -26,6 +26,9 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-prac
 
 /** Collects one line per violation so a run reports every screen, not only the first broken one. */
 async function violations(page: Page, screen: string): Promise<string[]> {
+  // Scan the loaded screen, never a skeleton: under load a page can still be fetching after networkidle,
+  // and a skeleton has no h1 (found on 21 Sep when the whole suite ran on one machine).
+  await page.locator('[aria-busy="true"]').first().waitFor({ state: 'detached', timeout: 15_000 }).catch(() => undefined)
   const results = await new AxeBuilder({ page }).withTags(TAGS).analyze()
   return results.violations.map(
     (v) =>
@@ -47,7 +50,7 @@ function expectNone(lines: string[]) {
 
 test('public screens have no axe violations', async ({ page }) => {
   const found: string[] = []
-  for (const path of ['/', '/login', '/privacy', '/terms', '/cookies']) {
+  for (const path of ['/', '/login', '/privacy', '/terms', '/cookies', '/releases', '/releases/v0.3.0']) {
     await page.goto(path)
     await page.waitForLoadState('networkidle')
     found.push(...(await violations(page, path)))
@@ -91,6 +94,7 @@ test('operator screens have no axe violations', async ({ page }) => {
     `${app.url}/documents`,
     `${app.url}/review`,
     `${app.url}/history`,
+    '/releases',
   ]) {
     await page.goto(path)
     await page.waitForLoadState('networkidle')
@@ -126,7 +130,7 @@ test('phone width (390) keeps the same standard, tap targets included', async ({
   await page.setViewportSize({ width: 390, height: 844 })
   const app = await seedPendingResubmission()
   const found: string[] = []
-  for (const path of ['/', '/login', '/privacy']) {
+  for (const path of ['/', '/login', '/privacy', '/releases']) {
     await page.goto(path)
     await page.waitForLoadState('networkidle')
     found.push(...(await violations(page, `390 ${path}`)))

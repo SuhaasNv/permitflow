@@ -35,6 +35,25 @@ Use cases are grouped exactly as the Notion board epics: **E0 Foundation**, **UC
 
 ---
 
+### UC0-B Read what changed (all personas and visitors; v0.4.0-rc.2, US-094)
+**Actor:** Operator, Officer, Admin, or a visitor on the public landing page
+**Requirements:** UX-009, REL-006
+
+**Main flow**
+1. The user notices the version number (in the side rail's footer on a desktop, at the right of the dark top strip on a phone, in the landing page's footer when signed out), with the word "New" beside it when this build's notes have not been read on this browser.
+2. The user opens it. The page heads with the running build (version, commit, environment, date; the version from the build, the commit and environment from `GET /health`), pins "Coming next", and lists every release newest first with the running one marked "This build" (label plus dot).
+3. The page shows the newest release with the reader's own audience block first (operators read "New for operators", officers "New for licensing officers"); the other audiences' blocks are folded rows with a count; blocks addressed to everyone stay open. An administrator or a visitor sees every block open.
+4. The user opens an earlier release from the list (`/releases/v0.3.0`), or a folded block, and reads on. Opening the page clears the "New" mark for this version on this browser.
+
+**Alternative / error flows**
+- 2a. The API is unreachable → the build line shows the version alone; the notes still render (they are part of the build).
+- 4a. A version that has no notes (`/releases/v9.9.9`) → the newest release is shown.
+- 4b. The release notes file is malformed at build time → the frontend tests fail and the build does not ship (the page can never show a broken file).
+
+**Expected outcome:** Anyone can see what this build changed for them and what the earlier releases brought, in the words of `RELEASE_NOTES.md`, without a second copy of the notes anywhere; an operator never meets an internal status code.
+
+---
+
 ## UC1: Operator Submission & Resubmission
 
 ### UC1-A Create and submit an application

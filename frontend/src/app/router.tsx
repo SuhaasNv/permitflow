@@ -4,6 +4,7 @@ import { AppShell } from './AppShell'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { LandingPage } from '@/features/landing/LandingPage'
 import { PolicyPage } from '@/features/legal/PolicyPage'
+import { ReleasesPage } from '@/features/releases/ReleasesPage'
 import { RequireRole } from '@/features/auth/RequireRole'
 import { AdminActivityPage } from '@/features/admin/ActivityPage'
 import { AdminOverviewPage } from '@/features/admin/OverviewPage'
@@ -30,6 +31,8 @@ export const router = createBrowserRouter([
   { path: '/privacy', element: <PolicyPage /> },
   { path: '/terms', element: <PolicyPage /> },
   { path: '/cookies', element: <PolicyPage /> },
+  { path: '/releases', element: <ReleasesPage /> },
+  { path: '/releases/:version', element: <ReleasesPage /> },
   {
     element: <RequireRole roles={['operator']} />,
     children: [
