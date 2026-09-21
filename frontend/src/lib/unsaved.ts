@@ -3,23 +3,13 @@
  * sign-out and the window warns before unload. Tiny on purpose: one boolean, no framework.
  */
 let dirty = false
-const listeners = new Set<(value: boolean) => void>()
 
 export function setUnsaved(value: boolean): void {
-  if (dirty === value) return
   dirty = value
-  for (const fn of listeners) fn(value)
 }
 
 export function hasUnsaved(): boolean {
   return dirty
-}
-
-export function subscribeUnsaved(fn: (value: boolean) => void): () => void {
-  listeners.add(fn)
-  return () => {
-    listeners.delete(fn)
-  }
 }
 
 /** Browser "leave site?" prompt while there are unsaved changes. Returns the cleanup for useEffect. */

@@ -189,10 +189,6 @@ export function useChecklist(id: string, readOnly = false) {
   })
 }
 
-export function useReadChecklist(id: string, enabled: boolean) {
-  return useQuery({ queryKey: officerKeys.checklist(id), queryFn: () => getChecklist(id), enabled })
-}
-
 /** A save refreshes the checklist and the case summary; the audit trail is untouched (no row per save). */
 export function useSaveChecklist(id: string) {
   const qc = useQueryClient()

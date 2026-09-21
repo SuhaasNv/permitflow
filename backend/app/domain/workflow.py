@@ -275,10 +275,6 @@ def transition(status: S, target: S, actor: Actor, ctx: TransitionContext) -> S:
     return target
 
 
-def is_terminal(status: S) -> bool:
-    return status in TERMINAL
-
-
 def can_withdraw(status: S) -> bool:
     """True when the owner may withdraw from this state (US-038)."""
     return status in _WITHDRAW_SOURCES

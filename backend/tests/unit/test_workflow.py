@@ -5,6 +5,7 @@ import itertools
 import pytest
 
 from app.domain.workflow import (
+    TERMINAL,
     TRANSITIONS,
     Actor,
     TransitionContext,
@@ -13,7 +14,6 @@ from app.domain.workflow import (
     allowed_targets,
     available_actions,
     can_withdraw,
-    is_terminal,
     transition,
 )
 from app.models.enums import ApplicationStatus as S
@@ -62,7 +62,7 @@ def test_every_combination(source: S, target: S, actor: Actor) -> None:
 
 def test_terminal_states_have_no_outgoing_edges() -> None:
     for s in (S.APPROVED, S.REJECTED, S.WITHDRAWN):
-        assert is_terminal(s)
+        assert s in TERMINAL
         assert not [t for t in TRANSITIONS if t.source == s]
 
 

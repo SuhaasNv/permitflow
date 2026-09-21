@@ -13,6 +13,7 @@ Five reviewers (three Opus, two Sonnet) read every file changed since `main`: ba
 - **Schema.** The six indexes that existed only in migrations are declared on the models (`alembic check` is clean), and migration 0014 creates the foreign key from `applications.current_revision_id` that migration 0001 declared but never emitted.
 - **Documents.** README (use case 3 is built on `dev`), ARCHITECTURE (the admin, checklist, clarification, site-visit and session modules; all fourteen metric families), STATE_MACHINE (the new edge), DOMAIN_MODEL (`deactivated`, the key), THREAT_MODEL (T4, T19, T25), OBSERVABILITY and OPERATIONS (rules by environment, the Railway variable), UI_STATES (the lapsed proposal), UAT_PLAN (the edge-case section at 246 checks), `.env.example` (seven rules), TEST_STRATEGY (859 backend, 238 frontend). Not changed: the story headings in USER_STORIES.md keep the Notion title format with its dash.
 - Still open, needs the deployed environment: the two-caller check of the limiter behind the edge (`X-Real-IP`, readiness row 25) after the next deploy of `dev`.
+- Owner's request the same morning: the policy pages (privacy, terms, cookies) open inside the app shell when signed in, so they follow the side rail, with the policy switcher and an On this page list beside the text at an 820 px measure; the public frame widened to match. `AppShell` takes children for a page outside the route groups.
 
 ## UAT run 4: UC3 on two devices, three stale-page fixes (21 Sep 2026)
 

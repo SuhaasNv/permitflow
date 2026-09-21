@@ -150,6 +150,19 @@ The owner set the frame in one message and left for the night: "make sure all th
 
 What the AI got wrong in this stretch, briefly: it ran the UAT edge script and the Playwright suite at the same time, and one signed the other out (the new session rule); it read a Python `\x89PNG` fixture as a valid image in three tests until the new image pipeline refused it; it put new dashboard panels on ids the cost row already used; it wrote an ISO cursor with a `+` that a query string turns into a space. Each was caught by a test or a run, not by a reader.
 
+### The morning after: the two-device run, the stability review, the release candidate (session prompts, 21 Sep)
+
+Prompts edited into plain sentences, in order; the work each produced is in `CHANGELOG.md` ("UAT run 4", "Stability review") and in `docs/10-uat/UAT_PLAN.md` (U16, run 4):
+
+- "Some stories are still In progress in Notion; which are they and why?" (US-080 and US-082 waited for a deploy of `dev`; US-081 for the release; US-091 parked.)
+- "Run two Claude in Chrome tests with different scenarios, note every step for me, and check that everything in use case 3 is done. Use different tabs or windows to try the iPad timing: the officer opens the checklist on an iPad, does not press Save, it autosaves; he comes back to the MacBook and expects it to be there. Try the concurrency cases." (Run 4: five tabs as two devices, two officers, the operator and the administrator; three stale-page findings fixed the same hour.)
+- "Everything is cleared in the new tab; I am back at Mark site visit scheduled. Why is it not autosaved? Solve this and try it in different ways." (The tab had opened the second seeded case; nothing was lost. The finding was recorded in the UAT plan and the remaining concurrency angles were tested, which produced the three fixes.)
+- "Explain how the iPad switch is handled, in simple words and in technical words, and put every learning and the new implementations in the debrief material." (Part 2b of the private preparation notes.)
+- "Recheck all the v0.4.0 code with subagents, three Opus and two Sonnet; check that everything is stable; ping the backends; smoke-test every endpoint; fix any bugs, edge cases and gaps you find; keep the documents consistent; then ping me." (Five reviews, a route-coverage smoke test, the edge checks, 30 findings fixed with tests, readiness row 26.)
+- "Merge everything to `dev`, make sure CI passes, tag it well, do not touch `main`; check the live development URL; update Notion and the release notes; every Markdown file live and correct; run two or three subagents in parallel; keep the code base tidy." (This section, the release candidate tag on `dev`, the tidy and consistency audits.)
+- "The policy pages have too much margin; spread them, and make them react to the side rail opening." (The policy opens inside the app shell when signed in, with a section list beside the text.)
+- "`AI_USAGE.md` should carry the prompts I used, refined, not verbatim, no colloquial language." (This list.)
+
 ### Legal, privacy and accessibility (session prompt, the whole checklist)
 
 Given whole because the AI's first move was to audit the code and cut the list down before building anything: "I do not want the site to expose me legally. Add a privacy policy, terms and conditions and a cookie policy; check whether cookie consent is needed at all; add a refund policy and consent on forms if they apply. Collect only the data the product needs. Check for analytics tracking and third-party embeds. Make the site accessible: alt text, colour contrast, keyboard-friendly forms, clear button labels. Remove any fake reviews or unsupported claims. Add the business details and check the copyright of every image. Check the applicable local laws and flag any other risk. Work carefully. Create a user story for this and record the outcome in a document a reviewer can read."
