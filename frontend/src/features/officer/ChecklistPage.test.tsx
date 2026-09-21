@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
@@ -280,6 +280,46 @@ describe('site visit checklist (US-060, US-061)', () => {
       needs_clarification: false,
     })
     expect(save.mock.calls[1]![1].items[1]!.result).toBe('satisfactory')
+    vi.useRealTimers()
+  })
+
+  it('a save refused because another tab submitted the checklist drops the edit and reloads the case', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const submitted: Checklist = {
+      ...draft,
+      status: 'submitted',
+      version: 9,
+      submitted_by: 'Lim Hui Ling',
+      submitted_at: '2026-09-24T07:00:00Z',
+      items: [
+        item('layout_matches_plan', 'premises', 1, { result: 'satisfactory' }),
+        item('floor_trap_graded', 'premises', 2, { result: 'satisfactory' }),
+        item('sink_provided', 'kitchen', 3, { result: 'satisfactory' }),
+      ],
+      counts: { total: 3, assessed: 3, flagged: 0, unsatisfactory: 0, not_applicable: 0, missing_comments: 0 },
+      remaining: '',
+    }
+    const filled: Checklist = { ...submitted, status: 'draft', submitted_by: null, submitted_at: null, version: 8 }
+    vi.spyOn(checklistApi, 'openChecklist').mockResolvedValueOnce(filled).mockResolvedValue(submitted)
+    // First load: the visit is scheduled. After the 409: the other tab's submit moved the case on.
+    vi.spyOn(api, 'getOfficerApplication')
+      .mockResolvedValueOnce(scheduled)
+      .mockResolvedValue(officerView({ ...scheduled, status: 'pending_post_site_clarification', status_label: 'Awaiting Post-Site Clarification' }))
+    const save = vi
+      .spyOn(checklistApi, 'saveChecklist')
+      .mockRejectedValue(new AppError(409, { code: 'conflict', message: 'This checklist was submitted; its findings can no longer change.' }))
+    renderAt('/officer/applications/a1/checklist')
+    const groups = await screen.findAllByRole('group', { name: 'Result' })
+    await user.click(within(groups[0]!).getByRole('button', { name: /^Not applicable$/ }))
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS + 30)
+    expect(await screen.findByText('This checklist was submitted; its findings can no longer change.')).toBeInTheDocument()
+    expect(save).toHaveBeenCalledTimes(1)
+    // the server copy stands: the local edit is gone, the page is read-only and the case badge moved on
+    await waitFor(() => expect(within(groups[0]!).getByRole('button', { name: /^Satisfactory$/ })).toHaveAttribute('aria-pressed', 'true'))
+    expect(within(groups[0]!).getByRole('button', { name: /^Not applicable$/ })).toBeDisabled()
+    expect(await screen.findByText('Awaiting Post-Site Clarification')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mark visit done and submit' })).not.toBeInTheDocument()
     vi.useRealTimers()
   })
 

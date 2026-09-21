@@ -2,6 +2,12 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## UAT run 4: UC3 on two devices, three stale-page fixes (21 Sep 2026)
+
+- Claude in Chrome ran UC3 twice on the local stack with five tabs (an iPad and a laptop for one officer, a second officer, the operator, the administrator): PF-2026-001668 approved after two clarification rounds with a PDF and a JPEG (EXIF and GPS stripped on disk), PF-2026-001669 rejected after a withdrawn question and three appointment rounds. The iPad to laptop hand-over held every time: the 1.5 s autosave and the keepalive save on tab hide put the draft on the server before the laptop signed in; the revoked iPad landed on the sign-in page with the reason. Record: `docs/10-uat/UAT_PLAN.md`, scenario U16 and run 4.
+- Fixed from the run, one unit test each: the officer's site-visit rail showed the raw server reason and stayed stale when the other device had already decided the appointment (now "This application changed since you opened it. Showing the latest." and the rail reloads); the checklist page kept the old case badge after a save was refused because the checklist was submitted from another tab; the operator's clarification header kept "needs more information on 1 item" after a send was refused because the officer had withdrawn the question. Frontend: 229 tests.
+- The owner's morning report ("everything cleared, back to Mark site visit scheduled") was the second seeded case opened from the Needs review tab, not lost work; the first case sat under Waiting on operator with everything saved.
+
 ## Review fixes after the v0.4.0 build (21 Sep 2026)
 
 - Three Sonnet reviewers (backend, frontend, document drift) read the whole diff. Fixed: two devices signing in to a fresh account at the same instant could both get a session (the user row is the lock now, with a two-thread test); a slow first save of a clarification answer could land over a newer one (one save in flight, the edit queued); the checklist kept an officer's local entries after a "submitted elsewhere" refusal instead of showing what stands; the administrator's checklist breadcrumb led to the officer's queue; two N+1 queries in the clarification service; the users page's filter announced tab semantics it did not implement. Documents: the admin module and dependency rows in ARCHITECTURE, the audit event list and ChecklistItem's extra-finding fields in DOMAIN_MODEL, "seven alert rules" everywhere, test counts.

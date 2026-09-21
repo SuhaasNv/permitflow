@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
 
+import { AppError } from '@/api/client'
 import * as formApi from '@/api/formSchema'
 import * as api from '@/api/officer'
 import * as visitApi from '@/api/siteVisit'
@@ -195,6 +196,43 @@ describe('site visit appointment, officer side (US-084)', () => {
     expect(await screen.findByText('Confirmed')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Mark site visit done' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Request a different date' })).toBeEnabled()
+  })
+
+  it('a 409 on a stale decision reloads the case and shows the latest, not the server reason', async () => {
+    const countered = visit({
+      status: 'counter_proposed',
+      status_label: 'Waiting for you',
+      counter: counterRound,
+      rounds: [officerRound, counterRound],
+      rounds_left: 4,
+    })
+    const settled = scheduled(
+      visit({
+        status: 'confirmed',
+        status_label: 'Confirmed',
+        date: '2026-09-24',
+        slot: 'afternoon',
+        when: counterRound.when,
+        can_reschedule: true,
+        rounds: [
+          { ...officerRound, outcome: 'declined' },
+          { ...counterRound, outcome: 'accepted' },
+        ],
+      }),
+    )
+    // First load: the counter-proposal is still open. Second load (after the 409): another device accepted it.
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValueOnce(scheduled(countered)).mockResolvedValue(settled)
+    const decide = vi
+      .spyOn(visitApi, 'decideSiteVisit')
+      .mockRejectedValue(new AppError(409, { code: 'conflict', message: 'The operator has not proposed another date.' }))
+    renderPage()
+    expect(await screen.findByText('Waiting for you')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Keep Tue 22 Sep, morning' }))
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('a1', { action: 'keep_original' }))
+    expect(await screen.findByText('This application changed since you opened it. Showing the latest.')).toBeInTheDocument()
+    expect(screen.queryByText('The operator has not proposed another date.')).not.toBeInTheDocument()
+    expect(await screen.findByText('Confirmed')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Keep Tue 22 Sep, morning' })).not.toBeInTheDocument()
   })
 
   it('a third date goes through the inline form with action propose', async () => {

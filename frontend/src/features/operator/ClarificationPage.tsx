@@ -381,6 +381,8 @@ export function ClarificationPage() {
         if (e instanceof AppError && e.status === 409) {
           toast.push({ title: 'Could not send', body: 'This application changed since you opened it. Showing the latest.', tone: 'error' })
           void clar.refetch()
+          // The header line comes from the application itself (the officer withdrew or decided): reload it too (UAT, 21 Sep).
+          void app.refetch()
           return
         }
         toast.push({ title: 'Could not send', body: e.message, tone: 'error' })

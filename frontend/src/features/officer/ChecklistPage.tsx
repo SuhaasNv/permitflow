@@ -326,6 +326,8 @@ export function ChecklistPage() {
             setEdits(null)
             touched.current.clear()
             void checklist.refetch()
+            // The case moved too (submitted from another tab): the status badge follows (UAT, 21 Sep).
+            void app.refetch()
             return
           }
           // Network or server trouble: keep the entries and try again with backoff, unless the tab is
