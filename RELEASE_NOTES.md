@@ -30,6 +30,7 @@ Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for 
 **Also**
 - Each application has 150 MB of storage room across its documents, evidence and licence; the pages say how much is left before a file is chosen.
 - The accessibility gate covers every new screen; every control on the checklist and the respond page is at least 44 px on a phone or a tablet.
+- Reviewed twice before release (a code review on 21 Sep and a stability review of the whole build with a smoke test of every route the same morning): a case can no longer end with Reject as the only move after every question of a round is withdrawn, a visit date that has passed cannot be confirmed, the last taps on the checklist are saved when you leave the page by a link, and typing while an answer saves no longer loses what you typed.
 
 ---
 

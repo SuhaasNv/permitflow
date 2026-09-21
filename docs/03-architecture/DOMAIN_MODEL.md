@@ -42,10 +42,10 @@ Ownership: a user owns their notifications. Operators own the applications they 
 | last_seen_at | datetime | refreshed by authenticated requests, at most once a minute per session |
 | expires_at | datetime | the token's own expiry |
 | revoked_at | datetime, nullable | set once |
-| revoked_reason | `taken_over` \| `signed_out` \| `idle`, nullable | why the row stopped being live |
+| revoked_reason | `taken_over` \| `signed_out` \| `idle` \| `deactivated`, nullable | why the row stopped being live |
 | created_at | datetime | |
 
-Live means: not revoked, `expires_at` in the future, `last_seen_at` within `SESSION_IDLE_MINUTES`. An account has at most one live session; `AuthService.authenticate` reads the live row under `FOR UPDATE`, refuses with `session_active` or, with `take_over`, revokes it (`taken_over`) and audits `user.session_taken_over` with `application_id = null`. Every authenticated request reads the row by id (`AuthService.current_user`); an idle row is closed the first time it is seen again. Sign-out revokes (`signed_out`) and audits `user.signed_out`.
+Live means: not revoked, `expires_at` in the future, `last_seen_at` within `SESSION_IDLE_MINUTES`. An account has at most one live session; `AuthService.authenticate` reads the live row under `FOR UPDATE`, refuses with `session_active` or, with `take_over`, revokes it (`taken_over`) and audits `user.session_taken_over` with `application_id = null`. Every authenticated request reads the row by id (`AuthService.current_user`); an idle row is closed the first time it is seen again. Sign-out revokes (`signed_out`) and audits `user.signed_out`. An administrator deactivating the account revokes every live row (`deactivated`), so a reactivation inside the idle window never revives a token issued before it (21 Sep 2026).
 
 ### Application
 The aggregate root. Holds current status and the editable working copy of form data.
@@ -57,7 +57,7 @@ The aggregate root. Holds current status and the editable working copy of form d
 | licence_type | enum | only `food_establishment` in the MVP |
 | status | enum `ApplicationStatus` | internal status; see STATE_MACHINE.md |
 | draft_data | JSON | working copy edited by the operator between submissions; copied into a revision on submit |
-| current_revision_id | FK ApplicationRevision, nullable | latest submitted revision |
+| current_revision_id | FK ApplicationRevision, nullable | latest submitted revision (the key is enforced since migration 0014; migration 0001 declared it inside `create_table` with `use_alter`, which Alembic never emitted) |
 | decision_note | text, nullable | officer note shown to the operator on approval/rejection |
 | draft_data.declarations.confirmed_at | stamped string | set by the server when the declarations are saved while responding to feedback; the diff reports it as "Confirmed on" so a re-confirmation counts as the change (US-041 follow-up) |
 | withdrawal_reason | text, nullable | operator's reason when they withdrew (US-038); served to officers and, once withdrawn, to the owner |
