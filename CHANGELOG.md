@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## v0.4.0-rc.1 on the development environment (21 Sep 2026, midday)
+
+`dev` pushed (89 commits, everything since the submission), CI green after one accessibility fix on the new policy layout, deployed to the development environment by the pipeline, seeded (the administrator and the spare officer), checked live (13 checks, `UAT_PLAN.md` 12:15 record), the Prometheus rules re-set by environment, the release candidate tagged `v0.4.0-rc.1` on that commit. Production and `main` stay on v0.3.0. The policy pages open inside the app shell when signed in and follow the side rail. `AI_USAGE.md` carries the day's prompts.
+
 ## Stability review of the whole v0.4.0 diff, with fixes (21 Sep 2026, late morning)
 
 Five reviewers (three Opus, two Sonnet) read every file changed since `main`: backend services, domain, repositories, models and migrations; the API layer and its security; the operator and officer frontend; the admin frontend, the end-to-end specs, the observability stack and the scripts; every document against the code. In parallel the 61 API routes were smoke-tested on the local stack (every route called with the right role on a real lifecycle, plus wrong-role and unauthenticated probes: 105 checks), `uat_edges.py` ran 246 of 246, and the deployed backends answered their health checks (production, development, Grafana). Everything below was then fixed, tested and merged into `dev`.
