@@ -8,6 +8,7 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import { ErrorPanel, Skeleton } from '@/features/shared/states'
 import { cn } from '@/lib/cn'
 import { formatDate, formatDateTime } from '@/lib/format'
+import { useBuildInfo } from '@/features/releases/queries'
 import { useAdminOverview } from './queries'
 
 const BAR_TONE: Record<string, string> = {
@@ -146,6 +147,26 @@ function TodayPanel({ today }: { today: Today }) {
   )
 }
 
+/** The build that answers, the same three values Telegram and Grafana name (US-094): metadata text, no card. */
+function BuildLine() {
+  const build = useBuildInfo()
+  const commit = build.data?.commit && build.data.commit !== 'local' ? ` (${build.data.commit})` : ''
+  return (
+    <p className="flex flex-wrap items-center gap-x-1.5 px-1 text-[13px] text-text-3" data-testid="admin-build-line">
+      <span>Build</span>
+      <span className="font-mono text-text-2">
+        v{__APP_VERSION__}
+        {commit}
+      </span>
+      {build.data ? <span>· {build.data.environment}</span> : null}
+      <span>·</span>
+      <Link to="/releases" className="text-text-3 hover:text-text">
+        What's new
+      </Link>
+    </p>
+  )
+}
+
 function IdleTable({ overview }: { overview: AdminOverview }) {
   const rows = overview.idle
   return (
@@ -223,7 +244,7 @@ export function AdminOverviewPage() {
         }
       />
       {overview.isPending ? (
-        <div className="flex flex-col gap-5" aria-busy="true" aria-label="Loading overview">
+        <div className="flex flex-col gap-5" role="status" aria-busy="true" aria-label="Loading overview">
           <div className="pf-surface grid grid-cols-2 gap-px lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="flex flex-col gap-2 px-5 py-4">
@@ -268,6 +289,7 @@ function Loaded({ data }: { data: AdminOverview }) {
         <div className="flex flex-col gap-5">
           <ChecksPanel checks={data.checks} />
           <TodayPanel today={data.today} />
+          <BuildLine />
         </div>
       </div>
       <IdleTable overview={data} />

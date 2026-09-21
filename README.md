@@ -1,6 +1,6 @@
 # PermitFlow
 
-*This branch (`dev`) carries v0.4.0 (use case 3, one session per account, the storage budget and the admin panel, planned in `docs/05-planning/RELEASE_PLAN_V0_4_0.md`), built, reviewed and tagged as the release candidate `v0.4.0-rc.1` on 21 Sep 2026. The submitted release is tag `v0.3.0` on `main`, live at permitflow.space; the development copy of this branch runs at dev.permitflow.space.*
+*This branch (`dev`) carries v0.4.0 (use case 3, one session per account, the storage budget and the admin panel, planned in `docs/05-planning/RELEASE_PLAN_V0_4_0.md`), built, reviewed and tagged as the release candidate `v0.4.0-rc.2` on 21 Sep 2026 (`rc.1` the same build without the What's new page). The submitted release is tag `v0.3.0` on `main`, live at permitflow.space; the development copy of this branch runs at dev.permitflow.space.*
 
 ## Live: [permitflow.space](https://permitflow.space)
 

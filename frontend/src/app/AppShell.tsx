@@ -7,6 +7,7 @@ import { useAuth } from '@/features/auth/AuthContext'
 import { Dialog } from '@/features/shared/Dialog'
 import { Logo } from '@/features/shared/Logo'
 import { NotificationsBell } from '@/features/shared/NotificationsBell'
+import { VersionChip } from '@/features/releases/VersionChip'
 import { hasUnsaved, setUnsaved } from '@/lib/unsaved'
 import { cn } from '@/lib/cn'
 import { formatDateTime } from '@/lib/format'
@@ -136,6 +137,9 @@ export function AppShell({ children }: { children?: ReactNode }) {
       <div role="region" aria-label="Portal notice" className="flex h-7 items-center gap-2 bg-ink px-4 text-xs text-[#aeb6c2] sm:px-6">
         <span className="font-semibold text-white">Secure licensing portal</span>
         <span className="hidden sm:inline">· Food Establishments Unit</span>
+        {/* The version lives in the rail footer; when there is none (phones) or it is folded away (collapsed
+            rail) it sits here at the right, unless the session warning needs the space (US-094). */}
+        {warning.level === 'none' ? <VersionChip variant="strip" className={cn('-mr-2 ml-auto', !collapsed && 'md:hidden')} /> : null}
         {warning.level !== 'none' && expiresAt ? (
           <span
             role="status"
@@ -238,10 +242,8 @@ export function AppShell({ children }: { children?: ReactNode }) {
               collapsed && 'hidden',
             )}
           >
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-text-2">PermitFlow</span>
-              <span className="rounded border border-line px-1.5 font-mono text-[10px] leading-4 text-text-3">v{__APP_VERSION__}</span>
-            </div>
+            <div className="font-medium text-text-2">PermitFlow</div>
+            <VersionChip variant="rail" />
             <div>Fictional assessment product</div>
             <nav aria-label="Policies" className="mt-1 flex gap-3">
               <Link to="/privacy" className="text-text-3 no-underline hover:text-text">

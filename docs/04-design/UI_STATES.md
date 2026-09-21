@@ -71,6 +71,7 @@ Progress on S-15: "Items addressed n of m"; Resubmit enabled once n ≥ 1.
 | Screen | Loading | Empty | Error | Success / other |
 |--------|---------|-------|-------|-----------------|
 | S-00 | button spinner | none | generic "Email or password is incorrect"; 429 shows the server message (failed-attempt window, or too many sign-ins from this network) | redirect by role |
+| S-44 What's new | none (the notes are in the build); the build line fills in when `/health` answers | none (the notes always hold at least one release) | `/health` unreachable: the build line shows the version alone; unknown version in the URL: the newest release | the reader's own block open under "For you", the other audiences folded with a count, "For everyone" open; "This build" on the running release; the "New" mark beside the version chip until the page is opened once per browser (`localStorage`, works without it) |
 | S-10 | strip + table skeleton | no applications | retry | none |
 | S-11 | form skeleton | new draft (all sections "Not started") | save failed (input kept); 403 if not draft ("This application can no longer be edited") | "Draft saved" note; section "Complete" badge |
 | S-11 (application) | sections + completion skeleton | none | withdraw 409 ("A decided application cannot be withdrawn.") as an error toast, dialog closes | withdraw: danger dialog (Cancel focused, reason optional) → toast "Application withdrawn" → neutral outcome panel with the reason; Withdraw panel disappears (US-038) |

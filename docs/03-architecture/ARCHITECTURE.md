@@ -175,7 +175,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /notifications/{id}/read | any | mark read; another user's id is 404 (built, US-025) |
 | POST | /notifications/read-all | any | mark every own notification read (built, US-025) |
 | GET | /metrics | bearer token (`METRICS_TOKEN`); 404 when no token is configured; exempt from the rate limit | Prometheus text format: `permitflow_http_requests_total`, `permitflow_http_request_seconds`, `permitflow_rate_limited_total`, `permitflow_verification_runs_total`, `permitflow_verification_run_seconds`, `permitflow_quota_refusals_total`, `permitflow_transitions_total`, `permitflow_applications` (gauge), `permitflow_openai_tokens_total`, `permitflow_sessions_active` (gauge), `permitflow_checklists_submitted_total`, `permitflow_clarification_rounds_total`, `permitflow_attachment_bytes_total`, `permitflow_storage_bytes` (gauge), `permitflow_build_info` (gauge with the version and commit); route templates and enum values as labels, never ids or text (US-077, US-089, US-093) |
-| GET | /health | public | `{status, database}`; 503 when the database ping fails, with the standard `error` object beside the status fields; provider details are not exposed publicly (the planned admin AI-health endpoint, US-071, would report them) |
+| GET | /health | public | `{status, database, version, commit, environment}`: liveness, the database, and the build that answers (the version the release ritual bumps, the commit CI bakes in as `GIT_SHA`, `local` outside an image, and `APP_ENV`), the same three values the metrics and Telegram name (US-094; the What's new page heads with them); 503 when the database ping fails, with the standard `error` object beside the status fields; provider details are not exposed publicly (the planned admin AI-health endpoint, US-071, would report them) |
 
 All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail": …}` bodies for 401/403/422 are replaced by explicit exception handlers so every error uses the standard shape (REL-001).
 
@@ -213,7 +213,7 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 
 - Request logging middleware: request id, method, path, status, duration, user id; request id echoed in `X-Request-ID`.
 - Verification logs: run id, provider, model, latency, outcome, `raw_output_valid`.
-- `/health`: database ping (503 on failure). AI provider configuration is never reported publicly; the planned admin AI-health endpoint (US-071) would carry it.
+- `/health`: database ping (503 on failure) plus `version`, `commit` and `environment` (US-094). AI provider configuration is never reported publicly; the planned admin AI-health endpoint (US-071) would carry it.
 - Metrics (US-077): `core/metrics.py` holds the Prometheus counters and histograms, the outermost middleware counts every answer, the services increment their own events, `api/v1/metrics.py` renders them behind a bearer token. Prometheus scrapes them every 15 s; Grafana draws one dashboard (API health, document checks, cost, queue); seven alert rules and an hourly digest reach Telegram, where a small bot also answers `/status` and friends. The layer in full, with the Railway services: `../13-observability/OBSERVABILITY.md`.
 
 ## Deployment

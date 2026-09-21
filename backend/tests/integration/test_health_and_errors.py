@@ -1,12 +1,20 @@
 from fastapi.testclient import TestClient
 
 from app.api.v1 import health as health_module
+from app.core.version import APP_VERSION, BUILD_COMMIT
 
 
 def test_health_ok(client: TestClient) -> None:
     r = client.get("/api/v1/health")
     assert r.status_code == 200
-    assert r.json() == {"status": "ok", "database": "ok"}
+    body = r.json()
+    assert body["status"] == "ok" and body["database"] == "ok"
+    # The build line (US-094): the version the release ritual bumps, the commit CI bakes in ("local" when
+    # it did not), and the environment; nothing about providers or keys.
+    assert body["version"] == APP_VERSION
+    assert body["commit"] == BUILD_COMMIT
+    assert body["environment"] == "test"
+    assert set(body) == {"status", "database", "version", "commit", "environment"}
     assert r.headers["X-Content-Type-Options"] == "nosniff"
     assert r.headers["X-Frame-Options"] == "DENY"
     assert r.headers["X-Request-ID"]
@@ -17,11 +25,10 @@ def test_health_503_when_database_down(client: TestClient, monkeypatch) -> None:
     monkeypatch.setattr(health_module, "_probe", None)  # the 2 s cache would hand back the last answer
     r = client.get("/api/v1/health")
     assert r.status_code == 503
-    assert r.json() == {
-        "status": "degraded",
-        "database": "unreachable",
-        "error": {"code": "unavailable", "message": "The database is unreachable."},
-    }
+    body = r.json()
+    assert body["status"] == "degraded" and body["database"] == "unreachable"
+    assert body["error"] == {"code": "unavailable", "message": "The database is unreachable."}
+    assert body["version"] == APP_VERSION
 
 
 def test_unknown_route_uses_error_shape(client: TestClient) -> None:

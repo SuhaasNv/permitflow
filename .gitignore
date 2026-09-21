@@ -51,6 +51,8 @@ notes/
 
 # vitest reporter output
 frontend/.vitest/
+# Copied in by CI for the image build (US-094); the source is the root RELEASE_NOTES.md
+frontend/RELEASE_NOTES.md
 
 # Presenter copies of the decks (with speaker notes) stay local; the shared copies carry no notes
 *-presenter.pptx
