@@ -293,3 +293,25 @@ export async function submitCleanChecklist(page: Page) {
   await page.locator('dialog[open]').getByRole('button', { name: 'Submit' }).click()
   await expect(status(page)).toHaveText('Awaiting Post-Site Clarification')
 }
+
+/** Visit 1 with two flagged items answered and clarified, routed to approval and returned to review: the case
+ * a second visit starts from (UAT run 5, F15 to F18). */
+export async function seedReturnedAfterClarification(): Promise<Seeded & { flagged: string[] }> {
+  const seeded = await seedAwaitingClarification()
+  const op = await login(OPERATOR)
+  const clar = await call<{ items: { item_id: string }[] }>(op, `/applications/${seeded.id}/clarifications`)
+  for (const item of clar.items) {
+    await call(op, `/applications/${seeded.id}/clarifications/${item.item_id}/responses`, {
+      method: 'POST',
+      body: JSON.stringify({ message: 'Fixed on site; photo on file.' }),
+    })
+  }
+  await call(op, `/applications/${seeded.id}/clarifications/send`, { method: 'POST' })
+  const off = await login(OFFICER)
+  for (const item of clar.items) {
+    await call(off, `/officer/applications/${seeded.id}/clarifications/${item.item_id}/resolve`, { method: 'POST' })
+  }
+  await transition(off, seeded.id, 'pending_approval')
+  await transition(off, seeded.id, 'under_review')
+  return seeded
+}

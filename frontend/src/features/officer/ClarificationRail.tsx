@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import type { ClarificationThread } from '@/api/clarification'
+import type { ClarificationOfficerView, ClarificationThread } from '@/api/clarification'
 import { downloadAttachment } from '@/api/clarification'
 import type { OfficerApplication } from '@/api/officer'
 import { Alert } from '@/features/shared/Alert'
@@ -10,8 +10,9 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import type { Tone } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
+import { UNDO_MS } from '@/lib/feedback'
 import { formatBytes, formatDateTime } from '@/lib/format'
-import { useReopenClarification, useResolveClarification, useWithdrawClarification } from './queries'
+import { useReopenClarification, useResolveClarification, useRestoreClarification, useWithdrawClarification } from './queries'
 import { useReadOnly } from './readOnly'
 import { useCaseRefusal } from './refusal'
 
@@ -34,6 +35,7 @@ function Thread({ view, thread, n }: { view: OfficerApplication; thread: Clarifi
   const resolve = useResolveClarification(view.id)
   const reopen = useReopenClarification(view.id)
   const withdraw = useWithdrawClarification(view.id)
+  const restore = useRestoreClarification(view.id)
   const toast = useToast()
   const [asking, setAsking] = useState(false)
   const [question, setQuestion] = useState('')
@@ -222,8 +224,22 @@ function Thread({ view, thread, n }: { view: OfficerApplication; thread: Clarifi
               disabled={busy}
               onClick={() =>
                 withdraw.mutate(thread.item_id, {
+                  // Undo for 10 s, the way feedback withdraws work (US-039); the server allows a little longer.
                   onSuccess: () =>
-                    toast.push({ title: 'Question withdrawn', body: 'The operator no longer needs to answer it.', tone: 'success' }),
+                    toast.push({
+                      title: 'Question withdrawn',
+                      body: 'The operator no longer needs to answer it.',
+                      tone: 'success',
+                      duration: UNDO_MS,
+                      action: {
+                        label: 'Undo',
+                        onClick: () =>
+                          restore.mutate(thread.item_id, {
+                            onSuccess: () => toast.push({ title: 'Undone', body: 'The question is open again.', tone: 'neutral' }),
+                            onError: fail('Could not undo'),
+                          }),
+                      },
+                    }),
                   onError: fail('Could not withdraw the question'),
                 })
               }
@@ -237,15 +253,26 @@ function Thread({ view, thread, n }: { view: OfficerApplication; thread: Clarifi
   )
 }
 
-/** S-31: the clarification threads on the case rail once the checklist is submitted (US-066). */
-export function ClarificationRail({ view }: { view: OfficerApplication }) {
-  const c = view.clarification
+/** S-31: the clarification threads on the case rail once the checklist is submitted (US-066). `clarification`
+ * shows an earlier visit's threads instead (read-only: the server sends no action on them, F18). */
+export function ClarificationRail({
+  view,
+  clarification,
+  embedded = false,
+}: {
+  view: OfficerApplication
+  clarification?: ClarificationOfficerView
+  embedded?: boolean
+}) {
+  const c = clarification ?? view.clarification
   if (!c) return null
+  // The active visit keeps its stable id; an earlier visit's copy is told apart by its number.
+  const titleId = embedded ? `clarification-title-${c.visit_no}` : 'clarification-title'
   return (
-    <section className="pf-surface" aria-labelledby="clarification-title">
+    <section className={embedded ? undefined : 'pf-surface'} aria-labelledby={titleId}>
       <div className="flex flex-col gap-1 border-b border-line px-5 pb-3 pt-5">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h2 id="clarification-title" className="text-[17px] font-semibold leading-6">
+          <h2 id={titleId} className="text-[17px] font-semibold leading-6">
             Clarification
           </h2>
           <span className="font-mono text-xs text-text-3">

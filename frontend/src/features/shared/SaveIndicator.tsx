@@ -10,6 +10,8 @@ export interface SaveIndicatorProps {
   savedAt: number | null
   /** A save failed on the way and will be tried again (US-061). */
   retrying?: boolean
+  /** The browser reports no connection: nothing is tried until it returns (UAT run 5, F10). */
+  offline?: boolean
   className?: string
 }
 
@@ -24,7 +26,7 @@ function relative(savedAt: number, now: number): string {
 }
 
 /** "Unsaved changes" / "Saving…" / "Saved just now" with a live relative time. Polite live region. */
-export function SaveIndicator({ dirty, saving, savedAt, retrying = false, className }: SaveIndicatorProps) {
+export function SaveIndicator({ dirty, saving, savedAt, retrying = false, offline = false, className }: SaveIndicatorProps) {
   const [now, setNow] = useState(() => Date.now())
   // savedAt changes only on a successful save; "now" then starts from that instant.
   const clock = savedAt !== null && savedAt > now ? savedAt : now
@@ -36,7 +38,11 @@ export function SaveIndicator({ dirty, saving, savedAt, retrying = false, classN
 
   let text: string
   let tone: 'muted' | 'saving' | 'saved' | 'dirty' | 'retrying'
-  if (saving) {
+  if (offline && (dirty || retrying || saving)) {
+    // Offline nothing is being retried: the save waits for the connection (the page's banner says why).
+    text = 'Waiting for the connection'
+    tone = 'dirty'
+  } else if (saving) {
     text = 'Saving…'
     tone = 'saving'
   } else if (retrying) {

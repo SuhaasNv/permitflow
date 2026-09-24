@@ -212,4 +212,76 @@ describe('clarification rail (US-066)', () => {
     expect(screen.getByText('1 question waits for Request another round.', { exact: false })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Withdraw' })).toBeInTheDocument()
   })
+
+  it('a withdrawn question can be undone from the toast (UAT run 5, F19)', async () => {
+    const open = thread({ status: 'open', can_resolve: false, can_reopen: false, can_withdraw: true })
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({
+      ...resubmitted,
+      status: 'awaiting_post_site_clarification',
+      clarification: { ...clarification, open_count: 1, answered_count: 0, items: [open] },
+    })
+    const withdrawn = vi
+      .spyOn(api, 'withdrawClarification')
+      .mockResolvedValue({
+        ...resubmitted,
+        clarification: { ...clarification, items: [{ ...open, status: 'withdrawn', can_withdraw: false }] },
+      })
+    const restore = vi
+      .spyOn(api, 'restoreClarification')
+      .mockResolvedValue({ ...resubmitted, clarification: { ...clarification, items: [open] } })
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Withdraw' }))
+    await waitFor(() => expect(withdrawn).toHaveBeenCalledWith('a1', 'i1'))
+    await userEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(restore).toHaveBeenCalledWith('a1', 'i1'))
+    expect(await screen.findByText('The question is open again.')).toBeInTheDocument()
+  })
+
+  it('back in review after a visit: the feedback panel returns and the visit is listed as history (UAT run 5, F15, F18)', async () => {
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({
+      ...resubmitted,
+      status: 'under_review',
+      status_label: 'Under Review',
+      feedback_editable: true,
+      feedback_locked_reason: null,
+      clarification: null,
+      site_visit: null,
+      checklist: null,
+      actions: [
+        {
+          target: 'pending_pre_site_resubmission',
+          label: 'Request resubmission',
+          enabled: false,
+          reason: 'At least one open feedback item is required.',
+          requires_note: false,
+        },
+      ],
+      earlier_visits: [
+        {
+          visit_no: 1,
+          site_visit: null,
+          checklist: {
+            visit_no: 1,
+            status: 'submitted',
+            version: 5,
+            counts: { total: 18, assessed: 18, flagged: 3, unsatisfactory: 4, not_applicable: 1, missing_comments: 0 },
+            updated_at: '2026-09-24T04:43:00Z',
+            submitted_at: '2026-09-24T04:43:00Z',
+          },
+          clarification: { ...clarification, items: [thread({ status: 'resolved', can_resolve: false, can_reopen: false })] },
+        },
+      ],
+    })
+    renderPage()
+    expect(await screen.findByRole('button', { name: 'Add feedback' })).toBeInTheDocument()
+    const earlier = screen.getByRole('heading', { name: 'Earlier visits' }).closest('section')!
+    expect(within(earlier).getByText('18 of 18 assessed, 3 flagged')).toBeInTheDocument()
+    expect(within(earlier).getByRole('link', { name: 'View visit 1 checklist' })).toHaveAttribute(
+      'href',
+      '/officer/applications/a1/checklist?visit=1',
+    )
+    // The first visit's thread is there, read-only.
+    expect(within(earlier).getByText('Regraded on 24 Sep; water now runs to the trap.')).toBeInTheDocument()
+    expect(within(earlier).queryByRole('button', { name: 'Mark clarified' })).not.toBeInTheDocument()
+  })
 })

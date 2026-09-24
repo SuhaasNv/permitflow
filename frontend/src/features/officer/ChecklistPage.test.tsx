@@ -11,7 +11,7 @@ import * as api from '@/api/officer'
 import { AppProviders } from '@/app/providers'
 import { formSchema, officerView } from '@/test/fixtures'
 import { OfficerCasePage } from './CasePage'
-import { AUTOSAVE_DELAY_MS, ChecklistPage, adoptServerKeys, mergeFindings, retryDelay, summarise, toInput } from './ChecklistPage'
+import { AUTOSAVE_DELAY_MS, ChecklistPage, adoptServerKeys, localCopy, mergeFindings, retryDelay, summarise, toInput } from './ChecklistPage'
 
 const defs = [
   ['premises', 'Premises', ['layout_matches_plan', 'floor_trap_graded']],
@@ -86,6 +86,9 @@ const scheduled = officerView({
     rounds_left: 5,
     round_limit_reason: null,
     rounds: [],
+    date_stands: true,
+    visit_day_reached: true,
+    is_current: true,
   },
   actions: [
     { target: 'site_visit_done', label: 'Mark site visit done', enabled: true, reason: null, requires_note: false },
@@ -231,7 +234,8 @@ describe('site visit checklist (US-060, US-061)', () => {
     await user.click(within(groups[0]!).getByRole('button', { name: /^Satisfactory$/ }))
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS + 10)
     expect(save).not.toHaveBeenCalled()
-    expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
+    // Offline nothing is retried: the line says what it waits for (UAT run 5, F10).
+    expect(screen.getByText('Waiting for the connection')).toBeInTheDocument()
     onLine.mockReturnValue(true)
     window.dispatchEvent(new Event('online'))
     await vi.advanceTimersByTimeAsync(20)
@@ -305,10 +309,14 @@ describe('site visit checklist (US-060, US-061)', () => {
     // First load: the visit is scheduled. After the 409: the other tab's submit moved the case on.
     vi.spyOn(api, 'getOfficerApplication')
       .mockResolvedValueOnce(scheduled)
-      .mockResolvedValue(officerView({ ...scheduled, status: 'pending_post_site_clarification', status_label: 'Awaiting Post-Site Clarification' }))
+      .mockResolvedValue(
+        officerView({ ...scheduled, status: 'pending_post_site_clarification', status_label: 'Awaiting Post-Site Clarification' }),
+      )
     const save = vi
       .spyOn(checklistApi, 'saveChecklist')
-      .mockRejectedValue(new AppError(409, { code: 'conflict', message: 'This checklist was submitted; its findings can no longer change.' }))
+      .mockRejectedValue(
+        new AppError(409, { code: 'conflict', message: 'This checklist was submitted; its findings can no longer change.' }),
+      )
     renderAt('/officer/applications/a1/checklist')
     const groups = await screen.findAllByRole('group', { name: 'Result' })
     await user.click(within(groups[0]!).getByRole('button', { name: /^Not applicable$/ }))
@@ -514,5 +522,100 @@ describe('site visit checklist (US-060, US-061)', () => {
       }),
     ).toEqual({ assessed: 3, flagged: 1, missing: 2, total: 4, remaining: 'Assess 1 more item and add 2 comments to submit.' })
     expect(summarise({ a: { result: 'satisfactory', comment: '', needs_clarification: false } }).remaining).toBeNull()
+  })
+
+  it('entries left on the device by a reload are put back over the draft and saved (UAT run 5, F11)', async () => {
+    localStorage.setItem(
+      'permitflow.unsaved.checklist.a1.1',
+      JSON.stringify({
+        savedAt: Date.now(),
+        value: {
+          findings: {
+            layout_matches_plan: { result: 'satisfactory', comment: '', needs_clarification: false },
+            floor_trap_graded: { result: 'unsatisfactory', comment: 'Water pools by the sink.', needs_clarification: true },
+            sink_provided: { result: 'not_assessed', comment: '', needs_clarification: false },
+          },
+          touched: ['floor_trap_graded'],
+        },
+      }),
+    )
+    vi.spyOn(checklistApi, 'openChecklist').mockResolvedValue(draft)
+    const save = vi.spyOn(checklistApi, 'saveChecklist').mockResolvedValue({ ...draft, version: 4 })
+    renderAt('/officer/applications/a1/checklist')
+    expect(await screen.findByText('Unsaved entries restored from this device')).toBeInTheDocument()
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    const body = save.mock.calls[0]![1]
+    // Only the touched item comes from the device; the rest is the server's draft.
+    expect(body.items.find((i) => i.key === 'floor_trap_graded')).toMatchObject({ result: 'unsatisfactory', needs_clarification: true })
+    expect(body.items.find((i) => i.key === 'layout_matches_plan')).toMatchObject({ result: 'not_assessed' })
+    expect(body.version).toBe(3)
+    await waitFor(() => expect(localStorage.getItem('permitflow.unsaved.checklist.a1.1')).toBeNull())
+  })
+
+  it('an unsaved touch is kept on the device until the server confirms it (F11)', async () => {
+    vi.spyOn(checklistApi, 'openChecklist').mockResolvedValue(draft)
+    vi.spyOn(checklistApi, 'saveChecklist').mockRejectedValue(new AppError(0, { code: 'network', message: 'Failed to fetch' }))
+    renderAt('/officer/applications/a1/checklist')
+    const groups = await screen.findAllByRole('group', { name: 'Result' })
+    await userEvent.click(within(groups[1]!).getByRole('button', { name: /^Satisfactory$/ }))
+    const stored = JSON.parse(localStorage.getItem('permitflow.unsaved.checklist.a1.1') ?? 'null') as {
+      value: { findings: Record<string, { result: string }>; touched: string[] }
+    } | null
+    expect(stored?.value.touched).toEqual(['floor_trap_graded'])
+    expect(stored?.value.findings.floor_trap_graded?.result).toBe('satisfactory')
+  })
+
+  it('before the visit day the submit waits, with the server reason (UAT run 5, F12)', async () => {
+    const complete = { ...draft, items: draft.items.map((i) => ({ ...i, result: 'satisfactory' as const })), remaining: null }
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({
+      ...scheduled,
+      actions: [
+        {
+          target: 'site_visit_done',
+          label: 'Mark site visit done',
+          enabled: false,
+          reason: 'The visit is on Wed 30 Sep. Mark it done on or after that day.',
+          requires_note: false,
+        },
+      ],
+    })
+    vi.spyOn(checklistApi, 'openChecklist').mockResolvedValue(complete)
+    renderAt('/officer/applications/a1/checklist')
+    const submit = await screen.findByRole('button', { name: 'Mark visit done and submit' })
+    expect(submit).toBeDisabled()
+    expect(screen.getByText(/The visit is on Wed 30 Sep\. Mark it done on or after that day\. You can keep filling the draft/)).toBeInTheDocument()
+  })
+
+  it("an earlier visit's checklist opens read-only by its number (UAT run 5, F17)", async () => {
+    const open = vi.spyOn(checklistApi, 'openChecklist')
+    const get = vi.spyOn(checklistApi, 'getChecklist').mockResolvedValue({ ...draft, status: 'submitted', submitted_by: 'Lim Hui Ling', submitted_at: '2026-09-24T04:43:00Z' })
+    renderAt('/officer/applications/a1/checklist?visit=1')
+    expect(await screen.findByText('Visit 1, an earlier visit')).toBeInTheDocument()
+    expect(get).toHaveBeenCalledWith('a1', 1)
+    expect(open).not.toHaveBeenCalled()
+    for (const b of within(screen.getAllByRole('group', { name: 'Result' })[0]!).getAllByRole('button')) expect(b).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /submit/i })).not.toBeInTheDocument()
+  })
+
+  it('the checklist stays open while the operator asks to move a confirmed date (UAT run 5, F8)', async () => {
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({
+      ...scheduled,
+      site_visit: { ...scheduled.site_visit!, status: 'counter_proposed', status_label: 'Waiting for you', date_stands: true },
+    })
+    renderAt('/officer/applications/a1')
+    expect(await screen.findByRole('link', { name: 'Open checklist' })).toBeInTheDocument()
+    expect(screen.getByText(/Confirmed date:/)).toBeInTheDocument()
+  })
+
+  it('the device copy keeps what has content and drops an empty new finding (F11)', () => {
+    const findings = {
+      sink_provided: { result: 'satisfactory' as const, comment: '', needs_clarification: false },
+      new_a1b2c3d4: { result: 'not_assessed' as const, comment: '', needs_clarification: false, extra: true, title: '', parent: null },
+      new_e5f6a7b8: { result: 'not_assessed' as const, comment: '', needs_clarification: false, extra: true, title: 'Loose tiles', parent: null },
+    }
+    expect(localCopy(findings, ['new_a1b2c3d4'])).toBeNull()
+    const copy = localCopy(findings, ['sink_provided', 'new_a1b2c3d4', 'new_e5f6a7b8'])
+    expect(copy?.touched).toEqual(['sink_provided', 'new_e5f6a7b8'])
+    expect(Object.keys(copy?.findings ?? {})).toEqual(['sink_provided', 'new_e5f6a7b8'])
   })
 })

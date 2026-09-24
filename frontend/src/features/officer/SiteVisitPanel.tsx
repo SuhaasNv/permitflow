@@ -14,7 +14,13 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import type { Tone } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { formatDate, formatDateTime } from '@/lib/format'
-import { officerKeys, useConfirmSiteVisitWithoutReply, useDecideSiteVisit, useProposeSiteVisit, useRescheduleSiteVisitAsOfficer } from './queries'
+import {
+  officerKeys,
+  useConfirmSiteVisitWithoutReply,
+  useDecideSiteVisit,
+  useProposeSiteVisit,
+  useRescheduleSiteVisitAsOfficer,
+} from './queries'
 import { MOVED_ON, useCaseRefusal } from './refusal'
 import { useReadOnly } from './readOnly'
 
@@ -273,7 +279,8 @@ export function SiteVisitPanel({ view, onPropose }: SiteVisitPanelProps) {
               </div>
             ) : null}
             <p className="text-[15px] font-semibold leading-6">
-              {visit.status === 'counter_proposed' ? 'Your proposal: ' : ''}
+              {/* The date on the table: still the confirmed one while the operator asks to move it (F7), else the officer's. */}
+              {visit.status === 'counter_proposed' ? (visit.date_stands ? 'Confirmed date: ' : 'Your proposal: ') : ''}
               {visit.when}
             </p>
             {visit.note ? <p className="text-[13px] leading-[19px] text-text-2">Note to the operator: {visit.note}</p> : null}

@@ -45,6 +45,12 @@ export interface SiteVisitOfficer {
   rounds_left: number
   round_limit_reason: string | null
   rounds: SiteVisitProposal[]
+  /** The confirmed date still stands: confirmed, or the operator asked to move it and the officer has not decided (UC3-0 4a). */
+  date_stands: boolean
+  /** Mark site visit done and the checklist submit wait for the visit day (Singapore date). */
+  visit_day_reached: boolean
+  /** False for an earlier visit shown as history. */
+  is_current: boolean
 }
 
 /** The operator's view: what is proposed, what they can do, every round in their own words. */
@@ -65,6 +71,9 @@ export interface SiteVisitOperator {
   rounds_left: number
   round_limit_reason: string | null
   rounds: SiteVisitProposal[]
+  date_stands: boolean
+  /** False for an earlier visit shown as history. */
+  is_current: boolean
 }
 
 export interface ProposeInput {

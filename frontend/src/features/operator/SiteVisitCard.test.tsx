@@ -42,6 +42,8 @@ function visit(over: Partial<SiteVisitOperator> = {}): SiteVisitOperator {
     rounds_left: 5,
     round_limit_reason: null,
     rounds: [officerRound],
+    date_stands: false,
+    is_current: true,
     ...over,
   }
 }
@@ -148,6 +150,19 @@ describe('site visit appointment, operator side (US-084)', () => {
     expect(screen.getByText('You proposed another date: Thursday 24 September 2026, afternoon (14:00 to 17:00)')).toBeInTheDocument()
   })
 
+  it('checks the date and the reason together before sending (UAT run 5, F5)', async () => {
+    vi.spyOn(api, 'getApplication').mockResolvedValue(pendingVisit(visit()))
+    const counter = vi.spyOn(visitApi, 'counterSiteVisit')
+    renderPage()
+    const form = await screen.findByRole('form', { name: 'Propose this date' })
+    await userEvent.type(within(form).getByLabelText(/Date/), '2026-09-22')
+    await userEvent.click(within(form).getByRole('button', { name: 'Propose this date' }))
+    // Too early and no reason: both messages at once, nothing sent.
+    expect(await within(form).findByText('Choose a date at least 2 working days ahead.')).toBeInTheDocument()
+    expect(within(form).getByText('Say why, in a sentence the officer will read.')).toBeInTheDocument()
+    expect(counter).not.toHaveBeenCalled()
+  })
+
   it('shows the server date rule under the field and reloads on a 409', async () => {
     vi.spyOn(api, 'getApplication').mockResolvedValue(pendingVisit(visit()))
     const counter = vi.spyOn(visitApi, 'counterSiteVisit').mockRejectedValueOnce(
@@ -159,7 +174,10 @@ describe('site visit appointment, operator side (US-084)', () => {
     )
     renderPage()
     const form = await screen.findByRole('form', { name: 'Propose this date' })
-    await userEvent.type(within(form).getByLabelText(/Date/), '2026-09-21')
+    // A date the form itself accepts (a weekday a week or so ahead), so the server's rule is the one shown.
+    const ahead = new Date(Date.now() + 7 * 86_400_000)
+    while (ahead.getUTCDay() === 0 || ahead.getUTCDay() === 6) ahead.setUTCDate(ahead.getUTCDate() + 1)
+    await userEvent.type(within(form).getByLabelText(/Date/), ahead.toISOString().slice(0, 10))
     await userEvent.type(within(form).getByLabelText(/Reason/), 'Sooner please.')
     await userEvent.click(within(form).getByRole('button', { name: 'Propose this date' }))
     expect(await within(form).findByText('Choose a date at least two working days ahead.')).toBeInTheDocument()
@@ -222,5 +240,83 @@ describe('site visit appointment, operator side (US-084)', () => {
     expect(await screen.findByRole('heading', { name: 'Site visit' })).toBeInTheDocument()
     expect(screen.getByText('Visit 1 · 1 round')).toBeInTheDocument()
     expect(screen.getByText(`The officer proposed ${officerRound.when}`)).toBeInTheDocument()
+  })
+
+  it("a second visit is answered on the page even with the first visit's clarification on record (UAT run 5, F16)", async () => {
+    vi.spyOn(api, 'getApplication').mockResolvedValue({
+      ...pendingVisit(visit({ visit_no: 2 })),
+      clarification: { can_respond: false, open_count: 0, answered_count: 0, round: 2 },
+    })
+    renderPage()
+    expect(await screen.findByRole('button', { name: 'Accept this date' })).toBeInTheDocument()
+  })
+
+  it('the history keeps an earlier visit with its rounds and answers (UAT run 5, F18)', async () => {
+    vi.spyOn(api, 'getApplication').mockResolvedValue({
+      ...pendingVisit(visit({ visit_no: 2 })),
+      earlier_visits: [
+        {
+          visit_no: 1,
+          site_visit: visit({
+            visit_no: 1,
+            status: 'done',
+            status_label: 'Done',
+            can_accept: false,
+            can_counter: false,
+            is_current: false,
+          }),
+          clarification: {
+            application_id: 'a1',
+            visit_no: 1,
+            items: [
+              {
+                item_id: 'i1',
+                key: 'sink_provided',
+                title: 'At least one sink in the food preparation area',
+                guidance: '',
+                status: 'Clarified',
+                round_no: 1,
+                requests: [{ id: 'q1', round_no: 1, message: 'Show where a second sink will go.', released_at: '2026-09-24T04:43:00Z' }],
+                responses: [
+                  {
+                    id: 'r1',
+                    round_no: 1,
+                    message: 'Second sink on the left wall.',
+                    created_at: '2026-09-24T04:45:00Z',
+                    sent_at: '2026-09-24T04:49:00Z',
+                    attachments: [
+                      {
+                        id: 'f1',
+                        original_filename: 'sink-plan.pdf',
+                        content_type: 'application/pdf',
+                        size_bytes: 1000,
+                        uploaded_at: '2026-09-24T04:46:00Z',
+                      },
+                    ],
+                  },
+                ],
+                can_respond: false,
+              },
+            ],
+            open_count: 0,
+            answered_count: 0,
+            resolved_count: 1,
+            round: 1,
+            can_respond: false,
+            can_send: false,
+            storage: null,
+          },
+        },
+      ],
+    })
+    const formApi = await import('@/api/formSchema')
+    const { formSchema } = await import('@/test/fixtures')
+    vi.spyOn(formApi, 'getFormSchema').mockResolvedValue(formSchema)
+    renderPage('/app/applications/a1/history')
+    expect(await screen.findByText(/Visit 1 · round 1 · 1 item/)).toBeInTheDocument()
+    expect(screen.getByText('Second sink on the left wall.')).toBeInTheDocument()
+    expect(screen.getByText(/sink-plan\.pdf/)).toBeInTheDocument()
+    expect(screen.getByText(/Visit 2 · 1 round/)).toBeInTheDocument()
+    expect(screen.getByText(/Visit 1 · 1 round/)).toBeInTheDocument()
   })
 })

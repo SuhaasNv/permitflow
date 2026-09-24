@@ -14,3 +14,6 @@ export function openItems<T extends HasResolution>(items: T[]): T[] {
 export function openFor<T extends HasResolution>(items: T[], type: 'section' | 'document', key: string): T[] {
   return openItems(items).filter((f) => (type === 'section' ? f.section_key === key : f.document_type === key))
 }
+
+/** How long an Undo stays offered after a withdraw or a decision (US-039); the server allows a little longer. */
+export const UNDO_MS = 10_000
