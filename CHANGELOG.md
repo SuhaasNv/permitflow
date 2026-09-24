@@ -2,6 +2,15 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Security audit fixes (24 Sep 2026)
+
+The Cloudflare security-audit skill ran over the repository at `ee67688` (standard profile, 15 agents, source-only; report kept outside the repository). No critical, high or medium finding; the two confirmed low findings and one hardening note from my own UAT run 5 change are fixed on `fix/security-audit-findings`, not yet merged into `dev`, nothing pushed (threat model T29, T28).
+
+- **The admin activity feed leaves out drafts.** A draft's events (file names of uploads, sections saved) no longer appear in `/admin/audit-feed` until it is submitted, matching every other admin read of a draft.
+- **A role change clears the user's notifications.** An officer demoted to operator no longer keeps officer notifications naming other operators and quoting their reasons.
+- **The checklist copy on the device is one officer's.** Its key now carries the officer's id, so after a session expires or is taken over the next officer on the same tablet is not offered the previous officer's unsaved findings.
+- **Tests.** Backend 867, vitest 273; each new check fails without its fix.
+
 ## UAT run 5 and its fixes (24 Sep 2026)
 
 A full browser run of use case 3 and the UAT plan on the development environment (Claude in Chrome: an iPad-width officer tab, a laptop tab after a take-over, a second officer, the operator, the administrator) found 20 things; every one is fixed or explained on the branch `fix/uc3-uat-findings`, not yet merged into `dev` (the owner merges after review), nothing pushed. Record: `docs/10-uat/UAT_PLAN.md` runs 5 and 6.

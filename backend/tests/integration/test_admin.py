@@ -15,7 +15,7 @@ from app.models import Application, AuditEvent, User
 from app.models.enums import Role
 from app.services.admin_overview import AdminOverviewService
 from tests.factories import DEFAULT_PASSWORD, login, make_user
-from tests.journeys import flag_and_request, submitted, to_pending_approval, under_review
+from tests.journeys import TXT, draft, flag_and_request, submitted, to_pending_approval, under_review, upload
 
 API = "/api/v1"
 
@@ -164,6 +164,22 @@ def test_audit_feed_pages_by_keyset_and_carries_user_rows(client: TestClient, db
     r = client.get(f"{API}/admin/audit-feed?before=garbage", headers=adm)
     assert r.status_code == 400 and r.json()["error"]["details"]["reason"] == "bad_cursor"
     assert client.get(f"{API}/admin/audit-feed", headers=off).status_code == 403
+
+
+def test_audit_feed_leaves_out_a_draft_until_it_is_submitted(client: TestClient, db: Session) -> None:
+    """Drafts are never visible to officers or admins; the feed is no side door to a draft's file names
+    (security audit, 24 Sep)."""
+    app_id, op, _off = submitted(client, db)
+    adm = _admin(client, db)
+    other = draft(client, op)
+    r = upload(client, op, other, "floor_plan", "Tenancy 12 Example Rd.txt", TXT, "text/plain")
+    assert r.status_code == 201, r.text
+    events = client.get(f"{API}/admin/audit-feed?limit=100", headers=adm).json()["events"]
+    assert all(e["application_id"] != other for e in events)
+    assert not any("Tenancy 12 Example Rd" in e["summary"] for e in events)
+    assert any(e["application_id"] == app_id for e in events)
+    # the draft's own case route agrees: 404 for the admin
+    assert client.get(f"{API}/admin/applications/{other}", headers=adm).status_code == 404
 
 
 def test_admin_reads_every_case_route_with_no_actions(client: TestClient, db: Session) -> None:
@@ -323,6 +339,17 @@ def test_role_change_and_deactivation_take_effect_on_the_next_request(
     assert kinds == ["user.role_changed", "user.deactivated", "user.reactivated"]
     assert all(e.application_id is None for e in events)
     assert events[0].payload["from"] == "operator" and events[0].payload["to"] == "officer"
+    # a demoted officer keeps none of the officer copies, which carry other operators' names
+    # (security audit, 24 Sep)
+    from app.models import Notification
+
+    app_id, op, _off = submitted(client, db)
+    assert db.scalars(select(Notification).where(Notification.user_id == spare.id)).all()
+    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={"role": "operator"})
+    assert r.status_code == 200
+    sp = login(client, "spare@example.sg")
+    assert client.get(f"{API}/notifications", headers=sp).json()["items"] == []
+    client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={"role": "officer"})
     # a deactivated officer receives no notifications: the fan-out reads active officers only
     from app.repositories.notifications import NotificationRepository
 

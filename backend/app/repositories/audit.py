@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import delete, func, select, tuple_
+from sqlalchemy import delete, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.domain.enums import ApplicationStatus
@@ -41,8 +41,14 @@ class AuditRepository:
 
     def feed(self, *, limit: int, before: tuple[datetime, uuid.UUID] | None = None) -> list[AuditEvent]:
         """The newest events across every application and every user change, keyset-paged on
-        (created_at, id) so a page deep in the history costs the same as the first (US-072)."""
-        stmt = select(AuditEvent)
+        (created_at, id) so a page deep in the history costs the same as the first (US-072). A draft's events
+        stay out until it is submitted: drafts are never visible to officers or admins (security audit,
+        24 Sep)."""
+        stmt = (
+            select(AuditEvent)
+            .outerjoin(Application, Application.id == AuditEvent.application_id)
+            .where(or_(AuditEvent.application_id.is_(None), Application.status != ApplicationStatus.DRAFT))
+        )
         if before is not None:
             stmt = stmt.where(tuple_(AuditEvent.created_at, AuditEvent.id) < before)
         stmt = stmt.order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc()).limit(limit)

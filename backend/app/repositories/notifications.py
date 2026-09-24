@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.models import Notification, User
@@ -44,6 +44,9 @@ class NotificationRepository:
             .values(read_at=at)
         )
         return int(getattr(result, "rowcount", 0) or 0)
+
+    def delete_for_user(self, user_id: uuid.UUID) -> None:
+        self.db.execute(delete(Notification).where(Notification.user_id == user_id))
 
     def active_officer_ids(self) -> list[uuid.UUID]:
         stmt = select(User.id).where(User.role == Role.OFFICER, User.is_active.is_(True))
