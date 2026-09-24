@@ -30,6 +30,8 @@ class TransitionContext:
     answered_clarification_count: int = 0  # items the operator answered that the officer has not decided
     all_open_items_answered: bool = False  # every open item carries a response in this round
     visit_confirmed: bool = False  # the site visit appointment is confirmed (US-084)
+    # The visit day still ahead ("Wed 30 Sep"), or None once it has arrived or when the rule is off (F12).
+    visit_day_ahead: str | None = None
 
 
 Guard = Callable[[TransitionContext], str | None]  # returns a failure reason or None
@@ -58,7 +60,11 @@ def _needs_note(ctx: TransitionContext) -> str | None:
 
 
 def _needs_visit_confirmed(ctx: TransitionContext) -> str | None:
-    return None if ctx.visit_confirmed else "Confirm the visit date with the operator first."
+    if not ctx.visit_confirmed:
+        return "Confirm the visit date with the operator first."
+    if ctx.visit_day_ahead:
+        return f"The visit is on {ctx.visit_day_ahead}. Mark it done on or after that day."
+    return None
 
 
 def _needs_checklist_complete(ctx: TransitionContext) -> str | None:

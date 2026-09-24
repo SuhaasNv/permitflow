@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # evidence, the licence). A 5 GB volume holds about 34 applications at the ceiling; most use a tenth.
     storage_budget_bytes: int = 150 * 1024 * 1024
 
+    # Mark site visit done and the checklist submit wait for the visit day (Singapore date; UAT run 5, F12).
+    # Off only where a whole appointment must run in one sitting: the automated suites and a demonstration.
+    site_visit_day_guard: bool = True
+
     login_rate_limit_per_minute: int = 10
     # Request limits per client IP, sliding minute (US-058): every request, and sign-in attempts of any
     # outcome. 0 disables. Single process; the production step is Redis or an edge limit.

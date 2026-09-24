@@ -84,8 +84,20 @@ def test_audit_summaries_read_as_sentences() -> None:
 def test_reply_deadline_never_falls_after_the_visit() -> None:
     proposed = datetime(2026, 9, 20, 13, 0, tzinfo=UTC)  # Sunday in Singapore
     assert reply_deadline(proposed) == date(2026, 9, 23)
-    assert reply_deadline(proposed, date(2026, 9, 22)) == date(2026, 9, 22)
+    # A visit on Tuesday: the working day before it (Monday), which is also the first working day.
+    assert reply_deadline(proposed, date(2026, 9, 22)) == date(2026, 9, 21)
     assert reply_deadline(proposed, date(2026, 10, 2)) == date(2026, 9, 23)
+
+
+def test_reply_deadline_is_the_working_day_before_the_visit() -> None:
+    # UAT run 5 (F4): proposed Thursday 24 Sep for Tuesday 29 Sep. Three working days would be the visit
+    # day itself; the officer may confirm alone from Monday 28 Sep instead.
+    thursday = datetime(2026, 9, 24, 4, 31, tzinfo=UTC)
+    assert reply_deadline(thursday, date(2026, 9, 29)) == date(2026, 9, 28)
+    # A visit on the next working day: the operator still gets that day, so the deadline is the visit day.
+    assert reply_deadline(thursday, date(2026, 9, 25)) == date(2026, 9, 25)
+    # A Monday visit proposed on Thursday: Friday, the working day before it.
+    assert reply_deadline(thursday, date(2026, 9, 28)) == date(2026, 9, 25)
 
 
 def test_midnight_in_singapore_not_utc() -> None:

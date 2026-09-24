@@ -86,6 +86,11 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
                 f"Site visit reschedule asked by the {p.get('by', '')}: {_visit(p)} "
                 f"(round {p.get('round', '')})"
             )
+        case "site_visit.move_request_closed":
+            return (
+                f"Request to move the visit to {p.get('asked', '')} closed: the visit took place on "
+                f"{_visit(p)} (round {p.get('round', '')})"
+            )
         case "checklist.created":
             return f"Checklist opened for visit {p.get('visit_no', '')} ({p.get('items', '')} items)"
         case "checklist.submitted":
@@ -111,6 +116,8 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
             )
         case "clarification.withdrawn":
             return f"Question on {p.get('item_key', '')} withdrawn (round {p.get('round', '')})"
+        case "clarification.restored":
+            return f"Question on {p.get('item_key', '')} restored (round {p.get('round', '')}, undo)"
         case "clarification.released":
             return f"Question on {p.get('item_key', '')} sent to the operator (round {p.get('round', '')})"
         case _:

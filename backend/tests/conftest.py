@@ -17,6 +17,9 @@ os.environ.setdefault("UPLOAD_DIR", "./data/test-uploads")
 # recorded in docs/07-ai/AI_VERIFICATION_DESIGN.md). Set TEST_LIVE_AI=1 to run the suite against OpenAI.
 if os.environ.get("TEST_LIVE_AI") != "1":
     os.environ["AI_PROVIDER"] = "mock"
+# The suite runs whole appointments in one sitting; the visit-day rule (F12) is switched on by the tests
+# that exercise it (the `visit_day_guard` fixture).
+os.environ["SITE_VISIT_DAY_GUARD"] = "false"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -86,3 +89,10 @@ def clean_uploads() -> Iterator[None]:
     import shutil
 
     shutil.rmtree(get_settings().upload_dir, ignore_errors=True)
+
+
+@pytest.fixture
+def visit_day_guard(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """The production rule: Mark site visit done and the checklist submit wait for the visit day (F12)."""
+    monkeypatch.setattr(get_settings(), "site_visit_day_guard", True)
+    yield

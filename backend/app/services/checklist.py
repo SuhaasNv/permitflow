@@ -157,8 +157,13 @@ class ChecklistService:
             raise NotFound("No checklist exists for this visit yet.")
         return self._out(row)
 
-    def summary(self, app: Application) -> ChecklistSummaryOut | None:
-        row = self.checklists.current_for(app.id)
+    def summary(self, app: Application, visit_no: int | None = None) -> ChecklistSummaryOut | None:
+        """The checklist of `visit_no`, or of the active visit (visit_scope): none while the case is back
+        in the pre-visit review, and none for a second visit until its own checklist is opened (F17)."""
+        from app.services.visit_scope import active_visit_no  # noqa: PLC0415
+
+        number = visit_no if visit_no is not None else active_visit_no(self.db, app)
+        row = self.checklists.get(app.id, number) if number is not None else None
         if row is None:
             return None
         items = self.checklists.items_for(row.id)

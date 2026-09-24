@@ -11,6 +11,7 @@ from app.models.enums import Role
 from app.schemas.applications import (
     ApplicationOperatorView,
     ApplicationSummaryOut,
+    EarlierVisitOperatorView,
     RevisionSummaryView,
     UploadOut,
     WithdrawIn,
@@ -35,6 +36,7 @@ from app.services.site_visit import SiteVisitService
 from app.services.submission import SubmissionService
 from app.services.uploads import storage_usage, storage_view
 from app.services.verification import VerificationService, run_verification
+from app.services.visit_scope import earlier_visit_nos
 from app.services.withdrawal import WithdrawalService
 
 router = APIRouter(prefix="/applications")
@@ -60,8 +62,28 @@ def _view(service: ApplicationService, app: Application) -> ApplicationOperatorV
         site_visit=SiteVisitService(service.db).operator_view(app),
         open_clarifications=ChecklistService(service.db).facts(app).open_clarifications,
         clarification=ClarificationService(service.db).block(app),
+        earlier_visits=_earlier_visits(service, app),
         storage=storage_view(storage_usage(service.db, app.id)),
     )
+
+
+def _earlier_visits(service: ApplicationService, app: Application) -> list[EarlierVisitOperatorView]:
+    """Visits before the active one, read-only, latest first (UAT run 5, F18)."""
+    if app.status == ApplicationStatus.DRAFT:
+        return []
+    visits = SiteVisitService(service.db)
+    clarification = ClarificationService(service.db)
+    out: list[EarlierVisitOperatorView] = []
+    for n in earlier_visit_nos(service.db, app):
+        clar = clarification.build(app, n)
+        out.append(
+            EarlierVisitOperatorView(
+                visit_no=n,
+                site_visit=visits.operator_view(app, n),
+                clarification=clar if clar.items else None,
+            )
+        )
+    return out
 
 
 @router.get("", response_model=list[ApplicationSummaryOut])
@@ -192,9 +214,15 @@ def reschedule_site_visit(
 
 
 @router.get("/{application_id}/clarifications", response_model=ClarificationOperatorView)
-def clarifications(application_id: uuid.UUID, user: OperatorUser, db: DbSession) -> ClarificationOperatorView:
-    """Only the flagged items with a released question, in operator words (US-064)."""
-    return ClarificationService(db).operator_view(user, application_id)
+def clarifications(
+    application_id: uuid.UUID,
+    user: OperatorUser,
+    db: DbSession,
+    visit: Annotated[int | None, Query(ge=1)] = None,
+) -> ClarificationOperatorView:
+    """Only the flagged items with a released question, in operator words (US-064): the active visit's,
+    or an earlier visit's with `visit`, read-only (F18)."""
+    return ClarificationService(db).operator_view(user, application_id, visit)
 
 
 @router.post(

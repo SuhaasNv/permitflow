@@ -78,10 +78,37 @@ class SiteVisitService:
     def today(self) -> date:
         return today_in_singapore(self.now())
 
-    def officer_view(self, app: Application) -> SiteVisitOut | None:
-        visit = self.visits.current_for(app.id)
+    def _visit(self, app: Application, visit_no: int | None) -> SiteVisit | None:
+        """The visit a view is about: `visit_no`, or the active one (none while the case is back in
+        the pre-visit review, visit_scope)."""
+        from app.services.visit_scope import active_visit_no  # noqa: PLC0415 - reads this repository
+
+        number = visit_no if visit_no is not None else active_visit_no(self.db, app)
+        if number is None:
+            return None
+        return next((v for v in self.visits.list_for(app.id) if v.visit_no == number), None)
+
+    @staticmethod
+    def date_stands(visit: SiteVisit, proposals: list[SiteVisitProposal]) -> bool:
+        """The confirmed date still holds: confirmed, or the operator asked to move a confirmed visit and
+        the officer has not decided yet (the date stays on the visit, UC3-0 4a)."""
+        if visit.status == SiteVisitStatus.CONFIRMED:
+            return True
+        if visit.status != SiteVisitStatus.COUNTER_PROPOSED:
+            return False
+        on_table = next(
+            (p for p in reversed(proposals[:-1]) if p.date == visit.date and p.slot == visit.slot), None
+        )
+        return on_table is not None and on_table.outcome in (
+            SiteVisitProposalOutcome.ACCEPTED,
+            SiteVisitProposalOutcome.KEPT,
+        )
+
+    def officer_view(self, app: Application, visit_no: int | None = None) -> SiteVisitOut | None:
+        visit = self._visit(app, visit_no)
         if visit is None:
             return None
+        current = visit_no is None
         proposals = self.visits.proposals_for(visit.id)
         last_officer = next((p for p in reversed(proposals) if p.author_role == Role.OFFICER.value), None)
         deadline = reply_deadline(last_officer.created_at, visit.date) if last_officer else None
@@ -107,8 +134,8 @@ class SiteVisitService:
             slot=visit.slot.value,
             when=format_visit(visit.date, visit.slot),
             note=visit.note,
-            reply_deadline=deadline,
-            can_confirm_without_reply=can_confirm,
+            reply_deadline=deadline if current else None,
+            can_confirm_without_reply=can_confirm and current,
             confirm_without_reply_reason=(
                 None
                 if can_confirm
@@ -124,16 +151,20 @@ class SiteVisitService:
             ),
             original=self._original(visit, proposals),
             counter=self._pending_counter(visit, proposals),
-            can_reschedule=reschedulable,
+            can_reschedule=reschedulable and current,
             rounds_left=left,
-            round_limit_reason=OFFICER_LIMIT_REASON if left == 0 else None,
+            round_limit_reason=OFFICER_LIMIT_REASON if left == 0 and current else None,
             rounds=[self._proposal_out(p) for p in proposals],
+            date_stands=self.date_stands(visit, proposals),
+            visit_day_reached=visit.date <= today,
+            is_current=current,
         )
 
-    def operator_view(self, app: Application) -> SiteVisitOperatorView | None:
-        visit = self.visits.current_for(app.id)
+    def operator_view(self, app: Application, visit_no: int | None = None) -> SiteVisitOperatorView | None:
+        visit = self._visit(app, visit_no)
         if visit is None:
             return None
+        current = visit_no is None
         proposals = self.visits.proposals_for(visit.id)
         last_officer = next((p for p in reversed(proposals) if p.author_role == Role.OFFICER.value), None)
         deadline = reply_deadline(last_officer.created_at, visit.date) if last_officer else None
@@ -147,16 +178,31 @@ class SiteVisitService:
             slot=visit.slot.value,
             when=format_visit(visit.date, visit.slot),
             note=visit.note,
-            reply_by=deadline if visit.status == SiteVisitStatus.PROPOSED else None,
-            can_accept=visit.status == SiteVisitStatus.PROPOSED and visit.date > self.today(),
-            can_counter=visit.status == SiteVisitStatus.PROPOSED and left > 0,
-            can_reschedule=reschedulable,
+            reply_by=deadline if visit.status == SiteVisitStatus.PROPOSED and current else None,
+            can_accept=current and visit.status == SiteVisitStatus.PROPOSED and visit.date > self.today(),
+            can_counter=current and visit.status == SiteVisitStatus.PROPOSED and left > 0,
+            can_reschedule=reschedulable and current,
             earliest_date=earliest_date(self.today(), by_operator=True),
             rounds_left=left,
-            round_limit_reason=OPERATOR_LIMIT_REASON if left == 0 else None,
+            round_limit_reason=OPERATOR_LIMIT_REASON if left == 0 and current else None,
             # The officer's name stays inside the office (T3): operators see the role, never the person.
             rounds=[self._proposal_out(p, mask_officer=True) for p in proposals],
+            date_stands=self.date_stands(visit, proposals),
+            is_current=current,
         )
+
+    def earlier_officer_views(self, app: Application) -> list[SiteVisitOut]:
+        """Every visit other than the active one, latest first, read-only (UAT run 5, F18)."""
+        from app.services.visit_scope import earlier_visit_nos  # noqa: PLC0415
+
+        out = [self.officer_view(app, n) for n in earlier_visit_nos(self.db, app)]
+        return [v for v in out if v is not None]
+
+    def earlier_operator_views(self, app: Application) -> list[SiteVisitOperatorView]:
+        from app.services.visit_scope import earlier_visit_nos  # noqa: PLC0415
+
+        out = [self.operator_view(app, n) for n in earlier_visit_nos(self.db, app)]
+        return [v for v in out if v is not None]
 
     def awaits_operator(self, app_ids: list[uuid.UUID]) -> set[uuid.UUID]:
         """Applications whose current visit waits on the operator (the dashboard's Needs your response)."""
@@ -461,17 +507,44 @@ class SiteVisitService:
 
     # Workflow hook -------------------------------------------------------------------------------
 
-    def mark_done(self, app: Application, now: datetime) -> None:
-        """Called by the workflow service inside the `site_visit_done` transaction (no commit here)."""
+    def mark_done(self, app: Application, now: datetime, actor: User | None = None) -> None:
+        """Called by the workflow service inside the `site_visit_done` transaction (no commit here). A
+        request to move the visit still waiting on the officer closes: the visit took place on the date
+        that stood (UC3-0 4a, UAT run 5 F8)."""
         visit = self.visits.current_for(app.id)
-        if visit is not None and visit.status == SiteVisitStatus.CONFIRMED:
-            visit.status = SiteVisitStatus.DONE
-            visit.done_at = now
-            visit.updated_at = now
+        if visit is None:
+            return
+        proposals = self.visits.proposals_for(visit.id)
+        if not self.date_stands(visit, proposals):
+            return
+        if visit.status == SiteVisitStatus.COUNTER_PROPOSED:
+            pending = proposals[-1]
+            self._settle(pending, SiteVisitProposalOutcome.DECLINED, now)
+            if actor is not None:
+                self._audit(
+                    app,
+                    actor,
+                    "site_visit.move_request_closed",
+                    visit,
+                    {"round": pending.round_no, "asked": pending.date.isoformat()},
+                )
+            visit.confirmed_at = visit.confirmed_at or now
+        visit.status = SiteVisitStatus.DONE
+        visit.done_at = now
+        visit.updated_at = now
 
     def visit_confirmed(self, app: Application) -> bool:
+        """The confirmed date stands (a pending request to move it does not unsettle it, UC3-0 4a)."""
         visit = self.visits.current_for(app.id)
-        return visit is not None and visit.status == SiteVisitStatus.CONFIRMED
+        return visit is not None and self.date_stands(visit, self.visits.proposals_for(visit.id))
+
+    def visit_day(self, app: Application) -> date | None:
+        """The date of the current visit when it is still ahead (Singapore date), else None: Mark site
+        visit done and the checklist submit wait for it (UAT run 5, F12)."""
+        visit = self.visits.current_for(app.id)
+        if visit is None or visit.date <= self.today():
+            return None
+        return visit.date
 
     # Helpers -------------------------------------------------------------------------------------
 

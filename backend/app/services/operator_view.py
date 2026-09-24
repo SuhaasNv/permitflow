@@ -13,6 +13,7 @@ from app.schemas.applications import (
     CompletenessView,
     DocumentSlotView,
     DocumentView,
+    EarlierVisitOperatorView,
     LicenceView,
     OperatorFeedbackView,
     ResubmitReadiness,
@@ -180,7 +181,7 @@ def _explanation(
             n = open_clarifications
             return (
                 f"The licensing officer needs more information on {n} {'item' if n == 1 else 'items'} "
-                "after the site visit. Answering arrives with the next update."
+                "after the site visit. Answer each item, then send your responses."
             )
         return "The site visit is recorded. The licensing office is finalising its assessment."
     return _EXPLANATIONS[status]
@@ -200,6 +201,7 @@ def operator_view(
     site_visit: SiteVisitOperatorView | None = None,
     open_clarifications: int = 0,
     clarification: ClarificationBlock | None = None,
+    earlier_visits: list[EarlierVisitOperatorView] | None = None,
     storage: StorageView | None = None,
 ) -> ApplicationOperatorView:
     documents = documents or []
@@ -269,6 +271,7 @@ def operator_view(
         licence=licence,
         site_visit=site_visit,
         clarification=clarification,
+        earlier_visits=earlier_visits or [],
         storage=storage,
         created_at=app.created_at,
         updated_at=app.updated_at,

@@ -21,6 +21,13 @@ class SiteVisitRepository:
         )
         return self.db.scalar(stmt)
 
+    def list_for(self, application_id: uuid.UUID) -> list[SiteVisit]:
+        """Every visit of the application, first visit first."""
+        stmt = (
+            select(SiteVisit).where(SiteVisit.application_id == application_id).order_by(SiteVisit.visit_no)
+        )
+        return list(self.db.scalars(stmt))
+
     def current_for_many(self, application_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, SiteVisit]:
         """The latest visit per application, for the queue and the operator list, in one query."""
         ids = list(application_ids)
