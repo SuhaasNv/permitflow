@@ -39,6 +39,8 @@ npm run dev                            # http://localhost:3000
 
 Local quotas: an operator may hold 20 open drafts and run 60 AI checks a day (the mock provider counts too). For local work set `MAX_DRAFTS_PER_USER=0` and `AI_RUNS_PER_USER_PER_DAY=0` in `.env`.
 
+A site visit is recorded on or after its day (`SITE_VISIT_DAY_GUARD=true`, the default): Mark site visit done and the checklist submit wait for the confirmed date. To run a whole appointment in one sitting (the browser suite, `backend/scripts/uat_edges.py`, a demonstration) set `SITE_VISIT_DAY_GUARD=false`.
+
 ## Demo accounts
 
 `backend/scripts/seed.py` creates four accounts (idempotent); sample documents, clean and with planted issues, are in `docs/12-demo/documents/`. The same accounts exist in every environment, and the password is shared on purpose: this is a demonstration, the sign-in page and the privacy policy say so, and no real personal data should be entered.

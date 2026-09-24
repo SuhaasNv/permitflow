@@ -40,6 +40,13 @@ class SiteVisitOut(BaseModel):
     rounds_left: int
     round_limit_reason: str | None
     rounds: list[SiteVisitProposalOut]
+    # The confirmed date still stands: confirmed, or the operator asked to move it and the officer has not
+    # decided yet (UC3-0 4a). The checklist stays open on such a visit (UAT run 5, F8).
+    date_stands: bool = False
+    # Mark site visit done and the checklist submit wait for the visit day (Singapore date; F12).
+    visit_day_reached: bool = False
+    # False for an earlier visit shown as history: nothing on it can change.
+    is_current: bool = True
 
 
 class SiteVisitOperatorView(BaseModel):
@@ -60,6 +67,8 @@ class SiteVisitOperatorView(BaseModel):
     rounds_left: int
     round_limit_reason: str | None
     rounds: list[SiteVisitProposalOut]
+    date_stands: bool = False
+    is_current: bool = True
 
 
 class SiteVisitProposeIn(BaseModel):

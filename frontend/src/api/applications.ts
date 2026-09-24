@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { ClarificationBlock } from './clarification'
+import type { ClarificationBlock, ClarificationView } from './clarification'
 import type { DocumentView } from './documents'
 import type { SiteVisitOperator } from './siteVisit'
 import type { Tone } from '@/features/shared/StatusBadge'
@@ -107,6 +107,8 @@ export interface ApplicationView {
   site_visit: SiteVisitOperator | null
   /** The clarification rounds after the site visit (US-064); present once an item was released. */
   clarification: ClarificationBlock | null
+  /** Visits before the active one, latest first, read-only (a second visit after Return to review). */
+  earlier_visits: EarlierVisitOperator[]
   /** What the application holds on the volume against its budget (US-085). */
   storage: StorageView | null
   created_at: string
@@ -149,4 +151,11 @@ export function withdrawApplication(id: string, reason: string | null): Promise<
 
 export function compareMyRevisions(id: string, from: number, to: number): Promise<import('./officer').Compare> {
   return request<import('./officer').Compare>(`/applications/${id}/compare?from=${from}&to=${to}`)
+}
+
+/** A visit before the active one: its appointment rounds and clarification thread, read-only. */
+export interface EarlierVisitOperator {
+  visit_no: number
+  site_visit: SiteVisitOperator | null
+  clarification: ClarificationView | null
 }

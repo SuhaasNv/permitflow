@@ -59,11 +59,26 @@ def add_working_days(start: date, days: int) -> date:
     return d
 
 
+def previous_working_day(d: date) -> date:
+    """The last working day before `d`."""
+    d -= timedelta(days=1)
+    while not is_working_day(d):
+        d -= timedelta(days=1)
+    return d
+
+
 def reply_deadline(proposed_at: datetime, visit_date: date | None = None) -> date:
     """The Singapore date from which an unanswered proposal may be confirmed by the officer alone:
-    three working days after the proposal, never later than the visit itself."""
-    deadline = add_working_days(proposed_at.astimezone(SINGAPORE).date(), REPLY_WORKING_DAYS)
-    return min(deadline, visit_date) if visit_date else deadline
+    three working days after the proposal, but no later than the last working day before the visit, so
+    the officer can confirm ahead of the day (UAT run 5, F4). Never before the next working day after the
+    proposal (the operator always gets one), and never after the visit itself."""
+    proposed_on = proposed_at.astimezone(SINGAPORE).date()
+    deadline = add_working_days(proposed_on, REPLY_WORKING_DAYS)
+    if visit_date is None:
+        return deadline
+    deadline = min(deadline, previous_working_day(visit_date))
+    deadline = max(deadline, add_working_days(proposed_on, 1))
+    return min(deadline, visit_date)
 
 
 def earliest_date(today: date, *, by_operator: bool) -> date:

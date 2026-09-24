@@ -57,6 +57,9 @@ function visit(over: Partial<SiteVisitOfficer> = {}): SiteVisitOfficer {
     rounds_left: 5,
     round_limit_reason: null,
     rounds: [officerRound],
+    date_stands: false,
+    visit_day_reached: false,
+    is_current: true,
     ...over,
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import type { Checklist, ChecklistItem, ChecklistItemInput, ChecklistResult } from '@/api/checklist'
 import { AppError } from '@/api/client'
@@ -16,6 +16,7 @@ import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
 import { retryDelay, tabHidden, useOnline } from '@/lib/connection'
 import { formatDateTime } from '@/lib/format'
+import { clearLocalDraft, readLocalDraft, writeLocalDraft } from '@/lib/localDraft'
 import { guardUnload, setUnsaved } from '@/lib/unsaved'
 import { useChecklist, useChecklistSchema, useOfficerApplication, useSaveChecklist, useSubmitChecklist } from './queries'
 import { useReadOnly } from './readOnly'
@@ -64,6 +65,26 @@ export interface Finding {
 }
 
 export type Findings = Record<string, Finding>
+
+/** What the device keeps of a checklist the server has not confirmed (F11). */
+export interface LocalChecklist {
+  findings: Findings
+  touched: string[]
+}
+
+/** The device copy: the working findings and the touched keys, without a new finding that has nothing in it yet
+ * (no title, no result, no comment); null when nothing is left worth keeping. */
+export function localCopy(findings: Findings, touched: Iterable<string>): LocalChecklist | null {
+  const empty = (key: string) => {
+    const f = findings[key]
+    return key.startsWith(NEW_PREFIX) && (!f || (!(f.title ?? '').trim() && f.result === 'not_assessed' && !f.comment.trim()))
+  }
+  const keep = [...touched].filter((k) => !empty(k))
+  if (keep.length === 0) return null
+  const out: Findings = {}
+  for (const [k, f] of Object.entries(findings)) if (!empty(k)) out[k] = f
+  return { findings: out, touched: keep }
+}
 
 /** Keys of extra findings not yet saved start with this; the server assigns the real key on save. */
 export const NEW_PREFIX = 'new_'
@@ -197,14 +218,19 @@ function ResultControl({
 /** S-30: the checklist as the officer fills it on site. Tablet first (820 portrait and 1024), one item after another,
  * a result per item, a comment when one is needed, a flag for the operator. The draft autosaves 1.5 s after the last
  * touch and on blur, retries with backoff when a save fails, holds its entries while offline, and merges another tab's
- * save under the officer's own (US-061). The submit arrives with US-063. */
+ * save under the officer's own (US-061). The submit arrives with US-063. Entries the server has not confirmed are
+ * also kept on the device and offered back after a reload (UAT run 5, F11). `?visit=N` reads an earlier visit's
+ * checklist, read-only (F17). */
 export function ChecklistPage() {
   const { id = '' } = useParams()
+  const [params] = useSearchParams()
+  const visitParam = Number(params.get('visit'))
+  const earlierVisit = Number.isInteger(visitParam) && visitParam > 0 ? visitParam : null
   const adminView = useReadOnly()
   const casePath = adminView ? `/admin/applications/${id}` : `/officer/applications/${id}`
   const app = useOfficerApplication(id)
   const schema = useChecklistSchema()
-  const checklist = useChecklist(id, adminView)
+  const checklist = useChecklist(id, adminView, earlierVisit)
   const save = useSaveChecklist(id)
   const submit = useSubmitChecklist(id)
   const navigate = useNavigate()
@@ -231,6 +257,12 @@ export function ChecklistPage() {
   // One id per attempt at the same batch of entries: a retry reuses it, so a save whose reply was lost
   // answers with the state instead of a conflict; a new touch starts a new batch.
   const saveId = useRef<string | null>(null)
+  const [restored, setRestored] = useState<number | null>(null)
+  const restoredOnce = useRef(false)
+  // The device copy of unsaved entries: one per case and visit (F11); one live session per account keeps it one officer's.
+  const localKey = checklist.data ? `checklist.${id}.${checklist.data.visit_no}` : null
+  const localKeyRef = useRef<string | null>(null)
+  localKeyRef.current = localKey
 
   useEffect(() => guardUnload(), [])
   useEffect(() => {
@@ -250,6 +282,12 @@ export function ChecklistPage() {
     dirtyRef.current = value
     setDirty(value)
     setUnsaved(value)
+    const key = localKeyRef.current
+    if (!key) return
+    // Every unsaved entry is on the device until the server confirms it (F11); an empty new finding carries nothing.
+    const local = value && work.current ? localCopy(work.current, touched.current) : null
+    if (local) writeLocalDraft<LocalChecklist>(key, local)
+    else clearLocalDraft(key)
   }
   const current = (): Findings | null => work.current ?? (server.current ? findingsOf(server.current.items) : null)
 
@@ -372,6 +410,29 @@ export function ChecklistPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- flush is a plain function reading refs
   }, [])
 
+  // Entries left on this device by a reload, a crash or a discarded tab (F11): merged over the server copy, the
+  // way another tab's save is (US-061), then saved. Once per page load; never onto a submitted or read-only one.
+  useEffect(() => {
+    const data = checklist.data
+    if (restoredOnce.current || !data || !localKey) return
+    restoredOnce.current = true
+    if (data.status === 'submitted' || adminView || earlierVisit !== null) {
+      clearLocalDraft(localKey)
+      return
+    }
+    const local = readLocalDraft<LocalChecklist>(localKey)
+    if (!local || local.touched.length === 0) return
+    const mergedCopy = mergeFindings(findingsOf(data.items), local.findings, local.touched)
+    work.current = mergedCopy
+    setEdits(mergedCopy)
+    for (const key of local.touched) touched.current.add(key)
+    versionRef.current = data.version
+    setRestored(local.touched.length)
+    markDirty(true)
+    schedule(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once the draft and its key are known
+  }, [checklist.data, localKey])
+
   // Back online with unsaved entries: save at once.
   const wasOnline = useRef(true)
   useEffect(() => {
@@ -424,7 +485,15 @@ export function ChecklistPage() {
   const view = app.data
   const draft = checklist.data
   const sections = schema.data.sections
-  const readOnly = draft.status === 'submitted' || adminView
+  const readOnly = draft.status === 'submitted' || adminView || earlierVisit !== null
+  // The appointment of the visit on screen: the active one, or an earlier visit's (F17).
+  const visitOnScreen =
+    earlierVisit !== null ? (view.earlier_visits.find((v) => v.visit_no === earlierVisit)?.site_visit ?? null) : view.site_visit
+  // From Site Visit Scheduled the submit also marks the visit done: the server's own reason when it cannot yet
+  // (the date not confirmed, the visit day still ahead: F12).
+  const doneAction = view.status === 'site_visit_scheduled' ? view.actions.find((a) => a.target === 'site_visit_done') : undefined
+  const submitBlocked =
+    doneAction !== undefined && !doneAction.enabled ? (doneAction.reason ?? 'The visit cannot be marked done yet.') : null
 
   const doSubmit = () => {
     submit.mutate(undefined, {
@@ -483,6 +552,8 @@ export function ChecklistPage() {
     if (!key.startsWith(NEW_PREFIX)) {
       markDirty(true)
       schedule(0)
+    } else if (dirtyRef.current) {
+      markDirty(true) // the device copy follows the removal
     }
   }
   const extrasUnder = (parent: string | null) => Object.entries(findings).filter(([, f]) => f.extra && (f.parent ?? null) === parent)
@@ -585,12 +656,12 @@ export function ChecklistPage() {
             <span className="text-sm text-text-2">
               {view.business_name ?? 'Business name not entered'}
               {view.premises_summary ? `, ${view.premises_summary}` : ''}. Visit {draft.visit_no}
-              {view.site_visit ? `, ${view.site_visit.when}` : ''}.
+              {visitOnScreen ? `, ${visitOnScreen.when}` : ''}.
               {draft.status === 'submitted'
                 ? ' The findings are final.'
                 : adminView
                   ? ' The officer is still filling it in; this is the draft as last saved.'
-                  : ' Fill the checklist on site; press Save draft as you go.'}
+                  : ' Fill the checklist on site; each entry saves as you go.'}
             </span>
           </div>
           <div className="mt-2 text-[13px] text-text-3">
@@ -600,7 +671,9 @@ export function ChecklistPage() {
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          {!readOnly ? <SaveIndicator dirty={dirty} saving={save.isPending} savedAt={savedAt} retrying={retrying} /> : null}
+          {!readOnly ? (
+            <SaveIndicator dirty={dirty} saving={save.isPending} savedAt={savedAt} retrying={retrying} offline={!online} />
+          ) : null}
           <Link to={casePath} className={buttonClasses('secondary', 'sm')}>
             Back to the case
           </Link>
@@ -611,6 +684,29 @@ export function ChecklistPage() {
         <div className="mb-5">
           <Alert tone="warning" title="You are offline: changes will not save until you reconnect">
             Keep this page open. Your entries stay here and are saved when the connection returns.
+          </Alert>
+        </div>
+      ) : null}
+      {earlierVisit !== null ? (
+        <div className="mb-5">
+          <Alert tone="neutral" title={`Visit ${earlierVisit}, an earlier visit`}>
+            This is the record of an earlier visit to the premises. It is read-only; the case is about the latest visit now.
+          </Alert>
+        </div>
+      ) : null}
+      {restored !== null ? (
+        <div className="mb-5">
+          <Alert
+            tone="info"
+            title="Unsaved entries restored from this device"
+            action={
+              <Button variant="ghost" size="sm" onClick={() => setRestored(null)}>
+                Dismiss
+              </Button>
+            }
+          >
+            Your entries on {restored} {restored === 1 ? 'item were' : 'items were'} not saved before the page closed. They were put back on
+            top of the saved draft and are being saved now.
           </Alert>
         </div>
       ) : null}
@@ -761,13 +857,16 @@ export function ChecklistPage() {
               Save draft
             </Button>
             <Button
-              disabled={summary.remaining !== null || dirty || save.isPending}
-              title={summary.remaining ?? (dirty || save.isPending ? 'Wait for the draft to save.' : undefined)}
+              disabled={summary.remaining !== null || dirty || save.isPending || submitBlocked !== null}
+              title={summary.remaining ?? submitBlocked ?? (dirty || save.isPending ? 'Wait for the draft to save.' : undefined)}
               onClick={() => setConfirming(true)}
             >
               {view.status === 'site_visit_done' ? 'Submit checklist' : 'Mark visit done and submit'}
             </Button>
           </div>
+          {submitBlocked !== null && summary.remaining === null ? (
+            <p className="basis-full text-[13px] text-text-2">{submitBlocked} You can keep filling the draft until then.</p>
+          ) : null}
         </div>
       ) : null}
       <Dialog

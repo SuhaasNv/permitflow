@@ -101,17 +101,19 @@ export function VisitRounds({ rounds, reader, className }: VisitRoundsProps) {
     <ol className={cn('flex flex-col', className)} aria-label="Site visit rounds">
       {rounds.map((p, i) => {
         const last = i === rounds.length - 1
+        // A proposal answered with another date is no longer waiting: the later round is (UAT run 5, F6).
+        const answered = p.outcome === 'pending' && !last
         return (
           <li key={p.round} className="flex gap-3">
             <span className="flex w-4 shrink-0 flex-col items-center" aria-hidden="true">
-              <span className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', OUTCOME_TONE[p.outcome])} />
+              <span className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', answered ? 'bg-line-strong' : OUTCOME_TONE[p.outcome])} />
               {last ? null : <span className="mt-1 w-0.5 flex-1 bg-line" />}
             </span>
             <div className={cn('flex min-w-0 flex-1 flex-col gap-1', last ? 'pb-0' : 'pb-4')}>
               <span className="text-sm font-semibold leading-5">{roundTitle(p, reader)}</span>
               {p.reason ? <span className="text-sm leading-5 text-text-2">{p.reason}</span> : null}
               <span className="text-xs leading-4 text-text-3">
-                Round {p.round} · {formatDateTime(p.created_at)} · {OUTCOME_LABEL[p.outcome]}
+                Round {p.round} · {formatDateTime(p.created_at)} · {answered ? 'Answered with another date' : OUTCOME_LABEL[p.outcome]}
               </span>
             </div>
           </li>

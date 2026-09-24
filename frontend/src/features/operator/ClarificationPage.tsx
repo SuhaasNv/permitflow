@@ -1,5 +1,5 @@
 import { useIsMutating, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import type { StorageView } from '@/api/applications'
@@ -18,8 +18,18 @@ import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/sh
 import { useToast } from '@/features/shared/Toast'
 import { isTransient, retryDelay, tabHidden, useOnline } from '@/lib/connection'
 import { formatBytes, formatDateTime } from '@/lib/format'
+import { clearLocalDraft, readLocalDraft, writeLocalDraft } from '@/lib/localDraft'
+import { guardUnload, setUnsaved } from '@/lib/unsaved'
 import { ApplicationHeader } from './ApplicationHeader'
-import { applicationKeys, useApplication, useAttach, useClarifications, useRemoveAttachment, useRespond, useSendClarifications } from './queries'
+import {
+  applicationKeys,
+  useApplication,
+  useAttach,
+  useClarifications,
+  useRemoveAttachment,
+  useRespond,
+  useSendClarifications,
+} from './queries'
 
 const TONE: Record<string, Tone> = {
   'Waiting for your response': 'warning',
@@ -30,8 +40,19 @@ const TONE: Record<string, Tone> = {
 
 const ATTACHMENT_CAP = 3
 
-/** One item's answer: text saved on blur, files added through the camera or a picker, removable until sent. */
-function ItemAnswer({ appId, item, storage }: { appId: string; item: ClarificationItem; storage: StorageView | null }) {
+/** One item's answer: text saved on blur, files added through the camera or a picker, removable until sent. Text the
+ * server has not confirmed is also kept on the device and put back after a reload (UAT run 5, F13). */
+function ItemAnswer({
+  appId,
+  item,
+  storage,
+  onDirty,
+}: {
+  appId: string
+  item: ClarificationItem
+  storage: StorageView | null
+  onDirty: (itemId: string, dirty: boolean) => void
+}) {
   const respond = useRespond(appId)
   const attach = useAttach(appId)
   const remove = useRemoveAttachment(appId)
@@ -39,7 +60,14 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
   const queryClient = useQueryClient()
   // The answer of the current round only; earlier rounds are shown read-only under their question.
   const latest = item.responses.find((r) => r.round_no === item.round_no) ?? null
-  const [text, setText] = useState(latest?.message ?? '')
+  const editable = item.can_respond && latest?.sent_at == null
+  const localKey = `clarification.${appId}.${item.item_id}.${item.round_no}`
+  // An answer typed here that never reached the server (offline, a reload, a closed tab) comes back first.
+  const [restored] = useState(() => {
+    const local = editable ? readLocalDraft<string>(localKey) : null
+    return local !== null && local.trim() !== '' && local !== (latest?.message ?? '') ? local : null
+  })
+  const [text, setText] = useState(restored ?? latest?.message ?? '')
   const [fileError, setFileError] = useState<string | null>(null)
   // A save or an upload that failed on the network waits for its next try (US-087): the attempt count
   // sets the backoff, the timer is cleared on unmount, and nothing typed is thrown away.
@@ -72,6 +100,14 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
     saved.current = next
     // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the server copy only
   }, [latest?.message])
+  // What is typed and not yet saved stays on the device and holds the page (F13).
+  useEffect(() => {
+    const dirty = editable && text.trim() !== '' && text.trim() !== saved.current.trim()
+    onDirty(item.item_id, dirty)
+    if (dirty) writeLocalDraft(localKey, text)
+    else if (!editable || text.trim() === saved.current.trim()) clearLocalDraft(localKey)
+  }, [text, editable, localKey, item.item_id, onDirty])
+  useEffect(() => () => onDirty(item.item_id, false), [item.item_id, onDirty])
 
   const later = (kind: 'save' | 'upload', run: () => void) => {
     attempt.current += 1
@@ -111,6 +147,10 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
           attempt.current = 0
           setRetrying(null)
           saved.current = value
+          if (textRef.current.trim() === value) {
+            clearLocalDraft(localKey)
+            onDirty(item.item_id, false)
+          }
           settle()
         },
         onError: (e) => {
@@ -124,7 +164,11 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
           setRetrying(null)
           if (e instanceof AppError && e.status === 409) {
             // The question was withdrawn or the round moved on: show what stands, not the server reason.
-            toast.push({ title: 'Could not save your answer', body: 'This application changed since you opened it. Showing the latest.', tone: 'error' })
+            toast.push({
+              title: 'Could not save your answer',
+              body: 'This application changed since you opened it. Showing the latest.',
+              tone: 'error',
+            })
             void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(appId) }) // the list is keyed under it
             return
           }
@@ -136,6 +180,12 @@ function ItemAnswer({ appId, item, storage }: { appId: string; item: Clarificati
       },
     )
   }
+
+  // A restored answer is saved once the page is up (it never reached the server before).
+  useEffect(() => {
+    if (restored !== null) saveText()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  }, [])
 
   // Back online, or back in front, with an answer still unsaved or a file still unsent: try at once.
   useEffect(() => {
@@ -359,6 +409,20 @@ export function ClarificationPage() {
   const [confirming, setConfirming] = useState(false)
   // An answer or a file still on its way to the server: the send waits so nothing typed is left behind.
   const saving = useIsMutating({ mutationKey: ['clarification', id] }) > 0
+  // Answers typed and not saved yet: the browser asks before leaving (F13); the device copy covers a crash.
+  const dirtyItems = useRef(new Set<string>())
+  const onDirty = useCallback((itemId: string, dirty: boolean) => {
+    if (dirty) dirtyItems.current.add(itemId)
+    else dirtyItems.current.delete(itemId)
+    setUnsaved(dirtyItems.current.size > 0)
+  }, [])
+  useEffect(() => {
+    const off = guardUnload()
+    return () => {
+      off()
+      setUnsaved(false)
+    }
+  }, [])
 
   if (app.isError && app.data === undefined) {
     if (app.error instanceof AppError && app.error.status === 404)
@@ -485,12 +549,7 @@ export function ClarificationPage() {
                       </div>
                     )
                   })}
-                  <ItemAnswer
-                    key={`${item.item_id}-${item.round_no}`}
-                    appId={id}
-                    item={item}
-                    storage={view.storage}
-                  />
+                  <ItemAnswer key={`${item.item_id}-${item.round_no}`} appId={id} item={item} storage={view.storage} onDirty={onDirty} />
                 </div>
               </li>
             ))}

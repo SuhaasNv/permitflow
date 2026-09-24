@@ -170,6 +170,8 @@ jobs:
       # They are exercised by their own integration tests, not by the browser suite.
       RATE_LIMIT_PER_MINUTE: "0"
       LOGIN_ATTEMPTS_PER_MINUTE: "0"
+      # The specs arrange a visit and record it in one run; the visit-day rule (F12) has its own integration tests.
+      SITE_VISIT_DAY_GUARD: "false"
       E2E_API_URL: http://localhost:8000/api/v1
       VITE_API_URL: http://localhost:8000/api/v1
     steps:

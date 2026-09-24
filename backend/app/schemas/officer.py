@@ -149,6 +149,16 @@ class FeedbackTemplateOut(BaseModel):
     message: str
 
 
+class EarlierVisitOfficerOut(BaseModel):
+    """A visit before the active one (UAT run 5, F17 and F18): its appointment, its checklist summary
+    (readable at /checklist?visit=N) and its clarification threads, read-only."""
+
+    visit_no: int
+    site_visit: SiteVisitOut | None = None
+    checklist: ChecklistSummaryOut | None = None
+    clarification: ClarificationOfficerView | None = None
+
+
 class OfficerApplicationOut(BaseModel):
     id: uuid.UUID
     reference_no: str
@@ -189,6 +199,8 @@ class OfficerApplicationOut(BaseModel):
     checklist: ChecklistSummaryOut | None = None
     # The clarification threads once the checklist is submitted (US-066).
     clarification: ClarificationOfficerView | None = None
+    # Earlier visits, latest first, read-only (the active visit is the fields above).
+    earlier_visits: list[EarlierVisitOfficerOut] = []
     licence: LicenceView | None = None
     version: int
     created_at: datetime

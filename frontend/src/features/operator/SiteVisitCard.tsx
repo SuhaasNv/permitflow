@@ -43,8 +43,13 @@ function DateForm({ earliest, submitLabel, busy, errors, onSubmit, onCancel }: D
       noValidate
       onSubmit={(e) => {
         e.preventDefault()
+        // Every problem at once, in the server's words (UAT run 5, F5); the server still has the last word.
         const next: Record<string, string> = {}
+        const weekday = date ? new Date(`${date}T00:00:00Z`).getUTCDay() : null
         if (!date) next.date = 'Choose a date.'
+        else if (weekday === 0 || weekday === 6) next.date = 'Choose a working day, Monday to Friday.'
+        else if (date < earliest) next.date = 'Choose a date at least 2 working days ahead.'
+        else if (date > bounds.max) next.date = 'Choose a date within the next 60 days.'
         if (reason.trim().length < 3) next.reason = 'Say why, in a sentence the officer will read.'
         setLocal(next)
         if (Object.keys(next).length) return
@@ -157,7 +162,9 @@ export function SiteVisitCard({ view }: { view: ApplicationView }) {
         ) : null}
 
         {visit.status === 'proposed' && !visit.can_accept ? (
-          <p className="text-[13px] leading-[18px] text-text-2">This date has passed and can no longer be accepted; propose another one below.</p>
+          <p className="text-[13px] leading-[18px] text-text-2">
+            This date has passed and can no longer be accepted; propose another one below.
+          </p>
         ) : null}
         {visit.can_accept ? (
           <div className="flex">

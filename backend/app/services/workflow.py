@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core import metrics
 from app.core.errors import Forbidden, InvalidTransition, ValidationFailed, VersionConflict
+from app.core.settings import get_settings
 from app.domain.enums import ApplicationStatus, NotificationKind
 from app.domain.labels import operator_label
 from app.domain.workflow import Actor, TransitionContext, TransitionError, actor_for_role, transition
@@ -124,7 +125,7 @@ class WorkflowService:
                 )
         if resolved == ApplicationStatus.SITE_VISIT_DONE:
             # The confirmed appointment is over (US-084); the guard made sure one exists.
-            SiteVisitService(self.db).mark_done(app, datetime.now(UTC))
+            SiteVisitService(self.db).mark_done(app, datetime.now(UTC), actor_user)
         released_count = 0
         if resolved == ApplicationStatus.PENDING_POST_SITE_RESUBMISSION:
             # Request another round (US-066): the drafted questions reach the operator now.
@@ -185,10 +186,13 @@ class WorkflowService:
 
         checklists = ChecklistService(self.db)
         facts = checklists.facts(app)
+        visits = SiteVisitService(self.db)
+        day = visits.visit_day(app) if get_settings().site_visit_day_guard else None
         return TransitionContext(
             open_feedback_count=open_feedback_count,
             has_note=has_note,
-            visit_confirmed=SiteVisitService(self.db).visit_confirmed(app),
+            visit_confirmed=visits.visit_confirmed(app),
+            visit_day_ahead=f"{day.strftime('%a')} {day.day} {day.strftime('%b')}" if day else None,
             checklist_complete=facts.complete,
             open_clarification_count=facts.open_clarifications,
             answered_clarification_count=facts.answered_clarifications,

@@ -19,6 +19,7 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `CORS_ORIGINS` | `http://localhost:3000` | backend | Comma separated allowlist. |
 | `UPLOAD_DIR` | `./data/uploads` | backend | Local disk storage; Railway volume at `/data/uploads`. |
 | `UPLOAD_MAX_BYTES` | `10485760` | backend | 10 MB per file. |
+| `SITE_VISIT_DAY_GUARD` | `true` | backend | UAT run 5 (F12): Mark site visit done and the checklist submit wait for the confirmed visit date (Singapore date); the checklist draft can be filled before. `false` where a whole appointment must run in one sitting: the CI browser suite, `uat_edges.py` and `smoke_routes.py`, a demonstration environment. |
 | `STORAGE_BUDGET_BYTES` | `157286400` | backend | 150 MB per application across every document version, the clarification evidence and the licence (US-085); a further upload is refused with 422 `storage_budget` naming the room left. The Railway `uploads` volume is 5,000 MB (`describe-environment`, 21 Sep 2026): 33 applications at the ceiling, several hundred at the usual few megabytes each. Watch `permitflow_storage_bytes` and the `PermitFlowVolumeFilling` alert (US-089, at 80 %) and raise the volume before it fills; locally the gauge reads the whole disk. |
 | `LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | backend | Failed attempts per IP per minute. |
 | `RATE_LIMIT_PER_MINUTE` | `240` | backend | Every request per client IP, sliding minute; 429 with `Retry-After` beyond it. 0 disables. Per process (US-058). |
@@ -109,7 +110,7 @@ The GitHub `production` environment only accepts deployments from `main`. Develo
 
 | Where | Name | Purpose |
 |---|---|---|
-| Railway backend service (per environment) | `APP_ENV`, `DATABASE_URL` (`${{Postgres.DATABASE_URL}}`), `JWT_SECRET` (distinct per environment), `JWT_EXPIRES_MINUTES`, `SESSION_IDLE_MINUTES` (optional), `CORS_ORIGINS` (that environment's frontend URL), `UPLOAD_DIR=/data/uploads`, `TRUSTED_PROXIES=*` (the Railway edge is the only peer), `CLIENT_IP_HEADER` (default `X-Real-IP`, the header Railway documents for the client address), `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `LANGSMITH_API_KEY`, `LANGSMITH_ENDPOINT`, `LANGSMITH_PROJECT`, `LANGSMITH_HIDE_INPUTS` (optional, tracing), `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `PORT=8000` | runtime configuration |
+| Railway backend service (per environment) | `APP_ENV`, `DATABASE_URL` (`${{Postgres.DATABASE_URL}}`), `JWT_SECRET` (distinct per environment), `JWT_EXPIRES_MINUTES`, `SESSION_IDLE_MINUTES` (optional), `CORS_ORIGINS` (that environment's frontend URL), `UPLOAD_DIR=/data/uploads`, `TRUSTED_PROXIES=*` (the Railway edge is the only peer), `CLIENT_IP_HEADER` (default `X-Real-IP`, the header Railway documents for the client address), `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `LANGSMITH_API_KEY`, `LANGSMITH_ENDPOINT`, `LANGSMITH_PROJECT`, `LANGSMITH_HIDE_INPUTS` (optional, tracing), `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `PORT=8000`; development only: `SITE_VISIT_DAY_GUARD=false` (set 24 Sep 2026, so a walkthrough can record a visit the day it is arranged; production leaves it unset, the rule on) | runtime configuration |
 | Railway frontend service (per environment) | `PORT=8080`, `API_URL` | written into `config.js` at start |
 | GitHub environment secret (`development`, `production`) | `RAILWAY_TOKEN` | a Railway **project token** scoped to that one environment (Project settings, Tokens); created by the owner in the dashboard |
 | GitHub repository variable | `RAILWAY_PROJECT_ID` | which project to redeploy |
@@ -166,6 +167,8 @@ Three layers, one solved, two planned.
 ### Verified
 
 Development: both health endpoints 200 after the first commit, demo accounts seeded, and `e2e/scenarios/02-reaches-officer.spec.ts` passed against the live URLs (19 Sep 2026).
+
+Development, v0.4.0-rc.2 (21 Sep 2026, evening, `dev` at `2be052a`, CI runs 35607398711 (dev) and 35607410789 (tag) green, deploy run 35608475721): the API answers `{"version": "0.4.0-rc.2", "commit": "2be052a", "environment": "development"}` on `/health`, the frontend bundle carries `0.4.0-rc.2` and the release notes (`/releases`); the seed unchanged.
 
 Development, v0.4.0-rc.1 (21 Sep 2026, `dev` at `8cf669f`, CI run 35559385079 green after one accessibility fix, deploy run 35560009743 with both post-deploy gates): the seed run once (the administrator and the spare officer created, four accounts), the API answers `0.4.0-rc.1` with 61 routes, the frontend bundle carries the version, the administrator and the spare officer sign in and read their pages, the limiter check of readiness row 25 passed, and the `prometheus` service was redeployed with `PROMETHEUS_ALERTS` re-set from `docker/observability/alerts.yml` (rules by environment). Production untouched on `sha-714a159`.
 

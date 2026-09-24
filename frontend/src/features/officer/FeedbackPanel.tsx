@@ -9,6 +9,7 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import type { Tone } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
+import { UNDO_MS } from '@/lib/feedback'
 import { formatDateTime } from '@/lib/format'
 import {
   useCreateFeedback,
@@ -20,8 +21,6 @@ import {
 } from './queries'
 import { useReadOnly } from './readOnly'
 import { useCaseRefusal } from './refusal'
-
-const UNDO_MS = 10_000
 
 const RESOLUTION: Record<FeedbackItem['resolution'], { label: string; tone: Tone }> = {
   open: { label: 'Open', tone: 'warning' },

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
 
@@ -404,5 +404,27 @@ describe('clarification after the site visit, operator side (US-064)', () => {
     })
     renderAt('/app/applications/a1/clarification')
     expect(await screen.findByRole('heading', { name: 'Nothing needs your response yet' })).toBeInTheDocument()
+  })
+
+  it('an answer typed and not saved stays on the device and comes back after a reload (UAT run 5, F13)', async () => {
+    vi.spyOn(api, 'getApplication').mockResolvedValue(afterVisit)
+    vi.spyOn(clarApi, 'getClarifications').mockResolvedValue(view)
+    const respond = vi.spyOn(clarApi, 'respondToClarification').mockRejectedValue(new AppError(0, { code: 'network', message: 'Failed to fetch' }))
+    const { unmount } = renderAt('/app/applications/a1/clarification')
+    const field = await screen.findByRole('textbox', { name: /Your answer/ })
+    fireEvent.change(field, { target: { value: 'Regraded on 25 Sep; photo to follow.' } })
+    const key = 'permitflow.unsaved.clarification.a1.i1.1'
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(key) ?? 'null')?.value).toBe('Regraded on 25 Sep; photo to follow.'))
+    unmount()
+    // The page loads again (a reload, a discarded tab): the answer is back and goes to the server.
+    respond.mockReset()
+    respond.mockResolvedValue({
+      ...view,
+      items: [{ ...view.items[0]!, responses: [{ id: 'r1', round_no: 1, message: 'Regraded on 25 Sep; photo to follow.', created_at: '', sent_at: null, attachments: [] }] }, view.items[1]!],
+    })
+    renderAt('/app/applications/a1/clarification')
+    expect(await screen.findByDisplayValue('Regraded on 25 Sep; photo to follow.')).toBeInTheDocument()
+    await waitFor(() => expect(respond).toHaveBeenCalledWith('a1', 'i1', 'Regraded on 25 Sep; photo to follow.'))
+    await waitFor(() => expect(localStorage.getItem(key)).toBeNull())
   })
 })

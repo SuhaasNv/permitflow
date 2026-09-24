@@ -45,9 +45,29 @@ describe('site visit helpers', () => {
     expect(roundTitle(operator, 'operator')).toBe('You proposed another date: Tuesday 22 September 2026, morning (09:00 to 12:00)')
     render(<VisitRounds rounds={[officer, operator]} reader="operator" />)
     expect(screen.getByRole('list', { name: 'Site visit rounds' })).toBeInTheDocument()
-    expect(screen.getByText(/Round 1 .* Waiting/)).toBeInTheDocument()
+    // A proposal answered with a later round no longer reads Waiting (UAT run 5, F6); the last pending one does.
+    expect(screen.getByText(/Round 1 .* Answered with another date/)).toBeInTheDocument()
     expect(screen.getByText(/Round 2 .* Accepted/)).toBeInTheDocument()
     expect(screen.queryByText(/Lim Hui Ling/)).not.toBeInTheDocument()
+  })
+
+  it('the round on the table still reads Waiting; one answered by a counter reads so (UAT run 5, F6)', () => {
+    const base: SiteVisitProposal = {
+      round: 1,
+      author_role: 'officer',
+      author_name: 'Lim Hui Ling',
+      date: '2026-09-29',
+      slot: 'afternoon',
+      when: 'Tuesday 29 September 2026, afternoon (14:00 to 17:00)',
+      reason: null,
+      outcome: 'pending',
+      created_at: '2026-09-24T04:31:00Z',
+      decided_at: null,
+    }
+    const counter: SiteVisitProposal = { ...base, round: 2, author_role: 'operator', author_name: 'Tan Wei Ling', reason: 'Audit.' }
+    render(<VisitRounds rounds={[base, counter]} reader="officer" />)
+    expect(screen.getByText(/Round 1 .* Answered with another date/)).toBeInTheDocument()
+    expect(screen.getByText(/Round 2 .* Waiting/)).toBeInTheDocument()
   })
 
   it('the slot control is a pressed-state group', async () => {

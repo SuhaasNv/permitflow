@@ -176,6 +176,8 @@ export interface OfficerApplication {
   checklist: ChecklistSummary | null
   /** The clarification threads once the checklist is submitted (US-066). */
   clarification: ClarificationOfficerView | null
+  /** Visits before the active one, latest first, read-only. */
+  earlier_visits: EarlierVisitOfficer[]
   version: number
   created_at: string
   updated_at: string
@@ -280,4 +282,17 @@ export function reopenClarification(id: string, itemId: string, message: string)
 
 export function withdrawClarification(id: string, itemId: string): Promise<OfficerApplication> {
   return request<OfficerApplication>(`/officer/applications/${id}/clarifications/${itemId}/withdraw`, { method: 'POST' })
+}
+
+/** Undo a withdraw inside the grace window; 409 once it has closed. */
+export function restoreClarification(id: string, itemId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/clarifications/${itemId}/restore`, { method: 'POST' })
+}
+
+/** A visit before the active one: appointment, checklist summary and clarification threads, read-only. */
+export interface EarlierVisitOfficer {
+  visit_no: number
+  site_visit: SiteVisitOfficer | null
+  checklist: ChecklistSummary | null
+  clarification: ClarificationOfficerView | null
 }

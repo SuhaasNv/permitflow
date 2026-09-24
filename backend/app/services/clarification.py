@@ -24,6 +24,7 @@ from app.domain.workflow import Actor
 from app.infra.storage import FileStorage, get_storage, new_storage_key
 from app.models import (
     Application,
+    Checklist,
     ChecklistItem,
     ClarificationAttachment,
     ClarificationRequest,
@@ -74,12 +75,24 @@ class ClarificationService:
         self.audit = AuditRepository(db)
         self.notifications = NotificationService(db)
 
-    def operator_view(self, operator: User, application_id: uuid.UUID) -> ClarificationOperatorView:
+    def operator_view(
+        self, operator: User, application_id: uuid.UUID, visit_no: int | None = None
+    ) -> ClarificationOperatorView:
         app = self.applications.get_for(operator, application_id)
-        return self.build(app)
+        return self.build(app, visit_no)
 
-    def build(self, app: Application) -> ClarificationOperatorView:
-        checklist = self.checklists.current_for(app.id)
+    def _checklist(self, app: Application, visit_no: int | None) -> Checklist | None:
+        """The checklist of `visit_no`, or of the active visit (visit_scope). A second visit has no
+        clarification until its own checklist is submitted; the first visit's threads stay readable
+        with their number (UAT run 5, F16 and F18)."""
+        from app.services.visit_scope import active_visit_no  # noqa: PLC0415
+
+        number = visit_no if visit_no is not None else active_visit_no(self.db, app)
+        return self.checklists.get(app.id, number) if number is not None else None
+
+    def build(self, app: Application, visit_no: int | None = None) -> ClarificationOperatorView:
+        checklist = self._checklist(app, visit_no)
+        current = visit_no is None
         if checklist is None:
             return ClarificationOperatorView(
                 application_id=app.id,
@@ -107,7 +120,7 @@ class ClarificationService:
             ]
             if not released:
                 continue  # unflagged, or only unreleased questions: not the operator's business yet
-            out.append(self._item_out(app, item, released, responses, attachments))
+            out.append(self._item_out(app, item, released, responses, attachments, current=current))
             if item.clarification_status == ClarificationStatus.OPEN:
                 drafted = responses.get(released[-1].id)
                 if drafted is None or not drafted.message.strip():
@@ -115,7 +128,7 @@ class ClarificationService:
         open_count = sum(1 for i in out if i.status == OPERATOR_WORDS[ClarificationStatus.OPEN])
         answered = sum(1 for i in out if i.status == OPERATOR_WORDS[ClarificationStatus.ANSWERED])
         resolved = sum(1 for i in out if i.status == OPERATOR_WORDS[ClarificationStatus.RESOLVED])
-        operator_turn = app.status in OPERATOR_TURN_STATES
+        operator_turn = current and app.status in OPERATOR_TURN_STATES
         return ClarificationOperatorView(
             application_id=app.id,
             visit_no=checklist.visit_no,
@@ -159,6 +172,8 @@ class ClarificationService:
         released: list[ClarificationRequest],
         responses: dict[uuid.UUID, ClarificationResponse],
         attachments: dict[uuid.UUID, list[ClarificationAttachment]],
+        *,
+        current: bool = True,
     ) -> ClarificationItemOut:
         current_round = max(q.round_no for q in released)
         definition = ITEM_BY_KEY.get(item.item_key)
@@ -208,7 +223,7 @@ class ClarificationService:
                 for q in released
             ],
             responses=answers,
-            can_respond=app.status in OPERATOR_TURN_STATES and status == ClarificationStatus.OPEN,
+            can_respond=current and app.status in OPERATOR_TURN_STATES and status == ClarificationStatus.OPEN,
         )
 
     # Operator actions (US-065) --------------------------------------------------------------------
@@ -469,15 +484,16 @@ class ClarificationService:
         ApplicationStatus.AWAITING_POST_SITE_CLARIFICATION,
     )
 
-    def officer_view(self, app: Application) -> ClarificationOfficerView | None:
-        """Every thread of the current visit's submitted checklist: the item's own finding on top, every
-        request and answer, and what the officer may do with it now. None before the checklist is
-        submitted."""
+    def officer_view(self, app: Application, visit_no: int | None = None) -> ClarificationOfficerView | None:
+        """Every thread of the active visit's submitted checklist (or of `visit_no`, read-only): the item's
+        own finding on top, every request and answer, and what the officer may do with it now. None before
+        the checklist is submitted."""
         from app.domain.enums import ChecklistStatus  # noqa: PLC0415
 
-        checklist = self.checklists.current_for(app.id)
+        checklist = self._checklist(app, visit_no)
         if checklist is None or checklist.status != ChecklistStatus.SUBMITTED:
             return None
+        current = visit_no is None
         items = self.checklists.items_for(checklist.id)
         requests = self.checklists.requests_for_items([i.id for i in items])
         responses = self.checklists.responses_for_requests([q.id for q in requests])
@@ -492,13 +508,17 @@ class ClarificationService:
             rounds = by_item.get(item.id, [])
             if not rounds:
                 continue
-            threads.append(self._thread_out(app, item, rounds, responses, attachments, names))
+            threads.append(
+                self._thread_out(app, item, rounds, responses, attachments, names, current=current)
+            )
         counts = {
             s: sum(1 for t in threads if t.status == s) for s in ("open", "answered", "resolved", "withdrawn")
         }
         unreleased = sum(1 for t in threads if t.pending_release)
         round_no = max((t.round_no for t in threads), default=0)
-        if app.status == ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED:
+        if not current:
+            turn = f"Visit {checklist.visit_no}, round {round_no}"
+        elif app.status == ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED:
             turn = f"Round {round_no}, your turn"
         elif app.status in OPERATOR_TURN_STATES and counts["open"] == 0 and counts["answered"] == 0:
             # Every question withdrawn: the operator has nothing to send; the next move is the officer's.
@@ -584,6 +604,35 @@ class ClarificationService:
         )
         self.db.commit()
 
+    def restore(self, officer: User, application_id: uuid.UUID, item_id: uuid.UUID) -> None:
+        """Undo a withdraw within the grace window (UAT run 5, F19, the same window as feedback, US-039):
+        the question is open again, released or still a draft as it was. Audited."""
+        from app.services.feedback import UNDO_WINDOW  # noqa: PLC0415
+
+        app = self.applications.get_for(officer, application_id, for_update=True)
+        item = self._item_for(app, item_id)
+        if app.status not in self.OFFICER_TURN_STATES + (ApplicationStatus.PENDING_POST_SITE_RESUBMISSION,):
+            raise Conflict("This question can no longer be restored.")
+        rounds = self.checklists.requests_for_items([item.id])
+        latest = rounds[-1] if rounds else None
+        now = datetime.now(UTC)
+        if (
+            item.clarification_status != ClarificationStatus.WITHDRAWN
+            or latest is None
+            or latest.withdrawn_at is None
+            or now - latest.withdrawn_at > UNDO_WINDOW
+        ):
+            raise Conflict("This question can no longer be restored.")
+        latest.withdrawn_at = None
+        item.clarification_status = ClarificationStatus.OPEN
+        self.audit.record(
+            application_id=app.id,
+            actor_id=officer.id,
+            event_type="clarification.restored",
+            payload={"item_key": item.item_key, "round": latest.round_no},
+        )
+        self.db.commit()
+
     def release_next_round(self, app: Application, officer: User, now: datetime) -> int:
         """Called by the workflow inside the Request another round transition: every unreleased
         request of the current checklist is released and audited; returns how many."""
@@ -619,14 +668,16 @@ class ClarificationService:
         responses: dict[uuid.UUID, ClarificationResponse],
         attachments: dict[uuid.UUID, list[ClarificationAttachment]],
         names: dict[uuid.UUID, str],
+        *,
+        current: bool = True,
     ) -> ClarificationThreadOut:
         parent = ITEM_BY_KEY.get(item.parent_key or "")
         title = item_title(item.item_key, item.custom_title)
         if item.is_extra and parent is not None:
             title = f"{parent.title}: {title}"
         status = item.clarification_status
-        deciding = app.status == ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED
-        withdrawable = app.status in self.OFFICER_TURN_STATES + (
+        deciding = current and app.status == ApplicationStatus.POST_SITE_CLARIFICATION_RESUBMITTED
+        withdrawable = current and app.status in self.OFFICER_TURN_STATES + (
             ApplicationStatus.PENDING_POST_SITE_RESUBMISSION,
         )
         out: list[ClarificationThreadRequestOut] = []

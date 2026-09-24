@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { compareMyRevisions } from '@/api/applications'
+import type { ClarificationView } from '@/api/clarification'
+import type { SiteVisitOperator } from '@/api/siteVisit'
 import { AppError } from '@/api/client'
 import { displayValue } from '@/features/operator/SectionSummary'
 import { VisitRounds } from '@/features/shared/SiteVisit'
@@ -158,89 +160,15 @@ export function HistoryPage() {
             <p className="text-sm text-text-3">No feedback from the licensing office yet.</p>
           )}
 
-          {clar.data && clar.data.items.length > 0 ? (
-            <section className="pf-surface overflow-hidden" aria-labelledby="clar-history-title">
-              <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4 sm:px-7">
-                <h2 id="clar-history-title" className="text-[13px] font-semibold uppercase tracking-[0.06em] text-text-3">
-                  Clarification after the site visit
-                </h2>
-                <span className="text-xs text-text-3">
-                  Visit {clar.data.visit_no} · round {clar.data.round} · {clar.data.items.length}{' '}
-                  {clar.data.items.length === 1 ? 'item' : 'items'}
-                </span>
-              </div>
-              <ol className="divide-y divide-line">
-                {clar.data.items.map((item) => (
-                  <li key={item.item_id} className="px-5 py-4 sm:px-7">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-[15px] font-semibold">{item.title}</h3>
-                      <StatusBadge
-                        label={item.status}
-                        tone={
-                          item.status === 'Clarified'
-                            ? 'success'
-                            : item.status === 'Sent'
-                              ? 'info'
-                              : item.status === 'Waiting for your response'
-                                ? 'warning'
-                                : 'neutral'
-                        }
-                      />
-                    </div>
-                    <ol className="mt-3 flex flex-col gap-2 text-sm">
-                      {item.requests.map((q) => {
-                        const answer = item.responses.find((r) => r.round_no === q.round_no)
-                        return (
-                          <li key={q.id} className="flex flex-col gap-1 border-l-2 border-line pl-3">
-                            <span>
-                              <span className="font-semibold">The officer asked</span> <span className="text-text-2">{q.message}</span>
-                            </span>
-                            <span className="text-xs text-text-3">
-                              Round {q.round_no} · {formatDateTime(q.released_at)}
-                            </span>
-                            {answer ? (
-                              <>
-                                <span>
-                                  <span className="font-semibold">You answered</span>{' '}
-                                  <span className="whitespace-pre-wrap text-text-2">{answer.message}</span>
-                                </span>
-                                <span className="text-xs text-text-3">
-                                  {answer.sent_at ? `Sent ${formatDateTime(answer.sent_at)}` : 'Draft, never sent'}
-                                  {answer.attachments.length ? ` · ${answer.attachments.map((a) => a.original_filename).join(', ')}` : ''}
-                                </span>
-                              </>
-                            ) : null}
-                          </li>
-                        )
-                      })}
-                    </ol>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          ) : null}
-
-          {view.site_visit ? (
-            <section className="pf-surface overflow-hidden" aria-labelledby="visit-history-title">
-              <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4 sm:px-7">
-                <h2 id="visit-history-title" className="text-[13px] font-semibold uppercase tracking-[0.06em] text-text-3">
-                  Site visit
-                </h2>
-                <StatusBadge
-                  label={view.site_visit.status_label}
-                  tone={view.site_visit.status === 'confirmed' || view.site_visit.status === 'done' ? 'success' : 'info'}
-                />
-                <span className="text-xs text-text-3">
-                  Visit {view.site_visit.visit_no} · {view.site_visit.rounds.length}{' '}
-                  {view.site_visit.rounds.length === 1 ? 'round' : 'rounds'}
-                </span>
-              </div>
-              <div className="px-5 py-5 sm:px-7">
-                <p className="mb-4 text-sm font-semibold">{view.site_visit.when}</p>
-                <VisitRounds rounds={view.site_visit.rounds} reader="operator" />
-              </div>
-            </section>
-          ) : null}
+          {clar.data && clar.data.items.length > 0 ? <ClarificationHistory clar={clar.data} /> : null}
+          {view.site_visit ? <VisitHistory visit={view.site_visit} /> : null}
+          {/* Earlier visits keep every round, question, answer and file (UAT run 5, F18). */}
+          {view.earlier_visits.map((v) => (
+            <div key={v.visit_no} className="flex flex-col gap-6">
+              {v.clarification && v.clarification.items.length > 0 ? <ClarificationHistory clar={v.clarification} earlier /> : null}
+              {v.site_visit ? <VisitHistory visit={v.site_visit} earlier /> : null}
+            </div>
+          ))}
         </div>
         <aside className="text-[13px] leading-[19px] text-text-2 lg:pt-1">
           <p>
@@ -255,5 +183,102 @@ export function HistoryPage() {
         </aside>
       </div>
     </>
+  )
+}
+
+/** One visit's clarification thread: every question, the operator's answer and files, round by round. */
+function ClarificationHistory({ clar, earlier = false }: { clar: ClarificationView; earlier?: boolean }) {
+  return (
+    <section
+      className="pf-surface overflow-hidden"
+      aria-labelledby={earlier ? `clar-history-title-${clar.visit_no ?? 0}` : 'clar-history-title'}
+    >
+      <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4 sm:px-7">
+        <h2
+          id={earlier ? `clar-history-title-${clar.visit_no ?? 0}` : 'clar-history-title'}
+          className="text-[13px] font-semibold uppercase tracking-[0.06em] text-text-3"
+        >
+          Clarification after the site visit
+        </h2>
+        <span className="text-xs text-text-3">
+          Visit {clar.visit_no} · round {clar.round} · {clar.items.length} {clar.items.length === 1 ? 'item' : 'items'}
+        </span>
+      </div>
+      <ol className="divide-y divide-line">
+        {clar.items.map((item) => (
+          <li key={item.item_id} className="px-5 py-4 sm:px-7">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-[15px] font-semibold">{item.title}</h3>
+              <StatusBadge
+                label={item.status}
+                tone={
+                  item.status === 'Clarified'
+                    ? 'success'
+                    : item.status === 'Sent'
+                      ? 'info'
+                      : item.status === 'Waiting for your response'
+                        ? 'warning'
+                        : 'neutral'
+                }
+              />
+            </div>
+            <ol className="mt-3 flex flex-col gap-2 text-sm">
+              {item.requests.map((q) => {
+                const answer = item.responses.find((r) => r.round_no === q.round_no)
+                return (
+                  <li key={q.id} className="flex flex-col gap-1 border-l-2 border-line pl-3">
+                    <span>
+                      <span className="font-semibold">The officer asked</span> <span className="text-text-2">{q.message}</span>
+                    </span>
+                    <span className="text-xs text-text-3">
+                      Round {q.round_no} · {formatDateTime(q.released_at)}
+                    </span>
+                    {answer ? (
+                      <>
+                        <span>
+                          <span className="font-semibold">You answered</span>{' '}
+                          <span className="whitespace-pre-wrap text-text-2">{answer.message}</span>
+                        </span>
+                        <span className="text-xs text-text-3">
+                          {answer.sent_at ? `Sent ${formatDateTime(answer.sent_at)}` : 'Draft, never sent'}
+                          {answer.attachments.length ? ` · ${answer.attachments.map((a) => a.original_filename).join(', ')}` : ''}
+                        </span>
+                      </>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ol>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+/** One visit's appointment rounds. */
+function VisitHistory({ visit, earlier = false }: { visit: SiteVisitOperator; earlier?: boolean }) {
+  return (
+    <section
+      className="pf-surface overflow-hidden"
+      aria-labelledby={earlier ? `visit-history-title-${visit.visit_no}` : 'visit-history-title'}
+    >
+      <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4 sm:px-7">
+        <h2
+          id={earlier ? `visit-history-title-${visit.visit_no}` : 'visit-history-title'}
+          className="text-[13px] font-semibold uppercase tracking-[0.06em] text-text-3"
+        >
+          Site visit
+        </h2>
+        <StatusBadge label={visit.status_label} tone={visit.status === 'confirmed' || visit.status === 'done' ? 'success' : 'info'} />
+        <span className="text-xs text-text-3">
+          Visit {visit.visit_no} · {visit.rounds.length} {visit.rounds.length === 1 ? 'round' : 'rounds'}
+        </span>
+      </div>
+      <div className="px-5 py-5 sm:px-7">
+        <p className="mb-4 text-sm font-semibold">{visit.when}</p>
+        <VisitRounds rounds={visit.rounds} reader="operator" />
+      </div>
+    </section>
   )
 }

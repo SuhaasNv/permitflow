@@ -26,6 +26,7 @@ from app.schemas.clarification import ClarificationOfficerView
 from app.schemas.officer import (
     ActionOut,
     ApplicantOut,
+    EarlierVisitOfficerOut,
     FeedbackOut,
     OfficerApplicationOut,
     OfficerDocumentOut,
@@ -42,6 +43,7 @@ from app.services.feedback import resolvable_in, restorable, target_label
 from app.services.licence import LicenceService, licence_view
 from app.services.operator_view import LICENCE_TITLE
 from app.services.site_visit import SiteVisitService
+from app.services.visit_scope import earlier_visit_nos
 from app.services.workflow import WorkflowService
 
 _NOTE_REQUIRED_TARGETS = {ApplicationStatus.REJECTED}
@@ -119,7 +121,23 @@ class OfficerViewService:
             site_visit=SiteVisitService(self.db).officer_view(app),
             checklist=ChecklistService(self.db).summary(app),
             clarification=ClarificationService(self.db).officer_view(app),
+            earlier_visits=self.earlier_visits(app),
         )
+
+    def earlier_visits(self, app: Application) -> list[EarlierVisitOfficerOut]:
+        """Every visit before the active one, read-only, latest first (UAT run 5, F17 and F18)."""
+        visits = SiteVisitService(self.db)
+        checklists = ChecklistService(self.db)
+        clarification = ClarificationService(self.db)
+        return [
+            EarlierVisitOfficerOut(
+                visit_no=n,
+                site_visit=visits.officer_view(app, n),
+                checklist=checklists.summary(app, n),
+                clarification=clarification.officer_view(app, n),
+            )
+            for n in earlier_visit_nos(self.db, app)
+        ]
 
 
 def _assemble(
@@ -139,6 +157,7 @@ def _assemble(
     site_visit: SiteVisitOut | None = None,
     checklist: ChecklistSummaryOut | None = None,
     clarification: ClarificationOfficerView | None = None,
+    earlier_visits: list[EarlierVisitOfficerOut] | None = None,
 ) -> OfficerApplicationOut:
     now = datetime.now(UTC)
     form = current.form_data if current else app.draft_data
@@ -270,6 +289,7 @@ def _assemble(
         site_visit=site_visit,
         checklist=checklist,
         clarification=clarification,
+        earlier_visits=earlier_visits or [],
         licence=licence,
         version=app.version,
         created_at=app.created_at,

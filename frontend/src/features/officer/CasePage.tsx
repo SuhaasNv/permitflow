@@ -24,6 +24,7 @@ import { FeedbackPanel } from './FeedbackPanel'
 import type { Target } from './FeedbackPanel'
 import { ChecklistCard } from './ChecklistCard'
 import { ClarificationRail } from './ClarificationRail'
+import { EarlierVisits } from './EarlierVisits'
 import { ProposeVisitDialog, SiteVisitPanel } from './SiteVisitPanel'
 import { useOfficerApplication, useRerunCheck, useTransition } from './queries'
 import { useReadOnly } from './readOnly'
@@ -128,7 +129,8 @@ function ReviewRail({
         // Keyed by case so a half-typed date on one case never reappears on the next.
         <SiteVisitPanel key={view.id} view={view} onPropose={onPropose} />
       ) : null}
-      {view.checklist !== null || view.site_visit?.status === 'confirmed' || view.status === 'site_visit_done' ? (
+      {/* The checklist opens once the date stands, and stays open while the operator asks to move it (F8). */}
+      {view.checklist !== null || view.site_visit?.date_stands === true || view.status === 'site_visit_done' ? (
         <ChecklistCard view={view} />
       ) : null}
       <section className="pf-surface" aria-labelledby="review-title">
@@ -207,8 +209,8 @@ function ReviewRail({
             ) : null}
             {view.actions.some((a) => a.target === 'site_visit_done') ? (
               <p className="mt-1 text-xs leading-[17px] text-text-3">
-                Mark the visit done once it has taken place. The checklist is the record of the visit; submitting it (arriving with the next
-                update) will mark the visit done in the same step.
+                Mark the visit done once it has taken place. The checklist is the record of the visit; submitting it marks the visit done in
+                the same step.
               </p>
             ) : null}
           </div>
@@ -596,6 +598,8 @@ export function OfficerCasePage() {
               </Link>
             </p>
           </section>
+
+          <EarlierVisits view={view} />
 
           <AuditTrail applicationId={id} />
         </div>

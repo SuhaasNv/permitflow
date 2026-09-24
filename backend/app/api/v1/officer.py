@@ -249,3 +249,14 @@ def withdraw_clarification(
 ) -> OfficerApplicationOut:
     ClarificationService(db).withdraw(user, application_id, item_id)
     return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
+    "/applications/{application_id}/clarifications/{item_id}/restore", response_model=OfficerApplicationOut
+)
+def restore_clarification(
+    application_id: uuid.UUID, item_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """Undo a withdraw within the grace window (F19). 409 once it has closed or the round moved on."""
+    ClarificationService(db).restore(user, application_id, item_id)
+    return OfficerViewService(db).get(user, application_id)

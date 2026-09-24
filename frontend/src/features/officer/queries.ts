@@ -15,6 +15,7 @@ import {
   reopenClarification,
   resolveClarification,
   transitionApplication,
+  restoreClarification,
   withdrawClarification,
   withdrawFeedback,
 } from '@/api/officer'
@@ -179,11 +180,12 @@ export function useChecklistSchema() {
 /** The current visit's checklist: created on first open, returned afterwards (the POST is create-or-get,
  * so a remount reloads the draft). No refetch on focus: the page merges another tab's save through the
  * version conflict instead of replacing entries under the officer's hands. */
-export function useChecklist(id: string, readOnly = false) {
+export function useChecklist(id: string, readOnly = false, visit: number | null = null) {
   return useQuery({
-    queryKey: officerKeys.checklist(id),
+    queryKey: visit === null ? officerKeys.checklist(id) : [...officerKeys.checklist(id), 'visit', visit],
     // An administrator reads what exists and never creates one (US-072): the GET, a 404 when there is none.
-    queryFn: () => (readOnly ? getChecklist(id) : openChecklist(id)),
+    // An earlier visit's checklist (`?visit=N`) is only ever read (UAT run 5, F17).
+    queryFn: () => (visit !== null ? getChecklist(id, visit) : readOnly ? getChecklist(id) : openChecklist(id)),
     refetchOnWindowFocus: false,
     retry: false,
   })
@@ -230,6 +232,14 @@ export function useReopenClarification(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ itemId, message }: { itemId: string; message: string }) => reopenClarification(id, itemId, message),
+    onSuccess: (view) => afterCaseChange(qc, id, view),
+  })
+}
+
+export function useRestoreClarification(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (itemId: string) => restoreClarification(id, itemId),
     onSuccess: (view) => afterCaseChange(qc, id, view),
   })
 }

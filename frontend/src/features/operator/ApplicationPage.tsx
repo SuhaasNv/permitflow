@@ -236,7 +236,8 @@ export function ApplicationPage() {
           <ClarificationNotice view={view} />
         </div>
       ) : null}
-      {view.site_visit && !view.clarification ? (
+      {/* The appointment while it is open, or once done with nothing asked; a second visit always shows (F16). */}
+      {view.site_visit && (view.site_visit.status !== 'done' || !view.clarification) ? (
         <div className="mb-6">
           <SiteVisitCard view={view} />
         </div>

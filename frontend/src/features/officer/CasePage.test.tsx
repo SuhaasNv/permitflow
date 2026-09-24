@@ -111,6 +111,7 @@ const view: OfficerApplication = {
   site_visit: null,
   checklist: null,
   clarification: null,
+  earlier_visits: [],
   version: 3,
   created_at: '2026-09-18T01:00:00Z',
   updated_at: '2026-09-18T01:40:00Z',
@@ -490,7 +491,9 @@ describe('OfficerCasePage', () => {
     vi.spyOn(api, 'getOfficerApplication').mockResolvedValueOnce(underReview).mockResolvedValue(movedOn)
     const withdraw = vi
       .spyOn(api, 'withdrawFeedback')
-      .mockRejectedValue(new AppError(409, { code: 'conflict', message: 'Feedback can be withdrawn only while the application is Under Review.' }))
+      .mockRejectedValue(
+        new AppError(409, { code: 'conflict', message: 'Feedback can be withdrawn only while the application is Under Review.' }),
+      )
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: 'Withdraw' }))
     await waitFor(() => expect(withdraw).toHaveBeenCalledWith('a1', 'f1'))

@@ -7,6 +7,7 @@ import type { UnauthorizedInfo } from '@/api/client'
 import { setUploadTokenProvider } from '@/api/documents'
 import type { Role, TokenResponse, User } from '@/api/auth'
 import { logout, me } from '@/api/auth'
+import { clearAllLocalDrafts } from '@/lib/localDraft'
 
 const STORAGE_KEY = 'permitflow.session'
 
@@ -120,6 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // The request is fired and forgotten; the local state clears at once either way.
   const signOut = useCallback(() => {
     if (session) logout().catch(() => undefined)
+    // Unsaved entries kept on the device go with the user's own sign-out (UAT run 5, F11, F13).
+    clearAllLocalDrafts()
     clearSession()
   }, [session, clearSession])
 
