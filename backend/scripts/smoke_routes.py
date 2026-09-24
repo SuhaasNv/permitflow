@@ -456,6 +456,21 @@ def main() -> None:
         "/officer/applications/{application_id}/clarifications/{item_id}/withdraw",
         200,
     )
+    # undo inside the window (UAT run 5, F19), then withdraw again so the flow below is unchanged
+    call(
+        off,
+        "POST",
+        f"/officer/applications/{aid}/clarifications/{i2}/restore",
+        "/officer/applications/{application_id}/clarifications/{item_id}/restore",
+        200,
+    )
+    call(
+        off,
+        "POST",
+        f"/officer/applications/{aid}/clarifications/{i2}/withdraw",
+        "/officer/applications/{application_id}/clarifications/{item_id}/withdraw",
+        200,
+    )
     cv = call(
         op,
         "POST",
@@ -554,6 +569,90 @@ def main() -> None:
         200,
         json={"target": "pending_approval", "expected_version": ov2["version"]},
     ).json()
+    # ---- second visit after Return to review (UAT run 5, F15 to F18) ----
+    ov2 = call(
+        off,
+        "POST",
+        f"/officer/applications/{aid}/transition",
+        "/officer/applications/{application_id}/transition",
+        200,
+        json={"target": "under_review", "expected_version": ov2["version"]},
+    ).json()
+    note(
+        "back in review: no active visit, visit 1 kept as history, feedback open",
+        ov2["site_visit"] is None
+        and ov2["clarification"] is None
+        and ov2["feedback_editable"] is True
+        and [v["visit_no"] for v in ov2.get("earlier_visits", [])] == [1],
+        str([v["visit_no"] for v in ov2.get("earlier_visits", [])]),
+    )
+    call(
+        off,
+        "POST",
+        f"/officer/applications/{aid}/site-visit",
+        "/officer/applications/{application_id}/site-visit",
+        (200, 201),
+        json={"date": working_day(4), "slot": "afternoon", "expected_version": ov2["version"]},
+    )
+    mine = client.get(f"/applications/{aid}", headers=op).json()
+    note(
+        "operator sees visit 2 and can answer it",
+        (mine.get("site_visit") or {}).get("visit_no") == 2 and mine["site_visit"]["can_accept"] is True,
+        str(mine.get("site_visit")),
+    )
+    past = client.get(f"/applications/{aid}/clarifications?visit=1", headers=op).json()
+    note(
+        "visit 1 clarification readable, read-only",
+        past.get("visit_no") == 1 and len(past.get("items", [])) >= 1 and past.get("can_respond") is False,
+    )
+    call(
+        op,
+        "POST",
+        f"/applications/{aid}/site-visit/accept",
+        "/applications/{application_id}/site-visit/accept",
+        200,
+    )
+    cl2 = call(
+        off,
+        "POST",
+        f"/officer/applications/{aid}/checklist",
+        "/officer/applications/{application_id}/checklist",
+        (200, 201),
+    ).json()
+    note("visit 2 checklist starts blank", cl2["visit_no"] == 2 and cl2["counts"]["assessed"] == 0)
+    first = client.get(f"/officer/applications/{aid}/checklist?visit=1", headers=off).json()
+    note(
+        "visit 1 checklist readable by number",
+        first.get("visit_no") == 1 and first.get("status") == "submitted",
+    )
+    clean = [
+        {"key": it["key"], "result": "satisfactory", "comment": None, "needs_clarification": False}
+        for it in cl2["items"]
+    ]
+    call(
+        off,
+        "PUT",
+        f"/officer/applications/{aid}/checklist",
+        "/officer/applications/{application_id}/checklist",
+        200,
+        json={"items": clean, "version": cl2["version"]},
+    )
+    call(
+        off,
+        "POST",
+        f"/officer/applications/{aid}/checklist/submit",
+        "/officer/applications/{application_id}/checklist/submit",
+        200,
+    )
+    ov2 = client.get(f"/officer/applications/{aid}", headers=off).json()
+    ov2 = call(
+        off,
+        "POST",
+        f"/officer/applications/{aid}/transition",
+        "/officer/applications/{application_id}/transition",
+        200,
+        json={"target": "pending_approval", "expected_version": ov2["version"]},
+    ).json()
     call(
         off,
         "GET",
@@ -603,6 +702,27 @@ def main() -> None:
 
     # ---- wrong-role and unauthenticated probes ----
     call(op, "GET", "/officer/applications", "/officer/applications", 403)
+    call(
+        op,
+        "POST",
+        f"/officer/applications/{aid}/clarifications/{i2}/restore",
+        "/officer/applications/{application_id}/clarifications/{item_id}/restore",
+        403,
+    )
+    call(
+        None,
+        "POST",
+        f"/officer/applications/{aid}/clarifications/{i2}/restore",
+        "/officer/applications/{application_id}/clarifications/{item_id}/restore",
+        401,
+    )
+    call(
+        off,
+        "POST",
+        f"/officer/applications/{aid}/clarifications/{i2}/restore",
+        "/officer/applications/{application_id}/clarifications/{item_id}/restore",
+        409,
+    )
     call(op, "GET", f"/officer/applications/{aid}", "/officer/applications/{application_id}", 403)
     call(op, "GET", "/admin/overview", "/admin/overview", 403)
     call(off, "GET", "/applications", "/applications", 403)

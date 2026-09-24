@@ -217,25 +217,26 @@ Deferred at v0.3.0; designed and planned on 20 Sep 2026 (`docs/05-planning/RELEA
 2. Operator accepts, or proposes another date and slot with a reason.
 3. Officer accepts the operator's date, keeps the original or proposes a third; the operator is told which date stands.
 4. Either side may reschedule a confirmed visit before its date, with a reason.
-5. Officer marks the site visit done once the visit is confirmed.
+5. Officer marks the site visit done once the visit is confirmed and its day has arrived (Singapore date; `SITE_VISIT_DAY_GUARD`, on by default; UAT run 5, F12).
 **Alternate flows:**
-- 2a. No reply for three working days (never later than the visit date itself): the officer confirms alone; the operator was told this when the date was proposed.
+- 2a. No reply for three working days, or by the last working day before the visit when that comes sooner (never before the next working day, never after the visit itself; UAT run 5, F4): the officer confirms alone; the operator was told this when the date was proposed.
 - 2b. A date in the past, on a non-working day, more than 60 days out, or fewer than two working days ahead for the operator (one for the officer): 422 naming the rule.
 - 3a. Six proposals reached (both sides together, reschedules included): "Propose another date" is closed on both sides; the operator can still accept, the officer can still accept the operator's date or keep the one on the table.
-- 4a. The operator asks to move a confirmed visit: the confirmed date stays until the officer decides; keeping it keeps that date, not an earlier proposal.
+- 4a. The operator asks to move a confirmed visit: the confirmed date stays until the officer decides; keeping it keeps that date, not an earlier proposal. Meanwhile the officer's rail shows it as "Confirmed date", the checklist stays open, and the visit can be recorded on that date, which closes the request (UAT run 5, F7, F8).
 **Expected outcome:** one confirmed date and slot, every round on record, the checklist opened against that visit.
 
 ### UC3-A Capture the site visit checklist (US-060 to US-063)
 **Actor:** Officer
-**Preconditions:** Application in `site_visit_scheduled` or `site_visit_done`; the visit confirmed.
+**Preconditions:** Application in `site_visit_scheduled` or `site_visit_done`; the visit's date stands (confirmed, or a move request pending on a confirmed date).
 **Main flow:**
 1. Officer opens the checklist for the visit (created on first open); seventeen items in five sections, every item Not assessed.
-2. On site, on a tablet, the officer records a result and a comment per item and flags the items that need clarification; the draft saves as they go and survives a poor connection.
+2. On site, on a tablet, the officer records a result and a comment per item and flags the items that need clarification; the draft saves as they go and survives a poor connection: what the server has not confirmed is also kept on the device and put back after a reload or a discarded tab (UAT run 5, F11).
 3. Officer submits (marking the visit done in the same step when it was still scheduled); the findings freeze; the case moves to `awaiting_post_site_clarification` on its own; the flagged items are released to the operator with the officer's comments; the operator is notified once with the count.
 **Alternate flows:**
 - 2a. Another session saved the checklist: the page merges the officer's unsaved input over the newer copy, never silently.
 - 3a. An item not assessed, or a flagged or unsatisfactory item without a comment: 422 listing the item keys.
 - 3b. Nothing flagged: the case still moves; the officer routes to approval from there.
+- 3c. The visit day has not arrived: the submit waits, with the reason, and the draft can still be filled (F12).
 **Expected outcome:** an immutable inspection record and the operator asked only about the flagged items.
 
 ### UC3-B Answer the flagged items (US-064, US-065)
@@ -246,7 +247,7 @@ Deferred at v0.3.0; designed and planned on 20 Sep 2026 (`docs/05-planning/RELEA
 2. Operator answers each item in writing and attaches up to three supporting files per item (the document rules: allowlist, magic bytes, 10 MB).
 3. Operator sends the responses; the case moves to `post_site_clarification_resubmitted`; officers are notified.
 **Alternate flows:**
-- 3a. An item unanswered: 422 listing the keys; the page keeps every typed response.
+- 3a. An item unanswered: 422 listing the keys; the page keeps every typed response (also on the device across a reload, and the browser asks before leaving while one is unsaved; UAT run 5, F13).
 - 3b. The officer withdrew an item a moment before: it is excluded from the requirement.
 **Expected outcome:** every open item answered in one round, attachments stored under the document rules.
 
@@ -259,9 +260,9 @@ Deferred at v0.3.0; designed and planned on 20 Sep 2026 (`docs/05-planning/RELEA
 3. UC3-B repeats; rounds are counted per item and unlimited.
 4. Once nothing is open or answered, the officer routes to approval.
 **Alternate flows:**
-- 1a. Withdraw an item that no longer matters.
+- 1a. Withdraw an item that no longer matters; Undo is offered for 10 s (UAT run 5, F19).
 - 4a. Reject with a note, or the operator withdraws, from any post-site state: the threads stay as they are; an unsent answer shows as a draft never sent.
-- 4b. Return to review after approval routing and a second visit: a new checklist for visit 2; visit 1 stays readable.
+- 4b. Return to review after approval routing and a second visit: the case is a review again (feedback and resubmission available, visit 1 shown as an earlier visit); the operator answers visit 2's appointment; a new, blank checklist for visit 2; visit 1's appointment, checklist and clarification thread stay readable for both roles (UAT run 5, F15 to F18).
 **Expected outcome:** every request, answer, file and decision on the item's own trail with timestamps, and in the audit trail.
 
 ---

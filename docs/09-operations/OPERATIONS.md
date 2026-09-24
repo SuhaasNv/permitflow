@@ -19,6 +19,7 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `CORS_ORIGINS` | `http://localhost:3000` | backend | Comma separated allowlist. |
 | `UPLOAD_DIR` | `./data/uploads` | backend | Local disk storage; Railway volume at `/data/uploads`. |
 | `UPLOAD_MAX_BYTES` | `10485760` | backend | 10 MB per file. |
+| `SITE_VISIT_DAY_GUARD` | `true` | backend | UAT run 5 (F12): Mark site visit done and the checklist submit wait for the confirmed visit date (Singapore date); the checklist draft can be filled before. `false` where a whole appointment must run in one sitting: the CI browser suite, `uat_edges.py` and `smoke_routes.py`, a demonstration environment. |
 | `STORAGE_BUDGET_BYTES` | `157286400` | backend | 150 MB per application across every document version, the clarification evidence and the licence (US-085); a further upload is refused with 422 `storage_budget` naming the room left. The Railway `uploads` volume is 5,000 MB (`describe-environment`, 21 Sep 2026): 33 applications at the ceiling, several hundred at the usual few megabytes each. Watch `permitflow_storage_bytes` and the `PermitFlowVolumeFilling` alert (US-089, at 80 %) and raise the volume before it fills; locally the gauge reads the whole disk. |
 | `LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | backend | Failed attempts per IP per minute. |
 | `RATE_LIMIT_PER_MINUTE` | `240` | backend | Every request per client IP, sliding minute; 429 with `Retry-After` beyond it. 0 disables. Per process (US-058). |
