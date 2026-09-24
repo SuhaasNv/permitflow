@@ -14,6 +14,7 @@ from app.models import User
 from app.models.enums import Role
 from app.repositories.audit import AuditRepository
 from app.repositories.concurrency import DeadlockError, deadlock_as_error
+from app.repositories.notifications import NotificationRepository
 from app.repositories.sessions import SessionRepository
 from app.repositories.users import UserRepository
 from app.schemas.admin import AdminUserOut, AdminUsersOut
@@ -47,6 +48,7 @@ class AdminUserService:
         self.users = UserRepository(db)
         self.audit = AuditRepository(db)
         self.sessions = SessionRepository(db)
+        self.notifications = NotificationRepository(db)
 
     def directory(self, caller: User) -> AdminUsersOut:
         rows = self.users.list_all()
@@ -99,6 +101,10 @@ class AdminUserService:
                 },
             )
             target.role = change.role
+            # Notifications are copies written for the old role (an officer's carry other operators' names
+            # and reasons); the new role starts with none, so a demoted officer keeps no case data
+            # (security audit, 24 Sep).
+            self.notifications.delete_for_user(target.id)
         if change.is_active is not None and change.is_active != target.is_active:
             self.audit.record(
                 application_id=None,

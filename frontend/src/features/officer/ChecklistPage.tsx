@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import type { Checklist, ChecklistItem, ChecklistItemInput, ChecklistResult } from '@/api/checklist'
 import { AppError } from '@/api/client'
+import { useCurrentUserId } from '@/features/auth/AuthContext'
 import { Alert } from '@/features/shared/Alert'
 import { Breadcrumb } from '@/features/shared/Breadcrumb'
 import { Button, buttonClasses } from '@/features/shared/Button'
@@ -259,8 +260,10 @@ export function ChecklistPage() {
   const saveId = useRef<string | null>(null)
   const [restored, setRestored] = useState<number | null>(null)
   const restoredOnce = useRef(false)
-  // The device copy of unsaved entries: one per case and visit (F11); one live session per account keeps it one officer's.
-  const localKey = checklist.data ? `checklist.${id}.${checklist.data.visit_no}` : null
+  // The device copy of unsaved entries: one per case, visit and officer (F11). The officer's id keeps a copy left by a
+  // session that expired or was taken over from reaching the next officer on a shared tablet (security audit, 24 Sep).
+  const userId = useCurrentUserId()
+  const localKey = checklist.data && userId ? `checklist.${id}.${checklist.data.visit_no}.${userId}` : null
   const localKeyRef = useRef<string | null>(null)
   localKeyRef.current = localKey
 

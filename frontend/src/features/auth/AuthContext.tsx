@@ -222,6 +222,11 @@ export function useAuth(): AuthState {
   return ctx
 }
 
+/** The signed-in user's id, or null outside the provider: for keys on this device that must stay one person's. */
+export function useCurrentUserId(): string | null {
+  return useContext(AuthContext)?.user?.id ?? null
+}
+
 export function homeFor(role: Role): string {
   switch (role) {
     case 'operator':

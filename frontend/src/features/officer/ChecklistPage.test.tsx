@@ -11,6 +11,12 @@ import * as api from '@/api/officer'
 import { AppProviders } from '@/app/providers'
 import { formSchema, officerView } from '@/test/fixtures'
 import { OfficerCasePage } from './CasePage'
+
+// The signed-in officer, for the device copy's key; the page is rendered without the auth provider.
+vi.mock('@/features/auth/AuthContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/auth/AuthContext')>()),
+  useCurrentUserId: () => 'officer-1',
+}))
 import { AUTOSAVE_DELAY_MS, ChecklistPage, adoptServerKeys, localCopy, mergeFindings, retryDelay, summarise, toInput } from './ChecklistPage'
 
 const defs = [
@@ -526,7 +532,7 @@ describe('site visit checklist (US-060, US-061)', () => {
 
   it('entries left on the device by a reload are put back over the draft and saved (UAT run 5, F11)', async () => {
     localStorage.setItem(
-      'permitflow.unsaved.checklist.a1.1',
+      'permitflow.unsaved.checklist.a1.1.officer-1',
       JSON.stringify({
         savedAt: Date.now(),
         value: {
@@ -549,7 +555,28 @@ describe('site visit checklist (US-060, US-061)', () => {
     expect(body.items.find((i) => i.key === 'floor_trap_graded')).toMatchObject({ result: 'unsatisfactory', needs_clarification: true })
     expect(body.items.find((i) => i.key === 'layout_matches_plan')).toMatchObject({ result: 'not_assessed' })
     expect(body.version).toBe(3)
-    await waitFor(() => expect(localStorage.getItem('permitflow.unsaved.checklist.a1.1')).toBeNull())
+    await waitFor(() => expect(localStorage.getItem('permitflow.unsaved.checklist.a1.1.officer-1')).toBeNull())
+  })
+
+  it("another officer's copy on this device is never offered (security audit, 24 Sep)", async () => {
+    // Left by a session that expired or was taken over; only the officer's own Sign out clears every copy.
+    localStorage.setItem(
+      'permitflow.unsaved.checklist.a1.1.officer-2',
+      JSON.stringify({
+        savedAt: Date.now(),
+        value: {
+          findings: { floor_trap_graded: { result: 'unsatisfactory', comment: 'Their finding.', needs_clarification: true } },
+          touched: ['floor_trap_graded'],
+        },
+      }),
+    )
+    vi.spyOn(checklistApi, 'openChecklist').mockResolvedValue(draft)
+    const save = vi.spyOn(checklistApi, 'saveChecklist').mockResolvedValue({ ...draft, version: 4 })
+    renderAt('/officer/applications/a1/checklist')
+    expect(await screen.findAllByRole('group', { name: 'Result' })).not.toHaveLength(0)
+    expect(screen.queryByText('Unsaved entries restored from this device')).not.toBeInTheDocument()
+    expect(save).not.toHaveBeenCalled()
+    localStorage.removeItem('permitflow.unsaved.checklist.a1.1.officer-2')
   })
 
   it('an unsaved touch is kept on the device until the server confirms it (F11)', async () => {
@@ -558,7 +585,7 @@ describe('site visit checklist (US-060, US-061)', () => {
     renderAt('/officer/applications/a1/checklist')
     const groups = await screen.findAllByRole('group', { name: 'Result' })
     await userEvent.click(within(groups[1]!).getByRole('button', { name: /^Satisfactory$/ }))
-    const stored = JSON.parse(localStorage.getItem('permitflow.unsaved.checklist.a1.1') ?? 'null') as {
+    const stored = JSON.parse(localStorage.getItem('permitflow.unsaved.checklist.a1.1.officer-1') ?? 'null') as {
       value: { findings: Record<string, { result: string }>; touched: string[] }
     } | null
     expect(stored?.value.touched).toEqual(['floor_trap_graded'])
