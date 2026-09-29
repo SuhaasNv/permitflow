@@ -1,0 +1,4 @@
+# PermitFlow is a fictional licensing service built for an engineering assessment.
+# It is not meant to be found through search engines, so every crawler is asked to stay out.
+User-agent: *
+Disallow: /
