@@ -158,20 +158,6 @@ export function LandingPage() {
                   How it works
                 </a>
               </div>
-              <dl className="mt-10 grid max-w-[520px] grid-cols-3 gap-6 border-t border-line pt-6 text-[13px] leading-[18px] text-text-3">
-                <div>
-                  <dt className="font-semibold text-text">About 20 minutes</dt>
-                  <dd>to complete, with drafts saved</dd>
-                </div>
-                <div>
-                  <dt className="font-semibold text-text">4 documents</dt>
-                  <dd>checked automatically on upload</dd>
-                </div>
-                <div>
-                  <dt className="font-semibold text-text">One officer</dt>
-                  <dd>makes every decision</dd>
-                </div>
-              </dl>
             </div>
             {/* At lg the panel sits centred inside the ink band, which bleeds to the right edge; below lg it flows under the copy. */}
             <div
