@@ -5,6 +5,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { homeFor, useAuth } from '@/features/auth/AuthContext'
 import { buttonClasses } from '@/features/shared/Button'
 import { Logo } from '@/features/shared/Logo'
+import { PolicyLinks } from '@/features/shared/PolicyLinks'
 import { Reveal } from '@/features/shared/Reveal'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import type { Tone } from '@/features/shared/StatusBadge'
@@ -308,17 +309,7 @@ export function LandingPage() {
           <VersionChip variant="rail" />
           <span className="hidden sm:inline">·</span>
           <span>A fictional licensing service built for an engineering assessment. Not a government service.</span>
-          <nav aria-label="Policies" className="flex gap-4 sm:ml-auto">
-            <Link to="/privacy" className="text-text-3 no-underline hover:text-text">
-              Privacy
-            </Link>
-            <Link to="/terms" className="text-text-3 no-underline hover:text-text">
-              Terms
-            </Link>
-            <Link to="/cookies" className="text-text-3 no-underline hover:text-text">
-              Cookies
-            </Link>
-          </nav>
+          <PolicyLinks className="sm:ml-auto" />
         </div>
       </footer>
     </div>

@@ -11,6 +11,7 @@ import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
 import { Field } from '@/features/shared/Field'
 import { Logo } from '@/features/shared/Logo'
+import { PolicyLinks } from '@/features/shared/PolicyLinks'
 import { formatDateTime } from '@/lib/format'
 import { homeFor, useAuth } from './AuthContext'
 import type { EndedReason } from './AuthContext'
@@ -230,11 +231,14 @@ export function LoginPage() {
         <div className="flex flex-col gap-2 text-[13px] text-text-3">
           <p>
             Demonstration only: accounts are shared and their passwords are published. Use the fictional demonstration documents, never real
-            personal data. See the <Link to="/privacy">privacy policy</Link>.
+            personal data. See the <Link to="/privacy">privacy policy</Link> and the <Link to="/terms">terms</Link>.
           </p>
-          <Link to="/" className="text-text-2 no-underline hover:text-text">
-            About PermitFlow
-          </Link>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <Link to="/" className="text-text-2 no-underline hover:text-text">
+              About PermitFlow
+            </Link>
+            <PolicyLinks />
+          </div>
         </div>
       </main>
       <aside

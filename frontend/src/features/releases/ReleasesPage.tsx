@@ -8,6 +8,7 @@ import { useAuth } from '@/features/auth/AuthContext'
 import { buttonClasses } from '@/features/shared/Button'
 import { Logo } from '@/features/shared/Logo'
 import { PageHeader } from '@/features/shared/PageHeader'
+import { PolicyLinks } from '@/features/shared/PolicyLinks'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import { cn } from '@/lib/cn'
 import { orderBlocks, parseReleaseNotes, releaseFor, tokenizeInline } from './notes'
@@ -284,6 +285,7 @@ export function ReleasesPage() {
           <span>© 2026 PermitFlow</span>
           <VersionChip variant="rail" />
           <span>A fictional licensing service built for an engineering assessment. Not a government service.</span>
+          <PolicyLinks className="sm:ml-auto" />
         </div>
       </footer>
     </div>

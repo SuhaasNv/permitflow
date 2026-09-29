@@ -130,4 +130,13 @@ describe('ReleasesPage (US-094)', () => {
     await new Promise((r) => setTimeout(r, 10))
     expect(build).not.toHaveTextContent('environment')
   })
+
+  it('signed out, the footer carries the policy links', () => {
+    vi.spyOn(healthApi, 'getHealth').mockRejectedValue(new Error('offline'))
+    renderAt('/releases')
+    const policies = screen.getByRole('navigation', { name: 'Policies' })
+    expect(within(policies).getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy')
+    expect(within(policies).getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms')
+    expect(within(policies).getByRole('link', { name: 'Cookies' })).toHaveAttribute('href', '/cookies')
+  })
 })

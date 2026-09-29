@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -96,5 +96,13 @@ describe('PolicyPage (US-057)', () => {
   it('redirects an unknown slug to the privacy policy', () => {
     const router = renderAt('/other')
     expect(router.state.location.pathname).toBe('/privacy')
+  })
+
+  it('signed out, the footer carries the policy links under its own landmark name', () => {
+    renderAt('/terms')
+    const footer = screen.getByRole('navigation', { name: 'Footer policies' })
+    expect(within(footer).getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy')
+    expect(within(footer).getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms')
+    expect(within(footer).getByRole('link', { name: 'Cookies' })).toHaveAttribute('href', '/cookies')
   })
 })
