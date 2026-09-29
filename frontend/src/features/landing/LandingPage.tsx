@@ -241,17 +241,17 @@ export function LandingPage() {
               <span className="pf-journey-line absolute left-0 top-0 hidden h-px w-full bg-ink lg:block" aria-hidden="true" />
               <ol className="grid grid-cols-1 gap-6 sm:grid-cols-3 lg:grid-cols-6">
                 {JOURNEY.map((s, i) => (
-                  <li key={s.label} className="relative pt-5" style={{ transitionDelay: `${200 + i * 180}ms` }}>
+                  <li key={s.label} className="relative pt-5" style={{ transitionDelay: `${200 + i * 60}ms` }}>
                     <span className="absolute left-0 top-0 h-px w-full bg-line lg:hidden" aria-hidden="true" />
                     <span
                       className={cn(
                         'pf-journey-dot absolute -top-[4px] left-0 h-[9px] w-[9px] rounded-full ring-4 ring-surface',
                         i === JOURNEY.length - 1 ? 'bg-success' : s.tone === 'warning' ? 'bg-warning' : 'bg-ink',
                       )}
-                      style={{ transitionDelay: `${260 + i * 200}ms` }}
+                      style={{ transitionDelay: `${260 + i * 60}ms` }}
                       aria-hidden="true"
                     />
-                    <div className="pf-reveal is-in" style={{ transitionDelay: `${300 + i * 200}ms` }}>
+                    <div className="pf-reveal is-in" style={{ transitionDelay: `${300 + i * 60}ms` }}>
                       <StatusBadge label={s.label} tone={s.tone} />
                       <p className="mt-2.5 text-[13px] leading-[18px] text-text-2">{s.note}</p>
                     </div>
