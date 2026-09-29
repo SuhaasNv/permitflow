@@ -2,6 +2,18 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Anti-slop design audit fixes (29 Sep 2026)
+
+The owner approved six findings from a design audit looking for the tells of a generated site; they are fixed on `fix/anti-slop-audit`, not yet merged into `dev`, nothing pushed. The landing page's glow behind the document panel stays, by the owner's choice.
+
+- **No invented numbers on the landing page.** The hero's "About 20 minutes" was never measured, and the other two facts in that row repeated the document panel and the checks section, so the row is gone.
+- **Every screen names its tab.** "Sign in | PermitFlow", "Review queue | PermitFlow", "Privacy policy | PermitFlow" and so on, set from the route table; `index.html` keeps "PermitFlow" as the fallback and now carries a meta description and share preview tags that say plainly it is a fictional service built for an engineering assessment (no preview image).
+- **A real not-found page.** An unknown address shows its own page with "Page not found" as the heading, its own tab title and a link home.
+- **Icons and robots.txt.** A 180 px Apple touch icon, a 32 px PNG and a `favicon.ico`, all rendered from `favicon.svg`. `robots.txt` asks every crawler to stay out, since this is a demonstration nobody should find through a search engine; no sitemap for the same reason.
+- **Policy links on every public footer.** Sign in, What's new and the policy pages now carry Privacy, Terms and Cookies like the landing footer, and the sign-in disclaimer links the terms next to the privacy policy.
+- **Calmer motion.** The journey rule on the landing page draws in 650 ms (was 1.4 s) and its steps follow 60 ms apart (300 ms in all, was 1 s); the pulsing dot on a live status stops when the visitor asks for reduced motion.
+- **Tests.** Vitest 282 in 47 files (new: tab titles, the not-found page, the footer links on sign-in, What's new and the policy pages); build and lint clean.
+
 ## Security audit fixes (24 Sep 2026)
 
 The Cloudflare security-audit skill ran over the repository at `ee67688` (standard profile, 15 agents, source-only; report kept outside the repository). No critical, high or medium finding; the two confirmed low findings and one hardening note from my own UAT run 5 change are fixed on `fix/security-audit-findings`, not yet merged into `dev`, nothing pushed (threat model T29, T28).

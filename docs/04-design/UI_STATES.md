@@ -31,7 +31,7 @@ UX-002 requires explicit loading, empty, error and success states for every data
 | Rate limited (429, US-058) | the server message ("Too many requests. Try again in a moment.") in the `ErrorPanel` or inline `Alert`; on sign-in, the message names which limit was hit; queries do not retry a 4xx, so a limit never causes a retry storm | built |
 | Storage room (US-085) | one sentence beside every file picker on the operator's pages: "147 MB of the application's 150 MB storage room is left", or, at zero, "This application has used its 150 MB of storage room. Remove a file you no longer need before adding one."; a refused upload shows the server's sentence naming the room (422 `storage_budget`); an image the server cannot read is refused with "The image could not be read. Send it again, or save it as a PDF." | NFR-009 (built) |
 | Draft limit (409 `draft_limit`, US-058) | "You already have 20 draft applications. Submit or delete one before starting another." in the dashboard and list alerts, without the generic retry advice | built |
-| Unknown route (404) | `NotFoundPanel` "Page not found" with a link to the front page; an application that does not exist keeps "Application not found" | built |
+| Unknown route (404) | `NotFoundPage`: logo header, "Page not found" as the page's h1, tab title "Page not found \| PermitFlow", a link to the front page; an application that does not exist keeps "Application not found". The server still answers 200 for an unknown address (the SPA fallback), so the not-found page is what the visitor sees, not what a crawler is told | built |
 
 ## Upload → verification lifecycle (S-12, S-15)
 
