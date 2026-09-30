@@ -24,6 +24,13 @@ import {
  */
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']
 
+// The US-095 and US-096 tests only read what they seed, so they share one application of each kind:
+// every seed is four document checks against the demonstration operator's daily quota.
+let pendingOnce: ReturnType<typeof seedPendingResubmission> | undefined
+let visitOnce: ReturnType<typeof seedVisitConfirmed> | undefined
+const sharedPending = () => (pendingOnce ??= seedPendingResubmission())
+const sharedVisit = () => (visitOnce ??= seedVisitConfirmed())
+
 /** Collects one line per violation so a run reports every screen, not only the first broken one. */
 async function violations(page: Page, screen: string): Promise<string[]> {
   // Scan the loaded screen, never a skeleton: under load a page can still be fetching after networkidle,
@@ -387,7 +394,7 @@ async function hiddenFocusStops(page: Page, screen: string, presses = 60): Promi
 }
 
 test('no focused control is hidden behind a sticky bar on the checklist or the respond page (US-095)', async ({ page }) => {
-  const visit = await seedVisitConfirmed()
+  const visit = await sharedVisit()
   const clarification = await seedAwaitingClarification()
   const hidden: string[] = []
   await signIn(page, OFFICER)
@@ -408,4 +415,168 @@ test('no focused control is hidden behind a sticky bar on the checklist or the r
   }
   await page.setViewportSize({ width: 1280, height: 844 })
   expect(hidden, hidden.join('\n')).toEqual([])
+})
+
+/** Paints the focused control and the same control blurred, each with room for its ring, and says whether
+ * anything changed. With Windows High Contrast emulated, a ring drawn only with box-shadow or a border colour
+ * is stripped by the browser, so identical pictures mean a keyboard user cannot see where they are (US-096). */
+async function focusIsPainted(page: Page, control: ReturnType<Page['locator']>, label: string): Promise<string[]> {
+  await control.scrollIntoViewIfNeeded()
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  const box = await control.boundingBox()
+  if (!box) return [`${label}: not on screen`]
+  const clip = { x: Math.max(0, box.x - 8), y: Math.max(0, box.y - 8), width: box.width + 16, height: box.height + 16 }
+  const blurred = await page.screenshot({ clip })
+  await page.keyboard.press('Shift')
+  await control.focus()
+  const focused = await page.screenshot({ clip })
+  return blurred.equals(focused) ? [`${label}: focus is not painted in forced-colours mode`] : []
+}
+
+test('keyboard focus stays visible in Windows High Contrast on inputs, checkboxes, result buttons and search (US-096)', async ({ page }) => {
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
+  const app = await sharedPending()
+  const visit = await sharedVisit()
+  const missing: string[] = []
+  await signIn(page, OPERATOR)
+  await page.goto(`${app.url}/form/premises`)
+  await page.locator('[name="address_line_1"]').waitFor()
+  missing.push(...(await focusIsPainted(page, page.locator('[name="address_line_1"]'), 'text input')))
+  await signOut(page)
+  await signIn(page, OFFICER)
+  await page.goto('/officer/queue')
+  await page.getByRole('searchbox').waitFor()
+  missing.push(...(await focusIsPainted(page, page.getByRole('searchbox'), 'search box')))
+  await page.goto(`/officer/applications/${visit.id}/checklist`)
+  const first = page.getByRole('group', { name: 'Result' }).first()
+  await first.waitFor()
+  missing.push(...(await focusIsPainted(page, first.getByRole('button', { name: 'Satisfactory', exact: true }), 'result button')))
+  missing.push(...(await focusIsPainted(page, page.getByLabel('Need further clarification').first(), 'checkbox')))
+  expect(missing, missing.join('\n')).toEqual([])
+})
+
+test('a control that shows text is named with that text, so voice control can say what it sees (US-096, WCAG 2.5.3)', async ({ page }) => {
+  const app = await sharedPending()
+  const mismatched: string[] = []
+  const scan = (screen: string) =>
+    page.evaluate((screen) => {
+      const squash = (s: string) => s.replace(/\s+/g, '').toLowerCase()
+      const out: string[] = []
+      for (const el of document.querySelectorAll<HTMLElement>('a[href], button, [role="button"]')) {
+        const label = el.getAttribute('aria-label')
+        if (!label || el.getClientRects().length === 0) continue
+        // each visible line of letters (a line of digits or a symbol is an index or a badge, checked in unit tests)
+        for (const line of el.innerText.split('\n').map((l) => l.trim()).filter((l) => (l.match(/[a-z]/gi) ?? []).length >= 3)) {
+          if (!squash(label).includes(squash(line))) out.push(`${screen}: "${label}" does not contain its visible text "${line}"`)
+        }
+      }
+      return out
+    }, screen)
+  for (const path of ['/', '/login']) {
+    await page.goto(path)
+    await page.waitForLoadState('networkidle')
+    mismatched.push(...(await scan(path)))
+  }
+  await signIn(page, OPERATOR)
+  for (const path of ['/app/dashboard', `${app.url}/form/premises`]) {
+    await page.goto(path)
+    await page.waitForLoadState('networkidle')
+    mismatched.push(...(await scan(path.replace(app.id, ':id'))))
+  }
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/app/dashboard')
+  await page.waitForLoadState('networkidle')
+  mismatched.push(...(await scan('390 /app/dashboard')))
+  expect([...new Set(mismatched)], [...new Set(mismatched)].join('\n')).toEqual([])
+})
+
+test('nothing is cut off or overlaps at 200% text size: the rail, the application cards and the form buttons (US-096, WCAG 1.4.4)', async ({ page }) => {
+  const app = await sharedPending()
+  const problems: string[] = []
+  await signIn(page, OPERATOR)
+  const measure = (screen: string, checkScroll: boolean) =>
+    page.evaluate(([screen, checkScroll]) => {
+      const out: string[] = []
+      for (const el of document.querySelectorAll<HTMLElement>('nav[aria-label="Main"] a span.truncate, main button, main nav .truncate, main aside .truncate')) {
+        if (el.getClientRects().length === 0 || el.closest('.sr-only')) continue
+        if (el.scrollWidth > el.clientWidth + 1) out.push(`${screen}: "${el.textContent?.trim().slice(0, 30)}" is cut off`)
+      }
+      // Sideways scrolling is judged where it is a fair test: 200% text on a desktop, and the 320 px reflow width.
+      // A phone with every rem-based size doubled is stricter than any real zoom (it behaves like a 195 px screen).
+      if (checkScroll && document.documentElement.scrollWidth > document.documentElement.clientWidth + 1) out.push(`${screen}: the page scrolls sideways`)
+      for (const card of document.querySelectorAll<HTMLElement>('main a[href^="/app/applications/"]')) {
+        const ref = card.querySelector<HTMLElement>('.font-mono')
+        const badge = card.querySelector<HTMLElement>('[data-tone]')
+        if (!ref || !badge) continue
+        const a = ref.getBoundingClientRect(), b = badge.getBoundingClientRect()
+        if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) out.push(`${screen}: a status badge covers the reference "${ref.textContent}"`)
+      }
+      return out
+    }, [screen, checkScroll] as const)
+  for (const [w, fs] of [[1280, 100], [1280, 200], [390, 100], [390, 200], [320, 100]] as const) {
+    await page.setViewportSize({ width: w, height: 900 })
+    for (const path of ['/app/dashboard', `${app.url}/form/premises`]) {
+      await page.goto(path)
+      await page.waitForLoadState('networkidle')
+      await page.evaluate((f) => { document.documentElement.style.fontSize = `${(15 * f) / 100}px` }, fs)
+      await page.waitForTimeout(250)
+      problems.push(...(await measure(`${w}px at ${fs}% ${path.replace(app.id, ':id')}`, fs === 100 || w >= 1280)))
+    }
+  }
+  expect(problems, problems.join('\n')).toEqual([])
+})
+
+/** Everything a person can see that spills out of its box on a signed-in screen: a box wider than the viewport,
+ * clipped text without an ellipsis, or a child wider than its parent. Elements that scroll on purpose or carry a
+ * negative margin (the case sidebar's scrollbar gutter) are left out (US-096). */
+const overflowProblems = () => {
+  const out: string[] = []
+  const iw = document.documentElement.clientWidth
+  if (document.documentElement.scrollWidth > iw + 1) out.push(`the page scrolls sideways (${document.documentElement.scrollWidth} > ${iw})`)
+  const name = (el: Element) => `${el.tagName.toLowerCase()} "${(el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 30)}"`
+  for (const el of document.querySelectorAll<HTMLElement>('body *')) {
+    if (el.getClientRects().length === 0 || el.closest('.sr-only, [hidden], dialog:not([open]), svg, aside.pf-scroll, [aria-live]')) continue
+    const cs = getComputedStyle(el)
+    const r = el.getBoundingClientRect()
+    if (r.width === 0 || r.height === 0 || !(el.textContent ?? '').trim()) continue
+    if (cs.overflowX === 'auto' || cs.overflowX === 'scroll' || parseFloat(cs.marginLeft) < 0 || parseFloat(cs.marginRight) < 0) continue
+    let scrolled = false
+    for (let p = el.parentElement; p; p = p.parentElement) if (getComputedStyle(p).overflowX !== 'visible') { scrolled = true; break }
+    if (!scrolled && r.right > iw + 1) out.push(`${name(el)} is beyond the right edge of the screen`)
+    if ((cs.overflowX === 'hidden' || cs.overflowX === 'clip') && cs.textOverflow !== 'ellipsis' && el.scrollWidth > el.clientWidth + 1) out.push(`${name(el)} is clipped`)
+    const par = el.parentElement
+    if (par && getComputedStyle(par).overflowX === 'visible' && cs.position !== 'absolute' && cs.position !== 'fixed') {
+      const pr = par.getBoundingClientRect()
+      if (pr.width > 0 && (r.right > pr.right + 2 || r.left < pr.left - 2)) out.push(`${name(el)} sticks out of its container by ${Math.round(Math.max(r.right - pr.right, pr.left - r.left))}px`)
+    }
+  }
+  return [...new Set(out)]
+}
+
+test('no screen spills out of its box from 320 to 1440 px for any role (US-096)', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const app = await sharedPending()
+  const visit = await sharedVisit()
+  const found: string[] = []
+  const sweep = async (screen: string, path: string) => {
+    for (const w of [320, 390, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width: w, height: 900 })
+      await page.goto(path)
+      await page.waitForLoadState('networkidle')
+      await page.locator('[aria-busy="true"]').first().waitFor({ state: 'detached', timeout: 15_000 }).catch(() => undefined)
+      await page.waitForTimeout(250)
+      for (const p of await page.evaluate(overflowProblems)) found.push(`${screen} at ${w}px: ${p}`)
+    }
+  }
+  await signIn(page, OPERATOR)
+  for (const [s, p] of [['dashboard', '/app/dashboard'], ['applications', '/app/applications'], ['application', app.url], ['form', `${app.url}/form/premises`], ['documents', `${app.url}/documents`], ['review', `${app.url}/review`], ['history', `${app.url}/history`]] as const) await sweep(s, p)
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await signOut(page)
+  await signIn(page, OFFICER)
+  for (const [s, p] of [['queue', '/officer/queue'], ['case', `/officer/applications/${visit.id}`], ['checklist', `/officer/applications/${visit.id}/checklist`]] as const) await sweep(s, p)
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await signOut(page)
+  await signIn(page, ADMIN)
+  for (const [s, p] of [['overview', '/admin/overview'], ['activity', '/admin/activity'], ['users', '/admin/users']] as const) await sweep(s, p)
+  expect(found, found.join('\n')).toEqual([])
 })

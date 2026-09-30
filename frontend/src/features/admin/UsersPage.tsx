@@ -214,7 +214,7 @@ export function AdminUsersPage() {
                 return (
                   <li
                     key={u.id}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 px-5 py-3.5 sm:grid-cols-[minmax(0,1fr)_150px_210px_110px_230px] sm:items-center"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 px-5 py-3.5 xl:grid-cols-[minmax(0,1fr)_150px_210px_110px_230px] xl:items-center"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-semibold">
@@ -245,7 +245,7 @@ export function AdminUsersPage() {
                       ) : null}
                     </span>
                     <span className="text-[13px] text-text-3">{formatDate(u.created_at)}</span>
-                    <span className="col-span-2 flex flex-wrap justify-end gap-1 sm:col-span-1">
+                    <span className="col-span-2 flex flex-wrap justify-end gap-1 xl:col-span-1">
                       <Button
                         variant="ghost"
                         size="sm"

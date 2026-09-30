@@ -65,7 +65,7 @@ export function NotificationsBell({ role }: { role: Role }) {
           'relative flex h-10 w-10 items-center justify-center rounded-md text-text-2 transition-colors hover:bg-neutral-soft hover:text-text',
           open && 'bg-neutral-soft text-text',
         )}
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+        aria-label={unread > 0 ? `Notifications, ${unread > 9 ? '9+' : unread} unread` : 'Notifications'}
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((v) => !v)}

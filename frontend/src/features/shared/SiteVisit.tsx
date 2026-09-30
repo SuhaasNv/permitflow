@@ -52,7 +52,7 @@ export function SlotControl({ value, onChange, disabled }: SlotControlProps) {
               className={cn(
                 'flex min-w-[150px] flex-col items-start gap-0.5 rounded-md border px-3.5 py-2.5 text-left',
                 'transition-[border-color,background-color] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
-                'focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(23,92,211,0.2)] disabled:cursor-not-allowed',
+                'focus-visible:outline-hidden focus-visible:shadow-[0_0_0_3px_rgba(23,92,211,0.2)] disabled:cursor-not-allowed',
                 on ? 'border-text bg-surface-3 text-text' : 'border-line-strong bg-surface text-text-2 hover:border-text-3',
               )}
             >

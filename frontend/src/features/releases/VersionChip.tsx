@@ -18,7 +18,6 @@ export function VersionChip({ variant, className }: VersionChipProps) {
   return (
     <Link
       to="/releases"
-      aria-label={`Version ${__APP_VERSION__}, what's new`}
       className={cn(
         'inline-flex items-center gap-1.5 whitespace-nowrap rounded no-underline',
         // On the strip the whole 28 px height is the target, with air on both sides.
@@ -35,8 +34,13 @@ export function VersionChip({ variant, className }: VersionChipProps) {
         v{__APP_VERSION__}
       </span>
       {!seen ? (
-        <span className={cn('text-[11px] font-semibold', dark ? 'text-white' : 'text-primary')}>New</span>
-      ) : dark ? null : (
+        <>
+          <span className={cn('text-[11px] font-semibold', dark ? 'text-white' : 'text-primary')}>New</span>
+          <span className="sr-only">what's new</span>
+        </>
+      ) : dark ? (
+        <span className="sr-only">what's new</span>
+      ) : (
         <span className="text-xs font-medium text-text-2 underline underline-offset-2">What's new</span>
       )}
     </Link>

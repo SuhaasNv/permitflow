@@ -6,7 +6,7 @@ import { ADMIN, OFFICER, OPERATOR, signIn, signOut } from '../helpers.js'
  * block comes first, the other audiences fold, the administrator sees everything; the "New" mark clears
  * on the first read; the phone keeps the chip in the top strip. */
 
-const chip = (page: import('@playwright/test').Page) => page.getByRole('link', { name: /^Version .*, what's new$/ })
+const chip = (page: import('@playwright/test').Page) => page.getByRole('link', { name: /^v\d[\w.-]*.*what's new$/i })
 
 test('signed out: the landing footer chip opens the page with every block open and the build line', async ({ page }) => {
   await page.goto('/')
