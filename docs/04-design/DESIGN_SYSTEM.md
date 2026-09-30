@@ -9,7 +9,7 @@ Rendered on the "Design system" artboard of the prototype. Values become Tailwin
 | `bg` | `#F3F4F6` | page canvas |
 | `surface` | `#FFFFFF` | cards, tables, forms |
 | `surface-2` | `#F9FAFB` | table header, card footer, read-only fields |
-| `line` / `line-strong` | `#D9DEE5` / `#AEB6C2` | borders / input borders |
+| `line` / `line-strong` | `#D9DEE5` / `#838C99` | borders / input, select and checkbox borders (3.40:1 on surface, 3.12:1 on bg: WCAG 1.4.11; was `#AEB6C2` at 2.04:1 until US-095) |
 | `text` / `text-2` / `text-3` | `#1B2430` / `#465060` / `#616C7A` | primary / secondary / metadata (`text-3` was `#66717F` until US-057: 4.34:1 on `surface-3` failed AA) |
 | `primary` / `primary-hover` | `#A8192A` / `#8A1422` | brand, primary action, attention |
 | `primary-soft` / `primary-line` | `#FBEDEE` / `#EFB8BE` | active nav, primary badge |

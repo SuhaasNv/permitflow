@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -40,11 +41,13 @@ const TONE_DOT: Record<string, string> = {
 }
 
 function Group({ title, hint, tone, count, children }: { title: string; hint: string; tone: string; count: number; children: ReactNode }) {
+  // An id without spaces: aria-labelledby reads a space as a list of ids (WCAG 1.3.1, US-095).
+  const headingId = useId()
   return (
-    <section aria-labelledby={`group-${title}`} className="pf-enter">
+    <section aria-labelledby={headingId} className="pf-enter">
       <div className="mb-3 flex items-baseline gap-3">
         <span className={cn('h-2 w-2 shrink-0 translate-y-[-1px] rounded-full', TONE_DOT[tone])} aria-hidden="true" />
-        <h2 id={`group-${title}`} className="text-[15px] font-semibold">
+        <h2 id={headingId} className="text-[15px] font-semibold">
           {title}
         </h2>
         <span className="font-mono text-xs text-text-3">{count}</span>

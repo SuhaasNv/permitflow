@@ -19,7 +19,7 @@ from pathlib import Path
 
 # Tokens (DESIGN_SYSTEM.md)
 BG, SURFACE, SURFACE2, SURFACE3 = "#F3F4F6", "#FFFFFF", "#F8F9FB", "#EEF0F3"
-LINE, LINE_STRONG = "#D9DEE5", "#AEB6C2"
+LINE, LINE_STRONG = "#D9DEE5", "#838C99"  # line-strong darkened to 3.40:1 for WCAG 1.4.11 (US-095)
 TEXT, TEXT2, TEXT3 = "#1B2430", "#465060", "#616C7A"
 PRIMARY, PRIMARY_HOVER, PRIMARY_SOFT, PRIMARY_LINE = "#A8192A", "#8A1422", "#FBEDEE", "#EFB8BE"
 INK = "#1B2430"
@@ -320,13 +320,27 @@ def version_chip(seen: bool, dark: bool = False) -> str:
                chip_ + label, "a", href="#", aria_label=f"Version {APP_VERSION[1:]}, what's new")
 
 
+# Session warning (US-095, WCAG 2.2.1): the masthead's right side, set per board by build_session_board.
+SESSION: dict[str, str] = {"notice": "", "action": ""}
+
+
+def session_notice(phone: bool) -> str:
+    """The warning as shipped in the masthead strip, with the one action that keeps the session (24 px target)."""
+    words = text(SESSION["notice"], 12, 16, 600, "#FFFFFF", "", "span")
+    action = ""
+    if SESSION["action"]:
+        action = div(st(height="24px", padding="0 10px", border_radius="4px", border="1px solid rgba(255,255,255,0.6)", background="transparent", color="#FFFFFF",
+                        font_size="12px", font_weight=600, font_family=SANS, display="inline-flex", align_items="center", cursor="pointer", flex_shrink=0), SESSION["action"], "button", type="button")
+    return div(st(margin_left="auto", display="flex", align_items="center", gap="10px"), words + action, "span", role="status")
+
+
 def shell(width: int, height: int, role: str, active: str, content: str, nav: str = "full", overlay: str = "") -> str:
     """App shell as shipped (frontend/src/app/AppShell.tsx): masthead 28, top bar 56, side nav 232 with its own footer, or the bottom tab bar on phones."""
     phone = nav == "phone"
     masthead = div(st(height="28px", flex_shrink=0, background=INK, color="#AEB6C2", display="flex", align_items="center", padding="0 16px" if phone else "0 24px", font_size="12px", gap="8px", white_space="nowrap", overflow="hidden"),
                    text("Secure licensing portal", 12, 16, 600, "#FFFFFF", "", "span") + ("" if phone else text("· Food Establishments Unit", 12, 16, 400, "#AEB6C2", "", "span"))
                    # On a phone there is no rail footer, so the version (and its What's new link) sits at the right of the masthead (US-094).
-                   + (div(st(margin_left="auto"), version_chip(seen=active == "What's new", dark=True), "span") if phone else ""), role="region", aria_label="Portal notice")
+                   + (session_notice(phone) if SESSION["notice"] else (div(st(margin_left="auto"), version_chip(seen=active == "What's new", dark=True), "span") if phone else "")), role="region", aria_label="Portal notice")
     bell = div(st(position="relative", width="40px", height="40px", display="flex", align_items="center", justify_content="center", border_radius="6px", color=TEXT2, border="none", background="transparent", cursor="pointer"), icon(IC["bell"], 18)
                + div(st(position="absolute", top="4px", right="4px", min_width="18px", height="18px", border_radius="999px", background=PRIMARY, color="#FFFFFF", font_size="10px", font_weight=700, display="flex", align_items="center", justify_content="center", padding="0 4px", border="2px solid #FFFFFF", box_sizing="border-box"), "2"), "button", type="button", aria_label="Notifications, 2 unread")
     avatar = div(st(width="32px", height="32px", border_radius="999px", background=INK, color="#FFFFFF", font_size="11px", font_weight=600, letter_spacing="0.04em", display="flex", align_items="center", justify_content="center", flex_shrink=0), initials(USERS[role]), "span")
@@ -1132,6 +1146,23 @@ def build_whats_new(width: int, height: int, role: str) -> str:
         content = hdr + build_line + div(st(display="grid", grid_template_columns="280px minmax(0, 1fr)", gap="48px", align_items="start"), left + article)
     return page("What's new", width, height, shell(width, height, role, "What's new", content, nav="phone" if phone else "full"))
 
+def build_session_board(board: str, w: int, h: int) -> str:
+    """Session warnings (US-095): idle at 55 minutes with Stay signed in; the 8-hour limit in its two options."""
+    notices = {
+        "session-idle-1280": ("You will be signed out in 5 min without activity", "Stay signed in"),
+        "session-idle-390": ("Signed out in 5 min", "Stay signed in"),
+        "session-8h-a": ("Session ends in 12 min", "Stay signed in"),
+        "session-8h-b": ("Session ends in 12 min · sign in again to continue", ""),
+    }
+    SESSION["notice"], SESSION["action"] = notices[board]
+    try:
+        if board == "session-idle-390":
+            return build_respond(w, h)
+        return build_checklist(w, h, "online")
+    finally:
+        SESSION["notice"], SESSION["action"] = "", ""
+
+
 # Canvas ----------------------------------------------------------------------------------------
 
 BOARDS: list[tuple[str, str, int, int, str, int]] = [
@@ -1155,6 +1186,10 @@ BOARDS: list[tuple[str, str, int, int, str, int]] = [
     ("S44-Whats-New.dc.html", "S-44 What's new, officer signed in (1280)", 1280, 1700, "whats-new-officer", 4),
     ("S44-Whats-New-Phone.dc.html", "S-44 What's new, operator on a phone (390)", 390, 2350, "whats-new-operator-390", 4),
     ("S44-Whats-New-Admin.dc.html", "S-44 What's new, administrator (every block open)", 1280, 2100, "whats-new-admin", 4),
+    ("S45-Session-Idle.dc.html", "S-45 Idle warning at 55 min, Stay signed in (1280)", 1280, 900, "session-idle-1280", 5),
+    ("S45-Session-Idle-Phone.dc.html", "S-45 Idle warning on a phone (390)", 390, 844, "session-idle-390", 5),
+    ("S45-Session-8h-A.dc.html", "S-45 8-hour limit, option A: Stay signed in renews the session", 1280, 900, "session-8h-a", 5),
+    ("S45-Session-8h-B.dc.html", "S-45 8-hour limit, option B: no renewal, sign in again", 1280, 900, "session-8h-b", 5),
 ]
 
 
@@ -1195,6 +1230,8 @@ def build(board: str, w: int, h: int) -> str:
         return build_whats_new(w, h, "operator")
     if board == "whats-new-admin":
         return build_whats_new(w, h, "admin")
+    if board.startswith("session-"):
+        return build_session_board(board, w, h)
     raise KeyError(board)
 
 
@@ -1217,6 +1254,7 @@ def main(out: Path) -> None:
         "row-operator": {"x": 0, "y": int(boards["S18-Respond-Phone.dc.html"]["y"]) - 300, "text": "Operator: answer only the flagged items", "kind": "title1", "maxW": 3400},  # type: ignore[call-overload]
         "row-admin": {"x": 0, "y": int(boards["S40-Admin-Overview.dc.html"]["y"]) - 300, "text": "Admin: overview, activity, users, read-only case", "kind": "title1", "maxW": 5400},  # type: ignore[call-overload]
         "row-visit": {"x": 0, "y": int(boards["S32-Schedule-Dialog.dc.html"]["y"]) - 300, "text": "Site visit appointment: propose, accept or counter, confirm (US-084)", "kind": "title1", "maxW": 4600},  # type: ignore[call-overload]
+        "row-session": {"x": 0, "y": int(boards["S45-Session-Idle.dc.html"]["y"]) - 300, "text": "Session warnings (US-095, WCAG 2.2.1): a warning with Stay signed in before the 60-minute idle limit; the 8-hour limit in two options, pick one", "kind": "title1", "maxW": 5400},  # type: ignore[call-overload]
         "row-whats-new": {"x": 0, "y": int(boards["S44-Whats-New.dc.html"]["y"]) - 300, "text": "What's new behind the version number: the reader's own changes first, every release below (US-094, v0.4.0-rc.2)", "kind": "title1", "maxW": 4600},  # type: ignore[call-overload]
     }
     canvas = {

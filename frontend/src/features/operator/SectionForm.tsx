@@ -36,6 +36,14 @@ export interface SectionFormProps {
   onDirtyChange: (dirty: boolean) => void
 }
 
+/** The applicant's own details, so browsers and assistive tools can fill them in (WCAG 1.3.5, US-095). */
+const AUTOCOMPLETE: Partial<Record<string, string>> = {
+  business_name: 'organization',
+  contact_name: 'name',
+  contact_email: 'email',
+  contact_phone: 'tel',
+}
+
 function fieldError(errors: Record<string, { message?: string } | undefined>, key: string): string | undefined {
   return errors[key]?.message
 }
@@ -208,6 +216,7 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
             className={className}
             type={f.kind === 'email' ? 'email' : f.kind === 'tel' ? 'tel' : 'text'}
             inputMode={f.key === 'postal_code' ? 'numeric' : undefined}
+            autoComplete={AUTOCOMPLETE[f.key]}
             maxLength={f.max_length ?? undefined}
             {...form.register(f.key)}
           />

@@ -27,7 +27,9 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-prac
 /** Collects one line per violation so a run reports every screen, not only the first broken one. */
 async function violations(page: Page, screen: string): Promise<string[]> {
   // Scan the loaded screen, never a skeleton: under load a page can still be fetching after networkidle,
-  // and a skeleton has no h1 (found on 21 Sep when the whole suite ran on one machine).
+  // and a skeleton has no h1 (found on 21 Sep when the whole suite ran on one machine). The skeleton may not
+  // have mounted yet either, so wait for the heading first (US-095: the officer case flaked 1 run in 3).
+  await page.locator('h1').first().waitFor({ timeout: 15_000 }).catch(() => undefined)
   await page.locator('[aria-busy="true"]').first().waitFor({ state: 'detached', timeout: 15_000 }).catch(() => undefined)
   const results = await new AxeBuilder({ page }).withTags(TAGS).analyze()
   return results.violations.map(
@@ -349,4 +351,58 @@ test('the checklist works from the keyboard alone (US-088)', async ({ page }) =>
   await page.keyboard.type('Reachable by keyboard.')
   await expect(page.getByText('Saved just now')).toBeVisible({ timeout: 5000 })
   await signOut(page)
+})
+
+/** Tabs through the page from the skip link and returns every stop the sticky header, the phone tab bar or a
+ * sticky submit card hid completely (WCAG 2.4.11 Focus Not Obscured, US-095). */
+async function hiddenFocusStops(page: Page, screen: string, presses = 60): Promise<string[]> {
+  const hidden: string[] = []
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.locator('main#main').focus()
+  for (let i = 0; i < presses; i++) {
+    await page.keyboard.press('Tab')
+    const stop = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null
+      if (!el || el === document.body) return null
+      const r = el.getBoundingClientRect()
+      const points = [
+        [r.left + 2, r.top + 2],
+        [r.right - 2, r.top + 2],
+        [r.left + 2, r.bottom - 2],
+        [r.right - 2, r.bottom - 2],
+        [(r.left + r.right) / 2, (r.top + r.bottom) / 2],
+      ]
+      const covered = points.every(([x, y]) => {
+        const hit = document.elementFromPoint(x, y)
+        return !hit || (!el.contains(hit) && !hit.contains(el))
+      })
+      return covered ? (el.getAttribute('aria-label') ?? el.textContent ?? el.tagName).trim().slice(0, 40) : null
+    })
+    if (stop) hidden.push(`${screen}: "${stop}" hidden after Tab ${i + 1}`)
+  }
+  return hidden
+}
+
+test('no focused control is hidden behind a sticky bar on the checklist or the respond page (US-095)', async ({ page }) => {
+  const visit = await seedVisitConfirmed()
+  const clarification = await seedAwaitingClarification()
+  const hidden: string[] = []
+  await signIn(page, OFFICER)
+  for (const [width, height] of [[390, 844], [820, 1180], [1280, 800]] as const) {
+    await page.setViewportSize({ width, height })
+    await page.goto(`/officer/applications/${visit.id}/checklist`)
+    await page.getByRole('group', { name: 'Result' }).first().waitFor()
+    hidden.push(...(await hiddenFocusStops(page, `${width} checklist`)))
+  }
+  await page.setViewportSize({ width: 1280, height: 844 })
+  await signOut(page)
+  await signIn(page, OPERATOR)
+  for (const [width, height] of [[390, 844], [1280, 800]] as const) {
+    await page.setViewportSize({ width, height })
+    await page.goto(`${clarification.url}/clarification`)
+    await page.getByLabel(/Your answer/).first().waitFor()
+    hidden.push(...(await hiddenFocusStops(page, `${width} respond page`)))
+  }
+  await page.setViewportSize({ width: 1280, height: 844 })
+  expect(hidden, hidden.join('\n')).toEqual([])
 })

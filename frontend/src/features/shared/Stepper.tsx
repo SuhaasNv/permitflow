@@ -111,11 +111,10 @@ export function Stepper({ steps, className }: { steps: Step[]; className?: strin
                 {inner}
               </Link>
             ) : (
-              <span
-                className="flex w-full flex-col items-center px-1"
-                aria-label={step.state === 'locked' ? `${step.label}: locked` : undefined}
-              >
+              <span className="flex w-full flex-col items-center px-1">
                 {inner}
+                {/* aria-label is not allowed on a plain span, so the state is spoken as text (WCAG 4.1.2, US-095). */}
+                {step.state === 'locked' ? <span className="sr-only">: locked</span> : null}
               </span>
             )}
           </li>

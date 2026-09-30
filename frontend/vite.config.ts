@@ -44,7 +44,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
-    css: false,
+    // CSS stays off in tests, except the token sheet that tokens.test.ts reads as text (US-095).
+    css: { include: [/styles\/index\.css/] },
     coverage: {
       provider: 'v8',
       // Every file matched by include counts, tested or not, so the number cannot be flattered by leaving files out.
