@@ -23,8 +23,8 @@ const SPECS = {}
 {
   const nodes = [
     { id: 'a1', row: 'A', col: 0, step: '1', actor: 'browser', title: 'Enter email and password', detail: 'Login page with a show-password toggle', file: 'features/auth/LoginPage.tsx' },
-    { id: 'a2', row: 'A', col: 1, step: '2', actor: 'api', check: true, title: 'Under the rate limit?', detail: '20 attempts a minute per client; the client key cannot be spoofed', file: 'core/rate_limit.py',
-      pill: { code: '429', text: 'Too many attempts. Try again in a minute.' } },
+    { id: 'a2', row: 'A', col: 1, step: '2', actor: 'api', check: true, title: 'Under the rate limit?', detail: '20 sign-in attempts a minute per client, and 10 failed ones', file: 'core/rate_limit.py',
+      pill: { code: '429', text: 'Too many requests. Try again in a moment.' } },
     { id: 'a3', row: 'A', col: 2, step: '3', actor: 'api', title: 'Find the user by email', detail: 'One lookup in the users table', file: 'services/auth.py',
       pill: { kind: 'store', text: 'users: email, Argon2 hash, role, active', label: 'read' } },
     { id: 'a4', row: 'A', col: 3, step: '4', actor: 'api', check: true, title: 'Active and password correct?', detail: 'Argon2 verify; unknown email checks a dummy hash, so timing is the same', file: 'core/security.py',
@@ -37,10 +37,10 @@ const SPECS = {}
       pill: { code: '401', text: 'Your session has expired. Sign in again.' } },
     { id: 'b3', row: 'B', col: 2, step: '9', actor: 'api', check: true, title: 'User still active?', detail: 'User re-read from the database on every request; the role comes from the row', file: 'services/auth.py',
       pill: { code: '401', text: 'Invalid or missing credentials.' } },
-    { id: 'b4', row: 'B', col: 3, step: '10', actor: 'api', check: true, title: 'Role allowed on this route?', detail: 'Operator, officer or admin routes', file: 'api/deps.py  require_role',
+    { id: 'b4', row: 'B', col: 3, step: '10', actor: 'api', check: true, title: 'Role allowed on this route?', detail: 'Operator and officer routes; the admin role is reserved', file: 'api/deps.py  require_role',
       pill: { code: '403', text: 'Not available for your role.' } },
-    { id: 'b5', row: 'B', col: 4, step: '11', actor: 'api', check: true, title: 'Allowed to see this record?', detail: 'Operators: only their own. Looked up by owner, never by id alone.', file: 'repositories/applications.py',
-      pill: { code: '404', text: 'Not found. (No hint that it exists.)' } },
+    { id: 'b5', row: 'B', col: 4, step: '11', actor: 'api', check: true, title: 'Allowed to see this record?', detail: 'Loaded by id, then the owner is checked. Operators see only their own.', file: 'repositories/applications.py',
+      pill: { code: '404', text: 'Application not found. (No hint that it exists.)' } },
     { id: 'b6', row: 'B', col: 5, step: '12', actor: 'api', done: true, tagLabel: 'API', title: 'Run the request', detail: 'The service does its work in one database transaction' },
   ]
   SPECS.signin = {
@@ -74,8 +74,8 @@ const SPECS = {}
     { id: 'a6', row: 'A', col: 5, step: '6', actor: 'browser', title: 'Build the form', detail: 'Zod validators made from that schema; each field checked when you leave it', file: 'lib/zodFromSchema.ts' },
 
     { id: 'b1', row: 'B', col: 0, step: '7', actor: 'browser', title: 'Save and continue', detail: 'Or Save and exit. Leaving with unsaved edits asks first.', file: 'operator/SectionForm.tsx' },
-    { id: 'b2', row: 'B', col: 1, step: '8', actor: 'api', check: true, title: 'Your application?', detail: 'Row locked for this save; looked up by owner', file: 'services/applications.py',
-      pill: { code: '404', text: 'Not found.' } },
+    { id: 'b2', row: 'B', col: 1, step: '8', actor: 'api', check: true, title: 'Your application?', detail: 'Row locked for this save; loaded by id, then the owner is checked', file: 'services/applications.py',
+      pill: { code: '404', text: 'Application not found.' } },
     { id: 'b3', row: 'B', col: 2, step: '9', actor: 'api', check: true, title: 'Section open for changes?', detail: 'Draft: every section.\nResubmission: only what the officer flagged.', file: 'domain/editability.py',
       pill: { code: '403', text: 'The licensing officer did not ask for changes to this section.' } },
     { id: 'b4', row: 'B', col: 3, step: '10', actor: 'api', check: true, title: 'Valid on the server?', detail: 'Same rules as the browser. A draft may leave fields blank, never wrong.', file: 'domain/form_schema.py',
@@ -151,7 +151,7 @@ const SPECS = {}
 /* 4. AI verification ----------------------------------------------------------------------------- */
 {
   const nodes = [
-    { id: 'a1', row: 'A', col: 0, step: '1', actor: 'db', check: true, title: 'Within the daily quota?', detail: '60 checks per applicant and 1,000 for the platform, per day', file: 'services/quotas.py',
+    { id: 'a1', row: 'A', col: 0, step: '1', actor: 'db', check: true, title: 'Within the daily quota?', detail: 'Checked at upload: 60 checks per applicant and 1,000 for the platform, per day', file: 'services/quotas.py',
       pill: { kind: 'status', text: 'Stored as unavailable: daily limit reached. No call.' } },
     { id: 'a2', row: 'A', col: 1, step: '2', actor: 'task', title: 'Claim the run', detail: 'pending to running in one atomic update; frees its DB connection before the slow part', file: 'services/verification.py' },
     { id: 'a3', row: 'A', col: 2, step: '3', actor: 'task', check: true, title: 'Text found?', detail: 'pypdf: up to 30 pages, 20,000 characters, 10 s. No OCR for images.', file: 'infra/extraction.py',
@@ -164,8 +164,8 @@ const SPECS = {}
     { id: 'b1', row: 'B', col: 0, step: '7', actor: 'openai', title: 'Call gpt-4.1-mini', detail: 'Temperature 0 · 30 s timeout · 1 retry · strict JSON schema · prompt 2026-09-19.3', file: 'infra/ai/openai_provider.py' },
     { id: 'b2', row: 'B', col: 1, step: '8', actor: 'rules', check: true, title: 'Answer on time and valid?', detail: 'Wire schema, then our model: confidence 0 to 1, status agrees with issues',
       pill: { kind: 'status', text: 'Timeout: unavailable. Bad answer: failed.' } },
-    { id: 'b3', row: 'B', col: 2, step: '9', actor: 'rules', title: 'Decide the status', detail: 'Injection phrase: needs review\nIssues listed: issues found\nVerified, under 0.6: needs review\nOtherwise: verified' },
-    { id: 'b4', row: 'B', col: 3, step: '10', actor: 'db', title: 'Save the result', detail: 'Status, issues with evidence, model, prompt version, latency, audit row' },
+    { id: 'b3', row: 'B', col: 2, step: '9', actor: 'rules', title: 'Decide the status', detail: 'Injection: needs review\nModel unreadable: unreadable\nIssues: issues found\nVerified under 0.6: needs review\nOtherwise: verified' },
+    { id: 'b4', row: 'B', col: 3, step: '10', actor: 'db', title: 'Save the result', detail: 'Status, issues with evidence, model, latency; the audit row records the prompt version' },
     { id: 'b5', row: 'B', col: 4, step: '11', actor: 'browser', title: 'Show it by role', detail: 'Operator: a plain label and what to fix. Officer: adds confidence, evidence, model.' },
     { id: 'b6', row: 'B', col: 5, step: '12', actor: 'officer', done: true, tagLabel: 'Officer', title: 'A person decides', detail: 'The check never changes status, feedback or what can be edited' },
   ]
