@@ -75,6 +75,7 @@ Scope status per requirement is tracked in `SCOPE.md` and, at the end, in `docs/
 | NFR-017 | Use case 3 is observable: counters for checklists submitted, clarification rounds requested and attachment bytes stored, a dashboard row generated from the same script as the rest, and the post-site states in the Telegram `/queue` reply. (v0.4.0, US-089) |
 | NFR-018 | Audit growth is bounded: no audit row per draft save; the activity feed is read in pages of 50 by keyset; the audit table's indexes carry the admin queries. (v0.4.0; covered by US-061, US-072, US-086) |
 | NFR-019 | One active session per account: a sign-in while another session is active is refused unless the user takes over; revocation takes effect on the next request; idle sessions end after 60 minutes; the session check costs one indexed read. (v0.4.0, US-093) | Owner's requirement 21 Sep 2026 (an officer on an iPad, then the laptop) |
+| NFR-020 | The product meets WCAG 2.2 AA on every screen, checked criterion by criterion (`docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`): the keyboard focus is never hidden behind a sticky bar, control borders reach 3:1, the idle sign-out is announced five minutes ahead with Stay signed in, and the 8-hour limit is announced 30 minutes ahead and not renewable by design. (US-095) | Owner's request 30 Sep 2026, after a WCAG 2.2 AA audit |
 
 ## 3. Security requirements
 

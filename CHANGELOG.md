@@ -2,17 +2,16 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
-## WCAG 2.2 AA fixes, in progress (US-095, 1 Oct 2026)
+## WCAG 2.2 AA (US-095, 1 Oct 2026)
 
-A WCAG 2.2 AA audit (55 A and AA criteria; axe at 375, 768 and 1280, keyboard walks, reflow, target size, text spacing, contrast, forms, sign-in) found six failures. Five are fixed on `feat/us-095-wcag-aa`, not merged into `dev`, nothing pushed.
+A WCAG 2.2 AA audit (55 A and AA criteria; axe at 375, 768 and 1280, keyboard walks, reflow, target size, text spacing, contrast, forms, sign-in) found six failures; all six are fixed on `feat/us-095-wcag-aa`, a second audit found none, and the result was checked again in Chrome. Merged into `dev` locally; nothing pushed. The criterion-by-criterion table is in `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.
 
-- **Focus is never hidden behind a sticky bar (2.4.11).** Tabbing through the checklist hid the focused control 30 times in 60 presses on a phone and 9 on a desktop; after the skip link the first breadcrumb sat under the header. The page now reserves the header, tab bar and submit card heights when it scrolls to focus; a new accessibility test walks the checklist and the respond page at 390, 820 and 1280 and finds no hidden stop (it finds 78 without the fix).
-- **Visible control borders (1.4.11).** Inputs, selects and checkboxes use `#838c99` (3.40:1) instead of `#aeb6c2` (2.04:1); a token test fails below 3:1.
+- **Focus is never hidden behind a sticky bar (2.4.11).** Tabbing through the checklist hid the focused control 30 times in 60 presses on a phone and 9 on a desktop; after the skip link the first breadcrumb sat under the header. The page now reserves the header, tab bar and submit card heights when it scrolls to focus; a new gate test walks the checklist and the respond page at 390, 820 and 1280 and finds no hidden stop (78 without the fix).
+- **Visible control borders (1.4.11).** Inputs, selects and checkboxes use `#838c99` (3.40:1) instead of `#aeb6c2` (2.04:1), approved by the owner; a token test fails below 3:1.
+- **Idle warning (2.2.1).** Five minutes before the 60-minute idle sign-out the portal strip warns and offers Stay signed in (one request keeps the session). The 8-hour limit stays final by the owner's choice (option B); its warning now says to sign in again. The strip's status region is always present, so warnings are read out. Artboards S-45 on the v0.4.0 canvas, approved before the code.
 - **Dashboard groups keep their names (1.3.1), a locked step says so (4.1.2), the applicant's own details can be autofilled (1.3.5).**
-- **The accessibility gate's officer-case scan no longer flakes** (it waits for the heading).
-- **Tests.** Vitest 284 in 48 files; the accessibility gate 12 of 12; build and lint clean.
-
-Handover: the idle-session warning (2.2.1) waits for the owner's yes on the S-45 artboards (v0.4.0 canvas, row "Session warnings") and a choice between the 8-hour options A and B; then code it in `AppShell` and `lib/session.ts`, update `LEGAL_AND_ACCESSIBILITY_REVIEW.md`, `UI_STATES.md`, `REQUIREMENTS.md` NFR-020, `TEST_STRATEGY.md`, `docs/04-design/README.md` (23 boards), re-run the audit, then Notion Done and merge.
+- **The gate's officer-case scan waits for its own heading** (it flaked when it caught the queue page mid-navigation).
+- **Tests.** Vitest 289 in 48 files; the accessibility gate 12 of 12; build and lint clean.
 
 ## Anti-slop design audit fixes (29 Sep 2026)
 

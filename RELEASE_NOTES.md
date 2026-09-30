@@ -34,6 +34,7 @@ Format: the product reads this file at build time for its What's new page (the v
 **Also**
 - Each application has 150 MB of storage room across its documents, evidence and licence; the pages say how much is left before a file is chosen.
 - The accessibility gate covers every new screen; every control on the checklist and the respond page is at least 44 px on a phone or a tablet.
+- Checked against every WCAG 2.2 AA rule: the control you reach with the keyboard is never hidden behind a sticky bar, input and checkbox borders are easier to see, screen readers name the dashboard groups and a locked step, your contact details can be filled in by the browser, and five minutes before you would be signed out for inactivity the top strip warns you with a Stay signed in button.
 - The version number in the corner opens What's new: this page, with your own changes first and every earlier release below; the word New sits beside the version until you have read it once.
 - Reviewed twice before release (a code review on 21 Sep and a stability review of the whole build with a smoke test of every route the same morning): a case can no longer end with Reject as the only move after every question of a round is withdrawn, a visit date that has passed cannot be confirmed, the last taps on the checklist are saved when you leave the page by a link, and typing while an answer saves no longer loses what you typed.
 
