@@ -4,7 +4,7 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 
 ## Anti-slop design audit fixes (29 Sep 2026)
 
-The owner approved six findings from a design audit looking for the tells of a generated site; they are fixed on `fix/anti-slop-audit`, not yet merged into `dev`, nothing pushed. The landing page's glow behind the document panel stays, by the owner's choice.
+The owner approved six findings from a design audit looking for the tells of a generated site; they were fixed on `fix/anti-slop-audit` and merged into `dev` on 30 Sep at the owner's request, nothing pushed. The landing page's glow behind the document panel stays, by the owner's choice.
 
 - **No invented numbers on the landing page.** The hero's "About 20 minutes" was never measured, and the other two facts in that row repeated the document panel and the checks section, so the row is gone.
 - **Every screen names its tab.** "Sign in | PermitFlow", "Review queue | PermitFlow", "Privacy policy | PermitFlow" and so on, set from the route table; `index.html` keeps "PermitFlow" as the fallback and now carries a meta description and share preview tags that say plainly it is a fictional service built for an engineering assessment (no preview image).
