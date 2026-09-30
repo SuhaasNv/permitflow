@@ -277,3 +277,47 @@ const SPECS = {}
     ],
   }
 }
+
+/* 7. Feedback and requesting a resubmission ------------------------------------------------------ */
+{
+  const nodes = [
+    { id: 'a1', row: 'A', col: 0, step: '1', actor: 'browser', title: 'Start review', detail: 'A button from the allowed actions: Application Received to Under Review; the operator is told', file: 'officer/CasePage.tsx' },
+    { id: 'a2', row: 'A', col: 1, step: '2', actor: 'browser', title: 'Add feedback', detail: 'Pick a section or a document; start from one of 7 templates or write your own', file: 'officer/FeedbackPanel.tsx' },
+    { id: 'a3', row: 'A', col: 2, step: '3', actor: 'api', check: true, title: 'Target and text valid?', detail: 'A real section or document type; 1 to 2,000 characters; a known template', file: 'services/feedback.py',
+      pill: { code: '422', text: 'Some fields need attention.' } },
+    { id: 'a4', row: 'A', col: 3, step: '4', actor: 'api', check: true, title: 'Under Review?', detail: 'Row locked. Feedback is added only while the case is Under Review.',
+      pill: { code: '409', text: 'Feedback can be added only while the application is Under Review.' } },
+    { id: 'a5', row: 'A', col: 4, step: '5', actor: 'db', title: 'Save as a draft', detail: 'Open, tied to the current revision, not yet visible to the operator; audit: feedback.created' },
+    { id: 'a6', row: 'A', col: 5, step: '6', actor: 'browser', title: 'Change your mind', detail: 'A draft can be withdrawn, with Undo for 10 s (the server allows 15 s)' },
+
+    { id: 'b1', row: 'B', col: 0, step: '7', actor: 'browser', title: 'Request resubmission', detail: 'Sends the target status and the version the page loaded', file: 'officer/queries.ts' },
+    { id: 'b2', row: 'B', col: 1, step: '8', actor: 'api', check: true, title: 'Page still current?', detail: 'Row locked; the version must match what the officer saw', file: 'services/workflow.py',
+      pill: { code: '409', text: 'This application changed since you opened it. Reload to see the latest.' } },
+    { id: 'b3', row: 'B', col: 2, step: '9', actor: 'api', check: true, title: 'At least one open item?', detail: 'The state machine guard for this move', file: 'domain/workflow.py',
+      pill: { code: '409', text: 'At least one open feedback item is required.' } },
+    { id: 'b4', row: 'B', col: 3, step: '10', actor: 'db', title: 'Release and freeze', detail: 'Status Pending Pre-Site Resubmission; every draft item stamped released; audit: feedback.released' },
+    { id: 'b5', row: 'B', col: 4, step: '11', actor: 'db', title: 'Record and notify', detail: 'status.changed audit row and one operator notification, same transaction; version + 1' },
+    { id: 'b6', row: 'B', col: 5, step: '12', actor: 'browser', done: true, tagLabel: 'Browser', title: 'The operator sees it', detail: 'Feedback on top, in operator words; only the flagged parts reopen' },
+  ]
+  SPECS.feedback = {
+    part: 'Flow 7 · Feedback and requesting a resubmission',
+    title: 'feedback and resubmission request',
+    sub: 'The officer points at exactly what needs fixing, then sends it all at once',
+    actors: ['browser', 'api', 'db'],
+    phases: {
+      A: { n: 1, t: 'Write feedback while Under Review', s: 'POST /officer/applications/{id}/feedback' },
+      B: { n: 2, t: 'Request the resubmission', s: 'POST /officer/applications/{id}/transition' },
+    },
+    nodes,
+    edges: [
+      ...chain(['a1', 'a2', 'a3', 'a4', 'a5', 'a6'], nodes),
+      { from: 'a6', to: 'b1', fs: 'r', ts: 'l', label: '', via: RETURN },
+      ...chain(['b1', 'b2', 'b3', 'b4', 'b5', 'b6'], nodes),
+    ],
+    banner: [
+      { k: 'Draft until released', v: 'Nothing appears or disappears under the operator while they edit; a round goes out whole.' },
+      { k: 'Tied to a target', v: 'Every item names a section or a document, and that is exactly what reopens for the operator.' },
+      { k: 'Honest gap', v: 'Text only: no attachments on feedback, no officer-to-officer notes, no case assignment.' },
+    ],
+  }
+}
