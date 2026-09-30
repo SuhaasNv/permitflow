@@ -19,7 +19,7 @@ Written by an engineer, not a lawyer. It is a good-faith reading of the law as i
 | 9 | Check third-party embeds | Yes | None: no iframes, no maps, no video, no social widgets. The one third-party request the site made, Google Fonts (which discloses the visitor's IP address to Google), is gone: the three typefaces are now served from our origin | `frontend/public/fonts/`, `src/styles/fonts.css`, `index.html`; `docker/nginx.conf.template` caches them |
 | 10 | Make the site accessible | Yes | Automated gate: axe-core with the WCAG 2.0, 2.1 and 2.2 A and AA rules plus best practices on 14 screens at desktop width (5 public, 7 operator, 2 officer), the feedback composer and a confirmation dialog, and 7 screens at phone width (390 px, which brings in the WCAG 2.2 target-size rule): 23 states. v0.4.0 (US-088) added the appointment card and panel, the checklist as a draft and as submitted at 1024, 820 and 390, the respond page, the history with rounds, the four admin screens and the add-account dialog, a 44 px target measurement and a keyboard walk of the checklist. Findings fixed: missing `main` landmark on the landing and sign-in pages, content outside landmarks (app masthead, now a named region; the sign-in page's decorative column, now a named `aside`), a contrast failure (below), and no skip link anywhere (added) | `frontend/e2e/a11y.spec.ts`, run in CI's end-to-end job |
 | 11 | Add alt text | Not applicable | The site has no `<img>` elements. Every SVG is decorative and carries `aria-hidden="true"`; the brand mark is inside a link whose accessible name is "PermitFlow home". The licence PDF's brand mark is drawn as vector paths, not an image | `grep -rn "<img" src` returns nothing; `Logo.tsx` |
-| 12 | Check colour contrast | Yes | Every text token was computed against every surface token (WCAG relative luminance). `text-3` (#66717f) failed at 4.34:1 on `surface-3` and at 4.36:1 on `primary-soft`, contradicting the design system's claim of 4.5:1 everywhere. Changed to #616c7a: lowest pairing now 4.68:1 (`surface-3`); 5.34:1 on white. `line-strong` is a border colour, never text, and is not held to the text ratio | `src/styles/index.css`, `docs/04-design/DESIGN_SYSTEM.md`; the computation is reproduced in this document's appendix |
+| 12 | Check colour contrast | Yes | Every text token was computed against every surface token (WCAG relative luminance). `text-3` (#66717f) failed at 4.34:1 on `surface-3` and at 4.36:1 on `primary-soft`, contradicting the design system's claim of 4.5:1 everywhere. Changed to #616c7a: lowest pairing now 4.68:1 (`surface-3`); 5.34:1 on white. `line-strong` is a border colour, never text, so it is held to the 3:1 non-text ratio instead (WCAG 1.4.11): #aeb6c2 at 2.04:1 failed it and became #838c99 at 3.40:1 on 1 Oct 2026 (US-095, `tokens.test.ts`) | `src/styles/index.css`, `docs/04-design/DESIGN_SYSTEM.md`; the computation is reproduced in this document's appendix |
 | 13 | Make forms keyboard-friendly | Yes | Sign-in completes from the keyboard alone (test); every control has a visible `:focus-visible` ring (2 px, 2 px offset, `info` blue at 5.99:1 on white); dialogs are native `<dialog>` elements opened with `showModal()`, so the browser traps focus inside, Escape closes (wired to the cancel action) and focus returns to the opener; focus lands on Cancel for destructive dialogs and on the primary action otherwise; the drop zone is a native file input with a visible label and focus ring, so Enter or Space opens the picker; a skip link to `#main` was added to the landing page, the policy pages and the app shell (missing before this story); radio groups, selects and checkboxes are native controls with labels; axe's `label`, `focus-order-semantics` and `tabindex` rules pass on every screen | `a11y.spec.ts` (keyboard sign-in, skip link); `Dialog.tsx`; `DropZone.tsx`; `index.css` `:focus-visible`, `.pf-skip-link` |
 | 14 | Use clear button labels | Yes | Reviewed every button in the codebase: labels are verbs with objects ("Save and continue", "Request resubmission", "Mark site visit scheduled", "Download licence"), destructive ones name the consequence and require a note, icon-only buttons carry `aria-label` (notifications bell, show/hide password, close dialog). axe's `button-name` and `link-name` rules pass on every screen | `a11y.spec.ts`; `docs/04-design/UI_STATES.md` |
 | 15 | Remove fake reviews | Not applicable | There are none: no testimonials, ratings, star widgets, customer logos or "trusted by" strip anywhere. The landing page describes the workflow and the documents needed, nothing else | `LandingPage.tsx` |
@@ -97,3 +97,63 @@ White on `primary` (every primary button, the take-over action) is 7.40:1. The l
 ### Target size on the touch screens (US-088)
 
 The root font size is 15 px, so the `h-10` control height is 37.5 px. Since 21 Sep 2026 every button, input and chip is at least 44 px tall below the desktop breakpoint (1280 px) and compact from it; the gate measures every control on the checklist (390, 820, 1024) and the respond page (390, 820) and fails below 44 x 44. Inline text links (breadcrumbs, the header's tab links) are exempt as WCAG 2.5.8 allows for links in running text; a checkbox is measured by the label that wraps it. A keyboard walk of the checklist (Space and Enter pick a result, Tab reaches the flag and the comment, the autosave follows) is part of the gate.
+
+## WCAG 2.2 AA audit, criterion by criterion (US-095, 1 Oct 2026)
+
+Run with the `wcag-audit` method on the local build (mock AI provider): the axe gate above plus axe at 768 px, reflow at 320 px and in phone landscape (34 checks), target size at 375 px, text spacing at 375 and 1280, 22 keyboard walks with a focus-indicator and focus-hidden probe at each stop, border contrast measured in the browser, form errors, sign-in, the dialog and the notifications menu; then checked again in Chrome. Twenty screens: the public pages and the 404, six operator, three officer, three admin. The first run found six failures; all six are fixed and the second run found none. This is not a conformance claim: axe finds about a third of real issues, and the screen-reader pass below is still to be done by a person.
+
+| SC | Level | Verdict | Evidence |
+|----|-------|---------|----------|
+| 1.1.1 Non-text Content | A | Pass | No `<img>`; icons `aria-hidden`; axe `svg-img-alt`, `button-name` clean |
+| 1.2.1 to 1.2.5 Time-based media | A, AA | N/A | No audio or video |
+| 1.3.1 Info and Relationships | A | Pass (fixed) | Dashboard groups were labelled by ids with spaces, so `aria-labelledby` named nothing; now `useId` (`DashboardPage.tsx`) |
+| 1.3.2 Meaningful Sequence | A | Pass | DOM order is reading order (accessibility snapshots) |
+| 1.3.3 Sensory Characteristics | A | Needs a person | No shape or position instructions found; to be read through by a person |
+| 1.3.4 Orientation | AA | Pass | 844 x 390 landscape reflows, no orientation lock |
+| 1.3.5 Identify Input Purpose | AA | Pass (fixed) | Sign-in `email`, `current-password`; the applicant's `organization`, `name`, `email`, `tel` added (`SectionForm.tsx`) |
+| 1.4.1 Use of Color | A | Pass | Every status is a label plus a dot (`StatusBadge`) |
+| 1.4.2 Audio Control | A | N/A | No audio |
+| 1.4.3 Contrast (Minimum) | AA | Pass | axe clean on every screen; its undecided cases computed by hand (primary button 7.40:1, `text-3` on `warning-soft` 4.97:1) |
+| 1.4.4 Resize Text | AA | Pass | Zoom allowed (viewport meta); reflow at 640 and 320 px |
+| 1.4.5 Images of Text | AA | Pass | None |
+| 1.4.10 Reflow | AA | Pass | 34 of 34 checks without horizontal scroll at 320 px |
+| 1.4.11 Non-text Contrast | AA | Pass (fixed) | Input, select and checkbox borders were 2.04:1; now 3.40:1 on white, 3.12:1 on the page; focus ring 5.99:1 |
+| 1.4.12 Text Spacing | AA | Pass | Override stylesheet at 375 and 1280, nothing clipped (checked in screenshots) |
+| 1.4.13 Content on Hover or Focus | AA | Pass | No custom tooltips; the notifications menu closes on Escape and returns focus |
+| 2.1.1 Keyboard | A | Pass | Keyboard walks; the checklist and sign-in keyboard tests |
+| 2.1.2 No Keyboard Trap | A | Pass | No trap in 22 walks; native `<dialog>` |
+| 2.1.4 Character Key Shortcuts | A | Pass | Only Escape is handled |
+| 2.2.1 Timing Adjustable | A | Pass (fixed) | Five minutes before the 60-minute idle limit the strip warns and offers Stay signed in (one request keeps the session). The 8-hour token limit is not renewable, by the owner's decision for security (option B, 1 Oct 2026); it is announced 30 minutes ahead and the work is saved as the user goes |
+| 2.2.2 Pause, Stop, Hide | A | Pass | The only motion is the pulsing dot while a check runs (seconds), off under reduced motion |
+| 2.3.1 Three Flashes | A | Pass | Nothing flashes |
+| 2.4.1 Bypass Blocks | A | Pass | Skip link on the shell, landing, policy and What's new pages; landmarks elsewhere |
+| 2.4.2 Page Titled | A | Pass | A title per route (`router.tsx`, tested) |
+| 2.4.3 Focus Order | A | Pass | No positive `tabindex`; dialogs focus Cancel or the primary action and return focus |
+| 2.4.4 Link Purpose | A | Pass | axe `link-name`; link texts read through |
+| 2.4.5 Multiple Ways | AA | Pass | Navigation, the queue search, dashboard and list links |
+| 2.4.6 Headings and Labels | AA | Pass | One h1 per screen, descriptive labels |
+| 2.4.7 Focus Visible | AA | Pass | An indicator at every stop (the date input shows its blue border) |
+| 2.4.11 Focus Not Obscured (Minimum) | AA | Pass (fixed) | The sticky header, tab bar and submit cards hid the focus 30 times in 60 presses on a phone and 9 on a desktop; `scroll-padding` now keeps it clear, and a gate test finds 0 (78 without the fix) |
+| 2.5.1 Pointer Gestures | A | N/A | No multipoint or path gestures |
+| 2.5.2 Pointer Cancellation | A | Pass | Actions fire on click |
+| 2.5.3 Label in Name | A | Pass | Accessible names contain the visible text |
+| 2.5.4 Motion Actuation | A | N/A | No motion input |
+| 2.5.7 Dragging Movements | AA | Pass | The drop zone is also a file picker |
+| 2.5.8 Target Size (Minimum) | AA | Pass | Every target under 24 px is an inline link or spaced; Stay signed in is 24 px |
+| 3.1.1 Language of Page | A | Pass | `<html lang="en">` |
+| 3.1.2 Language of Parts | AA | N/A | English only |
+| 3.2.1 On Focus | A | Pass | No change of context on focus |
+| 3.2.2 On Input | A | Pass | No select or radio navigates |
+| 3.2.3 Consistent Navigation | AA | Pass | One shell per role |
+| 3.2.4 Consistent Identification | AA | Pass | Same labels and icons throughout |
+| 3.2.6 Consistent Help | A | N/A | No help mechanism |
+| 3.3.1 Error Identification | A | Pass | `aria-invalid`, error text via `aria-describedby`, an alert summary |
+| 3.3.2 Labels or Instructions | A | Pass | Visible labels, required marked |
+| 3.3.3 Error Suggestion | AA | Pass | Errors say what to do |
+| 3.3.4 Error Prevention | AA | Pass | Review page and declarations before submit; destructive actions confirm |
+| 3.3.7 Redundant Entry | A | Pass | Resubmissions arrive pre-filled |
+| 3.3.8 Accessible Authentication (Minimum) | AA | Pass | Paste allowed, `autocomplete` set, no CAPTCHA |
+| 4.1.2 Name, Role, Value | A | Pass (fixed) | A locked stepper step used `aria-label` on a plain span (ignored); it now says "locked" as screen-reader text (`Stepper.tsx`) |
+| 4.1.3 Status Messages | AA | Pass | Toasts and the save indicator in live regions; the portal strip's status region is always present so a session warning is read out |
+
+Still to be done by a person: 1.3.3, and a screen-reader pass (VoiceOver or NVDA) of sign-in with a wrong password, a section saved with an empty required field, and a checklist result (pressed, then "Saved").

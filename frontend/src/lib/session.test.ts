@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { sessionWarning } from './session'
+import { IDLE_LIMIT_MS, idleWarning, sessionWarning } from './session'
 
 const now = Date.parse('2026-09-20T10:00:00Z')
 const at = (minutes: number) => new Date(now + minutes * 60_000).toISOString()
@@ -21,5 +21,23 @@ describe('sessionWarning (US-048)', () => {
   })
   it('ignores an unparsable timestamp', () => {
     expect(sessionWarning('not a date', now)).toEqual({ level: 'none' })
+  })
+})
+
+describe('idleWarning (US-095)', () => {
+  const idleFor = (minutes: number) => now - minutes * 60_000
+
+  it('stays silent until 55 minutes without a request', () => {
+    expect(idleWarning(idleFor(54), now)).toBeNull()
+  })
+
+  it('counts down the last 5 minutes, rounded up', () => {
+    expect(idleWarning(idleFor(55), now)).toBe('5 min')
+    expect(idleWarning(idleFor(57.5), now)).toBe('3 min')
+  })
+
+  it('says under a minute at the end and never goes negative', () => {
+    expect(idleWarning(idleFor(59.5), now)).toBe('under a minute')
+    expect(idleWarning(now - IDLE_LIMIT_MS - 60_000, now)).toBe('under a minute')
   })
 })
