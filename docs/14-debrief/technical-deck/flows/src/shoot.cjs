@@ -4,7 +4,7 @@ const path = require('path');
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 });
-  const names = { signin: '1-sign-in', application: '2-creating-an-application', upload: '3-document-upload', ai: '4-ai-verification' };
+  const names = { signin: '1-sign-in', application: '2-creating-an-application', upload: '3-document-upload', ai: '4-ai-verification', submit: '5-submit', officer: '6-officer-queue-and-case' };
   for (const [d, file] of Object.entries(names)) {
     await page.goto('file://' + path.resolve(__dirname, 'flow.html') + '?d=' + d);
     await page.evaluate(() => document.fonts.ready);
