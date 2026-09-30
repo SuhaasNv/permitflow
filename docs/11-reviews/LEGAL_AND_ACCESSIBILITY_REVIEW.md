@@ -114,7 +114,7 @@ Run with the `wcag-audit` method on the local build (mock AI provider): the axe 
 | 1.4.1 Use of Color | A | Pass | Every status is a label plus a dot (`StatusBadge`) |
 | 1.4.2 Audio Control | A | N/A | No audio |
 | 1.4.3 Contrast (Minimum) | AA | Pass | axe clean on every screen; its undecided cases computed by hand (primary button 7.40:1, `text-3` on `warning-soft` 4.97:1) |
-| 1.4.4 Resize Text | AA | Pass | Zoom allowed (viewport meta); reflow at 640 and 320 px |
+| 1.4.4 Resize Text | AA | Pass (fixed 1 Oct, persona run) | Zoom allowed (viewport meta); reflow at 640 and 320 px. At 200% text on a desktop the side rail cut its labels to "Dashbo…" and a form button was clipped at 390 px; the labels now wrap and buttons grow (`Button.tsx`, `AppShell.tsx`); a gate test measures both |
 | 1.4.5 Images of Text | AA | Pass | None |
 | 1.4.10 Reflow | AA | Pass | 34 of 34 checks without horizontal scroll at 320 px |
 | 1.4.11 Non-text Contrast | AA | Pass (fixed) | Input, select and checkbox borders were 2.04:1; now 3.40:1 on white, 3.12:1 on the page; focus ring 5.99:1 |
@@ -132,11 +132,11 @@ Run with the `wcag-audit` method on the local build (mock AI provider): the axe 
 | 2.4.4 Link Purpose | A | Pass | axe `link-name`; link texts read through |
 | 2.4.5 Multiple Ways | AA | Pass | Navigation, the queue search, dashboard and list links |
 | 2.4.6 Headings and Labels | AA | Pass | One h1 per screen, descriptive labels |
-| 2.4.7 Focus Visible | AA | Pass | An indicator at every stop (the date input shows its blue border) |
+| 2.4.7 Focus Visible | AA | Pass (fixed 1 Oct, persona run) | An indicator at every stop in a normal browser. In Windows High Contrast the soft shadow ring of the checklist result buttons and checkboxes was stripped and nothing replaced it; they now carry a transparent outline (`outline-hidden`), which High Contrast draws; a gate test compares the control focused and blurred with forced colours emulated |
 | 2.4.11 Focus Not Obscured (Minimum) | AA | Pass (fixed) | The sticky header, tab bar and submit cards hid the focus 30 times in 60 presses on a phone and 9 on a desktop; `scroll-padding` now keeps it clear, and a gate test finds 0 (78 without the fix) |
 | 2.5.1 Pointer Gestures | A | N/A | No multipoint or path gestures |
 | 2.5.2 Pointer Cancellation | A | Pass | Actions fire on click |
-| 2.5.3 Label in Name | A | Pass | Accessible names contain the visible text |
+| 2.5.3 Label in Name | A | Pass (fixed 1 Oct, persona run) | The first audit marked this Pass without testing it. The persona run found three misses: the bell showed "9+" but was named "Notifications, 352 unread"; the version link showed "v0.4.0-rc.2 New" but was named "Version 0.4.0-rc.2, what's new"; the logo showed "PermitFlow Licensing Services" but was named "PermitFlow home". Names now contain what is shown; a gate test checks every labelled control on six screens, and a unit test the bell |
 | 2.5.4 Motion Actuation | A | N/A | No motion input |
 | 2.5.7 Dragging Movements | AA | Pass | The drop zone is also a file picker |
 | 2.5.8 Target Size (Minimum) | AA | Pass | Every target under 24 px is an inline link or spaced; Stay signed in is 24 px |
@@ -157,3 +157,21 @@ Run with the `wcag-audit` method on the local build (mock AI provider): the axe 
 | 4.1.3 Status Messages | AA | Pass | Toasts and the save indicator in live regions; the portal strip's status region is always present so a session warning is read out |
 
 Still to be done by a person: 1.3.3, and a screen-reader pass (VoiceOver or NVDA) of sign-in with a wrong password, a section saved with an empty required field, and a checklist result (pressed, then "Saved").
+
+### Correction and persona run (US-096, 1 Oct 2026)
+
+The table above first said "0 failures of 55". That was premature: 2.5.3 had not been tested and 2.4.7 and 1.4.4 had only been tested for the default browser settings. Nine personas were then run on the same build, and each finding was fixed on `feat/us-096-persona-fixes` with a test that failed before the fix.
+
+| Persona | Method | Result before | Result after |
+|---------|--------|---------------|--------------|
+| Keyboard only, motor | Tab-only sign-in, skip link in the signed-in shell at 375 and 1280, focus never hidden | Pass | Pass |
+| Screen reader | Structure of eight screens: one h1, no skipped levels, landmarks, names of about 1,100 controls, duplicate ids, language, live regions | Pass (not listened to) | Pass (not listened to) |
+| Low vision | 200% text at 1280, 320 px reflow, clipped text | Side rail labels cut off, form button clipped at 390 px | Labels wrap, buttons grow |
+| Colour blind | Four simulated deficiencies and greyscale on the dashboard and the checklist | Pass | Pass |
+| Windows High Contrast | Forced colours emulated; focused and blurred control compared | Result buttons and checkboxes showed no focus | Focus drawn |
+| Motion sensitive | Running animations with and without reduced motion | Pass (0 looping animations with the preference on) | Pass |
+| Cognitive, attention | Queue refresh while a link has focus (70 s), error copy grade (5 to 7), timeouts | Pass | Pass |
+| Voice control | Label in name over six screens | Three misses | None |
+| Deaf, hard of hearing | No audio or video | Not applicable | Not applicable |
+
+Found on the way and fixed: on the operator dashboard at 1280 px the status badge covered the application reference and ran past the card edge (the card header now wraps). A sweep of every screen at seven widths then found more overflow, all fixed: the officer queue's action button fell out of its column at 1280 px and wider; the admin Users table was cut off at 768 and 1024 px and the Overview idle table at 768 px; status badges ran past their box on narrow screens; an issue code did not break at 320 px. Still to be done by a person: a listening pass with VoiceOver or NVDA, and the High Contrast result on a real Windows machine (Chromium's emulation is what the gate uses). Known and accepted: the phone stepper shortens its step names to fit six steps (the current step is named in the heading below it); 200% text on a 390 px phone with every rem-based size doubled scrolls sideways, which is stricter than a real zoom (it behaves like a 195 px screen).

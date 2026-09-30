@@ -244,7 +244,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
                   cn(
-                    'flex h-10 items-center gap-3 overflow-hidden rounded-md px-[11px] text-sm font-medium text-text-2 no-underline',
+                    'flex min-h-10 items-center gap-3 overflow-hidden rounded-md px-[11px] py-1 text-sm font-medium text-text-2 no-underline',
                     'transition-[background-color,color] duration-[var(--dur-fast)] ease-[var(--ease-out)] hover:bg-neutral-soft hover:text-text',
                     isActive && 'bg-surface-3 font-semibold text-text',
                   )
@@ -252,7 +252,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
               >
                 <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">{item.icon}</span>
                 <span
-                  className={cn('truncate transition-opacity duration-[var(--dur-fast)]', collapsed ? 'opacity-0' : 'opacity-100 delay-75')}
+                  className={cn('transition-opacity duration-[var(--dur-fast)]', collapsed ? 'truncate opacity-0' : 'break-words leading-5 opacity-100 delay-75')}
                 >
                   {item.label}
                 </span>

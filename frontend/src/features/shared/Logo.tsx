@@ -20,7 +20,7 @@ export function Logo({ inverted = false, className }: { inverted?: boolean; clas
         inverted ? 'text-white hover:text-white' : 'text-text hover:text-text',
         className,
       )}
-      aria-label="PermitFlow home"
+      aria-label="PermitFlow Licensing Services, home"
     >
       <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
         <rect width="32" height="32" rx="7" fill="#A8192A" />

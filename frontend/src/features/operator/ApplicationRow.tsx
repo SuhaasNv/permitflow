@@ -101,8 +101,8 @@ export function ApplicationCard({ app }: { app: ApplicationSummary }) {
           needsYou ? 'border-warning-line hover:border-warning' : 'border-line hover:border-line-strong',
         )}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+          <div className="min-w-[8.5rem] flex-1">
             <div className="font-mono text-xs text-text-3">{app.reference_no}</div>
             <div className="mt-0.5 truncate text-[15px] font-semibold leading-[22px]">
               {app.business_name ?? <span className="font-medium text-text-3">Business name not entered yet</span>}

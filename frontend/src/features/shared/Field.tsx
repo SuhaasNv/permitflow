@@ -15,7 +15,7 @@ export const inputClasses = (invalid = false, readOnly = false): string =>
   cn(
     'h-10 min-h-[44px] w-full rounded-md border bg-surface px-3 text-[15px] text-text placeholder:text-text-3/70 xl:min-h-0',
     'transition-[border-color,box-shadow,background-color] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
-    'focus:border-focus focus:shadow-[0_0_0_3px_rgba(23,92,211,0.16)] focus:outline-none',
+    'focus:border-focus focus:shadow-[0_0_0_3px_rgba(23,92,211,0.16)] focus:outline-hidden',
     'disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-text-2',
     invalid ? 'border-error shadow-[0_0_0_3px_rgba(180,35,24,0.12)]' : 'border-line-strong hover:border-text-3',
     readOnly && 'border-line bg-surface-2 text-text-2',

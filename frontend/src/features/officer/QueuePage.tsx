@@ -111,7 +111,7 @@ function Row({ item }: { item: QueueItem }) {
         <div className="hidden 2xl:block">
           <ChecksCell item={item} />
         </div>
-        <div className="hidden text-[13px] tabular-nums text-text-2 xl:block" title={formatDateTime(item.last_activity_at)}>
+        <div className="hidden text-[13px] tabular-nums text-text-2 2xl:block" title={formatDateTime(item.last_activity_at)}>
           <div>{formatRelative(item.last_activity_at)}</div>
           {item.submitted_at ? <div className="text-xs text-text-3">Submitted {formatDate(item.submitted_at)}</div> : null}
         </div>

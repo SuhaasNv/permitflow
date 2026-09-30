@@ -18,7 +18,7 @@ Rendered on the "Design system" artboard of the prototype. Values become Tailwin
 | `error` / soft / line | `#B42318` / `#FEF3F2` / `#F4B7B1` | validation, issues found, failed, rejected |
 | `info` / soft / line | `#175CD3` / `#EEF4FF` / `#B2CCFA` | in progress, changed, addressed |
 | `neutral` / soft / line | `#475467` / `#F2F4F7` / `#D0D5DD` | draft, unchanged, unavailable |
-| `focus` | `#175CD3` | 2 px focus ring, 2 px offset |
+| `focus` | `#175CD3` | 2 px focus ring, 2 px offset. A control that draws its own ring with a shadow also carries a transparent outline (`outline-hidden`), because Windows High Contrast strips shadows and draws transparent outlines (US-096). Buttons have a minimum height, not a fixed one, so a label wraps instead of clipping at large text sizes |
 
 Contrast: all `text*`, `success`, `warning`, `error`, `info`, `primary` ≥ 4.5:1 on every surface token, computed rather than assumed (table in `../11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`); the lowest pairing is `text-3` on `surface-3` at 4.68:1. A skip link (`.pf-skip-link`) precedes every page's header.
 

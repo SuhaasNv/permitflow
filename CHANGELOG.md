@@ -2,6 +2,17 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Persona audit and its fixes (US-096, 1 Oct 2026)
+
+Nine personas (keyboard only, screen reader, low vision, colour blind, Windows High Contrast, motion sensitive, cognitive, voice control, deaf) were run against the build after US-095. It showed the "0 failures of 55" claim had been premature; the review document is corrected (`docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`). Fixed on `feat/us-096-persona-fixes`, each with a gate test that failed before the fix.
+
+- **Names match what is shown (2.5.3).** The bell ("Notifications, 9+ unread"), the version link and the logo were named differently from their visible text, so a voice-control user could not say what they saw.
+- **Focus in Windows High Contrast (2.4.7).** Result buttons and checkboxes drew their ring with a shadow, which High Contrast strips; they now carry a transparent outline, which it draws.
+- **Large text (1.4.4).** The side rail cut "Dashboard" and "My applications" at 200% text and a form button clipped at 390 px; labels wrap and buttons grow (minimum height, not fixed).
+- **The dashboard card** no longer lets the status badge cover the application reference at 1280 px.
+- **Overflow, found by sweeping every screen at 320, 375, 390, 768, 1024, 1280 and 1440 px.** The officer queue's action button fell out of its column at 1280 px and wider (a last-activity column was shown in a grid built for four columns); the admin Users table was cut off at 768 and 1024 px and the Overview idle table at 768 px (their columns assumed more room than the side rail leaves); status badges ran past their box on narrow screens; an issue code could not break at 320 px. A gate test sweeps ten screens at six widths for any box wider than the screen, clipped text or a child wider than its parent; it fails with the queue fix removed.
+- **Dependency.** `pip-audit` began blocking the build on CVE-2026-101918 (a deeply nested token payload made PyJWT 2.14.0 raise an uncaught error); PyJWT 2.15.1 is in PR #14.
+
 ## WCAG 2.2 AA (US-095, 1 Oct 2026)
 
 A WCAG 2.2 AA audit (55 A and AA criteria; axe at 375, 768 and 1280, keyboard walks, reflow, target size, text spacing, contrast, forms, sign-in) found six failures; all six are fixed on `feat/us-095-wcag-aa`, a second audit found none, and the result was checked again in Chrome. Merged into `dev` locally; nothing pushed. The criterion-by-criterion table is in `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.

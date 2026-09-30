@@ -124,7 +124,7 @@ export function DocumentsPage() {
                       </svg>
                     ) : null}
                   </span>
-                  <span className="min-w-0 flex-1 truncate">{slot.label}</span>
+                  <span className="min-w-0 flex-1 break-words">{slot.label}</span>
                   <span className="text-xs text-text-3">{slot.present ? 'Uploaded' : 'Missing'}</span>
                 </li>
               ))}
