@@ -312,7 +312,7 @@
   .pf-journey-line {
     transform: scaleX(0);
     transform-origin: left;
-    transition: transform 1400ms var(--ease-out) 200ms;
+    transition: transform 650ms var(--ease-out) 200ms;
   }
   .is-in .pf-journey-line {
     transform: scaleX(1);

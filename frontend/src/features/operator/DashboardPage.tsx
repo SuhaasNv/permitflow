@@ -182,7 +182,7 @@ export function OperatorDashboardPage() {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
           <EmptyPanel
             title="No applications yet"
-            description="Start a new application to apply for a Food Establishment Licence. It takes about 20 minutes and you can save a draft at any point."
+            description="Start a new application to apply for a Food Establishment Licence. You can save a draft at any point."
             action={newApplication}
           />
           <WhatYouNeed />

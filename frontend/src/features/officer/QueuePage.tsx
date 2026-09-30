@@ -47,7 +47,7 @@ function ChecksCell({ item }: { item: QueueItem }) {
     return (
       <span className="inline-flex items-center gap-1.5 text-[13px] text-info">
         <span className="relative flex h-[7px] w-[7px]" aria-hidden="true">
-          <span className="absolute inset-0 animate-ping rounded-full bg-current opacity-60" />
+          <span className="absolute inset-0 animate-ping rounded-full bg-current opacity-60 motion-reduce:animate-none" />
           <span className="relative h-[7px] w-[7px] rounded-full bg-current" />
         </span>
         Checking {item.documents_checking}

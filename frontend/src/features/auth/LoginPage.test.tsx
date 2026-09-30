@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
@@ -190,5 +190,15 @@ describe('LoginPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Hide password' }))
     expect(password).toHaveAttribute('type', 'password')
     expect(login).not.toHaveBeenCalled()
+  })
+
+  it('links the privacy policy and the terms, and carries the footer policy links', () => {
+    renderLogin()
+    expect(screen.getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', '/privacy')
+    expect(screen.getByRole('link', { name: 'terms' })).toHaveAttribute('href', '/terms')
+    const policies = screen.getByRole('navigation', { name: 'Policies' })
+    expect(within(policies).getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy')
+    expect(within(policies).getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms')
+    expect(within(policies).getByRole('link', { name: 'Cookies' })).toHaveAttribute('href', '/cookies')
   })
 })

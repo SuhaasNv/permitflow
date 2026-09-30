@@ -34,7 +34,7 @@ export function StatusBadge({ label, tone, size = 'md', live, className }: Statu
       data-tone={tone}
     >
       <span className="relative flex h-[7px] w-[7px] shrink-0" aria-hidden="true">
-        {live ? <span className="absolute inset-0 animate-ping rounded-full bg-current opacity-60" /> : null}
+        {live ? <span className="absolute inset-0 animate-ping rounded-full bg-current opacity-60 motion-reduce:animate-none" /> : null}
         <span className="relative h-[7px] w-[7px] rounded-full bg-current" />
       </span>
       {label}

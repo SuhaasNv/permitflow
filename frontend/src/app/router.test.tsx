@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as authApi from '@/api/auth'
 import * as notificationsApi from '@/api/notifications'
+import * as officerApi from '@/api/officer'
 import App from '@/App'
 import { router } from '@/app/router'
 
@@ -45,9 +46,36 @@ describe('App routing', () => {
     expect(await screen.findByText('Not available for your role')).toBeInTheDocument()
   })
 
-  it('answers an unknown path with Not found', async () => {
+  it('answers an unknown path with a Not found page: an h1, its own title and a way home', async () => {
     await router.navigate('/definitely/not/here')
     render(<App />)
-    expect(await screen.findByText(/Back to PermitFlow/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to PermitFlow' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('main')).toBeInTheDocument()
+    await waitFor(() => expect(document.title).toBe('Page not found | PermitFlow'))
+  })
+
+  it('gives every public route its own tab title', async () => {
+    const expected: [string, string][] = [
+      ['/', 'PermitFlow | Food Establishment Licence'],
+      ['/login', 'Sign in | PermitFlow'],
+      ['/privacy', 'Privacy policy | PermitFlow'],
+      ['/terms', 'Terms | PermitFlow'],
+      ['/cookies', 'Cookies | PermitFlow'],
+      ['/releases', "What's new | PermitFlow"],
+    ]
+    render(<App />)
+    for (const [path, title] of expected) {
+      await router.navigate(path)
+      await waitFor(() => expect(document.title).toBe(title))
+    }
+  })
+
+  it('titles a signed-in screen after the screen', async () => {
+    signedInAs('officer')
+    vi.spyOn(officerApi, 'getQueue').mockResolvedValue({ items: [], officer_turn_count: 0, waiting_on_operator_count: 0, decided_count: 0 })
+    await router.navigate('/officer/queue')
+    render(<App />)
+    await waitFor(() => expect(document.title).toBe('Review queue | PermitFlow'))
   })
 })

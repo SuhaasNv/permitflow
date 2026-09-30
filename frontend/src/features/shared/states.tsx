@@ -13,10 +13,12 @@ interface PanelProps {
   tone?: 'neutral' | 'error'
   footnote?: string
   bordered?: boolean
+  /** `h1` when the panel is the whole page (the not-found page); a plain line inside a page. */
+  titleAs?: 'div' | 'h1'
 }
 
 /** Balanced empty/error state: small icon, one-line title, one sentence, optional action. Never a giant white box. */
-function Panel({ icon, title, description, action, tone = 'neutral', footnote, bordered = true }: PanelProps) {
+function Panel({ icon, title, description, action, tone = 'neutral', footnote, bordered = true, titleAs: Title = 'div' }: PanelProps) {
   return (
     <div
       className={cn(
@@ -33,7 +35,7 @@ function Panel({ icon, title, description, action, tone = 'neutral', footnote, b
       >
         {icon}
       </div>
-      <div className="text-[17px] font-semibold leading-6 text-text">{title}</div>
+      <Title className="text-[17px] font-semibold leading-6 text-text">{title}</Title>
       <div className="mt-1 max-w-[44ch] text-sm leading-[21px]">{description}</div>
       {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
       {footnote ? <div className="mt-6 text-xs text-text-3">{footnote}</div> : null}
@@ -93,15 +95,18 @@ export function NotFoundPanel({
   backLabel,
   title = 'Application not found',
   description = 'It may have been removed, or the link is incorrect.',
+  titleAs,
 }: {
   backTo: string
   backLabel: string
   title?: string
   description?: string
+  titleAs?: PanelProps['titleAs']
 }) {
   return (
     <Panel
       icon={SearchIcon}
+      titleAs={titleAs}
       title={title}
       description={description}
       action={

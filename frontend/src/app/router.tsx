@@ -23,89 +23,85 @@ import { ClarificationPage } from '@/features/operator/ClarificationPage'
 import { HistoryPage } from '@/features/operator/HistoryPage'
 import { OperatorDashboardPage } from '@/features/operator/DashboardPage'
 import { ApplicationsPage } from '@/features/operator/ApplicationsPage'
-import { NotFoundPanel } from '@/features/shared/states'
+import { NotFoundPage } from '@/features/shared/NotFoundPage'
+import { RouteTitle, titled } from './RouteTitle'
 
 export const router = createBrowserRouter([
-  { path: '/', element: <LandingPage /> },
-  { path: '/login', element: <LoginPage /> },
-  { path: '/privacy', element: <PolicyPage /> },
-  { path: '/terms', element: <PolicyPage /> },
-  { path: '/cookies', element: <PolicyPage /> },
-  { path: '/releases', element: <ReleasesPage /> },
-  { path: '/releases/:version', element: <ReleasesPage /> },
   {
-    element: <RequireRole roles={['operator']} />,
+    // Every screen names its browser tab through its route's handle (RouteTitle).
+    element: <RouteTitle />,
     children: [
+      { path: '/', element: <LandingPage />, handle: titled('PermitFlow | Food Establishment Licence', true) },
+      { path: '/login', element: <LoginPage />, handle: titled('Sign in') },
+      { path: '/privacy', element: <PolicyPage />, handle: titled('Privacy policy') },
+      { path: '/terms', element: <PolicyPage />, handle: titled('Terms') },
+      { path: '/cookies', element: <PolicyPage />, handle: titled('Cookies') },
+      { path: '/releases', element: <ReleasesPage />, handle: titled("What's new") },
+      { path: '/releases/:version', element: <ReleasesPage />, handle: titled("What's new") },
       {
-        element: <AppShell />,
+        element: <RequireRole roles={['operator']} />,
         children: [
-          { path: '/app/dashboard', element: <OperatorDashboardPage /> },
-          { path: '/app/applications', element: <ApplicationsPage /> },
-          { path: '/app/applications/:id', element: <ApplicationPage /> },
-          { path: '/app/applications/:id/documents', element: <DocumentsPage /> },
-          { path: '/app/applications/:id/review', element: <ReviewPage /> },
-          { path: '/app/applications/:id/submitted', element: <SubmittedPage /> },
-          { path: '/app/applications/:id/history', element: <HistoryPage /> },
-          { path: '/app/applications/:id/clarification', element: <ClarificationPage /> },
-          { path: '/app/applications/:id/form', element: <FormPage /> },
           {
-            path: '/app/applications/:id/form/:sectionKey',
-            element: <FormPage />,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    element: <RequireRole roles={['officer']} />,
-    children: [
-      {
-        element: <AppShell />,
-        children: [
-          { path: '/officer/queue', element: <OfficerQueuePage /> },
-          { path: '/officer/applications/:id', element: <OfficerCasePage /> },
-          { path: '/officer/applications/:id/licence-preview', element: <LicencePreviewPage /> },
-          { path: '/officer/applications/:id/checklist', element: <ChecklistPage /> },
-        ],
-      },
-    ],
-  },
-  {
-    element: <RequireRole roles={['admin']} />,
-    children: [
-      {
-        element: <AppShell />,
-        children: [
-          { path: '/admin/overview', element: <AdminOverviewPage /> },
-          { path: '/admin/activity', element: <AdminActivityPage /> },
-          { path: '/admin/users', element: <AdminUsersPage /> },
-          // The officer screens, read-only (US-072): the server sends no actions, the components render no controls.
-          {
-            element: (
-              <ReadOnlyProvider value={true}>
-                <Outlet />
-              </ReadOnlyProvider>
-            ),
+            element: <AppShell />,
             children: [
-              { path: '/admin/applications/:id', element: <OfficerCasePage /> },
-              { path: '/admin/applications/:id/checklist', element: <ChecklistPage /> },
+              { path: '/app/dashboard', element: <OperatorDashboardPage />, handle: titled('Dashboard') },
+              { path: '/app/applications', element: <ApplicationsPage />, handle: titled('My applications') },
+              { path: '/app/applications/:id', element: <ApplicationPage />, handle: titled('Application') },
+              { path: '/app/applications/:id/documents', element: <DocumentsPage />, handle: titled('Documents') },
+              { path: '/app/applications/:id/review', element: <ReviewPage />, handle: titled('Review and submit') },
+              { path: '/app/applications/:id/submitted', element: <SubmittedPage />, handle: titled('Application submitted') },
+              { path: '/app/applications/:id/history', element: <HistoryPage />, handle: titled('Application history') },
+              { path: '/app/applications/:id/clarification', element: <ClarificationPage />, handle: titled('Clarification') },
+              { path: '/app/applications/:id/form', element: <FormPage />, handle: titled('Application form') },
+              {
+                path: '/app/applications/:id/form/:sectionKey',
+                element: <FormPage />,
+                handle: titled('Application form'),
+              },
             ],
           },
         ],
       },
+      {
+        element: <RequireRole roles={['officer']} />,
+        children: [
+          {
+            element: <AppShell />,
+            children: [
+              { path: '/officer/queue', element: <OfficerQueuePage />, handle: titled('Review queue') },
+              { path: '/officer/applications/:id', element: <OfficerCasePage />, handle: titled('Application review') },
+              { path: '/officer/applications/:id/licence-preview', element: <LicencePreviewPage />, handle: titled('Licence preview') },
+              { path: '/officer/applications/:id/checklist', element: <ChecklistPage />, handle: titled('Site visit checklist') },
+            ],
+          },
+        ],
+      },
+      {
+        element: <RequireRole roles={['admin']} />,
+        children: [
+          {
+            element: <AppShell />,
+            children: [
+              { path: '/admin/overview', element: <AdminOverviewPage />, handle: titled('Operations overview') },
+              { path: '/admin/activity', element: <AdminActivityPage />, handle: titled('Activity') },
+              { path: '/admin/users', element: <AdminUsersPage />, handle: titled('Users') },
+              // The officer screens, read-only (US-072): the server sends no actions, the components render no controls.
+              {
+                element: (
+                  <ReadOnlyProvider value={true}>
+                    <Outlet />
+                  </ReadOnlyProvider>
+                ),
+                children: [
+                  { path: '/admin/applications/:id', element: <OfficerCasePage />, handle: titled('Application (read-only)') },
+                  { path: '/admin/applications/:id/checklist', element: <ChecklistPage />, handle: titled('Site visit checklist (read-only)') },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      { path: '*', element: <NotFoundPage />, handle: titled('Page not found') },
     ],
-  },
-  {
-    path: '*',
-    element: (
-      <div className="mx-auto max-w-lg px-4 py-10">
-        <NotFoundPanel
-          backTo="/"
-          backLabel="Back to PermitFlow"
-          title="Page not found"
-          description="There is nothing at this address. Check the link, or start from the front page."
-        />
-      </div>
-    ),
   },
 ])

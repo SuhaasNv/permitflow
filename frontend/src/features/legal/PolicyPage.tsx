@@ -5,6 +5,7 @@ import { AppShell } from '@/app/AppShell'
 import { useAuth } from '@/features/auth/AuthContext'
 import { buttonClasses } from '@/features/shared/Button'
 import { Logo } from '@/features/shared/Logo'
+import { PolicyLinks } from '@/features/shared/PolicyLinks'
 import { OPERATOR_URL, POLICIES } from './content'
 import type { PolicySlug } from './content'
 
@@ -137,6 +138,8 @@ export function PolicyPage() {
         <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-5 py-8 text-[13px] text-text-3 sm:flex-row sm:items-center sm:gap-4 sm:px-10">
           <span>© 2026 PermitFlow</span>
           <span>A fictional licensing service built for an engineering assessment. Not a government service.</span>
+          {/* The page body already has a nav named "Policies"; landmark names stay unique. */}
+          <PolicyLinks label="Footer policies" className="sm:ml-auto" />
         </div>
       </footer>
     </div>
