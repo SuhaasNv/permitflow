@@ -70,7 +70,7 @@ Two scripts drive the running API rather than the test client, so they see the r
 
 ## Running the browser suites locally, twice in a day
 
-Two things bit on 21 Sep 2026 and are worth knowing: the daily document-check quotas (`AI_RUNS_PER_USER_PER_DAY`, 60; `AI_RUNS_PER_DAY`, 1,000) count the shared demonstration operator's runs across every local Playwright and UAT run, so after a day of runs the checks come back `unavailable` and scenario 01 fails on purpose; start the local API with `AI_RUNS_PER_USER_PER_DAY=0 AI_RUNS_PER_DAY=0` for a test day (CI starts from an empty database). And since US-093 an account holds one session, so the UAT edge script and the Playwright suite must not run at the same time: each signs the other's demonstration accounts out.
+Two things bit on 21 Sep 2026 and are worth knowing: the daily document-check quotas (`AI_RUNS_PER_USER_PER_DAY`, 60; `AI_RUNS_PER_DAY`, 1,000) count the shared demonstration operator's runs across every local Playwright and UAT run, so after a day of runs the checks come back `unavailable` and scenario 01 fails on purpose; start the local API with `AI_RUNS_PER_USER_PER_DAY=0 AI_RUNS_PER_DAY=0` for a test day (CI starts from an empty database, and since 1 Oct 2026 also lifts the per-applicant limit: the suite itself had grown past 60 checks, so the last specs came back `unavailable`; the limit has its own integration tests). And since US-093 an account holds one session, so the UAT edge script and the Playwright suite must not run at the same time: each signs the other's demonstration accounts out.
 
 ## Shared journey helpers
 

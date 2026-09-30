@@ -24,6 +24,13 @@ import {
  */
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']
 
+// The US-095 and US-096 tests only read what they seed, so they share one application of each kind:
+// every seed is four document checks against the demonstration operator's daily quota.
+let pendingOnce: ReturnType<typeof seedPendingResubmission> | undefined
+let visitOnce: ReturnType<typeof seedVisitConfirmed> | undefined
+const sharedPending = () => (pendingOnce ??= seedPendingResubmission())
+const sharedVisit = () => (visitOnce ??= seedVisitConfirmed())
+
 /** Collects one line per violation so a run reports every screen, not only the first broken one. */
 async function violations(page: Page, screen: string): Promise<string[]> {
   // Scan the loaded screen, never a skeleton: under load a page can still be fetching after networkidle,
@@ -387,7 +394,7 @@ async function hiddenFocusStops(page: Page, screen: string, presses = 60): Promi
 }
 
 test('no focused control is hidden behind a sticky bar on the checklist or the respond page (US-095)', async ({ page }) => {
-  const visit = await seedVisitConfirmed()
+  const visit = await sharedVisit()
   const clarification = await seedAwaitingClarification()
   const hidden: string[] = []
   await signIn(page, OFFICER)
@@ -428,8 +435,8 @@ async function focusIsPainted(page: Page, control: ReturnType<Page['locator']>, 
 
 test('keyboard focus stays visible in Windows High Contrast on inputs, checkboxes, result buttons and search (US-096)', async ({ page }) => {
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
-  const app = await seedPendingResubmission()
-  const visit = await seedVisitConfirmed()
+  const app = await sharedPending()
+  const visit = await sharedVisit()
   const missing: string[] = []
   await signIn(page, OPERATOR)
   await page.goto(`${app.url}/form/premises`)
@@ -449,7 +456,7 @@ test('keyboard focus stays visible in Windows High Contrast on inputs, checkboxe
 })
 
 test('a control that shows text is named with that text, so voice control can say what it sees (US-096, WCAG 2.5.3)', async ({ page }) => {
-  const app = await seedPendingResubmission()
+  const app = await sharedPending()
   const mismatched: string[] = []
   const scan = (screen: string) =>
     page.evaluate((screen) => {
@@ -484,7 +491,7 @@ test('a control that shows text is named with that text, so voice control can sa
 })
 
 test('nothing is cut off or overlaps at 200% text size: the rail, the application cards and the form buttons (US-096, WCAG 1.4.4)', async ({ page }) => {
-  const app = await seedPendingResubmission()
+  const app = await sharedPending()
   const problems: string[] = []
   await signIn(page, OPERATOR)
   const measure = (screen: string, checkScroll: boolean) =>
@@ -548,8 +555,8 @@ const overflowProblems = () => {
 
 test('no screen spills out of its box from 320 to 1440 px for any role (US-096)', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  const app = await seedPendingResubmission()
-  const visit = await seedVisitConfirmed()
+  const app = await sharedPending()
+  const visit = await sharedVisit()
   const found: string[] = []
   const sweep = async (screen: string, path: string) => {
     for (const w of [320, 390, 768, 1024, 1280, 1440]) {
