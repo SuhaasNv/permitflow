@@ -63,6 +63,12 @@ export interface RequestOptions {
   keepalive?: boolean
 }
 
+/** When a signed-in request last succeeded: the server's idle clock restarts on each one (US-093, US-095). */
+let lastActivityAt = Date.now()
+export function lastActivity(): number {
+  return lastActivityAt
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {}
   const token = tokenProvider()
@@ -90,6 +96,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     })
   }
   const requestId = response.headers.get('X-Request-ID') ?? undefined
+  if (token && response.ok) lastActivityAt = Date.now()
   if (response.status === 204) return undefined as T
   const text = await response.text()
   let parsed: unknown = null

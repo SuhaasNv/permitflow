@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router-dom'
 
 import type { Role } from '@/api/auth'
+import { me } from '@/api/auth'
+import { lastActivity } from '@/api/client'
 import { useAuth } from '@/features/auth/AuthContext'
 import { Dialog } from '@/features/shared/Dialog'
 import { Logo } from '@/features/shared/Logo'
@@ -11,7 +13,7 @@ import { VersionChip } from '@/features/releases/VersionChip'
 import { hasUnsaved, setUnsaved } from '@/lib/unsaved'
 import { cn } from '@/lib/cn'
 import { formatDateTime } from '@/lib/format'
-import { sessionWarning } from '@/lib/session'
+import { idleWarning, sessionWarning } from '@/lib/session'
 
 interface NavItem {
   label: string
@@ -110,6 +112,9 @@ export function AppShell({ children }: { children?: ReactNode }) {
     return () => clearInterval(id)
   }, [])
   const warning = useMemo(() => (expiresAt ? sessionWarning(expiresAt, now) : { level: 'none' as const }), [expiresAt, now])
+  // Idle warning (US-095, WCAG 2.2.1): any signed-in request keeps the session, so Stay signed in is one call.
+  const idle = idleWarning(lastActivity(), now)
+  const staySignedIn = () => void me().then(() => setNow(Date.now()), () => undefined)
   const doSignOut = () => {
     setUnsaved(false)
     signOut()
@@ -138,17 +143,35 @@ export function AppShell({ children }: { children?: ReactNode }) {
         <span className="font-semibold text-white">Secure licensing portal</span>
         <span className="hidden sm:inline">· Food Establishments Unit</span>
         {/* The version lives in the rail footer; when there is none (phones) or it is folded away (collapsed
-            rail) it sits here at the right, unless the session warning needs the space (US-094). */}
-        {warning.level === 'none' ? <VersionChip variant="strip" className={cn('-mr-2 ml-auto', !collapsed && 'md:hidden')} /> : null}
-        {warning.level !== 'none' && expiresAt ? (
-          <span
-            role="status"
-            className={cn('ml-auto tabular-nums', warning.level === 'urgent' ? 'font-semibold text-white' : 'text-[#e6c8cc]')}
-            title={`Signed in until ${formatDateTime(expiresAt)} (Singapore time). Sign in again to continue afterwards.`}
-          >
-            {warning.text}
-          </span>
-        ) : null}
+            rail) it sits here at the right, unless a session warning needs the space (US-094). */}
+        {warning.level === 'none' && !idle ? <VersionChip variant="strip" className={cn('-mr-2 ml-auto', !collapsed && 'md:hidden')} /> : null}
+        {/* One live region, always present, so a warning that appears is announced (US-095). */}
+        <span role="status" className={cn('flex items-center gap-2.5', (idle || warning.level !== 'none') && 'ml-auto')}>
+          {idle ? (
+            <>
+              <span className="font-semibold text-white tabular-nums">
+                <span className="sm:hidden">Signed out in {idle}</span>
+                <span className="hidden sm:inline">You will be signed out in {idle} without activity</span>
+              </span>
+              <button
+                type="button"
+                onClick={staySignedIn}
+                className="h-[24px] shrink-0 rounded-[4px] border border-white/60 px-2.5 font-semibold text-white hover:bg-white/10 focus-visible:outline-white"
+              >
+                Stay signed in
+              </button>
+            </>
+          ) : warning.level !== 'none' && expiresAt ? (
+            <span
+              className={cn('tabular-nums', warning.level === 'urgent' ? 'font-semibold text-white' : 'text-[#e6c8cc]')}
+              title={`Signed in until ${formatDateTime(expiresAt)} (Singapore time). Sign in again to continue afterwards.`}
+            >
+              {warning.text}
+              {/* The 8-hour limit is not renewable, by the owner's choice for security (US-095, option B). */}
+              <span className="hidden sm:inline"> · sign in again to continue</span>
+            </span>
+          ) : null}
+        </span>
       </div>
       <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface/95 px-3 backdrop-blur sm:gap-4 sm:px-6">
         <button

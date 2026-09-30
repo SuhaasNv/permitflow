@@ -28,9 +28,11 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-prac
 async function violations(page: Page, screen: string): Promise<string[]> {
   // Scan the loaded screen, never a skeleton: under load a page can still be fetching after networkidle,
   // and a skeleton has no h1 (found on 21 Sep when the whole suite ran on one machine). The skeleton may not
-  // have mounted yet either, so wait for the heading first (US-095: the officer case flaked 1 run in 3).
-  await page.locator('h1').first().waitFor({ timeout: 15_000 }).catch(() => undefined)
-  await page.locator('[aria-busy="true"]').first().waitFor({ state: 'detached', timeout: 15_000 }).catch(() => undefined)
+  // have mounted yet either, so wait until a heading is on the page and nothing is loading, together
+  // (US-095: the officer case flaked 1 run in 3).
+  await expect
+    .poll(() => page.evaluate(() => Boolean(document.querySelector('h1')) && !document.querySelector('[aria-busy="true"]')), { timeout: 15_000 })
+    .toBe(true)
   const results = await new AxeBuilder({ page }).withTags(TAGS).analyze()
   return results.violations.map(
     (v) =>
@@ -114,6 +116,7 @@ test('officer screens have no axe violations', async ({ page }) => {
   await page.waitForLoadState('networkidle')
   found.push(...(await violations(page, '/officer/queue')))
   await openCase(page, app.reference)
+  await page.waitForURL(/\/officer\/applications\//)
   await page.waitForLoadState('networkidle')
   found.push(...(await violations(page, 'officer case')))
   await page.getByRole('button', { name: 'Add feedback' }).click()
