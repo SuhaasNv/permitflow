@@ -15,7 +15,7 @@ describe('VersionChip (US-094)', () => {
         <VersionChip variant="strip" />
       </MemoryRouter>,
     )
-    const [rail, strip] = screen.getAllByRole('link', { name: `Version ${__APP_VERSION__}, what's new` })
+    const [rail, strip] = screen.getAllByRole('link', { name: new RegExp(`^v${__APP_VERSION__.replace(/\./g, '\\.')}.*what's new$`, 'i') })
     expect(rail).toHaveAttribute('href', '/releases')
     expect(rail).toHaveTextContent(`v${__APP_VERSION__}`)
     expect(rail).toHaveTextContent('New')

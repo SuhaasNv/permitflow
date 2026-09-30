@@ -191,20 +191,20 @@ function IdleTable({ overview }: { overview: AdminOverview }) {
           {rows.map((row) => (
             <li
               key={row.id}
-              className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-5 py-3 sm:grid-cols-[130px_minmax(0,1fr)_200px_70px_120px_80px] sm:items-center"
+              className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-5 py-3 lg:grid-cols-[130px_minmax(0,1fr)_200px_70px_120px_80px] lg:items-center"
             >
               <span className="font-mono text-[13px] text-text-2">{row.reference_no}</span>
-              <span className="row-start-2 truncate text-sm sm:row-start-auto">
+              <span className="row-start-2 truncate text-sm lg:row-start-auto">
                 {row.business_name ?? <span className="text-text-3">Business name not entered</span>}
               </span>
-              <span className="row-start-3 sm:row-start-auto">
+              <span className="row-start-3 lg:row-start-auto">
                 <StatusBadge label={row.label} tone={row.tone} className="h-auto min-h-6 whitespace-normal py-0.5 text-left leading-4" />
               </span>
               <span className="text-right text-sm font-semibold tabular-nums text-primary">{row.days_idle} d</span>
-              <span className="row-start-3 text-[13px] text-text-3 sm:row-start-auto" title={formatDateTime(row.last_activity_at)}>
+              <span className="row-start-3 text-[13px] text-text-3 lg:row-start-auto" title={formatDateTime(row.last_activity_at)}>
                 {formatDate(row.last_activity_at)}
               </span>
-              <span className="row-start-1 col-start-2 text-right sm:row-start-auto sm:col-start-auto">
+              <span className="row-start-1 col-start-2 text-right lg:row-start-auto lg:col-start-auto">
                 <Link to={`/admin/applications/${row.id}`} className={buttonClasses('ghost', 'sm')}>
                   Open
                 </Link>
