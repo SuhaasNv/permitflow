@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css"><style>
+.nums{position:absolute;left:120px;top:300px;width:1680px;display:grid;grid-template-columns:repeat(4,1fr);gap:28px}
+.n{padding:26px 28px}
+.n .big{font-size:120px}
+.n p{margin-top:14px;font-size:20px;color:#465060;line-height:1.35}
+.uat{position:absolute;left:120px;top:640px;width:1100px}
+.uat .lab{margin-bottom:14px}
+.uat div.r{display:flex;gap:18px;padding:12px 0;border-top:1px solid #DDE1E7;font-size:20px;line-height:1.35}
+.uat .r .mono{flex:none;width:170px;font-size:16px;color:#616C7A;padding-top:3px}
+.status{position:absolute;left:1300px;top:640px;width:500px;padding:26px 28px}
+.status .lab{margin-bottom:12px}
+.status p{font-size:20px;line-height:1.45}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px}
+</style></head><body>
+<div class="kicker">EVIDENCE AND STATUS</div><div class="page">06 / 06</div>
+<div class="head">Built the same way as v0.3.0: design first, tested, and tried by hand on two devices.</div>
+<div class="nums">
+  <div class="card n"><div class="big">866</div><p>backend tests on a real PostgreSQL</p></div>
+  <div class="card n"><div class="big">272</div><p>frontend tests</p></div>
+  <div class="card n"><div class="big">30</div><p>browser tests, including a tablet walk through use case 3</p></div>
+  <div class="card n"><div class="big">16</div><p>screens designed and approved before any code</p></div>
+</div>
+<div class="uat"><div class="lab">ACCEPTANCE RUNS BY HAND, ON THE LIVE DEVELOPMENT SITE</div>
+  <div class="r"><span class="mono">RUN 4 · 21 SEP</span><span>Use case 3 twice, on an iPad and a laptop: 3 findings, all fixed the same day</span></div>
+  <div class="r"><span class="mono">RUN 5 · 24 SEP</span><span>Every script with the live model: 20 findings, 4 of them bugs</span></div>
+  <div class="r"><span class="mono">RUN 6 · 24 SEP</span><span>Every failed case re-tested after the fixes: pass</span></div>
+</div>
+<div class="card status"><div class="lab">WHERE IT IS</div>
+  <p><span class="dot" style="background:#175CD3"></span>On dev, deployed to the development site</p>
+  <p><span class="dot" style="background:#067647"></span>Production stays on v0.3.0, the submitted version</p>
+  <p style="margin-top:10px;color:#465060">Released after the assessment, on my go.</p></div>
+<div class="foot">Numbers as of 24 Sep 2026 · docs/10-uat/UAT_PLAN.md (runs 4 to 6) · CHANGELOG.md · RELEASE_PLAN_V0_4_0.md</div>
+</body></html>
