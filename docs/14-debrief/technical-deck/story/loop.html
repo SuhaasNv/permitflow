@@ -1,0 +1,72 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face { font-family:'Public Sans'; font-weight:400 700; src:url('../../../../frontend/public/fonts/public-sans-normal-400-latin.woff2') format('woff2'); }
+@font-face { font-family:'Instrument Serif'; src:url('../../../../frontend/public/fonts/instrument-serif-normal-400-latin.woff2') format('woff2'); }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../../frontend/public/fonts/ibm-plex-mono-normal-400-latin.woff2') format('woff2'); }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;background:#F4F5F7;font-family:'Public Sans',sans-serif;color:#1B2430;overflow:hidden;position:relative}
+.kicker{position:absolute;left:120px;top:88px;font-size:22px;font-weight:700;letter-spacing:.09em;color:#616C7A}
+.page{position:absolute;right:120px;top:90px;font-family:'IBM Plex Mono',monospace;font-size:20px;color:#616C7A}
+.head{position:absolute;left:120px;top:136px;width:1600px;font-family:'Instrument Serif',serif;font-size:58px;line-height:1.08}
+
+/* the loop: four steps, then back to the start */
+.steps{position:absolute;left:120px;top:300px;width:1680px;display:grid;grid-template-columns:repeat(4,1fr);gap:56px}
+.step{position:relative;background:#fff;border:1.5px solid #D9DEE5;border-radius:14px;padding:26px 28px 24px}
+.step + .step:before{content:"";position:absolute;left:-46px;top:62px;width:34px;border-top:3px solid #1B2430}
+.step + .step:after{content:"";position:absolute;left:-18px;top:55px;border:8px solid transparent;border-left:11px solid #1B2430}
+.n{font-family:'IBM Plex Mono',monospace;font-size:17px;color:#616C7A;letter-spacing:.06em}
+.w{font-family:'Instrument Serif',serif;font-size:62px;line-height:1;margin-top:6px}
+.a{margin-top:14px;font-size:19px;line-height:1.38;color:#465060;min-height:78px}
+.c{margin-top:18px;padding-top:16px;border-top:1px solid #EEF0F3;font-size:19px;line-height:1.35}
+.c span{display:block;font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.09em;color:#9A4A00;margin-bottom:6px}
+.c span:before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;background:#9A4A00;margin-right:8px;vertical-align:1px}
+.back{position:absolute;left:220px;top:646px;width:1480px;height:44px;border:3px solid #1B2430;border-top:none;border-radius:0 0 22px 22px}
+.back:after{content:"";position:absolute;left:-11px;top:-14px;border:8px solid transparent;border-bottom:11px solid #1B2430}
+.backl{position:absolute;left:0;right:0;top:702px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:16px;color:#616C7A;letter-spacing:.06em}
+
+/* sprints on a date line */
+.tl{position:absolute;left:720px;top:790px;width:1080px}
+.tl .rule{position:absolute;left:14px;right:40px;top:13px;height:3px;background:#1B2430}
+.sp{position:absolute;top:0;width:260px}
+.sp .d{width:28px;height:28px;border-radius:50%;background:#067647;border:3px solid #067647}
+.sp.design .d{background:#F4F5F7;border-color:#1B2430}
+.sp .when{margin-top:14px;font-family:'IBM Plex Mono',monospace;font-size:15px;color:#616C7A;letter-spacing:.04em}
+.sp .t{margin-top:4px;font-size:21px;font-weight:650}
+.sp .g{margin-top:2px;font-size:18px;color:#465060}
+.sp .v{margin-top:8px;display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:15px;padding:2px 10px;border-radius:999px;background:#ECFDF3;color:#067647;border:1.5px solid #A6E9C4}
+
+.anchor{position:absolute;left:120px;top:778px;display:flex;align-items:center;gap:28px;width:560px}
+.big{font-family:'Instrument Serif',serif;font-size:190px;line-height:.8}
+.anchor p{font-size:26px;line-height:1.3}
+.anchor p span{color:#616C7A}
+.foot{position:absolute;left:120px;bottom:60px;font-size:18px;color:#616C7A}
+
+/* pitch variant: no "caught" rows, no number */
+body.light .c,body.light .anchor{display:none}
+body.light .a{min-height:0}
+body.light .back{top:508px}
+body.light .backl{top:564px}
+body.light .tl{left:120px;top:690px;width:1680px}
+body.light .sp{width:380px}
+body.light .foot{bottom:90px;font-size:22px;color:#465060}
+</style></head><body>
+<div class="kicker">KICKER</div><div class="page">PAGE</div>
+<div class="head">HEAD</div>
+
+<div class="steps">
+  <div class="step"><div class="n">01 · REQUIREMENTS</div><div class="w">Agree</div><div class="a">Numbered requirements, stories with acceptance criteria</div><div class="c"><span>CAUGHT</span>A story that crept past scope</div></div>
+  <div class="step"><div class="n">02 · DESIGN</div><div class="w">Design</div><div class="a">State machine and screens approved before code</div><div class="c"><span>CAUGHT</span>A red landing band, rejected at review</div></div>
+  <div class="step"><div class="n">03 · BUILD</div><div class="w">Build</div><div class="a">One branch per story, checks on every push</div><div class="c"><span>CAUGHT</span>A scratch file, stopped in the diff</div></div>
+  <div class="step"><div class="n">04 · TEST</div><div class="w">Test</div><div class="a">Tests per layer, then an acceptance run</div><div class="c"><span>CAUGHT</span>A missing transition, found by the sweep</div></div>
+</div>
+<div class="back"></div><div class="backl">EVERY SPRINT CLOSES THE LOOP, THEN STARTS IT AGAIN</div>
+
+<div class="anchor"><div class="big">6</div><p>mistakes by the AI, each caught by a step. <span>All written down.</span></p></div>
+
+<div class="tl"><div class="rule"></div>
+  <div class="sp design" style="left:0%"><div class="d"></div><div class="when">17 SEP</div><div class="t">Design phase</div><div class="g">Requirements and prototype</div></div>
+  <div class="sp" style="left:26%"><div class="d"></div><div class="when">18 SEP</div><div class="t">Sprint 1</div><div class="g">An operator can submit</div><div class="v">v0.1.0</div></div>
+  <div class="sp" style="left:52%"><div class="d"></div><div class="when">18 SEP</div><div class="t">Sprint 2</div><div class="g">The loop closes, twice</div><div class="v">v0.2.0</div></div>
+  <div class="sp" style="left:78%"><div class="d"></div><div class="when">19 SEP</div><div class="t">Sprint 3</div><div class="g">Ship it honestly</div><div class="v">v0.3.0</div></div>
+</div>
+<div class="foot">FOOT</div>
+</body></html>
