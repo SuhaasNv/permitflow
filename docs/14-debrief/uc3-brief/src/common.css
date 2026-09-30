@@ -1,0 +1,17 @@
+@font-face { font-family:'Public Sans'; font-weight:400 700; src:url('../../../../frontend/public/fonts/public-sans-normal-400-latin.woff2') format('woff2'); }
+@font-face { font-family:'Instrument Serif'; src:url('../../../../frontend/public/fonts/instrument-serif-normal-400-latin.woff2') format('woff2'); }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../../frontend/public/fonts/ibm-plex-mono-normal-400-latin.woff2') format('woff2'); }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;background:#F4F5F7;font-family:'Public Sans',sans-serif;color:#1B2430;overflow:hidden;position:relative}
+.kicker{position:absolute;left:120px;top:88px;font-size:22px;font-weight:700;letter-spacing:.09em;color:#616C7A}
+.page{position:absolute;right:120px;top:90px;font-family:'IBM Plex Mono',monospace;font-size:20px;color:#616C7A}
+.head{position:absolute;left:120px;top:136px;width:1620px;font-family:'Instrument Serif',serif;font-size:58px;line-height:1.08}
+.foot{position:absolute;left:120px;bottom:60px;font-size:18px;color:#616C7A}
+.who{display:inline-block;padding:3px 12px;border-radius:999px;font-size:15px;font-weight:600;border:1.5px solid #D9DEE5;background:#fff;color:#465060}
+.who.off{color:#175CD3;border-color:#B2CCFA;background:#EEF4FF}
+.who.sys{color:#475467;border-style:dashed}
+.who.adm{color:#1B2430;border-color:#838C99}
+.mono{font-family:'IBM Plex Mono',monospace}
+.card{background:#fff;border:1.5px solid #D9DEE5;border-radius:14px}
+.lab{font-family:'IBM Plex Mono',monospace;font-size:15px;letter-spacing:.09em;color:#616C7A}
+.big{font-family:'Instrument Serif',serif;line-height:.8}

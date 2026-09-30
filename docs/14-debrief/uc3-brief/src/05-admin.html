@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css"><style>
+.grid{position:absolute;left:120px;top:300px;width:1680px;display:grid;grid-template-columns:1.25fr 1fr;gap:28px}
+.p{padding:26px 30px}
+.p .lab{margin-bottom:16px}
+.bar{display:flex;align-items:center;gap:14px;margin:9px 0;font-size:18px}
+.bar span{width:260px}.bar i{height:14px;border-radius:7px;background:#1B2430;display:block}
+.bar em{font-style:normal;font-family:'IBM Plex Mono',monospace;font-size:16px;color:#616C7A}
+.idle{margin-top:18px;padding-top:16px;border-top:1px solid #EEF0F3;font-size:18px;color:#465060}
+.idle b{color:#9A4A00}
+.feed div{padding:10px 0;border-bottom:1px solid #EEF0F3;font-size:18px;line-height:1.35}
+.feed .mono{font-size:14px;color:#616C7A;display:block}
+.bottom{position:absolute;left:120px;top:760px;width:1680px;display:flex;gap:28px}
+.bottom .p{flex:1;font-size:20px;line-height:1.4}
+.bottom b{display:block;font-size:22px;margin-bottom:4px}
+.ro{position:absolute;right:120px;top:246px}
+</style></head><body>
+<div class="kicker">THE ADMIN VIEW</div><div class="page">05 / 06</div>
+<div class="head">The office can see itself: what is stuck, whether the checks are healthy, who has access.</div>
+<div class="ro"><span class="who adm">Admin · read-only on cases</span></div>
+<div class="grid">
+  <div class="card p"><div class="lab">OVERVIEW · WHOSE TURN IS IT</div>
+    <div class="bar"><span>Under Review</span><i style="width:300px"></i><em>officer</em></div>
+    <div class="bar"><span>Site Visit Scheduled</span><i style="width:170px"></i><em>officer</em></div>
+    <div class="bar"><span>Awaiting clarification</span><i style="width:120px"></i><em>operator</em></div>
+    <div class="bar"><span>Pending Approval</span><i style="width:80px"></i><em>officer</em></div>
+    <div class="idle"><b>Idle more than 7 days:</b> the ten oldest cases, so nothing is forgotten. Document checks today, their failures and speed, against the daily quota.</div></div>
+  <div class="card p feed"><div class="lab">ACTIVITY · EVERY CHANGE, NEWEST FIRST</div>
+    <div><span class="mono">10:42 · officer</span>Checklist submitted, 2 items flagged</div>
+    <div><span class="mono">10:15 · operator</span>Answered the storage question, 1 photo</div>
+    <div><span class="mono">09:58 · admin</span>Changed a user's role to officer</div>
+    <div><span class="mono">09:31 · officer</span>Approved, licence FEL-2026-000010</div></div>
+</div>
+<div class="bottom">
+  <div class="card p"><b>Users</b>Create accounts, change roles, deactivate. Takes effect on the next request.</div>
+  <div class="card p"><b>Guard rails</b>No admin can change themselves, remove the last admin, or touch a protected account.</div>
+  <div class="card p"><b>Oversight, not action</b>Admins read any case; only officers decide. Every admin change is audited.</div>
+</div>
+<div class="foot">Screens drawn for this slide from the product · ADR-014 · US-070, US-072, US-073, US-089 · every /admin route has an authorization test</div>
+</body></html>
