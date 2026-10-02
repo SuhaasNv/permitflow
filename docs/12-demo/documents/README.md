@@ -19,7 +19,8 @@ All four are real PDFs with selectable text (rendered from HTML by Chromium, not
 |--------|-----------|---------------------------------|
 | `clean/` | The "happy path" demo: submit, AI verifies, officer approves | All four documents consistent with the application |
 | `second_business/` | The production example: a second, unrelated restaurant (Serangoon Spice House Pte. Ltd., UEN 202411223K, 52 Serangoon Garden Way #01-05, contact Priya Raghavan), clean set, so the record left on https://permitflow.space is not the same business as every test fixture | All four documents consistent with that application; the form values to enter are in the table below |
-| `with_issues/` | The "feedback round" demo: AI flags problems, officer requests changes, operator resubmits with the clean versions | Three findings: wrong UEN in the business profile, wrong unit number in the tenancy agreement, expired food hygiene certificate. The floor plan is fine. See `with_issues/NOTES.md` for the exact planted values and where they appear. Two edge-case files sit beside them: `injection_business_profile.pdf` (needs review, possible prompt injection) and `empty_document.pdf` (unreadable), described in the same notes |
+| `with_issues/` | The "feedback round" demo: AI flags problems, officer requests changes, operator resubmits with the clean versions | Three findings: wrong UEN in the business profile, wrong unit number in the tenancy agreement, expired food hygiene certificate. The floor plan is fine. See `with_issues/NOTES.md` for the exact planted values and where they appear. |
+| `edge_cases/` | Hostile, empty and disguised uploads, on a separate draft | Hidden and visible prompt injection (needs review), an empty PDF (unreadable), a text file named `.pdf` (refused at upload). See `edge_cases/README.md` |
 
 A typical demo: upload `with_issues/` first, walk through the findings, then replace the three flagged files with their `clean/` counterparts and show the application passing.
 
@@ -30,6 +31,7 @@ docs/12-demo/documents/
   README.md                 this file
   clean/                    the four PDFs that agree with the Kopi & Kaya form values
   with_issues/              the four PDFs with planted defects, plus NOTES.md listing them
+  edge_cases/               injection (hidden and visible), empty PDF, fake PDF, plus README.md
   second_business/          the four PDFs for Serangoon Spice House (the production example)
 ```
 

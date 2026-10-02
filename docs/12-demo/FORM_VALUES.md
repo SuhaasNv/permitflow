@@ -95,7 +95,7 @@ Tick both boxes:
 | Tenancy agreement | `tenancy_agreement.pdf` (unit `#01-21`) | `tenancy_agreement.pdf` |
 | Food hygiene certificate | `food_hygiene_certificate.pdf` (expired) | `food_hygiene_certificate.pdf` |
 
-Edge cases, on a separate draft: `with_issues/injection_business_profile.pdf` (needs review, hidden prompt injection) and `with_issues/empty_document.pdf` (unreadable).
+Edge cases, on a separate draft: `documents/edge_cases/` (hidden and visible prompt injection, an empty PDF, a fake PDF); expected results in its README.
 
 ---
 
