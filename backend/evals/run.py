@@ -8,6 +8,7 @@ post-processing rules) without a database, and report expected versus actual (US
 
 Cases marked `mock_gap` are expected to fail on the mock (its heuristics are deliberately simple);
 they still run and are reported, but do not count against the mock's pass rate.
+Cases marked `outside_gate` are red-team additions: reported on every provider, never counted.
 """
 
 from __future__ import annotations
@@ -104,7 +105,7 @@ def run_case(case: dict[str, Any], form: dict[str, Any], provider: VerificationP
     if expect.get("truncated"):
         ok = ok and truncated
         note = f"truncated to {settings.ai_max_text_chars} chars; " + note
-    counted = not (provider.name == "mock" and case.get("mock_gap"))
+    counted = not (provider.name == "mock" and case.get("mock_gap")) and not case.get("outside_gate")
     expected = "|".join(allowed) + (f" +{','.join(expect['codes'])}" if expect.get("codes") else "")
     return Outcome(
         case["id"], case["group"], case["document_type"], expected, actual, codes, ok, counted, ms, note
@@ -130,6 +131,9 @@ def _run_as_experiment(spec: dict[str, Any], provider: VerificationProvider) -> 
     cases = {c["id"]: c for c in spec["cases"]}
     if not client.has_dataset(dataset_name=DATASET):
         client.create_dataset(DATASET, description="PermitFlow golden and adversarial cases (cases.json)")
+    known = {(e.inputs or {}).get("id") for e in client.list_examples(dataset_name=DATASET)}
+    new = [c for c in json.loads((HERE / "cases.json").read_text())["cases"] if c["id"] not in known]
+    if new:
         client.create_examples(
             dataset_name=DATASET,
             examples=[
@@ -137,9 +141,10 @@ def _run_as_experiment(spec: dict[str, Any], provider: VerificationProvider) -> 
                     "inputs": {"id": c["id"], "group": c["group"], "document_type": c["document_type"]},
                     "outputs": {"expect": c["expect"]},
                 }
-                for c in spec["cases"]
+                for c in new
             ],
         )
+    selected = [e for e in client.list_examples(dataset_name=DATASET) if (e.inputs or {}).get("id") in cases]
     outcomes: dict[str, Outcome] = {}
 
     def target(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -153,7 +158,7 @@ def _run_as_experiment(spec: dict[str, Any], provider: VerificationProvider) -> 
 
     evaluate(
         target,
-        data=DATASET,
+        data=selected,
         evaluators=[passed],
         experiment_prefix=f"{provider.name}-{PROMPT_VERSION}",
         metadata={"provider": provider.name, "model": provider.model, "prompt_version": PROMPT_VERSION},
