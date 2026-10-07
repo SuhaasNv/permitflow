@@ -2,15 +2,15 @@
 
 ## Live: [permitflow.space](https://permitflow.space)
 
-![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/14-debrief/video/permitflow-launch-poster.jpg)
+![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/14-debrief/video/02-launch/poster.jpg)
 
 https://github.com/user-attachments/assets/942739f7-e2bd-4360-b525-ecf960a7e796
 
-*Launch video, 70 seconds. The narrated walkthrough (4 min 36 s) and the technical video (5 min 40 s) are in `docs/14-debrief/video/`.*
+*Launch video, 70 seconds. The intro film (3 min 14 s), the narrated walkthrough (4 min 36 s) and the technical video (5 min 40 s) are in `docs/14-debrief/video/`.*
 
 A regulatory licensing platform built for a 3-day full-stack assessment. An operator (the business owner, or an agent applying for the business) applies for a Food Establishment Licence through a guided form with checked uploads; a licensing officer reviews the submission, leaves feedback tied to a section or a document, and requests a resubmission in which only the flagged parts reopen. Every status change, feedback round and decision is audited; approval issues a licence certificate. An advisory AI verifier reads each uploaded document against the form before submission. It never decides anything.
 
-**Try it:** production, v0.3.0, at https://permitflow.space (one example application waiting in the officer's queue); development at https://dev.permitflow.space. Demo accounts below. Local setup takes about ten minutes.
+**Try it:** production, v0.4.0, at https://permitflow.space (one example application waiting in the officer's queue); development at https://dev.permitflow.space. Demo accounts below. Local setup takes about ten minutes.
 
 **Ten minutes to review it:** the technical deck's handout PDF in `docs/14-debrief/technical-deck/`, then `SCOPE.md`, then `docs/11-reviews/ASSESSMENT_TRACEABILITY.md` (every line of the brief mapped to code, test and evidence).
 
@@ -37,30 +37,34 @@ npm run dev                            # http://localhost:3000
 
 Local quotas: an operator may hold 20 open drafts and run 60 AI checks a day (the mock provider counts too). For local work set `MAX_DRAFTS_PER_USER=0` and `AI_RUNS_PER_USER_PER_DAY=0` in `.env`.
 
+A site visit is recorded on or after its day (`SITE_VISIT_DAY_GUARD=true`, the default): Mark site visit done and the checklist submit wait for the confirmed date. To run a whole appointment in one sitting (the browser suite, `backend/scripts/uat_edges.py`, a demonstration) set `SITE_VISIT_DAY_GUARD=false`.
+
 ## Demo accounts
 
-`backend/scripts/seed.py` creates two accounts (idempotent); sample documents, clean and with planted issues, are in `docs/12-demo/documents/`. The same accounts exist in every environment, and the password is shared on purpose: this is a demonstration, the sign-in page and the privacy policy say so, and no real personal data should be entered.
+`backend/scripts/seed.py` creates four accounts (idempotent); sample documents, clean and with planted issues, are in `docs/12-demo/documents/`. The same accounts exist in every environment, and the password is shared on purpose: this is a demonstration, the sign-in page and the privacy policy say so, and no real personal data should be entered.
 
 | Role | Email | Password |
 |------|-------|----------|
 | Operator (Tan Wei Ling) | operator@permitflow.example.sg | `PermitFlow!2026` |
 | Licensing officer (Rahim bin Abdullah) | officer@permitflow.example.sg | `PermitFlow!2026` |
+| Administrator (Priya Nair) | admin@permitflow.example.sg | `PermitFlow!2026` |
+| Spare licensing officer (Lim Jun Hao, the account the admin scenario changes and restores) | officer2@permitflow.example.sg | `PermitFlow!2026` |
 
-No admin account yet (the admin epic is v0.4.0), no self-registration or password reset by design (`SCOPE.md`, Deferred). Sign-in attempts are limited to 20 a minute per client.
+The first three are protected: no administrator can change their role or deactivate them, so the demonstration always works. Administrators create further accounts from the Users page or with `backend/scripts/create_user.py`; there is no self-registration or password reset by design (`SCOPE.md`, Deferred). Sign-in attempts are limited to 20 a minute per client.
 
 ## Scope
 
 `SCOPE.md` is the decision record: what is built, simplified, mocked and deferred, and every assumption made where the brief is ambiguous.
 
 - Use cases 1 and 2 are complete: sectioned form with validation and draft save, drag-and-drop uploads with a live AI check per document, submission as an immutable revision, officer queue and case view with the AI findings, feedback tied to a section or a document with templates, resubmission in which only the flagged parts reopen, revision compare, resolution tracking, role-specific status labels, notifications, audit trail, licence certificate on approval.
-- Use case 3 (site-visit checklist) is deferred; its three statuses and transitions exist in the state machine and are tested, the checklist screens are not built.
+- Use case 3 is complete (v0.4.0): the site-visit appointment with rounds, the officer's checklist with autosave and extra findings, the clarification rounds with evidence, one live session per account, the storage budget, and the administrator's overview, activity feed, read-only case and user management.
 - Beyond the brief: withdrawal, draft deletion, feedback undo and reopen, a public landing page, policy pages, an accessibility gate.
 
 ## Stack and architecture
 
 FastAPI, SQLAlchemy 2, Alembic and Pydantic v2 on PostgreSQL 16; React 19, TypeScript strict, Vite, Tailwind, TanStack Query, React Hook Form and Zod; pytest on a real database, vitest, Playwright; GitHub Actions, images on GHCR, Railway with two environments. Why each: `docs/03-architecture/decisions/ADR-009-stack-and-delivery-pipeline.md`.
 
-A modular monolith (`api → services → domain / repositories → models`, `domain/` pure Python) with the state machine as a data table (`backend/app/domain/workflow.py`), same-transaction audit rows, immutable revision snapshots and the AI behind a provider interface. The layering is enforced by a test (`backend/tests/unit/test_layering.py`). Start with `docs/03-architecture/ARCHITECTURE.md` and `STATE_MACHINE.md`; the twelve ADRs are indexed in `docs/03-architecture/decisions/README.md`.
+A modular monolith (`api → services → domain / repositories → models`, `domain/` pure Python) with the state machine as a data table (`backend/app/domain/workflow.py`), same-transaction audit rows, immutable revision snapshots and the AI behind a provider interface. The layering is enforced by a test (`backend/tests/unit/test_layering.py`). Start with `docs/03-architecture/ARCHITECTURE.md` and `STATE_MACHINE.md`; the fourteen ADRs are indexed in `docs/03-architecture/decisions/README.md`.
 
 ```
 backend/   FastAPI + SQLAlchemy 2 + Alembic
@@ -70,7 +74,7 @@ docs/      01-discovery … 14-debrief, one README per folder; docs/README.md is
 
 ## Security
 
-Argon2 password hashes; short-lived JWTs re-checked against the user row on every request; no fallback secret (the app refuses to start without a real `JWT_SECRET`). Authorization is server-side on every route (role per router, ownership as 404, sub-resource checks), with an authorization test per application-scoped endpoint. Uploads: allowlist, 10 MB, magic-byte check, server-generated keys, served only through authorised endpoints. Abuse limits: 240 requests a minute per client, sign-in limits, 20 open drafts, 60 AI checks a day per applicant and 1,000 per platform, counted in the database. Security headers and CSP on both tiers; gitleaks, pip-audit, bandit and npm audit block the build. Threats and controls: `docs/06-security/THREAT_MODEL.md`; the hardening checklist with a test per item: `docs/06-security/SECURITY_REVIEW.md`; privacy, legal and accessibility: `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.
+Argon2 password hashes; short-lived JWTs re-checked against the user row and the sign-in's session row on every request, one live session per account with a take-over from the sign-in page and a 60-minute idle limit (US-093); no fallback secret (the app refuses to start without a real `JWT_SECRET`). Authorization is server-side on every route (role per router, ownership as 404, sub-resource checks), with an authorization test per application-scoped endpoint. Uploads: allowlist, 10 MB, magic-byte check, server-generated keys, served only through authorised endpoints. Abuse limits: 240 requests a minute per client, sign-in limits, 20 open drafts, 60 AI checks a day per applicant and 1,000 per platform, counted in the database. Security headers and CSP on both tiers; gitleaks, pip-audit, bandit and npm audit block the build. Threats and controls: `docs/06-security/THREAT_MODEL.md`; the hardening checklist with a test per item: `docs/06-security/SECURITY_REVIEW.md`; privacy, legal and accessibility: `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.
 
 ## Tests
 
@@ -80,7 +84,7 @@ cd frontend && npm test && npm run lint && npm run typecheck && npm run build
 cd frontend && npm run e2e          # Playwright against the running stack (backend :8000 with AI_PROVIDER=mock, Vite :3000)
 ```
 
-763 backend cases from 174 test functions on a real PostgreSQL (the state-machine sweep alone is 588), 160 frontend tests, eight Playwright specs (the journey, six scenarios, the accessibility gate), 166 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
+859 backend cases from 258 test functions on a real PostgreSQL (the state-machine sweep alone is 597), 238 frontend tests, thirteen Playwright specs (the journey, eleven scenarios, the accessibility gate), 246 API-level edge checks (`backend/scripts/uat_edges.py`). Coverage: backend 95 %, frontend 81 % statements, both enforced in CI. Layers, commands and what each protects: `docs/08-testing/TEST_STRATEGY.md`; manual acceptance record: `docs/10-uat/UAT_PLAN.md`.
 
 ## Environment variables
 
@@ -92,11 +96,11 @@ cd frontend && npm run e2e          # Playwright against the running stack (back
 
 `main` is production, `dev` is integration, one branch per story merged with `--no-ff`; `main` is protected and receives only pull requests from `dev` with seven green checks (`docs/09-operations/BRANCHING.md`).
 
-`ci.yml` runs seven blocking jobs on every push and pull request: backend, frontend, end to end with the accessibility gate, secret scan, the six-stage AI gate (`ai-gate.yml`, on the mock provider), dependency and code audit, images. `ai-eval.yml` runs the same golden and fairness sets against the real model nightly and on changes to the AI path. Images are built once and pushed to GHCR; a merge to `dev` deploys the development environment automatically; production is pinned to a release image and deployed by hand behind the owner's approval, with health gates after every rollout. Environments, secrets, migrations and rollback by layer: `docs/09-operations/OPERATIONS.md`.
+`ci.yml` runs seven blocking jobs on every push and pull request: backend, frontend (with a 250 KB bundle budget), end to end with the accessibility gate, secret scan, the six-stage AI gate (`ai-gate.yml`, on the mock provider), dependency and code audit, images. `ai-eval.yml` runs the same golden and fairness sets against the real model nightly and on changes to the AI path. Images are built once and pushed to GHCR; a merge to `dev` deploys the development environment automatically; production is pinned to a release image and deployed by hand behind the owner's approval, with health gates after every rollout. Environments, secrets, migrations and rollback by layer: `docs/09-operations/OPERATIONS.md`.
 
 ## Observability
 
-`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. `docker compose --profile observability up -d` runs Prometheus with six alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same services run on Railway, Grafana at https://grafana.dev.permitflow.space, and Telegram carries the alerts, an hourly digest per environment and a command bot (`/status`, `/cost`, `/queue`). Details, every metric, the dashboard and what is still missing: `docs/13-observability/OBSERVABILITY.md`.
+`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. `docker compose --profile observability up -d` runs Prometheus with seven alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same services run on Railway, Grafana at https://grafana.dev.permitflow.space, and Telegram carries the alerts, an hourly digest per environment and a command bot (`/status`, `/cost`, `/queue`). Details, every metric, the dashboard and what is still missing: `docs/13-observability/OBSERVABILITY.md`.
 
 ## AI verification
 
@@ -112,15 +116,14 @@ The full record, with the prompts grouped by the decision they carry, what was d
 
 ## Release notes
 
-v0.3.0 (19 September 2026) is the version at https://permitflow.space. Next, v0.4.0: the admin panel and use case 3. An entry per release, in the users' words: `RELEASE_NOTES.md`; the engineering record: `CHANGELOG.md`.
+v0.4.0 (8 October 2026) is the version at https://permitflow.space. Next, v0.5.0: virus scanning, a separate worker for the document checks, AI usage per check and limits the administrator can tune. An entry per release, in the users' words: `RELEASE_NOTES.md`; the engineering record: `CHANGELOG.md`.
 
 ## What I would do next
 
 Each item has a row with severity in `docs/11-reviews/PRODUCTION_READINESS_REVIEW.md`.
 
-1. Use case 3: the checklist model, the officer's capture screen with draft save, per-item clarification, the operator's targeted response. The statuses and transitions already exist. About 1.5 days.
-2. A worker for the AI checks (Redis or a Postgres `SKIP LOCKED` queue) so checks survive deploys and scale apart from the API; ADR-004 has one call site to change.
-3. Object storage with signed URLs and a virus scan, a backup and restore drill, a retention policy.
-4. httpOnly cookie sessions with CSRF protection, CSP nonces, the rate windows in Redis or at the edge.
-5. Observability, second half: acknowledgement and escalation for the Telegram alerts, nginx and Postgres exporters, one Prometheus per environment, a runbook per alert (readiness row 24).
-6. AI assurance beyond 14 golden cases: a labelled set grown from officer overrides, a red-team suite, calibrated confidence, in-region tracing, a multilingual injection classifier, Project Moonshot as the Singapore assurance evidence (`docs/07-ai/AI_ASSURANCE.md`, Limits).
+1. A worker for the AI checks (Redis or a Postgres `SKIP LOCKED` queue) so checks survive deploys and scale apart from the API; ADR-004 has one call site to change.
+2. Object storage with signed URLs and a virus scan, a backup and restore drill, a retention policy.
+3. httpOnly cookie sessions with CSRF protection, CSP nonces, the rate windows in Redis or at the edge.
+4. Observability, second half: acknowledgement and escalation for the Telegram alerts, nginx and Postgres exporters, one Prometheus per environment, a runbook per alert (readiness row 24).
+5. AI assurance beyond 14 golden cases: a labelled set grown from officer overrides, a red-team suite, calibrated confidence, in-region tracing, a multilingual injection classifier, Project Moonshot as the Singapore assurance evidence (`docs/07-ai/AI_ASSURANCE.md`, Limits).

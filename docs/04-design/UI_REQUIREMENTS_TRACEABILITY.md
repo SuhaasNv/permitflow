@@ -14,7 +14,10 @@ Use cases and requirement IDs from `docs/02-requirements/`. Screens from `SCREEN
 | UC2-B Review a resubmission and compare | S-17 → S-23 Resubmission review → S-24 Compare |
 | UC2-C Advance to an outcome | S-21/S-23 header actions + dialogs (site visit, done, route, approve, reject) |
 | UC2-D View the audit trail | S-25 History & audit |
-| UC4-A Monitor operations | S-40 Admin overview, S-41 Admin users |
+| UC3-A Capture the site visit (v0.4.0) | S-21 (Open checklist) → S-30 Checklist (820 and 1024) → submit dialog → S-31 rail |
+| UC3-B Answer the flagged items (v0.4.0) | S-17 → S-15 (notice) → S-18 Respond (390 and 1280) → send dialog |
+| UC3-C Rounds and the per-item trail (v0.4.0) | S-31 rail (rounds, Not sent yet, Request another round), S-19 History (Site visit tab), S-25 audit trail |
+| UC4-A Monitor operations (v0.4.0) | S-40 Admin overview, S-42 Admin activity, S-43 Admin read-only case, S-41 Admin users |
 
 ## Requirement → UI element
 
@@ -51,8 +54,15 @@ Use cases and requirement IDs from `docs/02-requirements/`. Screens from `SCREEN
 | FR-033 | S-21 Mark resolved only on released items, Undo toasts, Not fixed reopen |
 | FR-034 | S-11 Discard draft / Delete draft dialogs |
 | FR-035 | S-26 licence preview page; S-21 licence block with download after approval; S-11b Download licence (PDF) in the outcome panel |
-| FR-029 | S-40 stats, status table, AI health bar, audit feed |
-| FR-030 | S-41 users table, Add user drawer, Change role, Deactivate; read-only application view |
+| FR-029 | S-40 stat strip, status table with bars, idle list, check health as a definition list, today's counts and the platform quota as metadata (v0.4.0 design) |
+| FR-030 | S-41 users table with Change role and Deactivate or Reactivate dialogs (no in-app creation, FR-030 amended), own and protected rows disabled with the reason; S-42 activity feed; S-43 read-only case with the banner |
+| FR-036, FR-037 | S-30 checklist opens from S-21 once a visit is scheduled; one checklist per visit; seventeen items in five sections with result, comment and guidance |
+| FR-038 | S-30 autosave: Saved hh:mm, retrying, offline banner, merge on conflict (`UI_STATES.md`) |
+| FR-039 | S-30 `FlagToggle` with the required comment |
+| FR-040 | S-30 submit dialog listing the flagged items; the case moves on its own; S-31 shows the released items as Open |
+| FR-041 | S-18 shows only the flagged items with the officer's comment first; response and up to three attachments per item; readiness line; Send responses |
+| FR-042, AUD-007 | S-31 threads with rounds, S-19 history per visit, S-25 audit events per item |
+| SEC-003 (amended) | S-43: admin reads the officer's case with no control rendered; every mutation 403 on the server |
 | NFR-007 | S-40 AI health (latency, outcomes) |
 | SEC-001–003 | Route guards + "Not available for your role" panel (S-90); operator views never include internal fields |
 | SEC-004 | Disabled transitions with reason; 409 handling |

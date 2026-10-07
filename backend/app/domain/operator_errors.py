@@ -12,6 +12,7 @@ _REQUIREMENT = {
     "submit": "Only a draft can be submitted.",
     "resubmit": "A resubmission is only possible while the office is waiting for your changes.",
     "withdraw": "Only an application the office is still working on can be withdrawn.",
+    "send": "Your answers can be sent while the licensing office is waiting for them.",
 }
 
 

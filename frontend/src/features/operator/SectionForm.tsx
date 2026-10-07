@@ -14,6 +14,7 @@ import { SaveIndicator } from '@/features/shared/SaveIndicator'
 import { useToast } from '@/features/shared/Toast'
 import type { SectionValues } from '@/lib/zodFromSchema'
 import { defaultsFor, sectionSchema, toPayload } from '@/lib/zodFromSchema'
+import { openItems } from '@/lib/feedback'
 
 export interface SectionFormHandle {
   /** Save the current values as a draft (partial allowed). Resolves true when saved, false when validation blocked it. */
@@ -33,6 +34,14 @@ export interface SectionFormProps {
   lockedReason?: string
   onSave: (payload: Record<string, unknown>, andContinue: boolean) => Promise<void>
   onDirtyChange: (dirty: boolean) => void
+}
+
+/** The applicant's own details, so browsers and assistive tools can fill them in (WCAG 1.3.5, US-095). */
+const AUTOCOMPLETE: Partial<Record<string, string>> = {
+  business_name: 'organization',
+  contact_name: 'name',
+  contact_email: 'email',
+  contact_phone: 'tel',
 }
 
 function fieldError(errors: Record<string, { message?: string } | undefined>, key: string): string | undefined {
@@ -207,6 +216,7 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
             className={className}
             type={f.kind === 'email' ? 'email' : f.kind === 'tel' ? 'tel' : 'text'}
             inputMode={f.key === 'postal_code' ? 'numeric' : undefined}
+            autoComplete={AUTOCOMPLETE[f.key]}
             maxLength={f.max_length ?? undefined}
             {...form.register(f.key)}
           />
@@ -235,13 +245,11 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
         ) : null}
       </div>
       <div className="flex flex-col gap-5 px-5 py-6 sm:px-7">
-        {feedback
-          .filter((f) => f.resolution === 'open')
-          .map((f) => (
-            <Alert key={f.id} tone="warning" title="The licensing office asked for a change here">
-              {f.message}
-            </Alert>
-          ))}
+        {openItems(feedback).map((f) => (
+          <Alert key={f.id} tone="warning" title="The licensing office asked for a change here">
+            {f.message}
+          </Alert>
+        ))}
         {feedback.some((f) => f.resolution === 'addressed') ? (
           <Alert tone="info">
             <span>You changed this section in your latest revision. The officer will review it.</span>

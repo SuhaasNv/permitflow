@@ -1,18 +1,15 @@
-import { guardUnload, hasUnsaved, setUnsaved, subscribeUnsaved } from './unsaved'
+import { guardUnload, hasUnsaved, setUnsaved } from './unsaved'
 
 describe('unsaved changes flag', () => {
   afterEach(() => setUnsaved(false))
 
-  it('notifies subscribers only on change', () => {
-    const seen: boolean[] = []
-    const stop = subscribeUnsaved((v) => seen.push(v))
+  it('holds the flag the pages set', () => {
+    expect(hasUnsaved()).toBe(false)
     setUnsaved(true)
     setUnsaved(true)
-    setUnsaved(false)
-    stop()
-    setUnsaved(true)
-    expect(seen).toEqual([true, false])
     expect(hasUnsaved()).toBe(true)
+    setUnsaved(false)
+    expect(hasUnsaved()).toBe(false)
   })
 
   it('asks the browser to confirm unload only while dirty', () => {

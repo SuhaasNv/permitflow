@@ -63,5 +63,74 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
             return f"Licence {p.get('licence_no', '')} issued, valid to {p.get('valid_to', '')}"
         case "feedback.restored":
             return f"Feedback on {p.get('target', '')} restored to {p.get('to', '')} (undo)"
+        case "user.role_changed":
+            return f"{p.get('email', '')}: role changed from {p.get('from', '')} to {p.get('to', '')}"
+        case "user.deactivated":
+            return f"Account deactivated: {p.get('email', '')}"
+        case "user.reactivated":
+            return f"Account reactivated: {p.get('email', '')}"
+        case "user.created":
+            return f"Account created: {p.get('email', '')} ({p.get('role', '')})"
+        case "user.session_taken_over":
+            return f"Signed in on {p.get('to_device', '')}; the session on {p.get('from_device', '')} ended"
+        case "user.signed_out":
+            return f"Signed out on {p.get('device', '')}"
+        case "site_visit.proposed":
+            return f"Site visit proposed: {_visit(p)} (round {p.get('round', '')})"
+        case "site_visit.counter_proposed":
+            return f"Operator proposed another visit date (round {p.get('round', '')})"
+        case "site_visit.confirmed":
+            return f"Site visit confirmed: {_visit(p)}{_HOW.get(str(p.get('how')), '')}"
+        case "site_visit.rescheduled":
+            return (
+                f"Site visit reschedule asked by the {p.get('by', '')}: {_visit(p)} "
+                f"(round {p.get('round', '')})"
+            )
+        case "site_visit.move_request_closed":
+            return (
+                f"Request to move the visit to {p.get('asked', '')} closed: the visit took place on "
+                f"{_visit(p)} (round {p.get('round', '')})"
+            )
+        case "checklist.created":
+            return f"Checklist opened for visit {p.get('visit_no', '')} ({p.get('items', '')} items)"
+        case "checklist.submitted":
+            flagged = len(p.get("flagged_keys") or [])
+            ok, bad, na = p.get("satisfactory", ""), p.get("unsatisfactory", ""), p.get("not_applicable", "")
+            return (
+                f"Checklist submitted for visit {p.get('visit_no', '')}: {ok} satisfactory, "
+                f"{bad} unsatisfactory, {na} not applicable, {flagged} flagged for clarification"
+            )
+        case "clarification.response_drafted":
+            return f"Operator drafted an answer on {p.get('item_key', '')} (round {p.get('round', '')})"
+        case "clarification.attachment_added":
+            return f"Operator attached {p.get('filename', '')} to an answer"
+        case "clarification.attachment_removed":
+            return f"Operator removed {p.get('filename', '')} from an answer"
+        case "clarification.answered":
+            return f"Answer sent on {p.get('item_key', '')} (round {p.get('round', '')})"
+        case "clarification.resolved":
+            return f"Item {p.get('item_key', '')} marked clarified"
+        case "clarification.reopened":
+            return (
+                f"Item {p.get('item_key', '')} still needs clarification (round {p.get('round', '')} drafted)"
+            )
+        case "clarification.withdrawn":
+            return f"Question on {p.get('item_key', '')} withdrawn (round {p.get('round', '')})"
+        case "clarification.restored":
+            return f"Question on {p.get('item_key', '')} restored (round {p.get('round', '')}, undo)"
+        case "clarification.released":
+            return f"Question on {p.get('item_key', '')} sent to the operator (round {p.get('round', '')})"
         case _:
             return event_type
+
+
+_HOW = {
+    "accepted_by_operator": " (accepted by the operator)",
+    "accepted_operator_date": " (the operator's date)",
+    "kept_original_date": " (original date kept)",
+    "confirmed_without_reply": " (no reply within three working days)",
+}
+
+
+def _visit(p: dict[str, Any]) -> str:
+    return f"{p.get('date', '')}, {p.get('slot', '')}".strip(", ")

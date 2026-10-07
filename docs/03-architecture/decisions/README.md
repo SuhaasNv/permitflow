@@ -1,12 +1,13 @@
 # Architecture decision records
 
-Twelve decisions, each in the same shape: context, the options considered with their trade-offs, the decision, why, the consequences, how it is validated, and amendments dated as the code changed. Read them in three groups.
+Fourteen decisions, each in the same shape: context, the options considered with their trade-offs, the decision, why, the consequences, how it is validated, and amendments dated as the code changed. Read them in four groups.
 
 ## How to read
 
 - **The shape** (001 to 003): what the system is made of.
 - **The rules** (004 to 008): the behaviours that make the brief's guarantees true.
 - **The delivery** (009 to 012): stack, pipeline, and the one feature that is a record in its own right.
+- **v0.4.0** (013 and 014): the site visit arranged inside the case, and the administrator who reads everything and changes only accounts.
 
 Each line below is the decision in one breath: chose X over Y because Z.
 
@@ -36,6 +37,8 @@ Each line below is the decision in one breath: chose X over Y because Z.
 | [010 Licence certificate in the approval transaction](ADR-010-licence-certificate-in-approval-transaction.md) | Render the PDF on approval, store the bytes with a hash, audit the issue; preview in memory with a watermark | Re-rendering on every download, or rendering in the browser | An issued document must never change after issue and must be attributable; a storage failure leaves the application unapproved rather than approved without a certificate |
 | [011 Delivery pipeline, two environments](ADR-011-delivery-pipeline-two-environments.md) | CI builds two images once to GHCR; Railway pulls by tag; `dev` deploys development automatically, `main` deploys production after a person approves; the job waits for the rollout and gates on health | Railway building from the repository on push, or the same plus promptfoo, tracing, SAST and staging | The tested artefact is the deployed artefact; rollback is a tag; a green CI on a weekend cannot change production; promptfoo and image scanning stay next steps, while the AI gate, live evaluation, tracing and blocking audits were built on the last day (amendments) |
 | [012 Abuse limits](ADR-012-abuse-limits-in-process-and-database.md) | Per-client sliding windows in process for request rate and sign-in attempts; quotas for drafts and daily model calls counted in the database; over quota a check is stored unavailable, never a blocked application | Relying on the platform, or Redis-backed windows | Cost is counted where the truth lives; the deployment is one process, so the edge, not the app, is the answer to a distributed attack; refusing a model call is safe because the check is advisory |
+| [014 Administrator read-only and user management](ADR-014-administrator-read-only-and-user-management.md) | The administrator reads every case through the officer's read routes and screens with `actions[]` empty by construction, and writes only users (role, active flag, creation) under a lock on the admin rows with protected demonstration accounts | A separate administrator case API; a super-role with officer powers | One read model per case and one authorization test per endpoint; the server never offers an administrator a transition; "never zero administrators" holds under concurrent changes |
+| [013 Site visit appointment](ADR-013-site-visit-appointment.md) | The appointment is a record inside Site Visit Scheduled with its own small state (proposed, counter-proposed, confirmed, done) and immutable rounds; one workflow guard (`visit_confirmed`), six proposals at most, the officer holds the closing move and a three-working-day silence rule | New statuses, or a bare date field | The brief's status list stays intact and every consumer of it untouched; a bounded loop with an officer-only close means no case waits forever; rounds as rows give the audit trail, both histories and the checklist one source |
 
 ## Amendments as built (19 Sep 2026)
 

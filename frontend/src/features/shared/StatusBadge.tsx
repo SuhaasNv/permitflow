@@ -26,15 +26,15 @@ export function StatusBadge({ label, tone, size = 'md', live, className }: Statu
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border font-semibold transition-colors duration-[var(--dur-base)]',
-        size === 'md' ? 'h-6 px-2 text-xs' : 'h-7 px-2.5 text-[13px]',
+        'inline-flex max-w-full items-center gap-1.5 whitespace-normal rounded-full border py-0.5 text-left font-semibold leading-4 transition-colors duration-[var(--dur-base)]',
+        size === 'md' ? 'min-h-6 px-2 text-xs' : 'min-h-7 px-2.5 text-[13px]',
         tones[tone],
         className,
       )}
       data-tone={tone}
     >
       <span className="relative flex h-[7px] w-[7px] shrink-0" aria-hidden="true">
-        {live ? <span className="absolute inset-0 animate-ping rounded-full bg-current opacity-60" /> : null}
+        {live ? <span className="absolute inset-0 animate-ping rounded-full bg-current opacity-60 motion-reduce:animate-none" /> : null}
         <span className="relative h-[7px] w-[7px] rounded-full bg-current" />
       </span>
       {label}

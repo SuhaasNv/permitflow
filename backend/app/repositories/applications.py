@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections.abc import Iterable
 
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
@@ -54,6 +55,13 @@ class ApplicationRepository:
             .order_by(Application.updated_at.desc())
         )
         return [(row[0], row[1]) for row in self.db.execute(stmt)]
+
+    def reference_numbers(self, ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, str]:
+        wanted = list(ids)
+        if not wanted:
+            return {}
+        stmt = select(Application.id, Application.reference_no).where(Application.id.in_(wanted))
+        return {row[0]: row[1] for row in self.db.execute(stmt)}
 
     def count_by_status(self) -> dict[ApplicationStatus, int]:
         """Applications per status, one query (the `/metrics` gauge, US-077)."""

@@ -11,17 +11,22 @@ from app.domain import completeness as completeness_rules
 from app.domain.enums import ApplicationStatus, DocumentType, FeedbackResolution, VerificationStatus
 from app.domain.form_schema import SECTIONS
 from app.domain.labels import officer_label, tone_for
-from app.domain.workflow import Actor, TransitionContext, available_actions
+from app.domain.phase import outcome_for, phase_for
+from app.domain.workflow import Actor, actor_for_role, available_actions
 from app.models import Application, ApplicationRevision, Document, Feedback, User, VerificationRun
+from app.models.enums import Role
 from app.repositories.applications import ApplicationRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.feedback import FeedbackRepository
 from app.repositories.revisions import RevisionRepository
 from app.repositories.users import UserRepository
 from app.schemas.applications import LicenceView
+from app.schemas.checklist import ChecklistSummaryOut
+from app.schemas.clarification import ClarificationOfficerView
 from app.schemas.officer import (
     ActionOut,
     ApplicantOut,
+    EarlierVisitOfficerOut,
     FeedbackOut,
     OfficerApplicationOut,
     OfficerDocumentOut,
@@ -30,10 +35,16 @@ from app.schemas.officer import (
     RevisionOut,
     VerificationSummaryOut,
 )
+from app.schemas.site_visit import SiteVisitOut
+from app.services.checklist import ChecklistService
+from app.services.clarification import ClarificationService
 from app.services.compare import CompareService
-from app.services.feedback import restorable, target_label
+from app.services.feedback import resolvable_in, restorable, target_label
 from app.services.licence import LicenceService, licence_view
 from app.services.operator_view import LICENCE_TITLE
+from app.services.site_visit import SiteVisitService
+from app.services.visit_scope import earlier_visit_nos
+from app.services.workflow import WorkflowService
 
 _NOTE_REQUIRED_TARGETS = {ApplicationStatus.REJECTED}
 
@@ -74,7 +85,9 @@ class OfficerViewService:
             raise NotFound("Application not found.")
         feedback = self.feedback.list_for(app.id)
         open_count = sum(1 for f in feedback if f.resolution == FeedbackResolution.OPEN)
-        ctx = TransitionContext(open_feedback_count=open_count, has_note=False)
+        ctx = WorkflowService(self.db).build_context(app, open_feedback_count=open_count, has_note=False)
+        # The viewer's own actor: an officer sees the officer edges, an admin none (read-only, ADR-014).
+        actor = actor_for_role(viewer.role) if viewer is not None else Actor.OFFICER
         actions = [
             ActionOut(
                 target=str(a["target"].value if hasattr(a["target"], "value") else a["target"]),
@@ -83,7 +96,7 @@ class OfficerViewService:
                 reason=(str(a["reason"]) if a["reason"] else None),
                 requires_note=a["target"] in _NOTE_REQUIRED_TARGETS,
             )
-            for a in available_actions(app.status, Actor.OFFICER, ctx)
+            for a in available_actions(app.status, actor, ctx)
         ]
         # Reject's guard needs a note the UI collects first; show it enabled with the requirement flagged.
         for a in actions:
@@ -103,8 +116,28 @@ class OfficerViewService:
             self.users,
             changed=(changed_sections, changed_docs, previous_no),
             viewer_id=viewer.id if viewer else None,
+            viewer_role=viewer.role if viewer else Role.OFFICER,
             licence=licence_view(LicenceService(self.db).for_application(app.id)),
+            site_visit=SiteVisitService(self.db).officer_view(app),
+            checklist=ChecklistService(self.db).summary(app),
+            clarification=ClarificationService(self.db).officer_view(app),
+            earlier_visits=self.earlier_visits(app),
         )
+
+    def earlier_visits(self, app: Application) -> list[EarlierVisitOfficerOut]:
+        """Every visit before the active one, read-only, latest first (UAT run 5, F17 and F18)."""
+        visits = SiteVisitService(self.db)
+        checklists = ChecklistService(self.db)
+        clarification = ClarificationService(self.db)
+        return [
+            EarlierVisitOfficerOut(
+                visit_no=n,
+                site_visit=visits.officer_view(app, n),
+                checklist=checklists.summary(app, n),
+                clarification=clarification.officer_view(app, n),
+            )
+            for n in earlier_visit_nos(self.db, app)
+        ]
 
 
 def _assemble(
@@ -119,7 +152,12 @@ def _assemble(
     users: UserRepository,
     changed: tuple[set[str], set[DocumentType], int | None] = (set(), set(), None),
     viewer_id: uuid.UUID | None = None,
+    viewer_role: Role = Role.OFFICER,
     licence: LicenceView | None = None,
+    site_visit: SiteVisitOut | None = None,
+    checklist: ChecklistSummaryOut | None = None,
+    clarification: ClarificationOfficerView | None = None,
+    earlier_visits: list[EarlierVisitOfficerOut] | None = None,
 ) -> OfficerApplicationOut:
     now = datetime.now(UTC)
     form = current.form_data if current else app.draft_data
@@ -197,6 +235,13 @@ def _assemble(
             ),
             resolved_at=f.resolved_at,
             can_undo=viewer_id is not None and restorable(f, app.status, viewer_id, now),
+            can_resolve=(
+                viewer_id is not None
+                and viewer_role == Role.OFFICER
+                and f.resolution in (FeedbackResolution.OPEN, FeedbackResolution.ADDRESSED)
+                and f.released_to_operator_at is not None
+                and resolvable_in(app.status)
+            ),
         )
         for f in feedback
     ]
@@ -209,6 +254,8 @@ def _assemble(
         reference_no=app.reference_no,
         licence_title=LICENCE_TITLE,
         status=app.status.value,
+        phase=phase_for(app.status),
+        outcome=outcome_for(app.status),
         status_label=officer_label(app.status),
         status_tone=tone_for(app.status),
         applicant=ApplicantOut(id=applicant.id, full_name=applicant.full_name, email=applicant.email),
@@ -239,6 +286,10 @@ def _assemble(
         actions=actions,
         decision_note=app.decision_note,
         withdrawal_reason=app.withdrawal_reason,
+        site_visit=site_visit,
+        checklist=checklist,
+        clarification=clarification,
+        earlier_visits=earlier_visits or [],
         licence=licence,
         version=app.version,
         created_at=app.created_at,

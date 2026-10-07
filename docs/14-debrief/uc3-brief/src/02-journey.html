@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css"><style>
+.line{position:absolute;top:500px;left:200px;width:1500px;height:4px;background:#1B2430;border-radius:2px}
+.stage{position:absolute;top:484px;width:250px;transform:translateX(-50%);text-align:center}
+.dot{width:36px;height:36px;border-radius:50%;border:4px solid #1B2430;background:#F4F5F7;margin:0 auto}
+.stage.old .dot{background:#1B2430}
+.stage.done .dot{background:#067647;border-color:#067647}
+.nm{margin-top:22px;font-size:25px;font-weight:650}
+.stage .who{margin-top:10px}
+.pr{margin-top:12px;font-size:18px;line-height:1.35;color:#465060}
+.loop{position:absolute;left:1030px;top:400px;width:320px;height:70px;border:3px solid #9A4A00;border-bottom:none;border-radius:40px 40px 0 0}
+.loop:after{content:"";position:absolute;left:-10px;bottom:-12px;border:8px solid transparent;border-top:11px solid #9A4A00}
+.loopl{position:absolute;left:1030px;width:320px;top:360px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:15px;letter-spacing:.06em;color:#9A4A00}
+.v1{position:absolute;left:120px;top:370px;font-family:'IBM Plex Mono',monospace;font-size:16px;color:#616C7A}
+.key{position:absolute;left:120px;top:840px;display:flex;gap:40px;font-size:19px;color:#465060;align-items:center}
+.key span{display:inline-flex;align-items:center;gap:10px}
+.key i{width:18px;height:18px;border-radius:50%;border:3px solid #1B2430;display:inline-block}
+.key i.f{background:#1B2430}.key i.g{background:#067647;border-color:#067647}
+</style></head><body>
+<div class="kicker">USE CASE 3 · THE WHOLE PATH</div><div class="page">02 / 06</div>
+<div class="head">After review, the case goes on site, and questions come back as rounds.</div>
+<div class="v1">UNDER REVIEW, FROM v0.3.0 →</div>
+<div class="loopl">ANOTHER ROUND, AS MANY AS NEEDED</div><div class="loop"></div>
+<div class="line"></div>
+<div class="stage old" style="left:200px"><div class="dot"></div><div class="nm">Reviewed</div><div class="who off">Officer</div><div class="pr">No open feedback</div></div>
+<div class="stage" style="left:500px"><div class="dot"></div><div class="nm">Visit arranged</div><div class="who off">Officer</div> <div class="who">Operator</div><div class="pr">Propose, accept<br>or counter a date</div></div>
+<div class="stage" style="left:800px"><div class="dot"></div><div class="nm">Checklist</div><div class="who off">Officer</div><div class="pr">17 items on a tablet,<br>flags need a comment</div></div>
+<div class="stage" style="left:1100px"><div class="dot"></div><div class="nm">Clarification</div><div class="who">Operator</div><div class="pr">Answers each flagged<br>item, with files</div></div>
+<div class="stage" style="left:1400px"><div class="dot"></div><div class="nm">Clarified</div><div class="who off">Officer</div><div class="pr">Mark clarified,<br>or ask again</div></div>
+<div class="stage done" style="left:1700px"><div class="dot"></div><div class="nm">Approved</div><div class="who off">Officer</div><div class="pr">Licence issued</div></div>
+<div class="key"><span><i class="f"></i>built in v0.3.0</span><span><i></i>new in v0.4.0</span><span><i class="g"></i>decision</span><span>The five post-site statuses were already in v0.3.0's state machine; v0.4.0 built the screens and rules behind them, every move audited.</span></div>
+<div class="foot">docs/03-architecture/STATE_MACHINE.md · ADR-013 (site visit) · US-060 to US-066, US-084, US-092</div>
+</body></html>

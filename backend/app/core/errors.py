@@ -34,6 +34,13 @@ class Unauthorized(AppError):
     code = "unauthorized"
 
 
+class SessionRevoked(Unauthorized):
+    """The token is valid but its session ended: taken over from another device, signed out, or idle
+    past the limit (US-093). The details say which, so the sign-in page can explain."""
+
+    code = "session_revoked"
+
+
 class Forbidden(AppError):
     status_code = 403
     code = "forbidden"
@@ -55,6 +62,13 @@ class InvalidTransition(Conflict):
 
 class VersionConflict(Conflict):
     code = "version_conflict"
+
+
+class SessionActive(Conflict):
+    """Another device holds this account's session (US-093); the details name it and when it was last
+    seen, so the sign-in page can offer to sign it out."""
+
+    code = "session_active"
 
 
 class ValidationFailed(AppError):

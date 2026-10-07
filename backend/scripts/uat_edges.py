@@ -76,7 +76,7 @@ def envelope_ok(r: httpx.Response) -> bool:
 
 
 def login(email: str) -> dict[str, str]:
-    r = client.post("/auth/login", json={"email": email, "password": PW})
+    r = client.post("/auth/login", json={"email": email, "password": PW, "take_over": True})
     assert r.status_code == 200, r.text
     return {"Authorization": "Bearer " + r.json()["access_token"]}
 
@@ -113,6 +113,17 @@ OPERATIONS = {
 DECL = {"information_accurate": True, "consent_to_inspection": True}
 DOC_TYPES = ["business_profile", "floor_plan", "tenancy_agreement", "food_hygiene_certificate"]
 TXT = b"Tenancy agreement business profile ACRA UEN floor plan kitchen food hygiene certificate. " * 3
+
+
+def tiny_png() -> bytes:
+    """A real 4 x 4 PNG: since US-085 an image the server cannot decode is refused at upload."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    out = BytesIO()
+    Image.new("RGB", (4, 4), (255, 255, 255)).save(out, "PNG")
+    return out.getvalue()
 
 
 def upload(h, app_id, dtype, name, content, mime="text/plain"):
@@ -175,6 +186,66 @@ def transition(o, app_id, target, note=None, version=None):
     return req(o, "POST", f"/officer/applications/{app_id}/transition", json=body)
 
 
+def working_day(n: int) -> str:
+    """ISO date n working days ahead in Singapore (the appointment rules of US-084)."""
+    from app.domain.site_visit import add_working_days, today_in_singapore
+
+    return add_working_days(today_in_singapore(), n).isoformat()
+
+
+def weekend_ahead() -> str:
+    from datetime import date, timedelta
+
+    from app.domain.site_visit import today_in_singapore
+
+    d: date = today_in_singapore() + timedelta(days=1)
+    while d.weekday() < 5:
+        d += timedelta(days=1)
+    return d.isoformat()
+
+
+def propose(o, app_id, date, slot="morning", note=None):
+    v = officer_view(o, app_id)["version"]
+    body = {"date": date, "slot": slot, "expected_version": v}
+    if note is not None:
+        body["note"] = note
+    return req(o, "POST", f"/officer/applications/{app_id}/site-visit", json=body)
+
+
+def arrange_visit(o, p, app_id):
+    """Propose and accept so Mark site visit done is allowed (the guard of US-084)."""
+    r = propose(o, app_id, working_day(3))
+    assert r.status_code == 200, r.text
+    r = req(p, "POST", f"/applications/{app_id}/site-visit/accept")
+    assert r.status_code == 200, r.text
+
+
+CHECKLIST = "/officer/applications/{}/checklist"
+
+
+def clean_items():  # type: ignore[no-untyped-def]
+    from app.domain.checklist_schema import ITEM_KEYS
+
+    return [
+        {"key": k, "result": "satisfactory", "comment": None, "needs_clarification": False} for k in ITEM_KEYS
+    ]
+
+
+def fresh_case_to_site_visit_done(op, off) -> str:  # type: ignore[no-untyped-def]
+    """A new application taken to Site Visit Done with a confirmed visit, for the licence walk."""
+    app = req(op, "POST", "/applications").json()
+    aid = app["id"]
+    fill_all(op, aid)
+    upload_all(op, aid)
+    wait_checks(op, aid)
+    assert req(op, "POST", f"/applications/{aid}/submit").status_code == 200
+    assert transition(off, aid, "under_review").status_code == 200
+    assert propose(off, aid, working_day(3)).status_code == 200
+    assert req(op, "POST", f"/applications/{aid}/site-visit/accept").status_code == 200
+    assert transition(off, aid, "site_visit_done").status_code == 200
+    return aid
+
+
 def operator_view_clean(v: dict) -> tuple[bool, str]:
     """No internal status code or officer-only label anywhere in an operator payload."""
     text = json.dumps(v)
@@ -198,7 +269,8 @@ def ensure_second_operator() -> None:
 
     with session_factory()() as db:
         repo = UserRepository(db)
-        if repo.get_by_email(OPERATOR2) is None:
+        user = repo.get_by_email(OPERATOR2)
+        if user is None:
             repo.add(
                 User(
                     email=OPERATOR2,
@@ -207,18 +279,21 @@ def ensure_second_operator() -> None:
                     password_hash=hash_password(PW),
                 )
             )
-            db.commit()
+        else:
+            user.is_active = True
+        db.commit()
 
 
-def remove_second_operator() -> None:
-    """Prune the account the run created: its drafts are gone by then, so the row can go too."""
+def retire_second_operator() -> None:
+    """Deactivate the account the run used. It is not deleted: its sign-ins left session rows and
+    user-level audit events (US-093), and audit rows are never deleted. Inactive, it cannot sign in."""
     from app.infra.db import session_factory
     from app.repositories.users import UserRepository
 
     with session_factory()() as db:
         user = UserRepository(db).get_by_email(OPERATOR2)
         if user is not None:
-            db.delete(user)
+            user.is_active = False
             db.commit()
 
 
@@ -227,7 +302,7 @@ def main() -> None:
     try:
         run_checks()
     finally:
-        remove_second_operator()
+        retire_second_operator()
 
 
 def run_checks() -> None:
@@ -444,9 +519,16 @@ def run_checks() -> None:
     check("U13", "officer cannot download a draft's document (404)", r.status_code == 404, r.text)
     r = req(op, "GET", f"/applications/{aid}/documents/{uuid.uuid4()}/download")
     check("U14", "unknown document id is 404", r.status_code == 404, r.text)
-    r = upload(op, aid, "floor_plan", "photo.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, "image/png")
+    r = upload(op, aid, "floor_plan", "photo.png", tiny_png(), "image/png")
     check("U15", "PNG is accepted", r.status_code in (200, 201), r.text[:200])
     png_doc = r.json()["document"]
+    r = upload(op, aid, "floor_plan", "broken.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, "image/png")
+    check(
+        "U15b",
+        "a PNG the server cannot decode is refused as unreadable_image (US-085)",
+        r.status_code == 400 and r.json()["error"]["details"].get("reason") == "unreadable_image",
+        r.text[:200],
+    )
     v = wait_checks(op, aid)
     slot = next(s for s in v["document_slots"] if s["type"] == "floor_plan")
     ver = (slot["document"] or {}).get("verification") or {}
@@ -866,7 +948,462 @@ def run_checks() -> None:
     )
     r = req(op, "POST", f"/applications/{aid}/resubmit")
     check("O33", "operator resubmit while a site visit is pending is 409", r.status_code == 409, r.text)
+
+    # ---------- Site visit appointment (US-084) ----------
     r = transition(off, aid, "site_visit_done")
+    check("SV1", "Mark site visit done before a confirmed date is 409 (guard)", r.status_code == 409, r.text)
+    v = officer_view(off, aid)
+    done = next(a for a in v["actions"] if a["target"] == "site_visit_done")
+    check(
+        "SV2",
+        "the guard reason is served on the action",
+        not done["enabled"] and "Confirm the visit date" in (done["reason"] or ""),
+        json.dumps(done),
+    )
+    r = req(
+        op,
+        "POST",
+        f"/officer/applications/{aid}/site-visit",
+        json={"date": working_day(3), "slot": "morning", "expected_version": v["version"]},
+    )
+    check("SV3", "operator on the officer propose route is 403", r.status_code == 403, r.text)
+    r = propose(off, aid, weekend_ahead())
+    check(
+        "SV4",
+        "a weekend date is 422 naming the rule",
+        r.status_code == 422 and "Monday to Friday" in r.json()["error"]["details"]["fields"]["date"],
+        r.text,
+    )
+    r = propose(off, aid, "2020-01-06")
+    check(
+        "SV5",
+        "a past date is 422",
+        r.status_code == 422 and "date" in r.json()["error"]["details"]["fields"],
+        r.text,
+    )
+    r = propose(off, aid, working_day(3), slot="evening")
+    check(
+        "SV6",
+        "an unknown slot is 422 on the slot field",
+        r.status_code == 422 and "slot" in r.json()["error"]["details"]["fields"],
+        r.text,
+    )
+    far = working_day(50)
+    r = propose(off, aid, far)
+    check(
+        "SV7",
+        "more than 60 days out is 422",
+        r.status_code == 422 and "60" in r.json()["error"]["details"]["fields"]["date"],
+        r.text,
+    )
+    r = propose(off, aid, working_day(3), note="x" * 501)
+    check("SV8", "a 501-character note is 422", r.status_code == 422, r.text[:200])
+    r = propose(off, aid, working_day(3), slot="afternoon", note="Have the pest control contract ready.")
+    check(
+        "SV9",
+        "a valid proposal on a case scheduled through the API opens the visit",
+        r.status_code == 200
+        and r.json()["site_visit"]["status"] == "proposed"
+        and r.json()["site_visit"]["status_label"] == "Waiting for the operator",
+        r.text[:300],
+    )
+    r = propose(off, aid, working_day(4))
+    check("SV10", "a second proposal while one is open is 409", r.status_code == 409, r.text)
+    r = req(op2, "POST", f"/applications/{aid}/site-visit/accept")
+    check("SV11", "another operator accepting is 404", r.status_code == 404, r.text)
+    r = req(off, "POST", f"/applications/{aid}/site-visit/accept")
+    check("SV12", "an officer on the operator accept route is 403", r.status_code == 403, r.text)
+    v = req(op, "GET", f"/applications/{aid}").json()
+    sv = v["site_visit"]
+    ok, note = operator_view_clean(v)
+    check(
+        "SV13",
+        "operator view: own label, reply-by date, the officer's note, the earliest date, no officer name",
+        ok
+        and sv["status_label"] == "Waiting for your reply"
+        and sv["reply_by"]
+        and sv["note"]
+        and sv["earliest_date"] == working_day(2)
+        and all(
+            r_["author_name"] == "Licensing officer" for r_ in sv["rounds"] if r_["author_role"] == "officer"
+        )
+        and v["needs_operator_action"]
+        and "Waiting for the operator" not in json.dumps(v),
+        note + json.dumps(sv)[:200],
+    )
+    r = req(
+        op,
+        "POST",
+        f"/applications/{aid}/site-visit/counter",
+        json={"date": working_day(1), "slot": "morning", "reason": "Too soon."},
+    )
+    check(
+        "SV14",
+        "a counter one working day ahead is 422 (two needed)",
+        r.status_code == 422 and "2 working days" in r.json()["error"]["details"]["fields"]["date"],
+        r.text,
+    )
+    r = req(
+        op,
+        "POST",
+        f"/applications/{aid}/site-visit/counter",
+        json={"date": working_day(4), "slot": "morning"},
+    )
+    check(
+        "SV15",
+        "a counter without a reason is 422 on the reason field",
+        r.status_code == 422 and "reason" in r.json()["error"]["details"]["fields"],
+        r.text,
+    )
+    r = req(
+        op,
+        "POST",
+        f"/applications/{aid}/site-visit/reschedule",
+        json={"date": working_day(4), "slot": "morning", "reason": "Not yet."},
+    )
+    check("SV16", "reschedule before the visit is confirmed is 409", r.status_code == 409, r.text)
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/confirm")
+    check(
+        "SV17",
+        "confirm without a reply before the deadline is 409 naming the date",
+        r.status_code == 409 and "until" in r.json()["error"]["message"],
+        r.text,
+    )
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "accept_operator"})
+    check("SV18", "deciding when no counter exists is 409", r.status_code == 409, r.text)
+    counter_date = working_day(5)
+    r = req(
+        op,
+        "POST",
+        f"/applications/{aid}/site-visit/counter",
+        json={"date": counter_date, "slot": "afternoon", "reason": "The shop is closed that morning."},
+    )
+    check(
+        "SV19",
+        "a valid counter waits on the officer; the operator can no longer accept",
+        r.status_code == 200
+        and r.json()["site_visit"]["status_label"] == "Waiting for the officer"
+        and r.json()["site_visit"]["can_accept"] is False,
+        r.text[:300],
+    )
+    r = req(op, "POST", f"/applications/{aid}/site-visit/accept")
+    check("SV20", "accept after countering is 409", r.status_code == 409, r.text)
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "flip_coin"})
+    check("SV21", "an unknown decision is 422", r.status_code == 422, r.text)
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "propose"})
+    check("SV22", "a third date without a date is 422", r.status_code == 422, r.text)
+    row = next(i for i in req(off, "GET", "/officer/applications").json()["items"] if i["id"] == aid)
+    check(
+        "SV23",
+        "the queue says Decide the visit date and it is the officer's turn",
+        row["next_action"] == "Decide the visit date" and row["officer_turn"],
+        json.dumps(row)[:200],
+    )
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "keep_original"})
+    sv = r.json().get("site_visit", {})
+    check(
+        "SV24",
+        "keep original confirms the officer's date",
+        r.status_code == 200
+        and sv.get("status") == "confirmed"
+        and sv.get("slot") == "afternoon"
+        and sv.get("date") == working_day(3),
+        r.text[:300],
+    )
+    r = req(
+        op,
+        "POST",
+        f"/applications/{aid}/site-visit/reschedule",
+        json={"date": working_day(8), "slot": "morning"},
+    )
+    check("SV25", "a reschedule without a reason is 422", r.status_code == 422, r.text)
+    r = req(
+        op,
+        "POST",
+        f"/applications/{aid}/site-visit/reschedule",
+        json={"date": working_day(8), "slot": "morning", "reason": "Renovation that week."},
+    )
+    sv = r.json().get("site_visit", {})
+    check(
+        "SV26",
+        "the operator's reschedule keeps the confirmed date until the officer decides",
+        r.status_code == 200
+        and sv.get("status_label") == "Waiting for the officer"
+        and sv.get("date") == working_day(3),
+        r.text[:300],
+    )
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "accept_operator"})
+    sv = r.json().get("site_visit", {})
+    check(
+        "SV27",
+        "accepting the operator's new date confirms it",
+        r.status_code == 200 and sv.get("status") == "confirmed" and sv.get("date") == working_day(8),
+        r.text[:300],
+    )
+    r = req(
+        off,
+        "POST",
+        f"/officer/applications/{aid}/site-visit/reschedule",
+        json={"date": working_day(9), "slot": "afternoon", "reason": "Inspector on leave."},
+    )
+    check(
+        "SV28",
+        "the officer's reschedule becomes a proposal the operator answers",
+        r.status_code == 200 and r.json()["site_visit"]["status"] == "proposed",
+        r.text[:300],
+    )
+    r = req(op, "POST", f"/applications/{aid}/site-visit/accept")
+    check(
+        "SV29",
+        "the operator accepts the moved date",
+        r.status_code == 200 and r.json()["site_visit"]["status_label"] == "Confirmed",
+        r.text[:300],
+    )
+    v = req(op, "GET", f"/applications/{aid}").json()
+    check(
+        "SV30",
+        "operator history: every round with its outcome, rounds counted",
+        len(v["site_visit"]["rounds"]) == 4
+        and [x["outcome"] for x in v["site_visit"]["rounds"]] == ["kept", "declined", "accepted", "accepted"],
+        json.dumps([x["outcome"] for x in v["site_visit"]["rounds"]]),
+    )
+    trail = req(off, "GET", f"/officer/applications/{aid}/audit").json()["events"]
+    kinds = [e["event_type"] for e in trail if e["event_type"].startswith("site_visit.")]
+    check(
+        "SV31",
+        "every round is an audit event in order",
+        kinds
+        == [
+            "site_visit.proposed",
+            "site_visit.counter_proposed",
+            "site_visit.confirmed",
+            "site_visit.rescheduled",
+            "site_visit.confirmed",
+            "site_visit.rescheduled",
+            "site_visit.confirmed",
+        ],
+        json.dumps(kinds),
+    )
+    check(
+        "SV32",
+        "audit summaries read as sentences",
+        all(
+            not e["summary"].startswith("site_visit.")
+            for e in trail
+            if e["event_type"].startswith("site_visit.")
+        ),
+        json.dumps([e["summary"] for e in trail if e["event_type"].startswith("site_visit.")])[:300],
+    )
+    r = transition(off, aid, "site_visit_done")
+    check(
+        "SV33",
+        "Mark site visit done once confirmed; the visit is done",
+        r.status_code == 200 and r.json()["site_visit"]["status"] == "done",
+        r.text[:300],
+    )
+    r = req(
+        op,
+        "POST",
+        f"/applications/{aid}/site-visit/reschedule",
+        json={"date": working_day(9), "slot": "morning", "reason": "Late."},
+    )
+    check("SV34", "reschedule after the visit is done is 409", r.status_code == 409, r.text)
+
+    # ---------- Site visit checklist (US-060 to US-063) ----------
+    r = transition(off, aid, "pending_approval")
+    check(
+        "CK1",
+        "no route from Site Visit Done straight to approval: the checklist is the way",
+        r.status_code == 409,
+        r.text,
+    )
+    r = req(op, "GET", "/checklist-schema")
+    check("CK2", "operator cannot read the checklist template (403)", r.status_code == 403, r.text)
+    r = req(off, "GET", "/checklist-schema")
+    check(
+        "CK3",
+        "the template is versioned with 17 items in 5 sections",
+        r.status_code == 200
+        and r.json()["version"] == 1
+        and r.json()["item_count"] == 17
+        and len(r.json()["sections"]) == 5,
+        r.text[:200],
+    )
+    r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
+    check("CK4", "submit before the checklist exists is 404", r.status_code == 404, r.text)
+    r = req(off, "PUT", CHECKLIST.format(aid), json={"items": clean_items(), "version": 1})
+    check("CK5", "save before the checklist exists is 404", r.status_code == 404, r.text)
+    r = req(off, "POST", CHECKLIST.format(aid))
+    check(
+        "CK6",
+        "first open creates the draft (201) with every item not assessed",
+        r.status_code == 201
+        and all(i["result"] == "not_assessed" for i in r.json()["items"])
+        and r.json()["version"] == 1,
+        r.text[:200],
+    )
+    cl = r.json()
+    r = req(off, "POST", CHECKLIST.format(aid))
+    check(
+        "CK7",
+        "second open returns the same draft (200)",
+        r.status_code == 200 and r.json()["id"] == cl["id"],
+        r.text[:200],
+    )
+    r = req(op, "POST", CHECKLIST.format(aid))
+    check("CK8", "operator on the checklist routes is 403", r.status_code == 403, r.text)
+    r = req(op2, "GET", CHECKLIST.format(aid))
+    check("CK9", "another operator on the checklist route is 403 (role first)", r.status_code == 403, r.text)
+    r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
+    check(
+        "CK10",
+        "submit with nothing assessed is 422 listing every item",
+        r.status_code == 422 and len(r.json()["error"]["details"]["items"]) == 17,
+        r.text[:200],
+    )
+    bad = clean_items() + [
+        {"key": "gold_taps", "result": "satisfactory", "comment": None, "needs_clarification": False}
+    ]
+    r = req(off, "PUT", CHECKLIST.format(aid), json={"items": bad, "version": cl["version"]})
+    check(
+        "CK11",
+        "an item not on the template is 422 on its key",
+        r.status_code == 422 and "gold_taps" in r.json()["error"]["details"]["fields"],
+        r.text[:200],
+    )
+    r = req(off, "PUT", CHECKLIST.format(aid), json={"items": clean_items()[:3], "version": cl["version"]})
+    check(
+        "CK12",
+        "a partial item list is 422 naming the count missing",
+        r.status_code == 422 and "14 missing" in r.json()["error"]["details"]["fields"]["items"],
+        r.text[:200],
+    )
+    items = clean_items()
+    items[1] = {
+        "key": "floor_trap_graded",
+        "result": "unsatisfactory",
+        "comment": None,
+        "needs_clarification": False,
+    }
+    items[2] = {"key": "coved_edges", "result": "satisfactory", "comment": None, "needs_clarification": True}
+    items[8] = {"key": "make_up_air", "result": "not_assessed", "comment": None, "needs_clarification": False}
+    r = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": cl["version"]})
+    check(
+        "CK13",
+        "a draft may hold unassessed and uncommented items; the counts say what is left",
+        r.status_code == 200
+        and r.json()["version"] == 2
+        and r.json()["counts"]["assessed"] == 16
+        and r.json()["counts"]["missing_comments"] == 2
+        and r.json()["remaining"] == "Assess 1 more item and add 2 comments to submit.",
+        r.text[:300],
+    )
+    r = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": 1})
+    check(
+        "CK14",
+        "a stale version is 409 version_conflict carrying the current content",
+        r.status_code == 409
+        and r.json()["error"]["code"] == "version_conflict"
+        and r.json()["error"]["details"]["current"]["version"] == 2,
+        r.text[:200],
+    )
+    r = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": 2, "save_id": "uat-1"})
+    r2 = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": 2, "save_id": "uat-1"})
+    check(
+        "CK15",
+        "a replayed save id answers 200 with the state instead of a conflict",
+        r.status_code == 200 and r2.status_code == 200 and r2.json()["version"] == r.json()["version"] == 3,
+        r2.text[:200],
+    )
+    r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
+    check(
+        "CK16",
+        "submit with an unassessed and two uncommented items is 422 naming the three keys",
+        r.status_code == 422
+        and set(r.json()["error"]["details"]["items"]) == {"floor_trap_graded", "coved_edges", "make_up_air"},
+        r.text[:300],
+    )
+    items[1]["comment"] = "Floor slopes away from the trap."
+    items[2]["comment"] = "Please confirm the coving work."
+    items[8]["result"] = "satisfactory"
+    r = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": 3})
+    check(
+        "CK17",
+        "the completed draft saves; nothing remains before submit",
+        r.status_code == 200 and r.json()["remaining"] is None,
+        r.text[:200],
+    )
+    row = next(i for i in req(off, "GET", "/officer/applications").json()["items"] if i["id"] == aid)
+    check(
+        "CK18",
+        "the queue says Continue the checklist",
+        row["next_action"] == "Continue the checklist",
+        json.dumps(row)[:200],
+    )
+    r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
+    check(
+        "CK19",
+        "submit freezes the findings, opens round 1 for the flagged item and moves the case",
+        r.status_code == 200
+        and r.json()["status"] == "submitted"
+        and next(i for i in r.json()["items"] if i["key"] == "coved_edges")["clarification_status"] == "open",
+        r.text[:300],
+    )
+    v = officer_view(off, aid)
+    check(
+        "CK20",
+        "the case is Awaiting Post-Site Clarification with the checklist summary submitted",
+        v["status"] == "awaiting_post_site_clarification"
+        and v["checklist"]["status"] == "submitted"
+        and v["site_visit"]["status"] == "done",
+        json.dumps(v["checklist"])[:200],
+    )
+    r = req(off, "PUT", CHECKLIST.format(aid), json={"items": items, "version": 5})
+    check("CK21", "a save after submit is 409 (findings frozen)", r.status_code == 409, r.text)
+    r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
+    check("CK22", "a second submit is 409", r.status_code == 409, r.text)
+    mine = req(op, "GET", f"/applications/{aid}").json()
+    ok, note = operator_view_clean(mine)
+    check(
+        "CK23",
+        "operator sees Pending Post-Site Clarification with the count, never a result or a checklist",
+        ok
+        and mine["status_label"] == "Pending Post-Site Clarification"
+        and "1 item" in mine["status_explanation"]
+        and "checklist" not in mine
+        and "unsatisfactory" not in json.dumps(mine),
+        mine["status_explanation"] + note,
+    )
+    trail = req(off, "GET", f"/officer/applications/{aid}/audit").json()["events"]
+    kinds = [e["event_type"] for e in trail][-2:]
+    check(
+        "CK24",
+        "audit order: checklist.submitted then the system hop (the visit was already done here)",
+        kinds == ["checklist.submitted", "status.changed"] and trail[-1]["payload"]["trigger"] == "system",
+        json.dumps(kinds),
+    )
+    r = transition(off, aid, "pending_approval")
+    check("CK25", "Route to approval waits while an item is open (409)", r.status_code == 409, r.text)
+    # answering the open item is US-065; for the walk below the flagged item is not needed: reject-free
+    # exit is only through the operator's answers, so this application ends here and the licence path
+    # continues on a fresh one
+    aid = fresh_case_to_site_visit_done(op, off)
+    r = req(off, "POST", CHECKLIST.format(aid))
+    req(off, "PUT", CHECKLIST.format(aid), json={"items": clean_items(), "version": r.json()["version"]})
+    r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
+    check(
+        "CK26",
+        "a clean checklist submits with nothing flagged",
+        r.status_code == 200 and r.json()["counts"]["flagged"] == 0,
+        r.text[:200],
+    )
+    mine = req(op, "GET", f"/applications/{aid}").json()
+    check(
+        "CK27",
+        "with nothing flagged the operator is told nothing is needed",
+        mine["status_explanation"].startswith("The site visit is recorded"),
+        mine["status_explanation"],
+    )
     r = transition(off, aid, "pending_approval")
     check("O34", "Route to approval", r.status_code == 200, r.text[:200])
     v = req(op, "GET", f"/applications/{aid}").json()
@@ -891,7 +1428,79 @@ def run_checks() -> None:
         r.text,
     )
     transition(off, aid, "site_visit_scheduled")
+    # the round cap: six proposals per visit, then only accept or keep
+    r = propose(off, aid, working_day(3))
+    check(
+        "SV35",
+        "a second visit opens after Return to review (visit 2)",
+        r.status_code == 200 and r.json()["site_visit"]["visit_no"] == 2,
+        r.text[:300],
+    )
+    for n in (4, 6):
+        req(
+            op,
+            "POST",
+            f"/applications/{aid}/site-visit/counter",
+            json={"date": working_day(n + 1), "slot": "morning", "reason": "Closed."},
+        )
+        req(
+            off,
+            "POST",
+            f"/officer/applications/{aid}/site-visit/decide",
+            json={"action": "propose", "date": working_day(n + 2), "slot": "morning"},
+        )
+    r = req(
+        op,
+        "POST",
+        f"/applications/{aid}/site-visit/counter",
+        json={"date": working_day(12), "slot": "morning", "reason": "Still closed."},
+    )
+    check(
+        "SV36",
+        "the sixth proposal is the last one allowed",
+        r.status_code == 200
+        and r.json()["site_visit"]["rounds_left"] == 0
+        and r.json()["site_visit"]["can_counter"] is False,
+        r.text[:300],
+    )
+    r = req(
+        off,
+        "POST",
+        f"/officer/applications/{aid}/site-visit/decide",
+        json={"action": "propose", "date": working_day(14), "slot": "morning"},
+    )
+    check(
+        "SV37",
+        "a seventh proposal is 409 No more dates can be proposed",
+        r.status_code == 409 and "No more dates" in r.json()["error"]["message"],
+        r.text,
+    )
+    r = req(off, "POST", f"/officer/applications/{aid}/site-visit/decide", json={"action": "accept_operator"})
+    check(
+        "SV38",
+        "at the cap the officer can still accept the operator's date",
+        r.status_code == 200
+        and r.json()["site_visit"]["status"] == "confirmed"
+        and r.json()["site_visit"]["can_reschedule"] is False,
+        r.text[:300],
+    )
     transition(off, aid, "site_visit_done")
+    r = req(off, "POST", CHECKLIST.format(aid))
+    check(
+        "CK28",
+        "a second visit gets its own checklist (visit 2)",
+        r.status_code == 201 and r.json()["visit_no"] == 2,
+        r.text[:200],
+    )
+    req(off, "PUT", CHECKLIST.format(aid), json={"items": clean_items(), "version": r.json()["version"]})
+    r = req(off, "POST", CHECKLIST.format(aid) + "/submit")
+    check(
+        "CK29",
+        "visit 2 submits clean; visit 1 stays readable",
+        r.status_code == 200
+        and req(off, "GET", CHECKLIST.format(aid) + "?visit=1").json()["status"] == "submitted",
+        r.text[:200],
+    )
     transition(off, aid, "pending_approval")
     r = req(off, "GET", f"/officer/applications/{aid}/licence/preview")
     check(
@@ -1106,6 +1715,85 @@ def run_checks() -> None:
         "OpenAPI docs reachable in development (not in production; checked in OPERATIONS)",
         r.status_code in (200, 404),
         str(r.status_code),
+    )
+
+    # ---------- One live session per account (US-093) ----------
+    # The second operator is free to use here: every earlier group signed in once and took over.
+    ipad_ua = {
+        "User-Agent": "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 Version/17.4 Mobile/15E148 Safari/604.1"
+    }
+    mac_ua = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36"
+    }
+    r = client.post(
+        "/auth/login", json={"email": OPERATOR2, "password": PW, "take_over": True}, headers=ipad_ua
+    )
+    check("SE1", "sign-in with a take-over is 200", r.status_code == 200, r.text[:120])
+    ipad = {"Authorization": "Bearer " + r.json()["access_token"]}
+    r = client.post("/auth/login", json={"email": OPERATOR2, "password": PW}, headers=mac_ua)
+    err = r.json().get("error", {}) if r.status_code == 409 else {}
+    check(
+        "SE2",
+        "a second sign-in is 409 session_active naming the iPad and its last activity",
+        r.status_code == 409
+        and err.get("code") == "session_active"
+        and err.get("details", {}).get("device") == "Safari on iPad"
+        and bool(err.get("details", {}).get("last_seen_at")),
+        r.text[:200],
+    )
+    check(
+        "SE3",
+        "the refused sign-in leaves the iPad working",
+        req(ipad, "GET", "/auth/me").status_code == 200,
+        "",
+    )
+    r = client.post(
+        "/auth/login", json={"email": OPERATOR2, "password": "wrong", "take_over": True}, headers=mac_ua
+    )
+    check(
+        "SE4",
+        "a wrong password with take_over is the generic 401",
+        r.status_code == 401 and r.json()["error"]["code"] == "unauthorized",
+        r.text[:120],
+    )
+    check("SE5", "and the iPad is untouched by it", req(ipad, "GET", "/auth/me").status_code == 200, "")
+    r = client.post(
+        "/auth/login", json={"email": OPERATOR2, "password": PW, "take_over": True}, headers=mac_ua
+    )
+    check("SE6", "the take-over signs the laptop in", r.status_code == 200, r.text[:120])
+    laptop = {"Authorization": "Bearer " + r.json()["access_token"]}
+    r = req(ipad, "GET", "/auth/me")
+    err = r.json().get("error", {}) if r.status_code == 401 else {}
+    check(
+        "SE7",
+        "the iPad's next request is 401 session_revoked, reason taken_over, with the time",
+        r.status_code == 401
+        and err.get("code") == "session_revoked"
+        and err.get("details", {}).get("reason") == "taken_over"
+        and bool(err.get("details", {}).get("at"))
+        and "another device" in err.get("message", ""),
+        r.text[:200],
+    )
+    check("SE8", "the laptop works", req(laptop, "GET", "/applications").status_code == 200, "")
+    r = req(laptop, "POST", "/auth/logout")
+    check("SE9", "sign-out is 204", r.status_code == 204, r.text[:120])
+    r = req(laptop, "GET", "/auth/me")
+    check(
+        "SE10",
+        "after sign-out the token is 401 session_revoked, reason signed_out",
+        r.status_code == 401 and r.json()["error"]["details"].get("reason") == "signed_out",
+        r.text[:200],
+    )
+    r = client.post("/auth/login", json={"email": OPERATOR2, "password": PW}, headers=ipad_ua)
+    check("SE11", "after sign-out a plain sign-in needs no take-over", r.status_code == 200, r.text[:120])
+    if r.status_code == 200:
+        req({"Authorization": "Bearer " + r.json()["access_token"]}, "POST", "/auth/logout")
+    r = client.post("/auth/logout")
+    check(
+        "SE12",
+        "sign-out without a token is 401 in the envelope",
+        r.status_code == 401 and envelope_ok(r),
+        r.text[:120],
     )
 
     # ---------- Summary ----------

@@ -76,22 +76,32 @@ def cost_expr(e: str) -> str:
             f' + sum(increase(permitflow_openai_tokens_total{{{e}, kind="completion"}}[1h])) * {PRICE_OUT}) / 1e6')
 
 
+def build_of(env: str) -> str:
+    """The version and commit the API in this environment reports (permitflow_build_info), or n/a."""
+    rows = prom_series(f'max by (version, commit) (permitflow_build_info{{environment="{env}"}})')
+    if not rows:
+        return "n/a"
+    m = rows[-1][0]
+    return f"{m.get('version', '?')}  ({m.get('commit', '?')})"
+
+
 def section_status(env: str) -> str:
     e = f'environment="{env}"'
     up = prom(f'min(up{{job="permitflow-api", {e}}})')
     api = "n/a" if up is None else ("up" if up >= 1 else "DOWN")
+    build = build_of(env)
     rpm = prom(f'sum(rate(permitflow_http_requests_total{{{e}}}[5m])) * 60')
     p995 = prom(f'histogram_quantile(0.995, sum by (le) (rate(permitflow_http_request_seconds_bucket{{{e}}}[5m]))) * 1000')
     err = prom(f'sum(rate(permitflow_http_requests_total{{{e}, status=~"5.."}}[5m])) / sum(rate(permitflow_http_requests_total{{{e}}}[5m]))')
     checks = prom(f'sum(increase(permitflow_verification_runs_total{{{e}}}[1h]))')
     spend = prom(cost_expr(e))
     apps = prom(f'sum(permitflow_applications{{{e}}})')
-    officer = prom(f'sum(permitflow_applications{{{e}, status=~"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval"}})')
-    operator = prom(f'sum(permitflow_applications{{{e}, status=~"pending_pre_site_resubmission|pending_post_site_resubmission"}})')
+    officer = prom(f'sum(permitflow_applications{{{e}, status=~"application_received|under_review|pre_site_resubmitted|site_visit_scheduled|site_visit_done|post_site_clarification_resubmitted|pending_approval"}})')
+    operator = prom(f'sum(permitflow_applications{{{e}, status=~"pending_pre_site_resubmission|awaiting_post_site_clarification|pending_post_site_resubmission"}})')
     quiet = not rpm  # no request in the last five minutes: latency and error share have no meaning
     traffic = ("Requests  <b>0</b> / min   ·   <i>quiet for five minutes</i>" if quiet else
                f"Requests  <b>{n(rpm)}</b> / min   ·   p99.5  <b>{n(p995)}</b> ms   ·   5xx  <b>{n((err or 0) * 100, '%.1f')} %</b>")
-    return (f"<b>{env.capitalize()}</b>  ·  API {api}\n{traffic}\n"
+    return (f"<b>{env.capitalize()}</b>  ·  API {api}  ·  version <b>{build}</b>\n{traffic}\n"
             f"Checks (1 h)  <b>{n(checks, none='0')}</b>   ·   spend  <b>USD {n(spend, '%.3f', '0.000')}</b>\n"
             f"Applications  <b>{n(apps)}</b>   ·   officer's turn  <b>{n(officer)}</b>   ·   operator's turn  <b>{n(operator)}</b>")
 
@@ -134,7 +144,11 @@ def queue(envs: list[str]) -> str:
         by = [(m.get("status"), v) for m, v in prom_series(f'permitflow_applications{{{e}}}') if v > 0]
         lines = "\n".join(f"{s}  <b>{v:.0f}</b>" for s, v in sorted(by, key=lambda x: -x[1])) or "no applications"
         moved = prom(f'sum(increase(permitflow_transitions_total{{{e}}}[1h]))')
-        parts.append(f"<b>{env.capitalize()}</b>\n{lines}\ntransitions in the last hour  <b>{n(moved, none='0')}</b>")
+        post_site = prom(f'sum(permitflow_applications{{{e}, status=~"site_visit_scheduled|site_visit_done|awaiting_post_site_clarification|pending_post_site_resubmission|post_site_clarification_resubmitted"}})')
+        checklists = prom(f'sum(increase(permitflow_checklists_submitted_total{{{e}}}[24h]))')
+        rounds = prom(f'sum(increase(permitflow_clarification_rounds_total{{{e}}}[24h]))')
+        parts.append(f"<b>{env.capitalize()}</b>\n{lines}\ntransitions in the last hour  <b>{n(moved, none='0')}</b>\n"
+                     f"post-site (visit to clarification)  <b>{n(post_site, none='0')}</b>   ·   checklists (24 h)  <b>{n(checklists, none='0')}</b>   ·   rounds (24 h)  <b>{n(rounds, none='0')}</b>")
     return f"<b>The queue</b>\n{RULE}\n" + f"\n{RULE}\n".join(parts) + f"\n{RULE}\nDashboard  {DASHBOARD}"
 
 

@@ -1,0 +1,60 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face { font-family:'Public Sans'; font-weight:400 700; src:url('../../../../frontend/public/fonts/public-sans-normal-400-latin.woff2') format('woff2'); }
+@font-face { font-family:'Instrument Serif'; src:url('../../../../frontend/public/fonts/instrument-serif-normal-400-latin.woff2') format('woff2'); }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../../frontend/public/fonts/ibm-plex-mono-normal-400-latin.woff2') format('woff2'); }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;background:#F4F5F7;font-family:'Public Sans',sans-serif;color:#1B2430;overflow:hidden;position:relative}
+.kicker{position:absolute;left:120px;top:88px;font-size:22px;font-weight:700;letter-spacing:.09em;color:#616C7A}
+.page{position:absolute;right:120px;top:90px;font-family:'IBM Plex Mono',monospace;font-size:20px;color:#616C7A}
+.head{position:absolute;left:120px;top:136px;width:1500px;font-family:'Instrument Serif',serif;font-size:58px;line-height:1.08}
+
+/* the record: one line, application to licence */
+.ends{position:absolute;top:350px;left:222px;width:1680px;display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:19px;color:#616C7A;letter-spacing:.04em}
+.ends b{color:#1B2430;font-weight:500}
+.line{position:absolute;top:412px;left:240px;width:1150px;height:4px;background:#1B2430;border-radius:2px}
+.stub{position:absolute;left:1390px;width:410px;border-top:3px dashed #B8C0CC}
+.stage{position:absolute;top:396px;width:230px;transform:translateX(-50%)}
+.dot{width:36px;height:36px;border-radius:50%;border:4px solid #1B2430;background:#F4F5F7;margin:0 auto}
+.stage.done .dot{background:#067647;border-color:#067647}
+.name{margin-top:22px;text-align:center;font-size:25px;font-weight:650;letter-spacing:-.01em}
+.who{margin:10px auto 0;display:table;padding:3px 12px;border-radius:999px;font-size:15px;font-weight:600;border:1.5px solid #D9DEE5;background:#fff;color:#465060}
+.who.off{color:#175CD3;border-color:#B2CCFA;background:#EEF4FF}
+.who.ai{color:#475467;border-style:dashed}
+.proof{margin-top:12px;text-align:center;font-size:18px;line-height:1.35;color:#465060}
+
+/* not built: stubs off the end */
+.nb{position:absolute;left:1580px;top:452px;width:230px}
+.nb .t{font-family:'IBM Plex Mono',monospace;font-size:15px;letter-spacing:.09em;color:#838C99;margin-bottom:12px}
+.nb div.i{font-size:17px;color:#838C99;line-height:1.3;margin-bottom:10px;padding-left:16px;position:relative}
+.nb div.i:before{content:"";position:absolute;left:0;top:10px;width:8px;border-top:2px dashed #B8C0CC}
+
+/* the anchor */
+.anchor{position:absolute;left:120px;top:720px;display:flex;align-items:center;gap:34px}
+.big{font-family:'Instrument Serif',serif;font-size:190px;line-height:.8;color:#1B2430}
+.anchor p{font-size:30px;line-height:1.3;max-width:760px}
+.anchor p span{color:#616C7A}
+.foot{position:absolute;right:120px;bottom:150px;width:640px;text-align:right;font-size:20px;line-height:1.4;color:#616C7A}
+.foot b{color:#1B2430;font-weight:650}
+</style></head><body>
+<div class="kicker">KICKER</div><div class="page">PAGE</div>
+<div class="head">Every application is one record, from the first form to the final decision.</div>
+
+<div class="ends"><span><b>Application</b> · PF-2026-001009</span><span></span></div>
+<div class="line"></div>
+<div class="stub" style="top:413px"></div>
+
+<div class="stage" style="left:240px"><div class="dot"></div><div class="name">Applied</div><div class="who">Operator</div><div class="proof">Four sections,<br>save and return</div></div>
+<div class="stage" style="left:470px"><div class="dot"></div><div class="name">Checked</div><div class="who ai">AI advises</div><div class="proof">Every document,<br>on upload</div></div>
+<div class="stage" style="left:700px"><div class="dot"></div><div class="name">Reviewed</div><div class="who off">Officer</div><div class="proof">Findings beside<br>each document</div></div>
+<div class="stage" style="left:930px"><div class="dot"></div><div class="name">Feedback</div><div class="who off">Officer</div><div class="proof">Pinned to a section<br>or a document</div></div>
+<div class="stage" style="left:1160px"><div class="dot"></div><div class="name">Resubmitted</div><div class="who">Operator</div><div class="proof">Only flagged parts;<br>each round frozen</div></div>
+<div class="stage done" style="left:1390px"><div class="dot"></div><div class="name">Licence issued</div><div class="who off">Officer</div><div class="proof">Signed off by name</div></div>
+
+<div class="nb"><div class="t">NOT BUILT YET</div>
+<div class="i">Fees and payment</div>
+<div class="i">Assignment and approval limits</div>
+<div class="i">Stages set by each agency's law</div></div>
+
+<div class="anchor"><div class="big">1</div><p>transaction writes the decision, the audit entry and the licence together. <span>If one fails, none is saved.</span></p></div>
+<div class="foot"><b>Every step on the record.</b> Access is decided on the server, and tested for every endpoint.</div>
+</body></html>

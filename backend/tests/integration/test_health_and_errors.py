@@ -1,12 +1,20 @@
 from fastapi.testclient import TestClient
 
 from app.api.v1 import health as health_module
+from app.core.version import APP_VERSION, BUILD_COMMIT
 
 
 def test_health_ok(client: TestClient) -> None:
     r = client.get("/api/v1/health")
     assert r.status_code == 200
-    assert r.json() == {"status": "ok", "database": "ok"}
+    body = r.json()
+    assert body["status"] == "ok" and body["database"] == "ok"
+    # The build line (US-094): the version the release ritual bumps, the commit CI bakes in ("local" when
+    # it did not), and the environment; nothing about providers or keys.
+    assert body["version"] == APP_VERSION
+    assert body["commit"] == BUILD_COMMIT
+    assert body["environment"] == "test"
+    assert set(body) == {"status", "database", "version", "commit", "environment"}
     assert r.headers["X-Content-Type-Options"] == "nosniff"
     assert r.headers["X-Frame-Options"] == "DENY"
     assert r.headers["X-Request-ID"]
@@ -14,13 +22,13 @@ def test_health_ok(client: TestClient) -> None:
 
 def test_health_503_when_database_down(client: TestClient, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setattr(health_module, "database_is_reachable", lambda: False)
+    monkeypatch.setattr(health_module, "_probe", None)  # the 2 s cache would hand back the last answer
     r = client.get("/api/v1/health")
     assert r.status_code == 503
-    assert r.json() == {
-        "status": "degraded",
-        "database": "unreachable",
-        "error": {"code": "unavailable", "message": "The database is unreachable."},
-    }
+    body = r.json()
+    assert body["status"] == "degraded" and body["database"] == "unreachable"
+    assert body["error"] == {"code": "unavailable", "message": "The database is unreachable."}
+    assert body["version"] == APP_VERSION
 
 
 def test_unknown_route_uses_error_shape(client: TestClient) -> None:
@@ -68,3 +76,19 @@ def test_unhandled_error_carries_cors_headers_and_request_id(monkeypatch) -> Non
         assert r.status_code == 503
         assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
         assert r.json()["error"]["code"] == "unavailable"
+
+
+def test_preflight_allows_every_verb_the_frontend_uses(client: TestClient) -> None:
+    """The checklist draft save is a PUT (US-060): the browser's preflight must allow it, as it allows
+    the PATCH of a section and the DELETE of a draft."""
+    for verb in ("PUT", "PATCH", "DELETE", "POST"):
+        r = client.options(
+            "/api/v1/officer/applications/00000000-0000-0000-0000-000000000000/checklist",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": verb,
+                "Access-Control-Request-Headers": "authorization,content-type",
+            },
+        )
+        assert r.status_code == 200, (verb, r.status_code, r.text)
+        assert verb in r.headers.get("access-control-allow-methods", "")

@@ -16,7 +16,7 @@ const token = (expires_at = inAnHour()): TokenResponse => ({ access_token: 'tok'
 
 /** A consumer that shows the auth state and holds one cached query so cache clearing is observable. */
 function Probe() {
-  const { user, ready, endedReason, signIn, signOut } = useAuth()
+  const { user, ready, endedReason, endedAt, signIn, signOut } = useAuth()
   const client = useQueryClient()
   const q = useQuery({ queryKey: ['probe'], queryFn: async () => 'cached', staleTime: Infinity })
   return (
@@ -24,6 +24,7 @@ function Probe() {
       <div data-testid="ready">{String(ready)}</div>
       <div data-testid="user">{user?.email ?? 'none'}</div>
       <div data-testid="ended">{endedReason ?? 'none'}</div>
+      <div data-testid="ended-at">{endedAt ?? 'none'}</div>
       <div data-testid="cache">{String(client.getQueryData(['probe']) ?? q.data ?? 'empty')}</div>
       <button onClick={() => signIn(token())}>sign in</button>
       <button onClick={() => signOut()}>sign out</button>
@@ -50,6 +51,7 @@ describe('AuthProvider (UC0-A session handling)', () => {
 
   it('signs in, mirrors the session to sessionStorage, and clears the cache on sign out', async () => {
     const clear = vi.spyOn(QueryClient.prototype, 'clear')
+    const logout = vi.spyOn(authApi, 'logout').mockResolvedValue(undefined)
     renderAuth()
     expect(await screen.findByTestId('ready')).toHaveTextContent('true')
     await userEvent.click(screen.getByText('sign in'))
@@ -62,6 +64,27 @@ describe('AuthProvider (UC0-A session handling)', () => {
     expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull()
     // The previous account's cached data must not survive for the next person on this browser.
     expect(clear).toHaveBeenCalled()
+    // Sign out ends the session on the server too (US-093), so the token dies with it.
+    expect(logout).toHaveBeenCalledTimes(1)
+  })
+
+  it('records why the server ended the session, for the sign-in page (US-093)', async () => {
+    renderAuth()
+    await screen.findByTestId('ready')
+    await userEvent.click(screen.getByText('sign in'))
+    act(() =>
+      notifyUnauthorized({
+        code: 'session_revoked',
+        message: 'Your session ended: this account signed in on another device.',
+        details: { reason: 'taken_over', at: '2026-09-21T02:05:00+00:00' },
+      }),
+    )
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('none'))
+    expect(screen.getByTestId('ended')).toHaveTextContent('taken_over')
+    expect(screen.getByTestId('ended-at')).toHaveTextContent('2026-09-21T02:05:00+00:00')
+    // Signing in again clears the explanation.
+    await userEvent.click(screen.getByText('sign in'))
+    expect(screen.getByTestId('ended')).toHaveTextContent('none')
   })
 
   it('restores a stored session and re-validates it against the server', async () => {

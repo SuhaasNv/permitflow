@@ -20,6 +20,8 @@ class UserOut(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=200)
+    # US-093: sign out the device that holds this account's session and continue here.
+    take_over: bool = False
 
 
 class TokenOut(BaseModel):

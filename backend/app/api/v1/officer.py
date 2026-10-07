@@ -4,8 +4,9 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Response, status
 
-from app.api.deps import DbSession, OfficerUser
+from app.api.deps import DbSession, OfficerOrAdmin, OfficerUser
 from app.domain.feedback_templates import TEMPLATES
+from app.schemas.clarification import ClarificationReopenIn
 from app.schemas.officer import (
     AuditTrailOut,
     FeedbackIn,
@@ -14,11 +15,14 @@ from app.schemas.officer import (
     QueueOut,
     TransitionIn,
 )
+from app.schemas.site_visit import SiteVisitDecideIn, SiteVisitProposeIn, SiteVisitRescheduleIn
 from app.services.audit_trail import AuditTrailService
+from app.services.clarification import ClarificationService
 from app.services.feedback import FeedbackService
 from app.services.licence import LicenceService
 from app.services.officer_queue import OfficerQueueService
 from app.services.officer_view import OfficerViewService
+from app.services.site_visit import SiteVisitService
 from app.services.verification import VerificationService, run_verification
 from app.services.workflow import WorkflowService
 
@@ -26,13 +30,15 @@ router = APIRouter(prefix="/officer")
 
 
 @router.get("/applications", response_model=QueueOut)
-def review_queue(user: OfficerUser, db: DbSession) -> QueueOut:
+def review_queue(user: OfficerOrAdmin, db: DbSession) -> QueueOut:
     """Review queue: every submitted application, newest activity first (FR-015)."""
     return OfficerQueueService(db).queue()
 
 
 @router.get("/applications/{application_id}", response_model=OfficerApplicationOut)
-def officer_application(application_id: uuid.UUID, user: OfficerUser, db: DbSession) -> OfficerApplicationOut:
+def officer_application(
+    application_id: uuid.UUID, user: OfficerOrAdmin, db: DbSession
+) -> OfficerApplicationOut:
     """Full submission: current revision, documents with verification detail, history, actions (FR-016)."""
     return OfficerViewService(db).get(user, application_id)
 
@@ -156,7 +162,101 @@ def preview_licence(application_id: uuid.UUID, user: OfficerUser, db: DbSession)
     return Response(content=pdf, media_type="application/pdf", headers={"Cache-Control": "no-store"})
 
 
+@router.post("/applications/{application_id}/site-visit", response_model=OfficerApplicationOut)
+def propose_site_visit(
+    application_id: uuid.UUID, body: SiteVisitProposeIn, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """Propose the visit's date and slot (US-084). From Under Review the case moves to Site Visit
+    Scheduled in the same transaction; the operator is told and can accept or propose another date."""
+    SiteVisitService(db).propose(
+        user,
+        application_id,
+        visit_date=body.date,
+        slot=body.slot,
+        note=body.note,
+        expected_version=body.expected_version,
+    )
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post("/applications/{application_id}/site-visit/decide", response_model=OfficerApplicationOut)
+def decide_site_visit(
+    application_id: uuid.UUID, body: SiteVisitDecideIn, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """On the operator's counter-proposal: accept their date, keep the original, or propose a third."""
+    SiteVisitService(db).decide(
+        user, application_id, action=body.action, visit_date=body.date, slot=body.slot, note=body.note
+    )
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post("/applications/{application_id}/site-visit/confirm", response_model=OfficerApplicationOut)
+def confirm_site_visit(application_id: uuid.UUID, user: OfficerUser, db: DbSession) -> OfficerApplicationOut:
+    """Confirm a proposal the operator left unanswered for three working days."""
+    SiteVisitService(db).confirm_without_reply(user, application_id)
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post("/applications/{application_id}/site-visit/reschedule", response_model=OfficerApplicationOut)
+def reschedule_site_visit(
+    application_id: uuid.UUID, body: SiteVisitRescheduleIn, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """Move a confirmed visit before its date (reason required); the operator answers the new proposal."""
+    SiteVisitService(db).reschedule(
+        user, application_id, visit_date=body.date, slot=body.slot, reason=body.reason
+    )
+    return OfficerViewService(db).get(user, application_id)
+
+
 @router.get("/applications/{application_id}/audit", response_model=AuditTrailOut)
-def audit_trail(application_id: uuid.UUID, user: OfficerUser, db: DbSession) -> AuditTrailOut:
+def audit_trail(application_id: uuid.UUID, user: OfficerOrAdmin, db: DbSession) -> AuditTrailOut:
     """Append-only history of everything that happened to the application (FR-025, SEC-009)."""
     return AuditTrailService(db).for_application(user, application_id)
+
+
+# Clarification rounds (US-066): decide each answered item, then Request another round or Route to approval.
+
+
+@router.post(
+    "/applications/{application_id}/clarifications/{item_id}/resolve", response_model=OfficerApplicationOut
+)
+def resolve_clarification(
+    application_id: uuid.UUID, item_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    ClarificationService(db).resolve(user, application_id, item_id)
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
+    "/applications/{application_id}/clarifications/{item_id}/reopen", response_model=OfficerApplicationOut
+)
+def reopen_clarification(
+    application_id: uuid.UUID,
+    item_id: uuid.UUID,
+    body: ClarificationReopenIn,
+    user: OfficerUser,
+    db: DbSession,
+) -> OfficerApplicationOut:
+    ClarificationService(db).reopen(user, application_id, item_id, body.message)
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
+    "/applications/{application_id}/clarifications/{item_id}/withdraw", response_model=OfficerApplicationOut
+)
+def withdraw_clarification(
+    application_id: uuid.UUID, item_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    ClarificationService(db).withdraw(user, application_id, item_id)
+    return OfficerViewService(db).get(user, application_id)
+
+
+@router.post(
+    "/applications/{application_id}/clarifications/{item_id}/restore", response_model=OfficerApplicationOut
+)
+def restore_clarification(
+    application_id: uuid.UUID, item_id: uuid.UUID, user: OfficerUser, db: DbSession
+) -> OfficerApplicationOut:
+    """Undo a withdraw within the grace window (F19). 409 once it has closed or the round moved on."""
+    ClarificationService(db).restore(user, application_id, item_id)
+    return OfficerViewService(db).get(user, application_id)

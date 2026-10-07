@@ -1,6 +1,19 @@
 import { expect, test } from '@playwright/test'
 
-import { OFFICER, OPERATOR, auditSummaries, confirmDialog, openCase, seedPendingResubmission, signIn, signOut, status } from '../helpers.js'
+import {
+  OFFICER,
+  OPERATOR,
+  acceptVisit,
+  auditSummaries,
+  confirmDialog,
+  openCase,
+  proposeVisit,
+  seedPendingResubmission,
+  signIn,
+  signOut,
+  status,
+  submitCleanChecklist,
+} from '../helpers.js'
 
 /** Workflow 4: two consecutive resubmission rounds, each compared and resolved, then the outcome. */
 test('two resubmission rounds: fix, resubmit, compare, resolve, again, then approve', async ({ page }) => {
@@ -68,15 +81,16 @@ test('two resubmission rounds: fix, resubmit, compare, resolve, again, then appr
   await page.getByRole('button', { name: 'Mark resolved' }).first().click()
   await expect(page.locator('aside').getByText('Resolved', { exact: true }).first()).toBeVisible()
   await page.getByRole('button', { name: 'Mark resolved' }).click()
-  for (const [action, confirm] of [
-    ['Mark site visit scheduled', 'Mark scheduled'],
-    ['Mark site visit done', 'Mark done'],
-    ['Route to approval', 'Route to approval'],
-  ] as const) {
-    await page.getByRole('button', { name: action }).click()
-    await confirmDialog(page, confirm)
-    await page.waitForTimeout(300)
-  }
+  // The visit is arranged first (US-084): the officer proposes, the operator accepts, then it can be marked done.
+  await proposeVisit(page)
+  await expect(page.getByRole('button', { name: 'Mark site visit done' })).toBeDisabled()
+  await acceptVisit(app.id)
+  await page.reload()
+  // The checklist is the record of the visit and the only way on (US-060 to US-063).
+  await submitCleanChecklist(page)
+  await page.getByRole('button', { name: 'Route to approval' }).click()
+  await page.locator('dialog[open]').getByRole('button', { name: 'Route to approval' }).click()
+  await expect(status(page)).toHaveText('Route to Approval')
   await page.getByRole('button', { name: 'Approve' }).click()
   await confirmDialog(page, 'Approve')
   await expect(status(page)).toHaveText('Approved')

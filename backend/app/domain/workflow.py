@@ -24,6 +24,14 @@ class TransitionContext:
     has_changes_to_flagged_targets: bool = False
     is_complete: bool = False
     has_note: bool = False
+    # Use case 3 (v0.4.0, US-079): the checklist and the clarification items of the current visit.
+    checklist_complete: bool = False  # every item assessed, every flagged or unsatisfactory item commented
+    open_clarification_count: int = 0  # items waiting for the operator (or drafted, not yet sent)
+    answered_clarification_count: int = 0  # items the operator answered that the officer has not decided
+    all_open_items_answered: bool = False  # every open item carries a response in this round
+    visit_confirmed: bool = False  # the site visit appointment is confirmed (US-084)
+    # The visit day still ahead ("Wed 30 Sep"), or None once it has arrived or when the rule is off (F12).
+    visit_day_ahead: str | None = None
 
 
 Guard = Callable[[TransitionContext], str | None]  # returns a failure reason or None
@@ -51,6 +59,36 @@ def _needs_note(ctx: TransitionContext) -> str | None:
     return None if ctx.has_note else "A note is required for this decision."
 
 
+def _needs_visit_confirmed(ctx: TransitionContext) -> str | None:
+    if not ctx.visit_confirmed:
+        return "Confirm the visit date with the operator first."
+    if ctx.visit_day_ahead:
+        return f"The visit is on {ctx.visit_day_ahead}. Mark it done on or after that day."
+    return None
+
+
+def _needs_checklist_complete(ctx: TransitionContext) -> str | None:
+    if ctx.checklist_complete:
+        return None
+    return "Assess every item and comment on each flagged or unsatisfactory item before submitting."
+
+
+def _needs_open_clarification(ctx: TransitionContext) -> str | None:
+    if ctx.open_clarification_count >= 1:
+        return None
+    return "At least one item must still need clarification."
+
+
+def _needs_all_answered(ctx: TransitionContext) -> str | None:
+    return None if ctx.all_open_items_answered else "Answer every item before sending your responses."
+
+
+def _needs_nothing_open(ctx: TransitionContext) -> str | None:
+    if ctx.open_clarification_count == 0 and ctx.answered_clarification_count == 0:
+        return None
+    return "Mark every clarification item clarified or withdraw it before routing to approval."
+
+
 @dataclass(frozen=True)
 class Transition:
     source: S
@@ -60,6 +98,7 @@ class Transition:
     label: str = ""
 
 
+# Every post-submission, non-terminal state: an abandoned or unsalvageable application always has an exit.
 _REJECT_SOURCES = (
     S.APPLICATION_RECEIVED,
     S.UNDER_REVIEW,
@@ -67,6 +106,9 @@ _REJECT_SOURCES = (
     S.PRE_SITE_RESUBMITTED,
     S.SITE_VISIT_SCHEDULED,
     S.SITE_VISIT_DONE,
+    S.AWAITING_POST_SITE_CLARIFICATION,
+    S.PENDING_POST_SITE_RESUBMISSION,
+    S.POST_SITE_CLARIFICATION_RESUBMITTED,
     S.PENDING_APPROVAL,
 )
 
@@ -109,37 +151,68 @@ TRANSITIONS: tuple[Transition, ...] = (
         _needs_flagged_change,
         "Resubmit",
     ),
-    Transition(S.SITE_VISIT_SCHEDULED, S.SITE_VISIT_DONE, Actor.OFFICER, None, "Mark site visit done"),
     Transition(
-        S.SITE_VISIT_DONE, S.AWAITING_POST_SITE_CLARIFICATION, Actor.SYSTEM, None, "Checklist submitted"
+        S.SITE_VISIT_SCHEDULED,
+        S.SITE_VISIT_DONE,
+        Actor.OFFICER,
+        _needs_visit_confirmed,
+        "Mark site visit done",
     ),
-    Transition(S.SITE_VISIT_DONE, S.PENDING_APPROVAL, Actor.OFFICER, None, "Route to approval"),
+    # Use case 3 (v0.4.0). The brief's grammar decides whose turn each post-site state is: after the
+    # checklist is submitted the operator answers (Awaiting Post-Site Clarification, round 1); the
+    # officer reviews in Post-Site Clarification Resubmitted; later rounds use Pending Post-Site
+    # Resubmission (SCOPE.md assumption 18, RELEASE_PLAN_V0_4_0.md section 4.1).
+    Transition(
+        S.SITE_VISIT_DONE,
+        S.AWAITING_POST_SITE_CLARIFICATION,
+        Actor.SYSTEM,
+        _needs_checklist_complete,
+        "Checklist submitted",
+    ),
     Transition(
         S.AWAITING_POST_SITE_CLARIFICATION,
-        S.PENDING_POST_SITE_RESUBMISSION,
-        Actor.OFFICER,
-        None,
-        "Request post-site resubmission",
+        S.POST_SITE_CLARIFICATION_RESUBMITTED,
+        Actor.OPERATOR,
+        _needs_all_answered,
+        "Send responses",
     ),
     Transition(
-        S.AWAITING_POST_SITE_CLARIFICATION, S.PENDING_APPROVAL, Actor.OFFICER, None, "Route to approval"
+        S.AWAITING_POST_SITE_CLARIFICATION,
+        S.PENDING_APPROVAL,
+        Actor.OFFICER,
+        _needs_nothing_open,
+        "Route to approval",
     ),
     Transition(
         S.PENDING_POST_SITE_RESUBMISSION,
         S.POST_SITE_CLARIFICATION_RESUBMITTED,
         Actor.OPERATOR,
-        None,
-        "Resubmit clarification",
+        _needs_all_answered,
+        "Send responses",
+    ),
+    # Every question of a later round withdrawn: the operator has nothing to send, so the officer
+    # needs the same exit as from round 1, or the case would sit with Reject as its only move
+    # (found in the two-device UAT run, 21 Sep).
+    Transition(
+        S.PENDING_POST_SITE_RESUBMISSION,
+        S.PENDING_APPROVAL,
+        Actor.OFFICER,
+        _needs_nothing_open,
+        "Route to approval",
     ),
     Transition(
         S.POST_SITE_CLARIFICATION_RESUBMITTED,
-        S.AWAITING_POST_SITE_CLARIFICATION,
+        S.PENDING_POST_SITE_RESUBMISSION,
         Actor.OFFICER,
-        None,
+        _needs_open_clarification,
         "Request another round",
     ),
     Transition(
-        S.POST_SITE_CLARIFICATION_RESUBMITTED, S.PENDING_APPROVAL, Actor.OFFICER, None, "Route to approval"
+        S.POST_SITE_CLARIFICATION_RESUBMITTED,
+        S.PENDING_APPROVAL,
+        Actor.OFFICER,
+        _needs_nothing_open,
+        "Route to approval",
     ),
     Transition(S.PENDING_APPROVAL, S.APPROVED, Actor.OFFICER, None, "Approve"),
     # An officer who notices something at the decision step can go back instead of rejecting.
@@ -179,9 +252,12 @@ def allowed_targets(status: S, actor: Actor) -> list[S]:
     return [t.target for t in TRANSITIONS if t.source == status and t.actor == actor]
 
 
-def available_actions(status: S, actor: Actor, ctx: TransitionContext) -> list[dict[str, object]]:
-    """Every edge for this actor from `status`, with whether its guard currently passes (UI hint)."""
+def available_actions(status: S, actor: Actor | None, ctx: TransitionContext) -> list[dict[str, object]]:
+    """Every edge for this actor from `status`, with whether its guard currently passes (UI hint).
+    A viewer without an actor (the admin) gets an empty list: read-only by construction (ADR-014)."""
     out: list[dict[str, object]] = []
+    if actor is None:
+        return out
     for t in TRANSITIONS:
         if t.source != status or t.actor != actor:
             continue
@@ -203,10 +279,6 @@ def transition(status: S, target: S, actor: Actor, ctx: TransitionContext) -> S:
         if reason is not None:
             raise TransitionError("guard", reason, allowed)
     return target
-
-
-def is_terminal(status: S) -> bool:
-    return status in TERMINAL
 
 
 def can_withdraw(status: S) -> bool:

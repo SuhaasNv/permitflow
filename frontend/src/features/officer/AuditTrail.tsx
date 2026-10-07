@@ -15,6 +15,9 @@ const FAMILY: Record<string, { label: string; tone: string }> = {
   verification: { label: 'Check', tone: 'bg-success' },
   section: { label: 'Section', tone: 'bg-line-strong' },
   application: { label: 'Application', tone: 'bg-ink' },
+  site_visit: { label: 'Site visit', tone: 'bg-info' },
+  checklist: { label: 'Checklist', tone: 'bg-success' },
+  clarification: { label: 'Clarification', tone: 'bg-warning' },
 }
 
 function family(type: string): string {
@@ -42,7 +45,7 @@ export function AuditTrail({ applicationId }: { applicationId: string }) {
         </Button>
       </div>
       {!open ? null : audit.isPending ? (
-        <div className="flex flex-col gap-3 px-5 py-6 sm:px-7" aria-busy="true" aria-label="Loading audit trail">
+        <div className="flex flex-col gap-3 px-5 py-6 sm:px-7" role="status" aria-busy="true" aria-label="Loading audit trail">
           <Skeleton className="h-4 w-1/2" />
           <Skeleton className="h-4 w-2/3" />
           <Skeleton className="h-4 w-1/3" />
@@ -71,13 +74,13 @@ export function AuditTrail({ applicationId }: { applicationId: string }) {
             {shown.map((e: AuditEvent) => (
               <li
                 key={e.id}
-                className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-3 px-5 py-3 sm:px-7 xl:grid-cols-[16px_170px_minmax(0,1fr)_200px]"
+                className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-3 px-5 py-3 sm:px-7 xl:grid-cols-[16px_200px_minmax(0,1fr)_200px]"
               >
                 <span
                   className={cn('mt-[7px] h-[7px] w-[7px] rounded-full', FAMILY[family(e.event_type)]?.tone ?? 'bg-line-strong')}
                   aria-hidden="true"
                 />
-                <span className="font-mono text-[12px] leading-[22px] text-text-3">{e.event_type}</span>
+                <span className="min-w-0 break-all font-mono text-[12px] leading-[22px] text-text-3">{e.event_type}</span>
                 <span className="col-start-2 text-sm xl:col-start-3">{e.summary}</span>
                 <span className="col-start-2 text-[12px] text-text-3 xl:col-start-4 xl:text-right">
                   {e.actor_name ? `${e.actor_name} (${e.actor_role})` : 'System'} · {formatDateTime(e.created_at)}

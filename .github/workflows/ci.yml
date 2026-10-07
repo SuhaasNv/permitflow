@@ -78,6 +78,8 @@ jobs:
           echo '### Frontend coverage (all source files counted)' >> "$GITHUB_STEP_SUMMARY"
           npx vitest run --coverage --coverage.reporter=text-summary 2>/dev/null | grep -E 'Statements|Branches|Functions|Lines' >> "$GITHUB_STEP_SUMMARY" || true
       - run: npm run build
+      - name: Bundle size (250 KB gzipped, US-087)
+        run: npm run size
 
   ai:
     name: AI gate
@@ -168,6 +170,11 @@ jobs:
       # They are exercised by their own integration tests, not by the browser suite.
       RATE_LIMIT_PER_MINUTE: "0"
       LOGIN_ATTEMPTS_PER_MINUTE: "0"
+      # The specs arrange a visit and record it in one run; the visit-day rule (F12) has its own integration tests.
+      SITE_VISIT_DAY_GUARD: "false"
+      # Every seeded application is four document checks from one shared operator; the suite outgrew the daily
+      # limit of 60 (US-096), so later specs saw "unavailable". The limit has its own integration tests.
+      AI_RUNS_PER_USER_PER_DAY: "0"
       E2E_API_URL: http://localhost:8000/api/v1
       VITE_API_URL: http://localhost:8000/api/v1
     steps:
@@ -262,8 +269,13 @@ jobs:
           context: ./backend
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.tags.outputs.backend }}
+          build-args: GIT_SHA=${{ github.sha }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
+      # The What's new page reads RELEASE_NOTES.md at build time (US-094); the image build's context is the
+      # frontend folder alone, so the file is copied in first (ignored by git, see .gitignore).
+      - name: Release notes into the frontend build context
+        run: cp RELEASE_NOTES.md frontend/RELEASE_NOTES.md
       - name: Frontend image
         uses: docker/build-push-action@v6
         with:

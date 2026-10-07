@@ -10,7 +10,13 @@ DEFAULT_PASSWORD = "Correct-Horse-9"
 
 
 def make_user(
-    db: Session, email: str, role: Role, *, password: str = DEFAULT_PASSWORD, active: bool = True
+    db: Session,
+    email: str,
+    role: Role,
+    *,
+    password: str = DEFAULT_PASSWORD,
+    active: bool = True,
+    protected: bool = False,
 ) -> User:
     user = User(
         email=email,
@@ -18,6 +24,7 @@ def make_user(
         role=role,
         password_hash=hash_password(password),
         is_active=active,
+        is_protected=protected,
     )
     db.add(user)
     db.commit()
@@ -26,6 +33,8 @@ def make_user(
 
 
 def login(client, email: str, password: str = DEFAULT_PASSWORD) -> dict[str, str]:  # type: ignore[no-untyped-def]
-    r = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    # One live session per account (US-093): the tests sign in as the same person many times, so each
+    # sign-in takes the session over; the session tests exercise the refusal explicitly.
+    r = client.post("/api/v1/auth/login", json={"email": email, "password": password, "take_over": True})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}

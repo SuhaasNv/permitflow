@@ -1,39 +1,6 @@
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
 
-const PASSWORD = process.env.SEED_PASSWORD ?? 'PermitFlow!2026'
-const OPERATOR = 'operator@permitflow.example.sg'
-const OFFICER = 'officer@permitflow.example.sg'
-
-const TXT =
-  'Tenancy agreement between landlord and tenant. Business profile ACRA UEN. Floor plan kitchen. Food hygiene certificate. '.repeat(3)
-
-async function signIn(page: Page, email: string) {
-  await page.goto('/login')
-  await page.getByLabel(/Email address/).fill(email)
-  await page.getByLabel(/^Password/).fill(PASSWORD)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
-}
-
-async function signOut(page: Page) {
-  await page.getByRole('button', { name: 'Sign out' }).click()
-  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
-}
-
-async function fillSection(page: Page, values: Record<string, string>, selects: Record<string, string> = {}) {
-  for (const [name, value] of Object.entries(values)) await page.locator(`[name="${name}"]`).fill(value)
-  for (const [name, value] of Object.entries(selects)) await page.locator(`select[name="${name}"]`).selectOption(value)
-  await page.getByRole('button', { name: /Save and continue/ }).click()
-}
-
-async function upload(page: Page, slot: string, filename: string) {
-  await page
-    .locator(`#slot-${slot} input[type=file]`)
-    .first()
-    .setInputFiles({ name: filename, mimeType: 'text/plain', buffer: Buffer.from(TXT) })
-  await expect(page.locator(`#slot-${slot}`).getByText('Uploaded')).toBeVisible()
-}
+import { OFFICER, OPERATOR, acceptVisit, fillSection, proposeVisit, signIn, signOut, status, submitCleanChecklist, uploadTxt as upload } from './helpers.js'
 
 /**
  * The critical journey the brief describes: operator submits, officer flags, operator fixes only the
@@ -155,15 +122,16 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
   await page.locator('dialog[open]').getByRole('button', { name: 'Start review' }).click()
   await page.getByRole('button', { name: 'Mark resolved' }).click()
   await expect(page.locator('aside').getByText('Resolved', { exact: true }).first()).toBeVisible()
-  for (const [action, confirm] of [
-    ['Mark site visit scheduled', 'Mark scheduled'],
-    ['Mark site visit done', 'Mark done'],
-    ['Route to approval', 'Route to approval'],
-  ] as const) {
-    await page.getByRole('button', { name: action }).click()
-    await page.locator('dialog[open]').getByRole('button', { name: confirm }).click()
-    await page.waitForTimeout(300)
-  }
+  // The visit is arranged first (US-084): the officer proposes, the operator accepts, then it can be marked done.
+  await proposeVisit(page)
+  await expect(page.getByRole('button', { name: 'Mark site visit done' })).toBeDisabled()
+  await acceptVisit(appUrl.split('/').pop() ?? '')
+  await page.reload()
+  // The checklist is the record of the visit and the only way on (US-060 to US-063).
+  await submitCleanChecklist(page)
+  await page.getByRole('button', { name: 'Route to approval' }).click()
+  await page.locator('dialog[open]').getByRole('button', { name: 'Route to approval' }).click()
+  await expect(status(page)).toHaveText('Route to Approval')
   await page.getByRole('link', { name: 'Preview licence' }).click()
   await expect(page.getByRole('heading', { name: 'Licence preview' })).toBeVisible()
   await expect(page.locator('object[type="application/pdf"]')).toBeVisible()

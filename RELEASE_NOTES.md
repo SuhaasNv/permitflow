@@ -2,17 +2,41 @@
 
 What each version of PermitFlow brings, written for the people who use it. Newest first. The engineering record behind each entry is `CHANGELOG.md`; every release adds an entry here before it is tagged (`docs/09-operations/BRANCHING.md`, rule 5).
 
-Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for fixes on a release, `v0.4.0` for the two epics below.
+Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for fixes on a release, `v0.4.0` for the two epics below, `v0.4.0-rc.N` for a release candidate tagged on `dev` for the development environment before the release.
+
+Format: the product reads this file at build time for its What's new page (the version number in the corner opens it; `frontend/src/features/releases/notes.ts`), so the lines keep four shapes. A release heading is `## vX.Y.Z, D Month YYYY (optional note): title`; a bold line such as `**New for operators**` opens an audience block and the bullets under it belong to it; text before the first block is the release's introduction; `## Coming next` holds the plan. Inline, only backticks, bold and bare links are rendered. A heading of another shape fails the frontend tests.
 
 ---
 
 ## Coming next
 
-**v0.4.0: the admin panel and use case 3.** Two epics in one release.
+**v0.5.0, planned: safe intake.** Every uploaded file is checked for viruses before an officer can open it, and a file that fails is blocked with a clear message. The automatic document check runs on its own worker, so a slow file never slows the rest of the service. The licensing office sees what each check cost and can tune the limits (requests, daily checks, upload size) from the overview, with every change recorded. Sign-in moves to a more secure cookie.
 
-*The admin panel.* A read-only oversight view for the licensing office: applications by status, the ones that have gone quiet, today's submissions, the health of the automatic document checks (how many ran, how many failed, how long they took), a feed of recent activity across every application, and a user directory where an administrator can change a role or deactivate an account (every change audited; the last active administrator cannot be removed). The admin role and its routes are already reserved; the screens are the work. Stories US-070 to US-073.
+**After that:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
 
-*Use case 3, the site visit.* After a visit is scheduled, the officer opens the inspection checklist on site from a tablet, fills it item by item with comments, saves it as a draft between rooms and finishes it later, and marks the items that need clarification. Submitting the checklist moves the case to Pending Post-Site Clarification on its own. The operator then sees only the flagged items with the officer's comment on each, answers them one by one and attaches supporting documents; several rounds per item are supported and every exchange is kept with its timestamps. The three post-site statuses and their transitions already exist and are tested; the checklist model, the officer's tablet screen and the operator's targeted-response screen are the work. Stories US-060 to US-066.
+## v0.4.0, 8 October 2026: the site visit, the clarification and the office's own view
+
+**New for licensing officers**
+- Arrange the site visit inside the case: propose a date and a morning or afternoon slot, see the operator accept or propose another date, keep or accept, ask to move a confirmed visit; six proposals at most per visit; every round on the record.
+- The inspection checklist on a tablet: seventeen items in five sections, a result and a comment each, saved as a draft as you go (also when the lid closes or the connection drops), the items that need clarification flagged, findings of your own added where the template has none, and a submit that records the visit done and sends the flagged items to the operator in one step.
+- The clarification rounds on the case: read each answer with its evidence, mark an item clarified, ask again, withdraw a question, request another round, route to approval when nothing is open.
+- One device at a time: your account is signed in on one device; a second sign-in tells you where it is and lets you sign that device out and continue where the draft was last saved.
+
+**New for operators**
+- Answer the flagged items after the visit: the officer's comment on each item in plain words, a text answer per item, up to three files (a photo from the phone camera included, stored without its camera data), one Send when every item is answered, and the whole history of rounds on the application.
+- Answers and files wait through a lost connection and go the moment it returns; every date and time is Singapore time.
+
+**New for the licensing office (administrators)**
+- An operations overview: every status with its count, the applications idle for more than seven days, today's submissions and rounds, and the health of the automatic document checks against the daily quota.
+- The activity feed across every application and every account change, and any case readable exactly as the officer sees it, without a single control.
+- Users: change a role, deactivate or reactivate an account, add an account; the demonstration accounts are protected; the last active administrator cannot be removed.
+
+**Also**
+- Each application has 150 MB of storage room across its documents, evidence and licence; the pages say how much is left before a file is chosen.
+- The accessibility gate covers every new screen; every control on the checklist and the respond page is at least 44 px on a phone or a tablet.
+- Checked against every WCAG 2.2 AA rule: the control you reach with the keyboard is never hidden behind a sticky bar, input and checkbox borders are easier to see, screen readers name the dashboard groups and a locked step, your contact details can be filled in by the browser, and five minutes before you would be signed out for inactivity the top strip warns you with a Stay signed in button. A second pass with nine kinds of user (voice control, Windows High Contrast and large text among them) fixed three more things: controls are named by the words they show, keyboard focus stays visible in High Contrast, and nothing is cut off at 200% text size.
+- The version number in the corner opens What's new: this page, with your own changes first and every earlier release below; the word New sits beside the version until you have read it once.
+- Reviewed twice before release (a code review on 21 Sep and a stability review of the whole build with a smoke test of every route the same morning): a case can no longer end with Reject as the only move after every question of a round is withdrawn, a visit date that has passed cannot be confirmed, the last taps on the checklist are saved when you leave the page by a link, and typing while an answer saves no longer loses what you typed.
 
 ---
 

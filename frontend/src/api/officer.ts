@@ -1,5 +1,11 @@
+import type { ChecklistSummary } from './checklist'
+import type { ClarificationOfficerView } from './clarification'
 import { request } from './client'
+import type { SiteVisitOfficer } from './siteVisit'
 import type { Tone } from '@/features/shared/StatusBadge'
+
+export type Phase = 'draft' | 'pre_site' | 'site_visit' | 'post_site' | 'decision' | 'decided'
+export type Outcome = 'approved' | 'rejected' | 'withdrawn' | null
 
 export interface QueueItem {
   id: string
@@ -112,6 +118,8 @@ export interface FeedbackItem {
   resolved_at: string | null
   /** The calling officer can undo their own withdraw or resolve for a short while (US-039). */
   can_undo: boolean
+  /** Open or addressed, released, and the case with the office: the server's rule, not the screen's (US-083). */
+  can_resolve: boolean
 }
 
 export interface FeedbackTemplate {
@@ -138,6 +146,9 @@ export interface OfficerApplication {
   status: string
   status_label: string
   status_tone: Tone
+  /** The stage and how it ended (US-083): the screens branch on these, never on label strings. */
+  phase: Phase
+  outcome: Outcome
   applicant: { id: string; full_name: string; email: string }
   business_name: string | null
   premises_summary: string | null
@@ -159,6 +170,14 @@ export interface OfficerApplication {
   decision_note: string | null
   withdrawal_reason: string | null
   licence: import('./applications').LicenceView | null
+  /** The appointment while the case is Site Visit Scheduled (US-084); null before the officer proposes one. */
+  site_visit: SiteVisitOfficer | null
+  /** The current visit's checklist once the officer opened it (US-060). */
+  checklist: ChecklistSummary | null
+  /** The clarification threads once the checklist is submitted (US-066). */
+  clarification: ClarificationOfficerView | null
+  /** Visits before the active one, latest first, read-only. */
+  earlier_visits: EarlierVisitOfficer[]
   version: number
   created_at: string
   updated_at: string
@@ -246,4 +265,34 @@ export interface AuditEvent {
 
 export function getAuditTrail(id: string): Promise<{ application_id: string; events: AuditEvent[] }> {
   return request<{ application_id: string; events: AuditEvent[] }>(`/officer/applications/${id}/audit`)
+}
+
+// Clarification rounds (US-066): each decision returns the refreshed case.
+
+export function resolveClarification(id: string, itemId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/clarifications/${itemId}/resolve`, { method: 'POST' })
+}
+
+export function reopenClarification(id: string, itemId: string, message: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/clarifications/${itemId}/reopen`, {
+    method: 'POST',
+    body: { message },
+  })
+}
+
+export function withdrawClarification(id: string, itemId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/clarifications/${itemId}/withdraw`, { method: 'POST' })
+}
+
+/** Undo a withdraw inside the grace window; 409 once it has closed. */
+export function restoreClarification(id: string, itemId: string): Promise<OfficerApplication> {
+  return request<OfficerApplication>(`/officer/applications/${id}/clarifications/${itemId}/restore`, { method: 'POST' })
+}
+
+/** A visit before the active one: appointment, checklist summary and clarification threads, read-only. */
+export interface EarlierVisitOfficer {
+  visit_no: number
+  site_visit: SiteVisitOfficer | null
+  checklist: ChecklistSummary | null
+  clarification: ClarificationOfficerView | null
 }

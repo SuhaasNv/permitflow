@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core import settings as settings_module
+from app.core.version import APP_VERSION, BUILD_COMMIT
 from app.models.enums import Role
 from tests.factories import login, make_user
 from tests.journeys import complete_draft
@@ -79,6 +80,8 @@ def test_metrics_report_requests_transitions_checks_and_gauges(
     assert _sample(body, "permitflow_applications", status="draft") == 1.0
     assert _sample(body, "permitflow_applications", status="application_received") == 1.0
     assert "permitflow_verification_run_seconds_bucket" in body
+    # the build the scrape comes from, for the bot and the digest (the commit is "local" outside an image)
+    assert _sample(body, "permitflow_build_info", version=APP_VERSION, commit=BUILD_COMMIT) == 1.0
     # the scrape does not count itself
     assert _sample(body, "permitflow_http_requests_total", route="/api/v1/metrics") is None
 
@@ -88,3 +91,45 @@ def test_layering_metrics_module_is_not_imported_by_domain() -> None:
 
     domain = Path(__file__).resolve().parents[2] / "app" / "domain"
     assert not any("metrics" in f.read_text() for f in domain.glob("*.py"))
+
+
+def test_use_case_3_counters_and_the_storage_gauge(client: TestClient, db: Session, token: str) -> None:
+    """US-089: a checklist submit, a released round, an answered round and the evidence bytes each move
+    their counter; the storage gauge reports the database sums and the volume."""
+    from tests.integration.test_clarification import _attach, _respond, _submitted
+    from tests.journeys import PDF
+
+    def scrape() -> str:
+        return client.get("/api/v1/metrics", headers={"Authorization": f"Bearer {token}"}).text
+
+    before = scrape()
+    submitted_before = _sample(before, "permitflow_checklists_submitted_total") or 0
+    released_before = _sample(before, "permitflow_clarification_rounds_total", event="released") or 0
+    answered_before = _sample(before, "permitflow_clarification_rounds_total", event="answered") or 0
+    bytes_before = _sample(before, "permitflow_attachment_bytes_total") or 0
+
+    app_id, op, off = _submitted(client, db)
+    after_submit = scrape()
+    assert _sample(after_submit, "permitflow_checklists_submitted_total") == submitted_before + 1
+    assert (
+        _sample(after_submit, "permitflow_clarification_rounds_total", event="released")
+        == released_before + 1
+    )
+
+    view = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    for item in view["items"]:
+        rid = _respond(client, op, app_id, item["item_id"], "Done.").json()
+        response_id = next(i for i in rid["items"] if i["item_id"] == item["item_id"])["responses"][0]["id"]
+        assert _attach(client, op, app_id, response_id, "proof.pdf", PDF).status_code == 201
+    assert client.post(f"/api/v1/applications/{app_id}/clarifications/send", headers=op).status_code == 200
+
+    body = scrape()
+    assert _sample(body, "permitflow_clarification_rounds_total", event="answered") == answered_before + 1
+    assert _sample(body, "permitflow_attachment_bytes_total") == bytes_before + len(PDF) * len(view["items"])
+    assert (_sample(body, "permitflow_storage_bytes", kind="attachments") or 0) >= len(PDF) * len(
+        view["items"]
+    )
+    assert (_sample(body, "permitflow_storage_bytes", kind="documents") or 0) > 0
+    assert (_sample(body, "permitflow_storage_bytes", kind="volume_total") or 0) > 0
+    assert (_sample(body, "permitflow_storage_bytes", kind="volume_used") or 0) > 0
+    assert _sample(body, "permitflow_sessions_active") is not None

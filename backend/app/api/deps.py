@@ -29,11 +29,13 @@ def get_current_user(
     payload = decode_access_token(credentials.credentials)
     try:
         user_id = uuid.UUID(str(payload.get("sub")))
+        session_id = uuid.UUID(str(payload.get("sid")))
     except ValueError as exc:
         raise Unauthorized("Invalid or missing credentials.") from exc
-    # Role and active flag are re-checked against the row on every request (T19).
-    user = AuthService(db).current_user(user_id)
+    # Role, active flag and the session row are re-checked on every request (T19, T27).
+    user = AuthService(db).current_user(user_id, session_id)
     request.state.user_id = str(user.id)
+    request.state.session_id = session_id
     return user
 
 
@@ -51,5 +53,9 @@ def require_role(*roles: Role) -> Callable[[User], User]:
 
 OperatorUser = Annotated[User, Depends(require_role(Role.OPERATOR))]
 OfficerUser = Annotated[User, Depends(require_role(Role.OFFICER))]
-# Admin routes arrive with US-070 (E4); the guard exists so the role is a first-class contract from Day 1.
 AdminUser = Annotated[User, Depends(require_role(Role.ADMIN))]
+# Reads an administrator may make alongside the officer (US-072): the queue, the case, the audit trail,
+# the checklist. Every mutation keeps `OfficerUser`.
+OfficerOrAdmin = Annotated[User, Depends(require_role(Role.OFFICER, Role.ADMIN))]
+# The shared downloads and the compare view: the owner, any officer, or an administrator.
+AnyReader = Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER, Role.ADMIN))]

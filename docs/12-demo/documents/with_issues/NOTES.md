@@ -12,3 +12,5 @@ These four PDFs are the "feedback round" versions of the demo documents. Three o
 Everything else (business name, incorporation date, contact person, email, phone, postal code, floor area, rent, term, landlord, seating, hours, staff count, certificate holder, course name, certificate number) matches the application in both sets.
 
 The values are set in the `with_issues` block of `../generate.mjs`; the rendered HTML next to each PDF shows exactly what was printed.
+
+Edge-case files (prompt injection, empty, a fake PDF) live in `../edge_cases/`.

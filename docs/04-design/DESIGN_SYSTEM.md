@@ -9,7 +9,7 @@ Rendered on the "Design system" artboard of the prototype. Values become Tailwin
 | `bg` | `#F3F4F6` | page canvas |
 | `surface` | `#FFFFFF` | cards, tables, forms |
 | `surface-2` | `#F9FAFB` | table header, card footer, read-only fields |
-| `line` / `line-strong` | `#D9DEE5` / `#AEB6C2` | borders / input borders |
+| `line` / `line-strong` | `#D9DEE5` / `#838C99` | borders / input, select and checkbox borders (3.40:1 on surface, 3.12:1 on bg: WCAG 1.4.11; was `#AEB6C2` at 2.04:1 until US-095) |
 | `text` / `text-2` / `text-3` | `#1B2430` / `#465060` / `#616C7A` | primary / secondary / metadata (`text-3` was `#66717F` until US-057: 4.34:1 on `surface-3` failed AA) |
 | `primary` / `primary-hover` | `#A8192A` / `#8A1422` | brand, primary action, attention |
 | `primary-soft` / `primary-line` | `#FBEDEE` / `#EFB8BE` | active nav, primary badge |
@@ -18,7 +18,7 @@ Rendered on the "Design system" artboard of the prototype. Values become Tailwin
 | `error` / soft / line | `#B42318` / `#FEF3F2` / `#F4B7B1` | validation, issues found, failed, rejected |
 | `info` / soft / line | `#175CD3` / `#EEF4FF` / `#B2CCFA` | in progress, changed, addressed |
 | `neutral` / soft / line | `#475467` / `#F2F4F7` / `#D0D5DD` | draft, unchanged, unavailable |
-| `focus` | `#175CD3` | 2 px focus ring, 2 px offset |
+| `focus` | `#175CD3` | 2 px focus ring, 2 px offset. A control that draws its own ring with a shadow also carries a transparent outline (`outline-hidden`), because Windows High Contrast strips shadows and draws transparent outlines (US-096). Buttons have a minimum height, not a fixed one, so a label wraps instead of clipping at large text sizes |
 
 Contrast: all `text*`, `success`, `warning`, `error`, `info`, `primary` ≥ 4.5:1 on every surface token, computed rather than assumed (table in `../11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`); the lowest pairing is `text-3` on `surface-3` at 4.68:1. A skip link (`.pf-skip-link`) precedes every page's header.
 
@@ -52,7 +52,7 @@ Three families (all SIL Open Font Licence, served from our own origin as woff2 l
 
 ## Motion
 
-Tokens in `frontend/src/styles/index.css`: `--ease-out` cubic-bezier(0.2, 0, 0, 1), `--dur-fast` 150 ms (hover, focus, press), `--dur-base` 220 ms (dialogs, rail collapse, badge tone change), `--dur-slow` 320 ms (page and panel entrance). Utilities: `.pf-enter` (6 px rise + fade, keyed on the route in `AppShell`), `.pf-stagger` (children enter 40 ms apart), `.pf-check` (check mark draws itself), skeleton shimmer 1.4 s, toast in 320 / out 220 ms, verification progress steps advance every 700 ms while the server run is pending. Buttons: a tone sweeps in behind the label on hover (primary from the left, secondary from below, ghost from the centre) and the button settles 1 px on press. Landing: `Reveal` fades sections up 16 px over 640 ms as they enter the viewport; the status journey rule draws left to right over 1.4 s and its dots pop in sequence; the logo scrolls back to the top when already on the landing page. `prefers-reduced-motion` collapses every animation and transition to 1 ms.
+Tokens in `frontend/src/styles/index.css`: `--ease-out` cubic-bezier(0.2, 0, 0, 1), `--dur-fast` 150 ms (hover, focus, press), `--dur-base` 220 ms (dialogs, rail collapse, badge tone change), `--dur-slow` 320 ms (page and panel entrance). Utilities: `.pf-enter` (6 px rise + fade, keyed on the route in `AppShell`), `.pf-stagger` (children enter 40 ms apart), `.pf-check` (check mark draws itself), skeleton shimmer 1.4 s, toast in 320 / out 220 ms, verification progress steps advance every 700 ms while the server run is pending. Buttons: a tone sweeps in behind the label on hover (primary from the left, secondary from below, ghost from the centre) and the button settles 1 px on press. Landing: `Reveal` fades sections up 16 px over 640 ms as they enter the viewport; the status journey rule draws left to right over 650 ms and its dots pop in sequence 60 ms apart (300 ms from first to last); the pulsing dot on a live status badge and on the queue's "Checking" cell stops under reduced motion (`motion-reduce:animate-none`); the logo scrolls back to the top when already on the landing page. `prefers-reduced-motion` collapses every animation and transition to 1 ms.
 
 ## Status badge vocabulary (as rendered)
 
@@ -66,8 +66,8 @@ Badge = dot + label, 24 px (28 px "lg" in status bars). Labels are the role-spec
 | pending_pre_site_resubmission | Pending Pre-Site Resubmission | Pending Pre-Site Resubmission | warning |
 | pre_site_resubmitted | Pre-Site Resubmitted | Pre-Site Resubmitted | info |
 | site_visit_scheduled | Site Visit Scheduled | Pending Site Visit | info |
-| site_visit_done | Site Visit Done | Pending Post-Site Clarification | info |
-| awaiting_post_site_clarification | Awaiting Post-Site Clarification | Pending Post-Site Clarification | info |
+| site_visit_done | Site Visit Done | Pending Post-Site Clarification | info (the officer is writing up the visit) |
+| awaiting_post_site_clarification | Awaiting Post-Site Clarification | Pending Post-Site Clarification | warning (the operator's turn from v0.4.0: `RELEASE_PLAN_V0_4_0.md` section 4.1) |
 | pending_post_site_resubmission | Awaiting Post-Site Resubmission | Pending Post-Site Resubmission | warning |
 | post_site_clarification_resubmitted | Post-Site Clarification Resubmitted | Post-Site Resubmitted | info |
 | pending_approval | Route to Approval | Pending Approval | info |

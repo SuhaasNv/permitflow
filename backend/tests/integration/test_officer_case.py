@@ -31,16 +31,13 @@ def test_officer_view_shows_revision_documents_and_actions(client: TestClient, d
     assert "version" in body
 
 
-def test_officer_view_is_officer_only_and_hides_drafts(client: TestClient, db: Session) -> None:
+def test_officer_view_is_officer_or_admin_and_hides_drafts(client: TestClient, db: Session) -> None:
     app_id, op, off = _submitted(client, db)
     make_user(db, "adm@example.sg", Role.ADMIN)
     assert client.get(f"/api/v1/officer/applications/{app_id}", headers=op).status_code == 403
-    assert (
-        client.get(
-            f"/api/v1/officer/applications/{app_id}", headers=login(client, "adm@example.sg")
-        ).status_code
-        == 403
-    )
+    # an administrator reads the case with no action offered (US-072)
+    r = client.get(f"/api/v1/officer/applications/{app_id}", headers=login(client, "adm@example.sg"))
+    assert r.status_code == 200 and r.json()["actions"] == []
     draft = client.post("/api/v1/applications", headers=op).json()["id"]
     assert client.get(f"/api/v1/officer/applications/{draft}", headers=off).status_code == 404
 
@@ -139,3 +136,34 @@ def test_officer_can_rerun_a_check_and_sees_it_pending(client: TestClient, db: S
     )
     events = list(db.scalars(select(AuditEvent).where(AuditEvent.event_type == "verification.requested")))
     assert len(events) >= 1
+
+
+def test_case_carries_phase_outcome_and_can_resolve(client: TestClient, db: Session) -> None:
+    """US-083: the screens branch on `phase`, `outcome` and the per-item `can_resolve`."""
+    from tests.journeys import add_feedback, transition
+
+    app_id, op, off = _submitted(client, db)
+    view = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    assert view["phase"] == "pre_site" and view["outcome"] is None
+    transition(client, off, app_id, "under_review")
+    add_feedback(
+        client, off, app_id, target_type="section", section_key="premises", message="Confirm the address."
+    )
+    view = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    # not released yet: nothing to resolve
+    assert [f["can_resolve"] for f in view["feedback"]] == [False]
+    transition(client, off, app_id, "pending_pre_site_resubmission")
+    view = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    # released, but the case is with the operator: resolving waits
+    assert [f["can_resolve"] for f in view["feedback"]] == [False]
+    assert view["phase"] == "pre_site"
+    transition(client, off, app_id, "rejected", note="Not enough.")
+    view = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    assert view["phase"] == "decided" and view["outcome"] == "rejected"
+    assert [f["can_resolve"] for f in view["feedback"]] == [False]
+
+    # an administrator reads the same case and can resolve nothing
+    make_user(db, "adm@example.sg", Role.ADMIN)
+    adm = login(client, "adm@example.sg")
+    r = client.get(f"/api/v1/officer/applications/{app_id}", headers=adm)
+    assert r.status_code == 200 and all(f["can_resolve"] is False for f in r.json()["feedback"])

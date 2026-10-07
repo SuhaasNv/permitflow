@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, new_id, str_enum, utcnow
@@ -33,6 +33,11 @@ class Document(Base):
 
 class VerificationRun(Base):
     __tablename__ = "verification_runs"
+    # The check-health window and the daily quota count (migration 0013), declared so autogenerate keeps them.
+    __table_args__ = (
+        Index("ix_verification_runs_created_at", "created_at"),
+        Index("ix_verification_runs_started_at", "started_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_id)
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id"), nullable=False, index=True)

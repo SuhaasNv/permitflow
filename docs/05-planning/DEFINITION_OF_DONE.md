@@ -27,7 +27,7 @@ A story is Done only when every applicable item below is true. "Works on my mach
 
 ## UI (for stories with a screen)
 - [ ] Loading, empty, error and success states implemented.
-- [ ] Works at 375 px, 768 px and 1280 px without horizontal scroll.
+- [ ] Works at 390 px, 1024 px and 1280 px without horizontal scroll (the widths of `CLAUDE.md` section 6a; the officer checklist also at 820 px, an iPad in portrait).
 - [ ] Keyboard reachable; visible focus; labels on inputs; colour not the only signal.
 - [ ] Role-specific labels shown; no internal status visible to operators.
 

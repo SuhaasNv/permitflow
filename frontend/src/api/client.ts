@@ -32,13 +32,20 @@ export function setTokenProvider(fn: () => string | null): void {
   tokenProvider = fn
 }
 
+/** What a 401 said, so the sign-in page can explain why the session ended (US-093). */
+export interface UnauthorizedInfo {
+  code: string
+  message?: string
+  details?: Record<string, unknown>
+}
+
 /** Called once per 401 so the session can end cleanly (redirect to sign-in with a return path). */
-let unauthorizedHandler: () => void = () => undefined
-export function setUnauthorizedHandler(fn: () => void): void {
+let unauthorizedHandler: (info: UnauthorizedInfo) => void = () => undefined
+export function setUnauthorizedHandler(fn: (info: UnauthorizedInfo) => void): void {
   unauthorizedHandler = fn
 }
-export function notifyUnauthorized(): void {
-  unauthorizedHandler()
+export function notifyUnauthorized(info: UnauthorizedInfo = { code: 'unauthorized' }): void {
+  unauthorizedHandler(info)
 }
 
 function isApiErrorBody(value: unknown): value is ApiErrorBody {
@@ -48,10 +55,18 @@ function isApiErrorBody(value: unknown): value is ApiErrorBody {
 }
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
   formData?: FormData
   signal?: AbortSignal
+  /** Let the browser finish the request after the page is hidden or unloaded (a last autosave). */
+  keepalive?: boolean
+}
+
+/** When a signed-in request last succeeded: the server's idle clock restarts on each one (US-093, US-095). */
+let lastActivityAt = Date.now()
+export function lastActivity(): number {
+  return lastActivityAt
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -72,6 +87,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       headers,
       body,
       signal: options.signal,
+      keepalive: options.keepalive,
     })
   } catch {
     throw new AppError(0, {
@@ -80,6 +96,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     })
   }
   const requestId = response.headers.get('X-Request-ID') ?? undefined
+  if (token && response.ok) lastActivityAt = Date.now()
   if (response.status === 204) return undefined as T
   const text = await response.text()
   let parsed: unknown = null
@@ -91,7 +108,13 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     }
   }
   if (!response.ok) {
-    if (response.status === 401) notifyUnauthorized()
+    if (response.status === 401) {
+      notifyUnauthorized(
+        isApiErrorBody(parsed)
+          ? { code: parsed.error.code, message: parsed.error.message, details: parsed.error.details }
+          : undefined,
+      )
+    }
     if (isApiErrorBody(parsed)) throw new AppError(response.status, parsed.error, requestId)
     throw new AppError(response.status, { code: 'http_error', message: `Request failed (${response.status})` }, requestId)
   }

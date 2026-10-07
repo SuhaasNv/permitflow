@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates the Grafana alerting provisioning files (US-077, Telegram): the six incident rules (one alert
+"""Generates the Grafana alerting provisioning files (US-077, Telegram): the seven incident rules (one alert
 per environment, from the `environment` label) and an hourly digest per environment, one Telegram contact
 point, the notification policy, the message template. Run after editing; the YAML files under alerting/
 are what Grafana provisions. The start script copies them only when TELEGRAM_BOT_TOKEN and
@@ -61,6 +61,9 @@ incidents = [
     incident("pf-rate-limiting", "PermitFlow rate limiting",
              'sum by (environment) (rate(permitflow_rate_limited_total[5m]))', "gt", 1, "10m", "info",
              "The per-client limiter is refusing more than one request a second."),
+    incident("pf-volume-filling", "PermitFlow upload volume filling",
+             'max by (environment) (permitflow_storage_bytes{kind="volume_used"}) / max by (environment) (permitflow_storage_bytes{kind="volume_total"})',
+             "gt", 0.8, "15m", "warning", "The upload volume is more than 80 % full; raise it before it fills (US-089)."),
 ]
 
 
@@ -77,21 +80,28 @@ def digest(env):
         ("F", f'sum(increase(permitflow_verification_runs_total{{{e}}}[1h])) or vector(0)'),
         ("G", cost),
         ("H", f'sum(permitflow_applications{{{e}}}) or vector(0)'),
-        ("I", f'sum(permitflow_applications{{{e}, status=~"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval"}}) or vector(0)'),
-        ("J", f'sum(permitflow_applications{{{e}, status=~"pending_pre_site_resubmission|pending_post_site_resubmission"}}) or vector(0)'),
+        ("I", f'sum(permitflow_applications{{{e}, status=~"application_received|under_review|pre_site_resubmitted|site_visit_scheduled|site_visit_done|post_site_clarification_resubmitted|pending_approval"}}) or vector(0)'),
+        ("J", f'sum(permitflow_applications{{{e}, status=~"pending_pre_site_resubmission|awaiting_post_site_clarification|pending_post_site_resubmission"}}) or vector(0)'),
     ]
     data = [query(r, x, 3600) for r, x in qs] + [reduce(r + "r", r) for r, _ in qs]
+    # the build answering in this environment: its version and commit ride as labels of K (owner's request, 21 Sep)
+    data += [query("K", f'max by (version, commit) (permitflow_build_info{{{e}}})'), reduce("Kr", "K")]
     # the environment exists when Prometheus has a target for it; otherwise the rule stays quiet (NoData -> OK)
     data += [query("Z", f'count(up{{job="permitflow-api", {e}}})'), reduce("Zr", "Z"), threshold("C", "Zr", "gt", 0)]
-    v = lambda r, fmt: f"{{{{ printf \"{fmt}\" (index $values \"{r}r\").Value }}}}"
+    # Every annotation guards its value: when a query has no result for an evaluation (Prometheus mid-restart,
+    # as on 21 Sep), Grafana keeps an annotation it cannot expand as the raw template text, and the message
+    # printed `{{ printf ... }}` instead of numbers. With the guard the number reads "n/a" for that hour.
+    v = lambda r, fmt: f'{{{{ with (index $values "{r}r") }}}}{{{{ printf "{fmt}" .Value }}}}{{{{ else }}}}n/a{{{{ end }}}}'
+    build = ('{{ with (index $values "Kr") }}{{ index .Labels "version" }} ({{ index .Labels "commit" }}){{ else }}n/a{{ end }}')
     return {"uid": f"pf-digest-{env}", "title": f"PermitFlow hourly digest ({env})", "condition": "C", "data": data,
             "for": "0s", "labels": {"severity": "info", "kind": "digest", "environment": env},
             "annotations": {
                 "summary": f"PermitFlow, the last hour, {env}",
-                "api": "{{ if ge (index $values \"Ar\").Value 1.0 }}up{{ else }}DOWN{{ end }}",
+                "api": '{{ with (index $values "Ar") }}{{ if ge .Value 1.0 }}up{{ else }}DOWN{{ end }}{{ else }}n/a{{ end }}',
                 "requests_per_minute": v("D", "%.0f"), "p995_ms": v("E", "%.0f"), "checks": v("F", "%.0f"),
                 "spend_usd": v("G", "%.3f"), "applications": v("H", "%.0f"),
                 "waiting_officer": v("I", "%.0f"), "waiting_operator": v("J", "%.0f"),
+                "build": build,
             },
             "noDataState": "OK", "execErrState": "OK", "isPaused": False}
 
@@ -100,7 +110,7 @@ rules_doc = {"apiVersion": 1, "deleteRules": [{"orgId": 1, "uid": "pf-digest"}],
                                           "rules": incidents + [digest(e) for e in ENVIRONMENTS]}]}
 
 SECTION = '''{{- range .Alerts }}{{ if and (eq .Labels.kind "digest") (eq .Labels.environment "ENV") }}
-<b>ENVTITLE</b>  ·  API {{ .Annotations.api }}
+<b>ENVTITLE</b>  ·  API {{ .Annotations.api }}  ·  version <b>{{ .Annotations.build }}</b>
 Requests  <b>{{ .Annotations.requests_per_minute }}</b> / min   ·   p99.5  <b>{{ .Annotations.p995_ms }}</b> ms
 Checks  <b>{{ .Annotations.checks }}</b>   ·   spend  <b>USD {{ .Annotations.spend_usd }}</b>
 Applications  <b>{{ .Annotations.applications }}</b>   ·   officer's turn  <b>{{ .Annotations.waiting_officer }}</b>   ·   operator's turn  <b>{{ .Annotations.waiting_operator }}</b>

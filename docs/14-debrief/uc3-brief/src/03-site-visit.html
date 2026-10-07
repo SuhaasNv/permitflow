@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css"><style>
+.chat{position:absolute;left:120px;top:300px;width:900px}
+.msg{position:relative;width:560px;padding:20px 24px;margin-bottom:22px}
+.msg.r{margin-left:340px}
+.msg .lab{margin-bottom:8px}
+.msg .d{font-size:26px;font-weight:650}
+.msg .n{margin-top:6px;font-size:18px;color:#465060}
+.msg.ok{border-color:#A6E9C4;background:#ECFDF3}
+.msg.ok .d{color:#067647}
+.rules{position:absolute;left:1120px;top:300px;width:680px}
+.rules .lab{margin-bottom:18px}
+.rule{display:flex;gap:18px;padding:16px 0;border-top:1px solid #DDE1E7;font-size:21px;line-height:1.35}
+.rule b{flex:none;width:120px;font-family:'Instrument Serif',serif;font-weight:400;font-size:40px;line-height:.9}
+</style></head><body>
+<div class="kicker">USE CASE 3 · THE SITE VISIT</div><div class="page">03 / 06</div>
+<div class="head">The date is agreed inside the case, not over email, and every round is on record.</div>
+<div class="chat">
+  <div class="msg card"><div class="lab">OFFICER · PROPOSES</div><div class="d">Tue 29 Sep · morning</div><div class="n">Reply by Thu 24 Sep</div></div>
+  <div class="msg card r"><div class="lab">OPERATOR · COUNTERS</div><div class="d">Wed 30 Sep · afternoon</div><div class="n">"The chef is away on Tuesday."</div></div>
+  <div class="msg card ok"><div class="lab">OFFICER · ACCEPTS</div><div class="d">Confirmed: Wed 30 Sep · afternoon</div><div class="n">Either side can reschedule later, with a reason</div></div>
+</div>
+<div class="rules"><div class="lab">RULES THE SERVER ENFORCES</div>
+  <div class="rule"><b>Mon–Fri</b><span>Weekdays only, at least one working day ahead, within 60 days</span></div>
+  <div class="rule"><b>3 days</b><span>Three working days to reply, never after the visit itself</span></div>
+  <div class="rule"><b>6</b><span>Proposals per visit at most, so it cannot bounce forever</span></div>
+  <div class="rule"><b>SGT</b><span>Every date in Singapore time, tested around midnight</span></div>
+</div>
+<div class="foot">An example exchange · ADR-013 · US-084, US-090 · POST /officer/applications/{id}/site-visit and /decide, /confirm, /reschedule</div>
+</body></html>

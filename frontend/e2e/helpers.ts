@@ -4,6 +4,9 @@ import type { Page } from '@playwright/test'
 export const PASSWORD = process.env.SEED_PASSWORD ?? 'PermitFlow!2026'
 export const OPERATOR = 'operator@permitflow.example.sg'
 export const OFFICER = 'officer@permitflow.example.sg'
+export const ADMIN = 'admin@permitflow.example.sg'
+/** The unprotected spare officer (seed.py): the admin scenario changes it and restores it at the end. */
+export const SPARE = 'officer2@permitflow.example.sg'
 /** Backend the scenarios seed through. Locally the backend runs on 8001 (see docs/09-operations/OPERATIONS.md). */
 export const API_URL = process.env.E2E_API_URL ?? 'http://localhost:8000/api/v1'
 
@@ -33,12 +36,18 @@ export const OPERATIONS = {
 
 // ---- UI helpers ----
 
+/** Signs in through the page. One live session per account (US-093): when the API seeding above signed
+ * in as the same person, the page offers to sign that session out, and the helper accepts. */
 export async function signIn(page: Page, email: string) {
   await page.goto('/login')
   await page.getByLabel(/Email address/).fill(email)
   await page.getByLabel(/^Password/).fill(PASSWORD)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  const takeOver = page.getByRole('button', { name: 'Sign out the other device and continue' })
+  const signedIn = page.getByRole('button', { name: 'Sign out', exact: true })
+  await expect(takeOver.or(signedIn)).toBeVisible()
+  if (await takeOver.isVisible()) await takeOver.click()
+  await expect(signedIn).toBeVisible()
 }
 
 export async function signOut(page: Page) {
@@ -97,7 +106,8 @@ async function login(email: string): Promise<Headers> {
   const r = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: PASSWORD }),
+    // Seeding takes the account over: the scenario signs in through the page afterwards and does the same.
+    body: JSON.stringify({ email, password: PASSWORD, take_over: true }),
   })
   if (!r.ok) throw new Error(`login ${email}: ${r.status}`)
   const body = (await r.json()) as { access_token?: string; token?: string }
@@ -112,6 +122,19 @@ async function call<T>(headers: Headers, path: string, init: RequestInit = {}): 
   })
   if (!r.ok) throw new Error(`${init.method ?? 'GET'} ${path}: ${r.status} ${await r.text()}`)
   return r.status === 204 ? (undefined as T) : ((await r.json()) as T)
+}
+
+/** Puts the spare officer back to its seeded shape (officer, active) through the API, whatever the
+ * scenario left behind: an assertion failing between the change and the restore must not leave the
+ * shared demo account deactivated on a persistent environment (review finding, 21 Sep). */
+export async function restoreSpareAccount(): Promise<void> {
+  const admin = await login(ADMIN)
+  const { users } = await call<{ users: { id: string; email: string; role: string; is_active: boolean }[] }>(admin, '/admin/users')
+  const spare = users.find((u) => u.email === SPARE)
+  if (!spare) return
+  if (!spare.is_active) await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ is_active: true }) })
+  if (spare.role !== 'officer') await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ role: 'officer' }) })
+  await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: admin })
 }
 
 export interface Seeded {
@@ -176,5 +199,119 @@ export async function seedPendingResubmission(message = 'Please confirm the prem
     body: JSON.stringify({ target_type: 'section', section_key: 'premises', message }),
   })
   await transition(off, seeded.id, 'pending_pre_site_resubmission')
+  return seeded
+}
+
+// ---- Site visit appointment (US-084) ----
+
+/** An ISO date `n` working days ahead of today in Singapore (Monday to Friday, no holiday calendar). */
+export function workingDayAhead(n: number): string {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' })
+  const d = new Date(`${today}T00:00:00Z`)
+  let left = n
+  while (left > 0) {
+    d.setUTCDate(d.getUTCDate() + 1)
+    const day = d.getUTCDay()
+    if (day !== 0 && day !== 6) left -= 1
+  }
+  return d.toISOString().slice(0, 10)
+}
+
+/** The officer proposes the visit through the UI: Mark site visit scheduled, then the dialog. */
+export async function proposeVisit(page: Page, date = workingDayAhead(3), slot: 'Morning' | 'Afternoon' = 'Morning', note?: string) {
+  await page.getByRole('button', { name: 'Mark site visit scheduled' }).click()
+  const dialog = page.locator('dialog[open]')
+  await dialog.getByLabel(/Date/).fill(date)
+  await dialog.getByRole('button', { name: new RegExp(slot) }).click()
+  if (note) await dialog.getByLabel(/Note for the operator/).fill(note)
+  await dialog.getByRole('button', { name: 'Propose visit' }).click()
+  await expect(status(page)).toHaveText('Site Visit Scheduled')
+}
+
+/** The operator accepts the proposed date through the API (setup for officer-side scenarios). */
+export async function acceptVisit(id: string) {
+  const op = await login(OPERATOR)
+  await call(op, `/applications/${id}/site-visit/accept`, { method: 'POST' })
+}
+
+/** Under review with a proposed visit the operator has not answered (Site Visit Scheduled, US-084). */
+export async function seedVisitProposed(): Promise<Seeded> {
+  const seeded = await seedUnderReview()
+  const off = await login(OFFICER)
+  const view = await call<{ version: number }>(off, `/officer/applications/${seeded.id}`)
+  await call(off, `/officer/applications/${seeded.id}/site-visit`, {
+    method: 'POST',
+    body: JSON.stringify({
+      date: workingDayAhead(3),
+      slot: 'afternoon',
+      note: 'Please have the pest control contract on the premises.',
+      expected_version: view.version,
+    }),
+  })
+  return seeded
+}
+
+/** Under review, the visit proposed and accepted (Site Visit Scheduled, confirmed): the checklist can open. */
+export async function seedVisitConfirmed(): Promise<Seeded> {
+  const seeded = await seedVisitProposed()
+  await acceptVisit(seeded.id)
+  return seeded
+}
+
+/** The visit done and the checklist submitted through the API with two items flagged, so the operator has a
+ * clarification round to answer (Awaiting Post-Site Clarification; US-063, US-064). */
+export async function seedAwaitingClarification(): Promise<Seeded & { flagged: string[] }> {
+  const seeded = await seedVisitConfirmed()
+  const off = await login(OFFICER)
+  const schema = await call<{ sections: { items: { key: string }[] }[] }>(off, '/checklist-schema')
+  const keys = schema.sections.flatMap((s) => s.items.map((i) => i.key))
+  const flagged = keys.slice(0, 2)
+  const created = await call<{ version: number }>(off, `/officer/applications/${seeded.id}/checklist`, { method: 'POST' })
+  const items = keys.map((key) =>
+    flagged.includes(key)
+      ? { key, result: 'unsatisfactory', comment: `Please confirm ${key.replaceAll('_', ' ')}.`, needs_clarification: true }
+      : { key, result: 'satisfactory', comment: null, needs_clarification: false },
+  )
+  await call(off, `/officer/applications/${seeded.id}/checklist`, {
+    method: 'PUT',
+    body: JSON.stringify({ items, version: created.version }),
+  })
+  await call(off, `/officer/applications/${seeded.id}/checklist/submit`, { method: 'POST' })
+  return { ...seeded, flagged }
+}
+
+/** On the case page: open the checklist, mark every item satisfactory, wait for the autosave, submit (US-063). */
+export async function submitCleanChecklist(page: Page) {
+  await page.getByRole('link', { name: /Open checklist|Continue checklist/ }).click()
+  await expect(page.getByRole('heading', { name: 'Site visit checklist' })).toBeVisible()
+  const groups = page.getByRole('group', { name: 'Result' })
+  await expect(groups).toHaveCount(17)
+  for (let i = 0; i < 17; i += 1) await groups.nth(i).getByRole('button', { name: 'Satisfactory', exact: true }).click()
+  await expect(page.getByText('Saved just now')).toBeVisible({ timeout: 5000 })
+  await page.getByRole('button', { name: /Mark visit done and submit|Submit checklist/ }).click()
+  await expect(page.locator('dialog[open]')).toContainText('Nothing is flagged')
+  await page.locator('dialog[open]').getByRole('button', { name: 'Submit' }).click()
+  await expect(status(page)).toHaveText('Awaiting Post-Site Clarification')
+}
+
+/** Visit 1 with two flagged items answered and clarified, routed to approval and returned to review: the case
+ * a second visit starts from (UAT run 5, F15 to F18). */
+export async function seedReturnedAfterClarification(): Promise<Seeded & { flagged: string[] }> {
+  const seeded = await seedAwaitingClarification()
+  const op = await login(OPERATOR)
+  const clar = await call<{ items: { item_id: string }[] }>(op, `/applications/${seeded.id}/clarifications`)
+  for (const item of clar.items) {
+    await call(op, `/applications/${seeded.id}/clarifications/${item.item_id}/responses`, {
+      method: 'POST',
+      body: JSON.stringify({ message: 'Fixed on site; photo on file.' }),
+    })
+  }
+  await call(op, `/applications/${seeded.id}/clarifications/send`, { method: 'POST' })
+  const off = await login(OFFICER)
+  for (const item of clar.items) {
+    await call(off, `/officer/applications/${seeded.id}/clarifications/${item.item_id}/resolve`, { method: 'POST' })
+  }
+  await transition(off, seeded.id, 'pending_approval')
+  await transition(off, seeded.id, 'under_review')
   return seeded
 }

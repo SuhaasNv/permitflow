@@ -15,6 +15,8 @@ import { formatDate } from '@/lib/format'
 import { ApplicationHeader } from './ApplicationHeader'
 import { CompletionCard } from './CompletionCard'
 import { FeedbackNotice, targetHref } from './FeedbackNotice'
+import { ClarificationNotice } from './ClarificationNotice'
+import { SiteVisitCard } from './SiteVisitCard'
 import { applicationKeys, useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
 
 const ArrowIcon = (
@@ -227,6 +229,17 @@ export function ApplicationPage() {
                 : 'Every flagged item has been changed. Press Resubmit to send your changes back to the licensing office.'
               : view.resubmit.reason}
           </Alert>
+        </div>
+      ) : null}
+      {view.clarification ? (
+        <div className="mb-6">
+          <ClarificationNotice view={view} />
+        </div>
+      ) : null}
+      {/* The appointment while it is open, or once done with nothing asked; a second visit always shows (F16). */}
+      {view.site_visit && (view.site_visit.status !== 'done' || !view.clarification) ? (
+        <div className="mb-6">
+          <SiteVisitCard view={view} />
         </div>
       ) : null}
       {view.feedback.length > 0 ? (

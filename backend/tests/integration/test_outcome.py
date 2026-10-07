@@ -3,7 +3,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Notification
-from tests.journeys import transition, under_review
+from tests.journeys import (
+    arrange_visit,
+    submit_clean_checklist,
+    to_pending_approval,
+    transition,
+    under_review,
+)
 
 
 def test_site_visit_to_approval_with_note(client: TestClient, db: Session) -> None:
@@ -14,8 +20,14 @@ def test_site_visit_to_approval_with_note(client: TestClient, db: Session) -> No
         client.get(f"/api/v1/applications/{app_id}", headers=op).json()["status_label"]
         == "Pending Site Visit"
     )
+    # Marking the visit done needs a confirmed appointment (US-084); the reason names it.
+    done = next(a for a in view["actions"] if a["target"] == "site_visit_done")
+    assert done["enabled"] is False and "Confirm the visit date" in done["reason"]
+    arrange_visit(client, off, op, app_id)
     view = transition(client, off, app_id, "site_visit_done")
-    assert {a["target"] for a in view["actions"]} == {"pending_approval", "rejected"}
+    # Since US-063 the checklist is the only way on: Route to approval waits for it, Reject stays.
+    assert {a["target"] for a in view["actions"]} == {"rejected"}
+    submit_clean_checklist(client, off, app_id)
     view = transition(client, off, app_id, "pending_approval")
     assert view["status_label"] == "Route to Approval"
     mine = client.get(f"/api/v1/applications/{app_id}", headers=op).json()
@@ -62,9 +74,7 @@ def test_reject_needs_a_note_and_is_final(client: TestClient, db: Session) -> No
 def test_return_to_review_from_pending_approval(client: TestClient, db: Session) -> None:
     """An officer who spots something at the decision step goes back instead of rejecting (US-031)."""
     app_id, op, off, _ = under_review(client, db)
-    transition(client, off, app_id, "site_visit_scheduled")
-    transition(client, off, app_id, "site_visit_done")
-    view = transition(client, off, app_id, "pending_approval")
+    view = to_pending_approval(client, off, op, app_id)
     actions = {a["target"]: a["label"] for a in view["actions"]}
     assert actions == {"approved": "Approve", "under_review": "Return to review", "rejected": "Reject"}
 

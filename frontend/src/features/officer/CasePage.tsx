@@ -15,13 +15,19 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
 import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
+import { openFor as openForTarget } from '@/lib/feedback'
 import { formatBytes, formatDate, formatDateTime, formatRelative } from '@/lib/format'
 import { CheckResult } from './CheckResult'
 import { AuditTrail } from './AuditTrail'
 import { ComparePanel } from './ComparePanel'
 import { FeedbackPanel } from './FeedbackPanel'
 import type { Target } from './FeedbackPanel'
+import { ChecklistCard } from './ChecklistCard'
+import { ClarificationRail } from './ClarificationRail'
+import { EarlierVisits } from './EarlierVisits'
+import { ProposeVisitDialog, SiteVisitPanel } from './SiteVisitPanel'
 import { useOfficerApplication, useRerunCheck, useTransition } from './queries'
+import { useReadOnly } from './readOnly'
 
 interface ActionCopy {
   title: string
@@ -41,17 +47,17 @@ const ACTION_COPY: Record<string, ActionCopy> = {
     body: 'Your open feedback is released to the operator. Only the flagged sections and documents reopen for them.',
     confirm: 'Request resubmission',
   },
-  site_visit_scheduled: {
-    title: 'Mark the site visit as scheduled?',
-    body: 'Status only: no appointment is booked here. The operator is told an officer will contact them to arrange the visit.',
-    confirm: 'Mark scheduled',
-  },
   site_visit_done: {
     title: 'Mark the site visit as done?',
     body: 'The application moves on to the post-visit stage.',
     confirm: 'Mark done',
   },
   pending_approval: { title: 'Route to approval?', body: 'The application is marked ready for a decision.', confirm: 'Route to approval' },
+  pending_post_site_resubmission: {
+    title: 'Request another round?',
+    body: 'Every question you drafted is sent to the operator now. They answer only those items and send the round back.',
+    confirm: 'Request another round',
+  },
   approved: { title: 'Approve this application?', body: 'This is final. The operator sees Approved and your note.', confirm: 'Approve' },
   rejected: {
     title: 'Reject this application?',
@@ -103,30 +109,43 @@ function ReviewRail({
   view,
   targets,
   onAction,
+  onPropose,
   busy,
 }: {
   view: OfficerApplication
   targets: Target[]
   onAction: (action: OfficerAction) => void
+  onPropose: () => void
   busy: boolean
 }) {
   const toast = useToast()
+  const readOnly = useReadOnly()
   const s = view.verification_summary
   const primary = view.actions.find((a) => a.enabled && !a.requires_note)
   const rest = view.actions.filter((a) => a !== primary)
   return (
-    <aside className="order-first flex flex-col gap-5 lg:order-none lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-104px)] lg:self-start lg:overflow-y-auto">
+    <aside className="pf-scroll order-first flex flex-col gap-5 lg:order-none lg:sticky lg:top-[88px] lg:-mr-3 lg:max-h-[calc(100vh-104px)] lg:self-start lg:overflow-y-auto lg:pb-1 lg:pr-3">
+      {view.site_visit !== null || view.status === 'site_visit_scheduled' ? (
+        // Keyed by case so a half-typed date on one case never reappears on the next.
+        <SiteVisitPanel key={view.id} view={view} onPropose={onPropose} />
+      ) : null}
+      {/* The checklist opens once the date stands, and stays open while the operator asks to move it (F8). */}
+      {view.checklist !== null || view.site_visit?.date_stands === true || view.status === 'site_visit_done' ? (
+        <ChecklistCard view={view} />
+      ) : null}
       <section className="pf-surface" aria-labelledby="review-title">
         <div className={cn('px-5 pt-5', view.actions.length === 0 && 'pb-5')}>
           <h2 id="review-title" className="text-[17px] font-semibold leading-6">
             Review
           </h2>
           <p className="mt-1 text-[13px] leading-[19px] text-text-2">
-            {view.status === 'withdrawn'
+            {view.outcome === 'withdrawn'
               ? 'The operator withdrew this application. Nothing further can happen to it.'
-              : view.actions.length === 0
-                ? 'No further action is available for this application.'
-                : 'Every status change is recorded with your name in the audit trail.'}
+              : readOnly
+                ? 'Every action on this case stays with the licensing officer; you are reading it.'
+                : view.actions.length === 0
+                  ? 'No further action is available for this application.'
+                  : 'Every status change is recorded with your name in the audit trail.'}
           </p>
         </div>
         {view.licence ? (
@@ -167,7 +186,7 @@ function ReviewRail({
                 {a.label}
               </Button>
             ))}
-            {view.status === 'pending_approval' ? (
+            {view.phase === 'decision' ? (
               <Link to={`/officer/applications/${view.id}/licence-preview`} className={buttonClasses('ghost')}>
                 Preview licence
               </Link>
@@ -183,10 +202,15 @@ function ReviewRail({
                   ))}
               </ul>
             ) : null}
-            {view.actions.some((a) => a.target === 'site_visit_scheduled' || a.target === 'site_visit_done') ? (
+            {view.actions.some((a) => a.target === 'site_visit_scheduled') ? (
               <p className="mt-1 text-xs leading-[17px] text-text-3">
-                The site visit steps change the status only. The visit checklist and post-visit clarification rounds are out of scope for
-                this release.
+                Scheduling proposes a date and slot to the operator; the case moves to Site Visit Scheduled at once.
+              </p>
+            ) : null}
+            {view.actions.some((a) => a.target === 'site_visit_done') ? (
+              <p className="mt-1 text-xs leading-[17px] text-text-3">
+                Mark the visit done once it has taken place. The checklist is the record of the visit; submitting it marks the visit done in
+                the same step.
               </p>
             ) : null}
           </div>
@@ -204,16 +228,16 @@ function ReviewRail({
           <Stat label="Documents" value={s.total} />
           <Stat label="Verified" value={s.verified} tone="success" />
           <Stat label="Issues found" value={s.issues_found} tone="warning" />
-          <Stat label="Need your review" value={s.needs_review} tone="warning" />
+          <Stat label={readOnly ? 'Need officer review' : 'Need your review'} value={s.needs_review} tone="warning" />
           {s.checking > 0 ? <Stat label="Still checking" value={s.checking} tone="info" /> : null}
           {s.other > 0 ? <Stat label="Not checked" value={s.other} tone="warning" /> : null}
         </dl>
         <p className="border-t border-line px-5 py-3 text-xs leading-[18px] text-text-3">
-          Checks compare each document with the submitted form. They are advisory: the decision is yours.
+          Checks compare each document with the submitted form. They are advisory: the decision is {readOnly ? "the officer's" : 'yours'}.
         </p>
       </section>
 
-      <FeedbackPanel view={view} targets={targets} />
+      {view.clarification ? <ClarificationRail view={view} /> : <FeedbackPanel view={view} targets={targets} />}
     </aside>
   )
 }
@@ -239,12 +263,14 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: 'su
 /** Officer case review workspace (S-21): submission on the left, review rail on the right. */
 export function OfficerCasePage() {
   const { id = '' } = useParams()
+  const readOnly = useReadOnly()
   const app = useOfficerApplication(id)
   const schema = useFormSchema()
   const transition = useTransition(id)
   const rerun = useRerunCheck(id)
   const toast = useToast()
   const [pending, setPending] = useState<OfficerAction | null>(null)
+  const [proposing, setProposing] = useState(false)
   const [note, setNote] = useState('')
   const [noteError, setNoteError] = useState<string | null>(null)
 
@@ -261,7 +287,11 @@ export function OfficerCasePage() {
   // A failed background refetch keeps the cached view (and any unsaved work); only a first load can fail the page.
   if (app.isError && app.data === undefined) {
     if (app.error instanceof AppError && app.error.status === 404)
-      return <NotFoundPanel backTo="/officer/queue" backLabel="Back to the queue" />
+      return readOnly ? (
+        <NotFoundPanel backTo="/admin/overview" backLabel="Back to the overview" />
+      ) : (
+        <NotFoundPanel backTo="/officer/queue" backLabel="Back to the queue" />
+      )
     return <ErrorPanel error={app.error} onRetry={() => void app.refetch()} />
   }
   if (schema.isError) return <ErrorPanel error={schema.error} onRetry={() => void schema.refetch()} />
@@ -278,8 +308,7 @@ export function OfficerCasePage() {
       key: d.document_type,
     })),
   ]
-  const openFor = (type: 'section' | 'document', key: string) =>
-    view.feedback.filter((f) => f.resolution === 'open' && (type === 'section' ? f.section_key === key : f.document_type === key))
+  const openFor = (type: 'section' | 'document', key: string) => openForTarget(view.feedback, type, key)
   const error = transition.error instanceof AppError ? transition.error : null
   const stale = error?.status === 409 && error.code === 'version_conflict'
 
@@ -309,7 +338,18 @@ export function OfficerCasePage() {
 
   return (
     <>
-      <Breadcrumb items={[{ label: 'Review queue', to: '/officer/queue' }, { label: view.reference_no }]} />
+      <Breadcrumb
+        items={[
+          readOnly ? { label: 'Overview', to: '/admin/overview' } : { label: 'Review queue', to: '/officer/queue' },
+          { label: view.reference_no },
+        ]}
+      />
+      {readOnly ? (
+        <Alert tone="neutral" title="Read-only" className="mb-5">
+          Administrators can read every case as the officer sees it, but cannot act on one: no status change, no feedback, no checklist, no
+          clarification. Every action stays with the licensing officer.
+        </Alert>
+      ) : null}
       <div className="mb-6">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <span className="font-mono text-[13px] font-medium tracking-[0.02em] text-text-2">{view.reference_no}</span>
@@ -324,7 +364,7 @@ export function OfficerCasePage() {
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           <StatusBadge label={view.status_label} tone={view.status_tone} size="lg" live={view.verification_summary.checking > 0} />
           {view.decision_note ? <span className="text-sm text-text-2">Note: {view.decision_note}</span> : null}
-          {view.status === 'withdrawn' ? (
+          {view.outcome === 'withdrawn' ? (
             <span className="text-sm text-text-2">
               Withdrawn by the operator{view.withdrawal_reason ? `: ${view.withdrawal_reason}` : ' without a reason'}
             </span>
@@ -499,8 +539,9 @@ export function OfficerCasePage() {
                   {d.verification ? (
                     <div className="mt-4 rounded-md border border-line bg-surface-2 px-4 py-3.5">
                       <CheckResult verification={d.verification} />
-                      {(d.verification.status !== 'pending' && d.verification.status !== 'running') ||
-                      isCheckStale(d.verification.requested_at) ? (
+                      {!readOnly &&
+                      ((d.verification.status !== 'pending' && d.verification.status !== 'running') ||
+                        isCheckStale(d.verification.requested_at)) ? (
                         <div className="mt-3 flex justify-end border-t border-line pt-2.5">
                           <Button
                             variant="ghost"
@@ -552,18 +593,28 @@ export function OfficerCasePage() {
               ))}
             </ol>
             <p className="border-t border-line px-5 py-3 text-xs text-text-3 sm:px-7">
-              <Link to="/officer/queue" className="inline-block py-2 text-text-2 sm:py-0">
-                Back to the queue
+              <Link to={readOnly ? '/admin/overview' : '/officer/queue'} className="inline-block py-2 text-text-2 sm:py-0">
+                {readOnly ? 'Back to the overview' : 'Back to the queue'}
               </Link>
             </p>
           </section>
 
+          <EarlierVisits view={view} />
+
           <AuditTrail applicationId={id} />
         </div>
-        <ReviewRail view={view} targets={targets} busy={transition.isPending} onAction={(a) => setPending(a)} />
+        <ReviewRail
+          view={view}
+          targets={targets}
+          busy={transition.isPending}
+          // Scheduling the visit is the proposal itself (US-084): the dialog asks for the date and slot.
+          onAction={(a) => (a.target === 'site_visit_scheduled' ? setProposing(true) : setPending(a))}
+          onPropose={() => setProposing(true)}
+        />
         {/* Below lg the rail renders first (order) so the officer's actions are not the last thing on the page. */}
       </div>
 
+      <ProposeVisitDialog open={proposing} view={view} onClose={() => setProposing(false)} />
       <Dialog
         open={pending !== null}
         title={copy?.title ?? ''}

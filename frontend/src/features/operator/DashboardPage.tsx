@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -40,11 +41,13 @@ const TONE_DOT: Record<string, string> = {
 }
 
 function Group({ title, hint, tone, count, children }: { title: string; hint: string; tone: string; count: number; children: ReactNode }) {
+  // An id without spaces: aria-labelledby reads a space as a list of ids (WCAG 1.3.1, US-095).
+  const headingId = useId()
   return (
-    <section aria-labelledby={`group-${title}`} className="pf-enter">
+    <section aria-labelledby={headingId} className="pf-enter">
       <div className="mb-3 flex items-baseline gap-3">
         <span className={cn('h-2 w-2 shrink-0 translate-y-[-1px] rounded-full', TONE_DOT[tone])} aria-hidden="true" />
-        <h2 id={`group-${title}`} className="text-[15px] font-semibold">
+        <h2 id={headingId} className="text-[15px] font-semibold">
           {title}
         </h2>
         <span className="font-mono text-xs text-text-3">{count}</span>
@@ -57,7 +60,7 @@ function Group({ title, hint, tone, count, children }: { title: string; hint: st
 
 function DashboardSkeleton() {
   return (
-    <div className="flex flex-col gap-8" aria-busy="true" aria-label="Loading dashboard">
+    <div className="flex flex-col gap-8" role="status" aria-busy="true" aria-label="Loading dashboard">
       <div className="flex flex-col gap-3">
         <Skeleton className="h-4 w-40" />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -182,7 +185,7 @@ export function OperatorDashboardPage() {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
           <EmptyPanel
             title="No applications yet"
-            description="Start a new application to apply for a Food Establishment Licence. It takes about 20 minutes and you can save a draft at any point."
+            description="Start a new application to apply for a Food Establishment Licence. You can save a draft at any point."
             action={newApplication}
           />
           <WhatYouNeed />

@@ -2,6 +2,286 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## v0.4.0 released (US-081, 8 Oct 2026)
+
+The assessment is over and the `main` freeze is lifted, so v0.4.0 moves from the development environment to production through the release ritual (`docs/09-operations/BRANCHING.md`, rule 5).
+
+- **Version.** `0.4.0-rc.2` becomes `0.4.0` in `frontend/package.json`, `package-lock.json`, `backend/pyproject.toml`, `uv.lock` and `backend/app/core/version.py`.
+- **Release notes.** The v0.4.0 entry is dated 8 Oct 2026, and "Coming next" now describes v0.5.0 "Safe intake" (virus scanning, a separate worker for the document checks, AI usage per check, limits the administrator can tune, cookie sessions) and the releases after it.
+- **README.** The dev-branch notice is gone; production is v0.4.0 and use case 3 is complete. "What I would do next" no longer lists the release itself.
+- **Since `v0.4.0-rc.2`.** The release also carries the UAT run 5 fixes (PR #12), the security audit fixes (PR #13), WCAG 2.2 AA (US-095), the persona audit fixes (US-096), PyJWT 2.15.1, the four red-team evaluation cases outside the gate, and the final debrief material.
+- **Still to do after the merge.** Tag `v0.4.0` on the merge commit, deploy production from the release image, seed once, and record the image in `OPERATIONS.md`. Each step waits for the owner's yes.
+
+## Persona audit and its fixes (US-096, 1 Oct 2026)
+
+Nine personas (keyboard only, screen reader, low vision, colour blind, Windows High Contrast, motion sensitive, cognitive, voice control, deaf) were run against the build after US-095. It showed the "0 failures of 55" claim had been premature; the review document is corrected (`docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`). Fixed on `feat/us-096-persona-fixes`, each with a gate test that failed before the fix.
+
+- **Names match what is shown (2.5.3).** The bell ("Notifications, 9+ unread"), the version link and the logo were named differently from their visible text, so a voice-control user could not say what they saw.
+- **Focus in Windows High Contrast (2.4.7).** Result buttons and checkboxes drew their ring with a shadow, which High Contrast strips; they now carry a transparent outline, which it draws.
+- **Large text (1.4.4).** The side rail cut "Dashboard" and "My applications" at 200% text and a form button clipped at 390 px; labels wrap and buttons grow (minimum height, not fixed).
+- **The dashboard card** no longer lets the status badge cover the application reference at 1280 px.
+- **Overflow, found by sweeping every screen at 320, 375, 390, 768, 1024, 1280 and 1440 px.** The officer queue's action button fell out of its column at 1280 px and wider (a last-activity column was shown in a grid built for four columns); the admin Users table was cut off at 768 and 1024 px and the Overview idle table at 768 px (their columns assumed more room than the side rail leaves); status badges ran past their box on narrow screens; an issue code could not break at 320 px. A gate test sweeps ten screens at six widths for any box wider than the screen, clipped text or a child wider than its parent; it fails with the queue fix removed.
+- **Dependency.** `pip-audit` began blocking the build on CVE-2026-101918 (a deeply nested token payload made PyJWT 2.14.0 raise an uncaught error); PyJWT 2.15.1 is in PR #14.
+
+## WCAG 2.2 AA (US-095, 1 Oct 2026)
+
+A WCAG 2.2 AA audit (55 A and AA criteria; axe at 375, 768 and 1280, keyboard walks, reflow, target size, text spacing, contrast, forms, sign-in) found six failures; all six are fixed on `feat/us-095-wcag-aa`, a second audit found none, and the result was checked again in Chrome. Merged into `dev` locally; nothing pushed. The criterion-by-criterion table is in `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.
+
+- **Focus is never hidden behind a sticky bar (2.4.11).** Tabbing through the checklist hid the focused control 30 times in 60 presses on a phone and 9 on a desktop; after the skip link the first breadcrumb sat under the header. The page now reserves the header, tab bar and submit card heights when it scrolls to focus; a new gate test walks the checklist and the respond page at 390, 820 and 1280 and finds no hidden stop (78 without the fix).
+- **Visible control borders (1.4.11).** Inputs, selects and checkboxes use `#838c99` (3.40:1) instead of `#aeb6c2` (2.04:1), approved by the owner; a token test fails below 3:1.
+- **Idle warning (2.2.1).** Five minutes before the 60-minute idle sign-out the portal strip warns and offers Stay signed in (one request keeps the session). The 8-hour limit stays final by the owner's choice (option B); its warning now says to sign in again. The strip's status region is always present, so warnings are read out. Artboards S-45 on the v0.4.0 canvas, approved before the code.
+- **Dashboard groups keep their names (1.3.1), a locked step says so (4.1.2), the applicant's own details can be autofilled (1.3.5).**
+- **The gate's officer-case scan waits for its own heading** (it flaked when it caught the queue page mid-navigation).
+- **Tests.** Vitest 289 in 48 files; the accessibility gate 12 of 12; build and lint clean.
+
+## Anti-slop design audit fixes (29 Sep 2026)
+
+The owner approved six findings from a design audit looking for the tells of a generated site; they were fixed on `fix/anti-slop-audit` and merged into `dev` on 30 Sep at the owner's request, nothing pushed. The landing page's glow behind the document panel stays, by the owner's choice.
+
+- **No invented numbers on the landing page.** The hero's "About 20 minutes" was never measured, and the other two facts in that row repeated the document panel and the checks section, so the row is gone.
+- **Every screen names its tab.** "Sign in | PermitFlow", "Review queue | PermitFlow", "Privacy policy | PermitFlow" and so on, set from the route table; `index.html` keeps "PermitFlow" as the fallback and now carries a meta description and share preview tags that say plainly it is a fictional service built for an engineering assessment (no preview image).
+- **A real not-found page.** An unknown address shows its own page with "Page not found" as the heading, its own tab title and a link home.
+- **Icons and robots.txt.** A 180 px Apple touch icon, a 32 px PNG and a `favicon.ico`, all rendered from `favicon.svg`. `robots.txt` asks every crawler to stay out, since this is a demonstration nobody should find through a search engine; no sitemap for the same reason.
+- **Policy links on every public footer.** Sign in, What's new and the policy pages now carry Privacy, Terms and Cookies like the landing footer, and the sign-in disclaimer links the terms next to the privacy policy.
+- **Calmer motion.** The journey rule on the landing page draws in 650 ms (was 1.4 s) and its steps follow 60 ms apart (300 ms in all, was 1 s); the pulsing dot on a live status stops when the visitor asks for reduced motion.
+- **Tests.** Vitest 282 in 47 files (new: tab titles, the not-found page, the footer links on sign-in, What's new and the policy pages); build and lint clean.
+
+## Security audit fixes (24 Sep 2026)
+
+The Cloudflare security-audit skill ran over the repository at `ee67688` (standard profile, 15 agents, source-only; report kept outside the repository). No critical, high or medium finding; the two confirmed low findings and one hardening note from my own UAT run 5 change are fixed on `fix/security-audit-findings`, merged into `dev` as `338cfa1` (PR #13) and deployed to the development environment (threat model T29, T28).
+
+- **The admin activity feed leaves out drafts.** A draft's events (file names of uploads, sections saved) no longer appear in `/admin/audit-feed` until it is submitted, matching every other admin read of a draft.
+- **A role change clears the user's notifications.** An officer demoted to operator no longer keeps officer notifications naming other operators and quoting their reasons.
+- **The checklist copy on the device is one officer's.** Its key now carries the officer's id, so after a session expires or is taken over the next officer on the same tablet is not offered the previous officer's unsaved findings.
+- **Tests.** Backend 867, vitest 273; each new check fails without its fix.
+
+## UAT run 5 and its fixes (24 Sep 2026)
+
+A full browser run of use case 3 and the UAT plan on the development environment (Claude in Chrome: an iPad-width officer tab, a laptop tab after a take-over, a second officer, the operator, the administrator) found 20 things; every one is fixed or explained on the branch `fix/uc3-uat-findings`, merged into `dev` as `ee67688` (PR #12) and deployed to the development environment. Record: `docs/10-uat/UAT_PLAN.md` runs 5 and 6.
+
+- **A second site visit works for everyone (F15 to F18).** The case views now read one *active* visit (`services/visit_scope.py`: none while the case is back in the pre-visit review, otherwise the latest) and list the others as `earlier_visits`, read-only. The operator answers visit 2's appointment (it was hidden behind visit 1's clarification notice); a case returned to review is a review again (Feedback panel, Request resubmission); visit 2 opens a blank checklist; visit 1's appointment, checklist (`/checklist?visit=1`) and clarification thread stay readable in the officer's new "Earlier visits" section and on the operator's History (`/clarifications?visit=1`).
+- **Nothing typed on site is lost (F10, F11, F13).** Checklist entries and clarification answers the server has not confirmed are kept on the device (`lib/localDraft.ts`), restored after a reload or a discarded tab and saved; cleared on save and by the user's own Sign out (threat model T28). The clarification page now warns before leaving while an answer is unsaved. Offline the save line reads "Waiting for the connection".
+- **The appointment rules (F4, F7, F8, F12).** Mark site visit done and the checklist submit wait for the visit day (`SITE_VISIT_DAY_GUARD`, on by default; off in the browser suite and the UAT scripts); the reply-by date is the working day before the visit when that is sooner; a confirmed date stands while the operator asks to move it (the rail says "Confirmed date", the checklist stays open, recording the visit closes the request, audit `site_visit.move_request_closed`).
+- **Smaller fixes.** Undo on a withdrawn clarification question (`POST …/clarifications/{item_id}/restore`, audit `clarification.restored`; F19); the operator's date and reason errors show together (F5); an answered round reads "Answered with another date" (F6); stale copy on the officer rail, the operator header and the checklist header (F3, F9); UAT U1 no longer says sections autosave (F1).
+- **Tests.** Backend 866 (`test_visit_scope.py`), vitest 272, Playwright scenario 13 (second visit), `smoke_routes.py` 122 checks with the second-visit path and every route, `uat_edges.py` 246. Browser re-test of every failed case passed (run 6).
+- **Decision for the owner.** The development environment has no `SITE_VISIT_DAY_GUARD` variable, so after the merge it will enforce the visit-day rule: a same-sitting walkthrough there then needs `SITE_VISIT_DAY_GUARD=false` on the development backend.
+
+## What's new behind the version number, v0.4.0-rc.2 (21 Sep 2026, evening)
+
+US-094 at the owner's request, planned with four personas (an operator on a phone, an officer whose procedure changed, an administrator matching the build with Telegram, a visitor judging the product). The version chip in the rail footer, the landing footer and, on phones or with the rail collapsed, the dark top strip is a link to `/releases`; it says "New" until the page has been read once on that browser, then "What's new". The page reads `RELEASE_NOTES.md` at build time (a Vite virtual module, a 60-line parser for the format now documented at the top of that file, so nothing is typed twice and a malformed file fails the tests), heads with the running build (`GET /health` gains `version`, `commit`, `environment`), lists every release newest first with "This build" marked, and shows the reader's own audience block first with the others folded; administrators and visitors see everything open. The admin overview names the build too. Use case UC0-B, requirement UX-009, screen S-44, three artboards on the v0.4.0 canvas (critiqued by a design agent before the code: link words on the chip, bounded disclosure rows, the list before Coming next, a "For everyone" kicker). Tests: 7 backend (health fields), 18 vitest (parser over the real file, page per role, chip), Playwright scenario 12 (signed out, operator, officer, admin, phone) and `/releases` in the accessibility gate at 1280 and 390. Versions bumped to `0.4.0-rc.2`; `RELEASE_NOTES.md` "Coming next" rewritten in the users' words. Local run before the push: pytest, vitest, the accessibility gate, every Playwright spec (28 of 29; the officer case screen in the accessibility spec failed only when the whole suite ran on one laptop and passes alone), the production build under the JavaScript budget. Pushed as `dev` `2be052a` with the tag `v0.4.0-rc.2`; CI green on both (dev run 35607398711, tag run 35607410789), deployed to the development environment (run 35608475721): `/health` answers `0.4.0-rc.2 (2be052a)`, the bundle carries the notes. Loading regions across the app now carry `role="status"` (an `aria-label` on a plain div was a prohibited attribute the gate only caught when a scan landed on a skeleton).
+
+## The build named in Telegram (21 Sep 2026, afternoon)
+
+Owner's request: the Telegram messages say which version runs. The API exposes `permitflow_build_info{version, commit}` (the version from `app/core/version.py`, the one place it lives now; the commit baked into the image by CI as `GIT_SHA`); the bot's `/status`, `/dev` and `/prod` carry "version 0.4.0-rc.1 (8cf669f)" per environment, and the hourly digest's section per environment reads the same from a query whose labels the annotation uses. Grafana's rules and templates regenerated; the Railway variables refreshed. The same afternoon a digest arrived as raw template text (Prometheus had been restarting during that evaluation, so the values were missing): every digest annotation now guards its value and prints "n/a" for that hour instead.
+
+## v0.4.0-rc.1 on the development environment (21 Sep 2026, midday)
+
+`dev` pushed (89 commits, everything since the submission), CI green after one accessibility fix on the new policy layout, deployed to the development environment by the pipeline, seeded (the administrator and the spare officer), checked live (13 checks, `UAT_PLAN.md` 12:15 record), the Prometheus rules re-set by environment, the release candidate tagged `v0.4.0-rc.1` on that commit. Production and `main` stay on v0.3.0. The policy pages open inside the app shell when signed in and follow the side rail. `AI_USAGE.md` carries the day's prompts.
+
+## Stability review of the whole v0.4.0 diff, with fixes (21 Sep 2026, late morning)
+
+Five reviewers (three Opus, two Sonnet) read every file changed since `main`: backend services, domain, repositories, models and migrations; the API layer and its security; the operator and officer frontend; the admin frontend, the end-to-end specs, the observability stack and the scripts; every document against the code. In parallel the 61 API routes were smoke-tested on the local stack (every route called with the right role on a real lifecycle, plus wrong-role and unauthenticated probes: 105 checks), `uat_edges.py` ran 246 of 246, and the deployed backends answered their health checks (production, development, Grafana). Everything below was then fixed, tested and merged into `dev`.
+
+- **Workflow.** Withdrawing the last question of a later clarification round left the case with Reject as the officer's only move: the officer now has Route to approval from Pending Post-Site Resubmission too, the rail says "nothing open: route to approval or reject", the queue row is the officer's turn. A proposal whose date arrived unanswered could be accepted or confirmed for the past and then never moved: accept, decide and confirm-without-reply refuse a date that has passed, the operator counters, the officer proposes another date. The queue's "Route to approval" label on a done visit without a checklist now reads "Open the checklist".
+- **Security and limits.** Every request body is bounded before FastAPI reads it (`core/body_limit.py`: 256 KiB for JSON, the upload cap on both multipart routes, 411 for a chunked body without a length; previously the gate covered one route and was bypassed by chunked encoding). The image ceiling is a hard 40 megapixels checked from the header before decoding (Pillow only warned below 80 MP; a 250 KB PNG cost 600 MB of the worker). Deactivating an account revokes its live session. A re-encoded image is checked against the per-file cap. A non-ASCII bearer on `/metrics` was a 500. A crafted feed cursor was a 500. The client-supplied `X-Request-ID` is accepted only as a plain token. The limiter's exemption matches the exact probe paths, and the health probe is cached for two seconds.
+- **Frontend.** The officer's last checklist taps went with the timer when they left by a link inside the 1.5 s debounce on a device that does not focus buttons: the unmount now sends them with keepalive; a keepalive save goes even while another save is in flight; a body over the keepalive cap goes as a plain fetch; every touch is a new save batch so a retry never replays the in-flight id. The operator's answer field was remounted by its first save, dropping text typed meanwhile and the focus. An evidence upload that failed offline was never retried. The 409 rule (shared sentence, reload) now covers the feedback rail, the clarification rail, the propose-visit dialog and the operator's answer save. Sign-in after a 401 lands on the page the session ended on, not the role home. A stored session that ran out while the tab was closed is explained on the sign-in page. The send dialog waits for an in-flight answer save. One non-null assertion replaced by `skipToken`.
+- **Observability and scripts.** Four Prometheus alert rules summed across both environments on the one Prometheus that scrapes both: every rule now groups by environment (`PROMETHEUS_ALERTS` on Railway must be re-set from the file). The admin end-to-end scenario restores the spare account in an `afterEach` and the seed resets role and active flag on a rerun, so a failed run cannot leave the demo account deactivated. The load scripts refuse any target that is not local or named for load runs; the scratch-database check matches the database name, not a substring of the URL.
+- **Schema.** The six indexes that existed only in migrations are declared on the models (`alembic check` is clean), and migration 0014 creates the foreign key from `applications.current_revision_id` that migration 0001 declared but never emitted.
+- **Documents.** README (use case 3 is built on `dev`), ARCHITECTURE (the admin, checklist, clarification, site-visit and session modules; all fourteen metric families), STATE_MACHINE (the new edge), DOMAIN_MODEL (`deactivated`, the key), THREAT_MODEL (T4, T19, T25), OBSERVABILITY and OPERATIONS (rules by environment, the Railway variable), UI_STATES (the lapsed proposal), UAT_PLAN (the edge-case section at 246 checks), `.env.example` (seven rules), TEST_STRATEGY (859 backend, 238 frontend). Not changed: the story headings in USER_STORIES.md keep the Notion title format with its dash.
+- Still open, needs the deployed environment: the two-caller check of the limiter behind the edge (`X-Real-IP`, readiness row 25) after the next deploy of `dev`.
+- Owner's request the same morning: the policy pages (privacy, terms, cookies) open inside the app shell when signed in, so they follow the side rail, with the policy switcher and an On this page list beside the text at an 820 px measure; the public frame widened to match. `AppShell` takes children for a page outside the route groups.
+
+## UAT run 4: UC3 on two devices, three stale-page fixes (21 Sep 2026)
+
+- Claude in Chrome ran UC3 twice on the local stack with five tabs (an iPad and a laptop for one officer, a second officer, the operator, the administrator): PF-2026-001668 approved after two clarification rounds with a PDF and a JPEG (EXIF and GPS stripped on disk), PF-2026-001669 rejected after a withdrawn question and three appointment rounds. The iPad to laptop hand-over held every time: the 1.5 s autosave and the keepalive save on tab hide put the draft on the server before the laptop signed in; the revoked iPad landed on the sign-in page with the reason. Record: `docs/10-uat/UAT_PLAN.md`, scenario U16 and run 4.
+- Fixed from the run, one unit test each: the officer's site-visit rail showed the raw server reason and stayed stale when the other device had already decided the appointment (now "This application changed since you opened it. Showing the latest." and the rail reloads); the checklist page kept the old case badge after a save was refused because the checklist was submitted from another tab; the operator's clarification header kept "needs more information on 1 item" after a send was refused because the officer had withdrawn the question. Frontend: 229 tests.
+- The owner's morning report ("everything cleared, back to Mark site visit scheduled") was the second seeded case opened from the Needs review tab, not lost work; the first case sat under Waiting on operator with everything saved.
+
+## Review fixes after the v0.4.0 build (21 Sep 2026)
+
+- Three Sonnet reviewers (backend, frontend, document drift) read the whole diff. Fixed: two devices signing in to a fresh account at the same instant could both get a session (the user row is the lock now, with a two-thread test); a slow first save of a clarification answer could land over a newer one (one save in flight, the edit queued); the checklist kept an officer's local entries after a "submitted elsewhere" refusal instead of showing what stands; the administrator's checklist breadcrumb led to the officer's queue; two N+1 queries in the clarification service; the users page's filter announced tab semantics it did not implement. Documents: the admin module and dependency rows in ARCHITECTURE, the audit event list and ChecklistItem's extra-finding fields in DOMAIN_MODEL, "seven alert rules" everywhere, test counts.
+
+## Sprints 4 to 7 closed, Sprint 8 in progress (21 Sep 2026)
+
+The five planned one-day sprints ran as one long session across 20 and 21 September 2026, the owner reviewing from a phone and answering questions between stories; the close ritual was run once for the four of them at the end, story by story against the Definition of Done, and the Notion board reflects it. Numbers at close: backend 854 test cases from 253 functions (95 % statements), frontend 226 tests (82 % statements), 12 Playwright specs (the journey, ten scenarios, the accessibility gate with 11 tests), 246 API-level edge checks, 14 ADRs, two new threat rows (T26, T27), production untouched on v0.3.0.
+
+### Sprint 4: "Agree the shape"
+
+| Story | Outcome |
+|-------|---------|
+| US-078 Design pass | Done (sixteen artboards approved by the owner, 20 Sep evening) |
+| US-079 Workflow amendments | Done |
+| US-082 Limiter behind the edge | Built (`CLIENT_IP_HEADER`); the two-caller check on the development environment waits for the next deploy of `dev` |
+| US-084 Site visit appointment | Done (pulled forward at the owner's request) |
+| US-090 Singapore time | Done |
+
+Retro: the design pass paid for itself; every screen was built from an approved artboard and none was redrawn. What slowed us: the state machine reading of the post-site statuses took three reviews to settle.
+
+### Sprint 5: "The officer inspects"
+
+| Story | Outcome |
+|-------|---------|
+| US-060, US-061, US-062, US-063 Checklist | Done |
+| US-064 Operator view of the flagged items | Done |
+| US-092 Extra findings on the checklist | Done (added at the owner's question) |
+
+Retro: the autosave took two review rounds (rapid taps lost edits until the refs were written synchronously); the second visit rule (a done visit is not reused) came from a reviewer, not a test. Nothing slipped.
+
+### Sprint 6: "The operator clarifies"
+
+| Story | Outcome |
+|-------|---------|
+| US-065 Responses with evidence | Done |
+| US-066 Rounds | Done |
+| US-093 One live session per account | Done (added at the owner's request) |
+| US-085 Storage budget and photos without camera data | Done |
+| US-087 Poor connection | Slipped to Sprint 7: sessions and storage came first at the owner's request; done there |
+
+Retro: a session model changed every test helper (sign in with `take_over`), which is the cost of a rule that holds everywhere. What to change: run the UAT script and Playwright one at a time; they share the demonstration accounts and one revokes the other.
+
+### Sprint 7: "The office can see itself"
+
+| Story | Outcome |
+|-------|---------|
+| US-070 Overview (absorbs US-071) | Done |
+| US-072 Activity feed and read-only case | Done |
+| US-073 Users (with account creation at the owner's request) | Done |
+| US-088 Accessibility gate over the new screens | Done (found two real defects) |
+| US-089 Use case 3 and storage on the dashboard | Done |
+| US-087 Poor connection (from Sprint 6) | Done |
+
+Retro: the gate earned its keep (37.5 px controls, a checklist unreadable after the visit); the read-only case through a context was one afternoon, a separate admin API would have been a day. What to change: measure before promising a latency budget (Sprint 8 found the overview at 2.8 s).
+
+### Sprint 8: "Release v0.4.0 honestly" (in progress)
+
+| Story | Outcome |
+|-------|---------|
+| US-086 Latency budgets under load | Done |
+| US-083 Phase, outcome, can_resolve | Done |
+| US-080 Acceptance and documents | Documents in progress; the UAT on the development environment waits for the owner's push and deploy of `dev` |
+| US-082 Two-caller check on development | Waits for the same deploy |
+| US-081 Release v0.4.0 | On the owner's go, after the Xtremax process |
+
+`SCOPE.md` re-read at the close: V1 to V26 built except the release itself; the parked v0.5.0 list unchanged.
+
+## US-086 Latency budgets under load (21 Sep 2026, Sprint 8)
+
+- A load kit (`scripts/load/`: a scratch seed of 10,000 applications and 100,000 audit rows, a k6 script and a threaded runner for a machine without k6) and the indexes the admin reads need. Measured on the scratch database: checklist save p95 18 ms, admin overview p95 312 ms, activity feed p95 46 ms, every budget met; the overview's idle list had to become one grouped query to get there (2.8 s before).
+
+## US-083 The case response says where it stands (21 Sep 2026, Sprint 8)
+
+- The case carries its stage, its outcome and whether each feedback item can be resolved; the screens branch on those instead of on label strings, and the three places that counted open feedback share one rule. Readiness row 22 closed.
+
+## US-087 A poor connection on site and on the phone (21 Sep 2026, Sprint 7)
+
+- The respond page keeps what the operator typed through a lost connection, says so within a second, retries the save and the upload with the same backoff as the checklist (1 s to 30 s, never while the tab is hidden), and shows a progress bar on every evidence upload. The checklist stops retrying while hidden and resumes when it comes back. A bundle size check in CI (215 KB gzipped against 250 KB) and a Playwright test with the connection cut and a Fast 4G paint budget.
+
+## US-088 The accessibility gate over the new screens (21 Sep 2026, Sprint 7)
+
+- The gate now covers the checklist as a draft and as submitted, the respond page, the history with rounds, the appointment, the four admin screens and the add-account dialog at phone and desktop widths, measures every control on the checklist and the respond page against 44 px, and walks the checklist by keyboard. Two findings fixed on the way: controls were 37.5 px on touch widths (44 px below the desktop breakpoint now) and a submitted checklist could not be opened once the case moved past the visit.
+
+## US-089 Use case 3 and storage on the dashboard (21 Sep 2026, Sprint 7)
+
+- Four new metric families (checklists submitted, clarification rounds released and answered, evidence bytes, storage by kind including the volume itself), a dashboard row generated from the script, an alert when the upload volume passes 80 %, and the Telegram `/queue` answer naming the post-site cases. The "whose turn" numbers on the dashboard, the hourly digest and the bot now follow the same rule as the administrator's overview.
+
+## Admin epic: US-070, US-072, US-073 (21 Sep 2026, Sprint 7)
+
+- The administrator's three screens: an operations overview (every status with its count, whose turn, the ten longest-idle applications in Singapore calendar days, today's numbers, document-check health over 24 hours against the daily quota), an activity feed across every application and every user change with a keyset "Show older activity", and user management (change a role, deactivate, reactivate, and, at the owner's request, add an account from the page). An administrator opens any case through the officer's screens without a single control: the server sends no actions and refuses every mutation. The seed now creates the administrator (Priya Nair) and a spare officer (Lim Jun Hao); the three demonstration accounts are protected from any change. ADR-014 records the design.
+
+## US-085 Storage budget and photos without camera data (21 Sep 2026, Sprint 6)
+
+- Every JPG or PNG an operator uploads, as a document or as clarification evidence, is stored without its camera data (location, device, time), turned upright first, colour profile kept. Each application has 150 MB of storage room across every document version, its evidence and its licence; the pages say how much is left before a file is chosen, and a file that would pass the room is refused with the room named. One upload pipeline now serves both paths.
+
+## US-093 One live session per account (21 Sep 2026, Sprint 6)
+
+- An account is signed in on one device at a time. A second sign-in is refused and names the device that holds the account and when it was last active; the person may sign that device out and continue, and the other device lands on the sign-in page with the reason and the time on its next request. Sign-out ends the session on the server; a session unseen for 60 minutes (`SESSION_IDLE_MINUTES`) ends by itself. Continuity is the server-side draft: the checklist autosaves, so the next device opens it where the last one left it (Playwright 09 proves it with two browser contexts). Added at the owner's request (an officer on an iPad, then the laptop). Tokens issued before this change are refused (no session id), so every signed-in browser signs in once more after the deploy.
+
+## US-092 Extra findings on the checklist (21 Sep 2026, Sprint 5)
+
+- An officer adds a finding of their own: free under Other findings, or as a second finding under a template item ("Finding 2 on this item"), each with a title, the same result, comment and flag, removable while a draft; the draft save assigns the key; counts and the submit rules cover them; a flagged one reaches the operator with its parent's title first. Added at the owner's question whether the checklist can take items of the officer's own and two findings on one item.
+- Also at the owner's question: the draft is sent the moment the tab goes to the background or the page unloads (keepalive), so an iPad lid closing loses nothing; the browser's leave-page alert stays only while a save is pending or failing. From the Sonnet review of the clarification stories: the operator's notice asks for a response only while the office is waiting, evidence on a withdrawn item's answer is refused, Send waits for an answer or file still in flight. The queue's long status labels wrap at tablet width (H4).
+
+## US-090 Singapore time everywhere (21 Sep 2026, Sprint 5)
+
+- The frontend renders every instant in Asia/Singapore through one helper set in `lib/format.ts` (dates, times, relative times, the greeting, the save indicator, the session tooltip); date-only values stay the calendar dates they name. Tests sit on 16:00 UTC, midnight in Singapore, and the whole suite runs under four browser zones.
+
+## US-066 Clarification rounds (21 Sep 2026, Sprint 5)
+
+- The officer marks an answered item clarified, asks again (an unreleased question for the next round, shown as Not sent yet) or withdraws an open question; Request another round releases the drafts and tells the operator with the count; Route to approval waits for nothing open or answered; rounds are counted per item. The case carries every thread with the finding on top; the rail (S-31) replaces the feedback panel in the post-site states; the operator's history page lists the rounds. Audit labels for every clarification event.
+- Tests: two rounds end to end, five rounds losing nothing, a withdraw racing a send under the row lock, a rejection mid-round; the rail's vitest; scenario eight now runs from the visit to Route to Approval through two rounds.
+
+## US-065 The operator answers, attaches evidence and sends (21 Sep 2026, Sprint 5)
+
+- One answer per open question, rewritable until sent; up to three files per answer under the document rules (allowlist, magic bytes, 10 MB), an identical file reported as no change, removal until sent, downloads for the owner, officers and admins with the ownership chain checked at every hop (migration 0009). Send responses needs every open item answered (422 listing the keys), leaves out items withdrawn before the send, moves the case to Post-Site Clarification Resubmitted with the operator as actor, and tells every active officer.
+- `ClarificationPage`: an answer per item saved on blur, Take a photo (the camera on phones) and Choose a file, Remove, a sticky Send responses with the readiness line and a confirmation.
+
+## US-064 The operator's view of the flagged items (21 Sep 2026, Sprint 5)
+
+- `GET /applications/{id}/clarifications` serves only the items with a released question, in operator words, from a model with no field for a result or an unflagged item; the application view carries the `clarification` block; a case in a post-site operator-turn state needs the operator only while an item is open. `ClarificationNotice` on the application page, `ClarificationPage` at `/app/applications/:id/clarification` (the officer's question first on each item; answering arrives with US-065), the empty state.
+- From the Sonnet review of the checklist stories: a case scheduled again before a new date was proposed was handed the frozen checklist of the done visit (fixed, tested); a retried autosave now reuses its save id so a lost reply is recognised; a 409 or 422 on autosave stops the loop and reloads; the checklist query's comment matched its behaviour.
+
+## US-062 and US-063 Flag rule and checklist submit (20 Sep 2026, Sprint 5)
+
+- `POST …/checklist/submit`: every item assessed and every unsatisfactory or flagged item commented (422 naming the keys); from Site Visit Scheduled the officer hop to Site Visit Done is recorded first, then the system hop to Awaiting Post-Site Clarification; findings frozen; a released round-1 `ClarificationRequest` per flagged item (migration 0008); audit `checklist.submitted` between the two `status.changed`; one operator notification with the count ("needs more information on 2 items" or "nothing is needed from you"). The transitional route from Site Visit Done straight to approval is gone: every case reaches approval through the checklist, and the backend suites, the edge script (group CK, 233 checks) and the Playwright journey walk that way.
+- Page: the submit dialog lists the flagged items by title and the counts; a 422 scrolls to the first named item; after submit the page is read-only and the case card says Submitted with a View checklist link; the operator's status sentence names the count. Audit families Checklist and Clarification in the trail.
+- Fixed on the way: two taps faster than a React commit could lose an entry (the save path now reads synchronous refs).
+
+## US-061 Checklist autosave, retry, offline and merge (20 Sep 2026, Sprint 5)
+
+- The draft autosaves 1.5 s after the last touch and on leaving the list; Save draft goes at once. A failed save keeps the entries and retries with backoff (3, 6, 12, 24 s, then every 30 s) under "Could not save, retrying"; while offline a banner says so and the save goes the moment the connection returns; a stale version takes the other tab's copy with the officer's touched items kept on top and saves again, with a notice. Pressing a selected result again clears it. `SaveIndicator` gained the retrying tone.
+- Tests: vitest with fake timers for the debounce, the retry ladder, the offline round trip and the merge; `08-checklist.spec.ts` waits for the autosave.
+
+## US-060 Checklist template, model and draft (20 Sep 2026, Sprint 5 started)
+
+- `GET /checklist-schema` (officers and admins): seventeen items in five sections, versioned in code, grounded in SFA's public Food Shop self-checklist and saying it is not an SFA document. `Checklist` and `ChecklistItem` (migration 0007): one per visit number, every item present from creation.
+- `POST …/checklist` creates the current visit's draft under the row lock (201) or returns it (200), 409 outside the site-visit states, audited `checklist.created`; `GET` with `?visit=n`; `PUT` saves the whole list against the template with an optimistic version (409 with the current content) and a replayable `save_id`; no audit row per save. `checklist_started` now reads the checklist, so the transitional route from Site Visit Done to approval closes once one exists. The queue says Open or Continue the checklist; the case rail carries the summary card.
+- `ChecklistPage` (S-30): section chips with counts, progress line, a result control per item (label plus dot, stretched below 1100 px), the clarification flag, a comment when one is needed with the required-comment message, a sticky card with what still blocks a submit, Save draft with "Saved just now", a version-conflict banner with Keep my entries or Take theirs. CORS preflight now allows PUT.
+- Tests: 5 backend (schema, create-or-get and the closed route, the two-tab race, the save rules, authorization) + the preflight; 5 vitest; `08-checklist.spec.ts`; axe at 1024, 820 and 390.
+
+## US-084 Site visit appointment (20 Sep 2026, Sprint 4, pulled forward from Sprint 5)
+
+- The date is arranged inside the case (FR-043, ADR-013): Mark site visit scheduled opens a proposal dialog (date, slot, note) and `POST /officer/applications/{id}/site-visit` moves the case and records the proposal in one transaction; the operator accepts (with a confirmation) or proposes another date with a reason; the officer accepts the operator's date, keeps the one on the table or proposes a third; either side may ask to move a confirmed visit before its date; the officer may confirm a proposal left unanswered for three working days (never later than the visit); at most six proposals per visit, then only accept or keep; Mark site visit done only once confirmed. No new application status.
+- `domain/site_visit.py` (Singapore working days, notice periods, the deadline, the cap), `services/site_visit.py`, migration 0006 (`site_visits`, `site_visit_proposals`), seven routes, four audit event types with plain-language summaries, notifications both ways; the queue says whose move it is; the operator's header sentence follows the appointment; the operator sees "Licensing officer", never the officer's name.
+- Frontend: `ProposeVisitDialog` and `SiteVisitPanel` on the officer case (S-32, S-34), `SiteVisitCard` on the operator application (S-33), the rounds on History (S-19), the Site visit family in the audit trail; the rail scrolls with a thin thumb on hover instead of a native track; the audit type column fits the new event names.
+- Tests: 17 backend tests for the loop, the cap, the date rules, keep after a reschedule, authorization and ownership; 4 unit tests for the rules; 14 vitest for the dialog, the panel and the card; the seven routes in the contract test; `07-site-visit.spec.ts`; axe over the visit screens at 1280 and 390; `uat_edges.py` group SV (38 checks, 204 in total). Coverage: backend 95 %, frontend 81.8 % statements.
+- Three Sonnet reviews before the browser run (backend, frontend, security and document drift): keep-after-reschedule reverted to round one (fixed), the officer's name in the operator's rounds (masked), the officer forms did not stack on phones (fixed), `THREAT_MODEL.md` T24 and the documents listed below written.
+- Documents: `ARCHITECTURE.md` API table, `DOMAIN_MODEL.md` (two entities, invariants 8 and 9), `STATE_MACHINE.md` (the guard and the side effect), ADR-013, `SCOPE.md` (V24, assumption 22), `REQUIREMENTS.md` FR-043, `USE_CASES.md` UC3-0, `USER_STORIES.md`, `SCREEN_INVENTORY.md`, `UI_STATES.md`, `THREAT_MODEL.md` T24, `UAT_PLAN.md` (U13, group SV, the run), `TEST_STRATEGY.md`, `README.md`, `AI_USAGE.md`.
+
+## Route lock test (20 Sep 2026, chore)
+
+- `tests/unit/test_routes_locked.py`: every mounted API route must carry a role guard, or be one of the three public routes (sign-in, health, the token-checked metrics scrape) or the five signed-in routes (me, form schema, notifications); a second test asserts no route lets an admin write until the admin epic. New routers in v0.4.0 fail it before review if they forget their guard. `SECURITY_REVIEW.md` row 2.
+
+## US-082 Limiter keyed on the real caller behind the edge (20 Sep 2026, Sprint 4)
+
+- `client_key` reads the edge's own client header before `X-Forwarded-For` when the peer is a trusted proxy: `CLIENT_IP_HEADER`, default `X-Real-IP`, the header Railway documents for the connecting address (its edge instance is the last forwarded hop, which is what readiness row 25 found). Without a trusted proxy the socket address still wins, so a caller cannot pick a bucket with a forged header. Both limiters (every request, sign-in attempts) and the failed-login block use it. Tests: the edge case, the forged header, an older platform without the header, a multi-value header, two callers behind one edge in separate buckets. `.env.example`, `OPERATIONS.md`, `SECURITY_REVIEW.md` and readiness row 25 updated; the on-platform check with two callers runs once `dev` is deployed.
+
+## Non-functional requirements for v0.4.0 (20 Sep 2026, owner's request)
+
+- `REQUIREMENTS.md` NFR-008 to NFR-018: checklist save latency, attachment limits and a 150 MB storage budget per application, image metadata stripped on upload, admin read latency at 10,000 applications, poor-connection behaviour, phone performance of the respond page, storage observed with an alert, the accessibility gate over the new screens, Singapore time for every new date, use case 3 on the dashboard, bounded audit growth.
+- Six stories with measurable acceptance criteria and a sprint each: US-085 (limits, budget, metadata; Sprint 6), US-086 (k6 load check and indexes; Sprint 8), US-087 (retry with backoff, offline notice, size and paint budgets; Sprint 6), US-088 (accessibility gate, 44 px targets, keyboard checklist; Sprint 7), US-089 (counters, storage gauge, volume alert, `/queue`; Sprint 7, was V16), US-090 (Asia/Singapore everywhere new, tests around midnight; Sprint 5). On the board and in `SPRINTS.md` and the release plan.
+
+## US-079 State machine and workflow amendments (20 Sep 2026, Sprint 4)
+
+- `domain/workflow.py`: the post-site edges read the brief's way (SCOPE.md assumption 18): a new operator edge `awaiting_post_site_clarification → post_site_clarification_resubmitted` (guard: every open item answered); `post_site_clarification_resubmitted → pending_post_site_resubmission` replaces the edge back to `awaiting`; the officer edge `awaiting → pending_post_site_resubmission` is gone; both routes to approval from the post-site states are guarded by "nothing open or answered"; the system edge from `site_visit_done` needs a complete checklist; Reject is allowed from the three post-site states; the direct route `site_visit_done → pending_approval` survives Sprint 4 behind a `checklist_started = false` guard and goes with US-063. `TransitionContext` gains the five use case 3 fields; `available_actions` answers an empty list for a viewer without an actor.
+- `services/workflow.py`: the actor comes from the caller (`actor_for_role`; `Actor.SYSTEM` for the checklist submit; an admin is refused before the table), `build_context` builds one guard context for transitions and for the case view, `NOTIFY_OPERATOR` names the targets the operator is told about, the caller may pass the notification body, the audit `trigger` and the metric label carry the acting actor, and the operator's messages for the post-site states are written. `services/officer_view.py` lists edges for the viewer's own actor (none for an admin). `domain/officer_actions.py`: Submit checklist, Waiting on operator, Review responses.
+- Tests: the 588-combination sweep with a permissive context per target; the brief's reading, the new guards, Reject from the post-site states and the admin's empty action list (766 backend cases from 177 functions).
+- Documents: `STATE_MACHINE.md` (edge table, guards, the reading, editability, side effects), ADR-003 amendment, `REQUIREMENTS.md` (FR-027 and FR-030 amended, FR-036 to FR-043, SEC-003 amended, AUD-007), `USE_CASES.md` (UC3-0 to UC3-C written as planned, UC4-A without account creation), `ARCHITECTURE.md` (the planned `/admin/ai-health` row folded into the overview).
+
+## Sprint 4 started: US-078 design pass (20 Sep 2026, evening)
+
+- Prototype v0.4.0 (https://claude.ai/artifact/VmZ2biUWNkGMTAFoa6D8LY): eleven artboards for the eight new screens, generated from `docs/04-design/prototype-src/v0-4-0/build.py` with the as-built tokens and the shipped shell: the officer's checklist at 820 portrait (offline state) and 1024, the officer's case with the clarification rail, the operator's respond screen at 390 (with a focused field, and once more with the send dialog as a sheet) and at 1280 with the send dialog, the operator's history, the admin overview, activity, users (with the change-role dialog) and the read-only case.
+- One design critique pass (`UI_DESIGN.md`, pass 3) with 29 findings applied before the owner's review: Reject neutral, selected chips neutral, no badge for a fact, the case actions under the rail header, definition lists instead of number grids, one chronology across the operator boards and the rail, viewer-aware copy on the admin's read-only case, 44 px phone targets with the send card above the tab bar, the offline banner's promise corrected.
+- Design documents: `SCREEN_INVENTORY.md` (eight rows, the v0.4.0 dialogs), `UI_STATES.md` (the states matrix for the eight screens and the checklist and clarification lifecycle), `COMPONENT_INVENTORY.md` (the v0.4.0 section and the reuse list), `UI_FLOW.md` (the three new flows and the routes), `USER_JOURNEY.md`, `UI_REQUIREMENTS_TRACEABILITY.md` (FR-036 to FR-042), `DESIGN_SYSTEM.md` (the operator-turn post-site badges), `docs/04-design/README.md` (the prototype link).
+- Revised the same evening at the owner's request: the artboards were redrawn from fresh captures of the development environment (the shipped shell, the product's own font files uploaded to the canvas, the inline case header, the rail panels), and the site visit appointment (US-084: propose a date and slot, accept or counter, confirm, reschedule; five artboards) was added as the owner's product decision. Sixteen artboards approved by the owner on 20 Sep 2026, evening: US-078 Done. The owner also found the queue's next-action chip overflowing at 1280 (layout audit H4, tied to US-083).
+- Owner's rules recorded in `CLAUDE.md`: a story merges into `dev` only when its whole Definition of Done is met; screens are approved before code; `main` is frozen while the submission is assessed (no pull request, tag or production deploy until the owner lifts it).
+
+## v0.4.0 planned (20 Sep 2026, evening, after the submission)
+
+- `docs/05-planning/RELEASE_PLAN_V0_4_0.md`: the plan for use case 3 and the admin panel in five one-day sprints on `dev` (Sprints 4 to 8 in `SPRINTS.md`), production frozen on the submitted v0.3.0 until the owner runs the release ritual. Three independent reviews of the first draft (feasibility, product design, QA and security) changed it before it was adopted; section 12 of the plan records what each changed: the GitHub default branch moved from `dev` to `main` so reviewers land on the submitted release; the post-site statuses read the brief's way (the operator answers right after the checklist is submitted); the checklist bypass `site_visit_done → pending_approval` goes; one checklist per visit; the seeded demonstration accounts protected from the admin write path; the admin epic after UC3 and first in the cut order; the workflow service to take the actor and a notification policy from the caller; existing notification kinds reused so a rollback stays safe; idempotent autosave with no audit row per save; the limiter fix (readiness row 25) before autosave lands.
+- Stories: full acceptance criteria for US-060 to US-066 and US-070 to US-073; US-071 absorbed by US-070; new US-078 (design pass), US-079 (state machine and workflow amendments), US-080 (acceptance and documents), US-081 (release), US-082 (limiter behind the edge), US-083 (officer `phase` fields). Notion: Sprint Day options Sprint 4 to Sprint 8, the UC3 epic renamed, the seventeen stories set.
+- `SCOPE.md`: a v0.4.0 section, assumption 6 marked as closing, assumptions 18 to 21 (the post-site reading, no revision per round, no check on attachments, the static checklist template), the UC3 and S7 rows updated. `DEFINITION_OF_DONE.md` widths aligned with `CLAUDE.md` (390, 1024, 1280, plus 820 for the checklist). `BRANCHING.md` rule 5: `v0.<release>.0`. README notice on `dev`; working version `0.4.0-dev` (`0.4.0.dev0` in the backend).
+- No feature code changed; the first story of Sprint 4 starts on the owner's go.
+
 ## Production release of the observability endpoint (20 Sep 2026, 16:16 SGT)
 
 - Production pinned to `sha-714a159` (`main` after pull requests #9 and #10: the technical video v3, the policy-page fix, the observability endpoint). `/api/v1/metrics` answers 401 without the token in production; both Prometheus targets `up`; the dashboard's `production` view and the Telegram `/status` answer carry production numbers.

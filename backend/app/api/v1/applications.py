@@ -4,27 +4,39 @@ from typing import Annotated, Any
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import DbSession, OperatorUser, require_role
+from app.api.deps import AnyReader, DbSession, OperatorUser, require_role
 from app.domain.enums import ApplicationStatus, DocumentType
 from app.models import Application, User
 from app.models.enums import Role
 from app.schemas.applications import (
     ApplicationOperatorView,
     ApplicationSummaryOut,
+    EarlierVisitOperatorView,
     RevisionSummaryView,
     UploadOut,
     WithdrawIn,
 )
+from app.schemas.clarification import (
+    ClarificationAttachOut,
+    ClarificationOperatorView,
+    ClarificationResponseIn,
+)
 from app.schemas.compare import CompareOut
+from app.schemas.site_visit import SiteVisitCounterIn, SiteVisitRescheduleIn
 from app.services.applications import ApplicationService
+from app.services.checklist import ChecklistService
+from app.services.clarification import ClarificationService
 from app.services.compare import CompareService
 from app.services.documents import DocumentService, content_disposition
 from app.services.draft_deletion import DraftDeletionService
 from app.services.licence import LicenceService, licence_view
 from app.services.operator_view import document_view, operator_view, summary
 from app.services.resubmission import ResubmissionService
+from app.services.site_visit import SiteVisitService
 from app.services.submission import SubmissionService
+from app.services.uploads import storage_usage, storage_view
 from app.services.verification import VerificationService, run_verification
+from app.services.visit_scope import earlier_visit_nos
 from app.services.withdrawal import WithdrawalService
 
 router = APIRouter(prefix="/applications")
@@ -47,7 +59,31 @@ def _view(service: ApplicationService, app: Application) -> ApplicationOperatorV
             for r in service.revisions.list_for(app.id)
         ],
         licence=licence_view(LicenceService(service.db).for_application(app.id)),
+        site_visit=SiteVisitService(service.db).operator_view(app),
+        open_clarifications=ChecklistService(service.db).facts(app).open_clarifications,
+        clarification=ClarificationService(service.db).block(app),
+        earlier_visits=_earlier_visits(service, app),
+        storage=storage_view(storage_usage(service.db, app.id)),
     )
+
+
+def _earlier_visits(service: ApplicationService, app: Application) -> list[EarlierVisitOperatorView]:
+    """Visits before the active one, read-only, latest first (UAT run 5, F18)."""
+    if app.status == ApplicationStatus.DRAFT:
+        return []
+    visits = SiteVisitService(service.db)
+    clarification = ClarificationService(service.db)
+    out: list[EarlierVisitOperatorView] = []
+    for n in earlier_visit_nos(service.db, app):
+        clar = clarification.build(app, n)
+        out.append(
+            EarlierVisitOperatorView(
+                visit_no=n,
+                site_visit=visits.operator_view(app, n),
+                clarification=clar if clar.items else None,
+            )
+        )
+    return out
 
 
 @router.get("", response_model=list[ApplicationSummaryOut])
@@ -55,8 +91,17 @@ def list_applications(user: OperatorUser, db: DbSession) -> list[ApplicationSumm
     service = ApplicationService(db)
     apps = service.list_for(user)
     present, revisions = service.list_stats(apps)
+    ids = [a.id for a in apps]
+    awaiting = SiteVisitService(db).awaits_operator(ids)
+    open_items = ClarificationService(db).open_counts(ids)
     return [
-        summary(a, present_types=present.get(a.id, set()), revision_count=revisions.get(a.id, 0))
+        summary(
+            a,
+            present_types=present.get(a.id, set()),
+            revision_count=revisions.get(a.id, 0),
+            visit_awaits_operator=a.id in awaiting,
+            open_clarifications=open_items.get(a.id, 0),
+        )
         for a in apps
     ]
 
@@ -84,7 +129,7 @@ def submit_application(
 @router.get("/{application_id}/compare", response_model=CompareOut)
 def compare_revisions(
     application_id: uuid.UUID,
-    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER))],
+    user: AnyReader,
     db: DbSession,
     from_revision: Annotated[int, Query(alias="from", ge=1)],
     to_revision: Annotated[int, Query(alias="to", ge=1)],
@@ -106,7 +151,7 @@ def resubmit_application(
 @router.get("/{application_id}/licence")
 def download_licence(
     application_id: uuid.UUID,
-    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER))],
+    user: AnyReader,
     db: DbSession,
 ) -> StreamingResponse:
     """The issued licence certificate as a PDF (US-051). Owner or officer; 404 before approval."""
@@ -132,6 +177,125 @@ def withdraw_application(
     409 for drafts and decided applications."""
     app = WithdrawalService(db).withdraw(user, application_id, body.reason)
     return _view(ApplicationService(db), app)
+
+
+@router.post("/{application_id}/site-visit/accept", response_model=ApplicationOperatorView)
+def accept_site_visit(
+    application_id: uuid.UUID, user: OperatorUser, db: DbSession
+) -> ApplicationOperatorView:
+    """Accept the date and slot the officer proposed (US-084); officers are told."""
+    SiteVisitService(db).accept(user, application_id)
+    service = ApplicationService(db)
+    return _view(service, service.get_for(user, application_id))
+
+
+@router.post("/{application_id}/site-visit/counter", response_model=ApplicationOperatorView)
+def counter_site_visit(
+    application_id: uuid.UUID, user: OperatorUser, db: DbSession, body: SiteVisitCounterIn
+) -> ApplicationOperatorView:
+    """Propose another date and slot with a reason; the officer decides."""
+    SiteVisitService(db).counter(
+        user, application_id, visit_date=body.date, slot=body.slot, reason=body.reason
+    )
+    service = ApplicationService(db)
+    return _view(service, service.get_for(user, application_id))
+
+
+@router.post("/{application_id}/site-visit/reschedule", response_model=ApplicationOperatorView)
+def reschedule_site_visit(
+    application_id: uuid.UUID, user: OperatorUser, db: DbSession, body: SiteVisitRescheduleIn
+) -> ApplicationOperatorView:
+    """Ask to move a confirmed visit before its date (reason required); the officer decides."""
+    SiteVisitService(db).reschedule(
+        user, application_id, visit_date=body.date, slot=body.slot, reason=body.reason
+    )
+    service = ApplicationService(db)
+    return _view(service, service.get_for(user, application_id))
+
+
+@router.get("/{application_id}/clarifications", response_model=ClarificationOperatorView)
+def clarifications(
+    application_id: uuid.UUID,
+    user: OperatorUser,
+    db: DbSession,
+    visit: Annotated[int | None, Query(ge=1)] = None,
+) -> ClarificationOperatorView:
+    """Only the flagged items with a released question, in operator words (US-064): the active visit's,
+    or an earlier visit's with `visit`, read-only (F18)."""
+    return ClarificationService(db).operator_view(user, application_id, visit)
+
+
+@router.post(
+    "/{application_id}/clarifications/{item_id}/responses",
+    response_model=ClarificationOperatorView,
+)
+def respond_to_clarification(
+    application_id: uuid.UUID,
+    item_id: uuid.UUID,
+    body: ClarificationResponseIn,
+    user: OperatorUser,
+    db: DbSession,
+) -> ClarificationOperatorView:
+    """Draft or rewrite the answer to the open question on one item (US-065)."""
+    return ClarificationService(db).respond(user, application_id, item_id, body.message)
+
+
+@router.post(
+    "/{application_id}/clarifications/responses/{response_id}/attachments",
+    response_model=ClarificationAttachOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def attach_to_response(
+    application_id: uuid.UUID,
+    response_id: uuid.UUID,
+    user: OperatorUser,
+    db: DbSession,
+    file: Annotated[UploadFile, File()],
+) -> ClarificationAttachOut:
+    view, unchanged = ClarificationService(db).attach(
+        user, application_id, response_id, file.filename or "", file.content_type, file.file
+    )
+    return ClarificationAttachOut(view=view, unchanged=unchanged)
+
+
+@router.delete(
+    "/{application_id}/clarifications/responses/{response_id}/attachments/{attachment_id}",
+    response_model=ClarificationOperatorView,
+)
+def remove_attachment(
+    application_id: uuid.UUID,
+    response_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+    user: OperatorUser,
+    db: DbSession,
+) -> ClarificationOperatorView:
+    return ClarificationService(db).remove_attachment(user, application_id, response_id, attachment_id)
+
+
+@router.post("/{application_id}/clarifications/send", response_model=ClarificationOperatorView)
+def send_clarifications(
+    application_id: uuid.UUID, user: OperatorUser, db: DbSession
+) -> ClarificationOperatorView:
+    """Send every drafted answer of the round; the case moves to Post-Site Clarification Resubmitted."""
+    return ClarificationService(db).send(user, application_id)
+
+
+@router.get("/{application_id}/clarifications/attachments/{attachment_id}/download")
+def download_attachment(
+    application_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER, Role.ADMIN))],
+    db: DbSession,
+) -> StreamingResponse:
+    row, chunks = ClarificationService(db).open_attachment(user, application_id, attachment_id)
+    return StreamingResponse(
+        chunks,
+        media_type=row.content_type,
+        headers={
+            "Content-Disposition": content_disposition(row.original_filename),
+            "Content-Length": str(row.size_bytes),
+        },
+    )
 
 
 @router.patch("/{application_id}/sections/{key}", response_model=ApplicationOperatorView)
@@ -184,7 +348,7 @@ def delete_document(
 def download_document(
     application_id: uuid.UUID,
     document_id: uuid.UUID,
-    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER))],
+    user: AnyReader,
     db: DbSession,
 ) -> StreamingResponse:
     doc, chunks = DocumentService(db).open_for_download(user, application_id, document_id)

@@ -9,6 +9,8 @@ from fastapi import Request
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from starlette.responses import Response
 
+from app.core.version import APP_VERSION, BUILD_COMMIT
+
 HTTP_REQUESTS = Counter(
     "permitflow_http_requests_total",
     "HTTP requests by method, route template and status code.",
@@ -49,6 +51,32 @@ OPENAI_TOKENS = Counter(
 )
 APPLICATIONS = Gauge(
     "permitflow_applications", "Applications by status, refreshed on every scrape.", ["status"]
+)
+SESSIONS_ACTIVE = Gauge(
+    "permitflow_sessions_active", "Accounts signed in right now (US-093), refreshed on every scrape."
+)
+# Which build answers: the version and the commit, as labels on a gauge that is always 1, so the bot and
+# the hourly digest can name the release running in each environment (owner's request, 21 Sep 2026).
+BUILD_INFO = Gauge(
+    "permitflow_build_info", "The version and the commit of the running API, always 1.", ["version", "commit"]
+)
+BUILD_INFO.labels(APP_VERSION, BUILD_COMMIT).set(1)
+# Use case 3 on the dashboard (US-089): the checklist and the rounds moving, and the volume filling.
+CHECKLISTS_SUBMITTED = Counter(
+    "permitflow_checklists_submitted_total", "Site visit checklists submitted (US-063)."
+)
+CLARIFICATION_ROUNDS = Counter(
+    "permitflow_clarification_rounds_total",
+    "Clarification rounds by event: released to the operator, answered by the operator.",
+    ["event"],
+)
+ATTACHMENT_BYTES = Counter(
+    "permitflow_attachment_bytes_total", "Bytes stored as clarification evidence (US-065)."
+)
+STORAGE_BYTES = Gauge(
+    "permitflow_storage_bytes",
+    "Bytes on the upload volume by kind (documents, attachments, volume_used, volume_total), per scrape.",
+    ["kind"],
 )
 
 

@@ -234,11 +234,11 @@ export function FormPage() {
                 return (
                   <span
                     key={s.key}
-                    className="flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-text-3"
+                    className="flex min-h-10 items-center gap-3 rounded-md px-3 py-1 text-sm font-medium text-text-3"
                     title="The licensing officer did not ask for changes here."
                   >
                     <span className="w-5 font-mono text-xs text-text-3">0{i + 1}</span>
-                    <span className="min-w-0 flex-1 truncate">{s.title}</span>
+                    <span className="min-w-0 flex-1 break-words">{s.title}</span>
                     <span className="text-[11px] font-medium uppercase tracking-[0.06em]">Locked</span>
                   </span>
                 )
@@ -249,13 +249,13 @@ export function FormPage() {
                   to={`${base}/form/${s.key}`}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-text-2 no-underline',
+                    'flex min-h-10 items-center gap-3 rounded-md px-3 py-1 text-sm font-medium text-text-2 no-underline',
                     'transition-[background-color,color] duration-[var(--dur-fast)] ease-[var(--ease-out)] hover:bg-neutral-soft hover:text-text',
                     active && 'bg-surface-3 font-semibold text-text',
                   )}
                 >
                   <span className="w-5 font-mono text-xs text-text-3">0{i + 1}</span>
-                  <span className="min-w-0 flex-1 truncate">{s.title}</span>
+                  <span className="min-w-0 flex-1 break-words">{s.title}</span>
                   {responding ? (
                     <span className={cn('text-[11px] font-medium', mark.tone === 'bg-warning' ? 'text-warning' : 'text-success')}>
                       {mark.label}
@@ -272,7 +272,7 @@ export function FormPage() {
             <div className="mx-3 my-2 h-px bg-line" />
             {responding && !docsFlagged ? (
               <span
-                className="flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-text-3"
+                className="flex min-h-10 items-center gap-3 rounded-md px-3 py-1 text-sm font-medium text-text-3"
                 title="No document was flagged."
               >
                 <span className="w-5 font-mono text-xs text-text-3">05</span>

@@ -103,8 +103,8 @@ export function CheckResult({ verification }: { verification: OfficerVerificatio
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2">
                       <span className="font-medium text-text">{issue.message}</span>
-                      <span className="font-mono text-[11px] text-text-3">{issue.code}</span>
-                      {issue.field ? <span className="font-mono text-[11px] text-text-3">{issue.field}</span> : null}
+                      <span className="break-all font-mono text-[11px] text-text-3">{issue.code}</span>
+                      {issue.field ? <span className="break-all font-mono text-[11px] text-text-3">{issue.field}</span> : null}
                     </div>
                     {issue.evidence ? (
                       <blockquote className="mt-1.5 break-words border-l-2 border-line-strong pl-2.5 font-mono text-[12px] leading-[18px] text-text-2">

@@ -81,7 +81,7 @@ panels = [
          thresholds={"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "orange", "value": 0.3}, {"color": "red", "value": 0.5}]}),
     stat(5, "Checks in the last hour", f'sum(increase({m("permitflow_verification_runs_total")}[1h]))', 12, 3, 4, unit="short", decimals=0, color="purple"),
     stat(6, "Applications", f'sum({m("permitflow_applications")})', 16, 3, 4, unit="short", decimals=0, color="blue"),
-    stat(7, "Waiting on an officer", f'sum({m("permitflow_applications", "status=~\"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval\"")})', 20, 3, 4, unit="short", decimals=0, color="orange"),
+    stat(7, "Waiting on an officer", f'sum({m("permitflow_applications", "status=~\"application_received|under_review|pre_site_resubmitted|site_visit_scheduled|site_visit_done|post_site_clarification_resubmitted|pending_approval\"")})', 20, 3, 4, unit="short", decimals=0, color="orange"),
 
     row(100, "Is the API healthy?", 7),
     panel(11, "Requests per second, by status class", [(f'sum by (class) (label_replace(rate({m("permitflow_http_requests_total")}[5m]), "class", "${{1}}xx", "status", "(.).*"))', "{{class}}")], 0, 8, unit="reqps", stack=True),
@@ -122,8 +122,18 @@ panels = [
     panel(31, "Applications by status (now)", [(f'{m("permitflow_applications")}', "{{status}}")], 0, 63, w=12, h=9, kind="bargauge",
           extra={"options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "horizontal", "displayMode": "gradient"}}),
     panel(32, "Transitions per hour, by target status", [(f'sum by (target) (increase({m("permitflow_transitions_total")}[1h]))', "{{target}}")], 12, 63, w=12, h=9, unit="short", stack=True),
-    panel(33, "Waiting on the officer", [(f'sum({m("permitflow_applications", "status=~\"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval\"")})', "officer's turn")], 0, 72, w=12, h=6, unit="short"),
-    panel(34, "Waiting on the operator", [(f'sum({m("permitflow_applications", "status=~\"pending_pre_site_resubmission|pending_post_site_resubmission\"")})', "operator's turn")], 12, 72, w=12, h=6, unit="short"),
+    panel(33, "Waiting on the officer", [(f'sum({m("permitflow_applications", "status=~\"application_received|under_review|pre_site_resubmitted|site_visit_scheduled|site_visit_done|post_site_clarification_resubmitted|pending_approval\"")})', "officer's turn")], 0, 72, w=12, h=6, unit="short"),
+    panel(34, "Waiting on the operator", [(f'sum({m("permitflow_applications", "status=~\"pending_pre_site_resubmission|awaiting_post_site_clarification|pending_post_site_resubmission\"")})', "operator's turn")], 12, 72, w=12, h=6, unit="short"),
+
+    row(104, "Is the site visit moving, and is the volume filling? (use case 3, US-089)", 78),
+    panel(51, "Checklists submitted per day", [(f'sum(increase({m("permitflow_checklists_submitted_total")}[1d]))', "checklists")], 0, 79, w=8, h=7, unit="short"),
+    panel(52, "Clarification rounds per day, released and answered", [(f'sum by (event) (increase({m("permitflow_clarification_rounds_total")}[1d]))', "{{event}}")], 8, 79, w=8, h=7, unit="short", stack=True),
+    panel(53, "Post-site cases (now)", [(f'sum({m("permitflow_applications", "status=~\"site_visit_scheduled|site_visit_done|awaiting_post_site_clarification|pending_post_site_resubmission|post_site_clarification_resubmitted\"")})', "in use case 3")], 16, 79, w=8, h=7, unit="short"),
+    panel(54, "Volume used (alert at 80 %)", [(f'sum({m("permitflow_storage_bytes", chr(107)+"ind=\"volume_used\"")}) / sum({m("permitflow_storage_bytes", chr(107)+"ind=\"volume_total\"")})', "used share")], 0, 86, w=8, h=7,
+          extra={"fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "orange", "value": 0.6}, {"color": "red", "value": 0.8}]}}}, "options": {"reduceOptions": {"calcs": ["lastNotNull"]}}}, kind="gauge"),
+    panel(55, "What the applications hold, by kind", [(f'{m("permitflow_storage_bytes", chr(107)+"ind=~\"documents|attachments\"")}', "{{kind}}")], 8, 86, w=8, h=7, unit="bytes", stack=True),
+    panel(56, "Evidence bytes uploaded per day", [(f'sum(increase({m("permitflow_attachment_bytes_total")}[1d]))', "bytes")], 16, 86, w=8, h=7, unit="bytes"),
+    stat(57, "Signed in right now", f'sum({m("permitflow_sessions_active")})', 0, 93, 8, unit="short", decimals=0, color="blue"),
 ]
 
 dashboard = {

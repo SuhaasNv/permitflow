@@ -8,6 +8,9 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.schemas.applications import LicenceView
+from app.schemas.checklist import ChecklistSummaryOut
+from app.schemas.clarification import ClarificationOfficerView
+from app.schemas.site_visit import SiteVisitOut
 
 
 class QueueItemOut(BaseModel):
@@ -124,6 +127,9 @@ class FeedbackOut(BaseModel):
     resolved_at: datetime | None
     # True while the calling officer can undo their own withdraw or resolve (US-039).
     can_undo: bool = False
+    # True while this item can be marked resolved: open or addressed, released, and the case with the
+    # office (US-083); the screen no longer recomputes the rule from the status.
+    can_resolve: bool = False
 
 
 class FeedbackIn(BaseModel):
@@ -143,6 +149,16 @@ class FeedbackTemplateOut(BaseModel):
     message: str
 
 
+class EarlierVisitOfficerOut(BaseModel):
+    """A visit before the active one (UAT run 5, F17 and F18): its appointment, its checklist summary
+    (readable at /checklist?visit=N) and its clarification threads, read-only."""
+
+    visit_no: int
+    site_visit: SiteVisitOut | None = None
+    checklist: ChecklistSummaryOut | None = None
+    clarification: ClarificationOfficerView | None = None
+
+
 class OfficerApplicationOut(BaseModel):
     id: uuid.UUID
     reference_no: str
@@ -150,6 +166,10 @@ class OfficerApplicationOut(BaseModel):
     status: str
     status_label: str
     status_tone: str
+    # US-083: the stage (draft, pre_site, site_visit, post_site, decision, decided) and how it ended
+    # (approved, rejected, withdrawn, or null); the screens branch on these, never on label strings.
+    phase: str
+    outcome: str | None
     applicant: ApplicantOut
     business_name: str | None
     premises_summary: str | None
@@ -173,6 +193,14 @@ class OfficerApplicationOut(BaseModel):
     decision_note: str | None
     # Operator's reason when they withdrew (US-038).
     withdrawal_reason: str | None
+    # The site visit appointment (US-084): present once a date was proposed for the current visit.
+    site_visit: SiteVisitOut | None = None
+    # The current visit's checklist (US-060): present once the officer opened it.
+    checklist: ChecklistSummaryOut | None = None
+    # The clarification threads once the checklist is submitted (US-066).
+    clarification: ClarificationOfficerView | None = None
+    # Earlier visits, latest first, read-only (the active visit is the fields above).
+    earlier_visits: list[EarlierVisitOfficerOut] = []
     licence: LicenceView | None = None
     version: int
     created_at: datetime

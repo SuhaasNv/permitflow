@@ -45,7 +45,7 @@ export function SearchBox({ value, onChange, label, placeholder, className }: Se
         className={cn(
           'h-10 w-full rounded-md border border-line-strong bg-surface pl-8 pr-2.5 text-[13px] sm:h-8 text-text placeholder:text-text-3/70',
           'transition-[border-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
-          'hover:border-text-3 focus:border-focus focus:shadow-[0_0_0_3px_rgba(23,92,211,0.16)] focus:outline-none',
+          'hover:border-text-3 focus:border-focus focus:shadow-[0_0_0_3px_rgba(23,92,211,0.16)] focus:outline-hidden',
           '[&::-webkit-search-cancel-button]:cursor-pointer',
         )}
       />

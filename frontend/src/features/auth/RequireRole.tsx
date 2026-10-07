@@ -10,7 +10,7 @@ export function RequireRole({ roles }: { roles: Role[] }) {
   const location = useLocation()
   if (!ready) {
     return (
-      <div className="mx-auto max-w-[1360px] px-4 py-8 sm:px-8" aria-busy="true" aria-label="Restoring your session">
+      <div className="mx-auto max-w-[1360px] px-4 py-8 sm:px-8" role="status" aria-busy="true" aria-label="Restoring your session">
         <Skeleton className="mb-3 h-8 w-64" />
         <Skeleton className="h-4 w-96" />
       </div>

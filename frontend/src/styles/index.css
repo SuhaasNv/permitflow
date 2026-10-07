@@ -12,7 +12,7 @@
   --color-surface-2: #f8f9fb;
   --color-surface-3: #eef0f3;
   --color-line: #dde1e7;
-  --color-line-strong: #aeb6c2;
+  --color-line-strong: #838c99; /* 3.40:1 on surface, 3.12:1 on bg: control borders meet WCAG 1.4.11; was #aeb6c2 at 2.04 (US-095) */
   --color-text: #1b2430;
   --color-text-2: #465060;
   --color-text-3: #616c7a; /* 4.68:1 on surface-3, the lowest pairing; was #66717f at 4.34 (US-057) */
@@ -66,6 +66,17 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     font-feature-settings: 'tnum' 0;
+    /* WCAG 2.4.11 (US-095): focus and anchor scrolling keep clear of the sticky header, the phone tab bar
+       and the sticky submit cards, so a focused control is never hidden behind them. */
+    scroll-padding: 72px 0 220px;
+  }
+  @media (min-width: 1024px) {
+    html {
+      scroll-padding-bottom: 110px;
+    }
+  }
+  main#main {
+    scroll-margin-top: 72px;
   }
   .font-display {
     font-family: var(--font-display);
@@ -170,6 +181,19 @@
     background: var(--color-surface);
     border: 1px solid var(--color-line);
     border-radius: var(--radius-lg);
+  }
+  /* A pane that scrolls on its own (the officer rail, the notifications list): thin thumb, no track,
+     visible only while the pointer is over it or a control inside has focus, in a reserved gutter so
+     it never sits on the cards. */
+  .pf-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    scrollbar-gutter: stable;
+    transition: scrollbar-color var(--dur-base) var(--ease-out);
+  }
+  .pf-scroll:hover,
+  .pf-scroll:focus-within {
+    scrollbar-color: var(--color-line-strong) transparent;
   }
   .pf-eyebrow {
     font-size: 12px;
@@ -299,7 +323,7 @@
   .pf-journey-line {
     transform: scaleX(0);
     transform-origin: left;
-    transition: transform 1400ms var(--ease-out) 200ms;
+    transition: transform 650ms var(--ease-out) 200ms;
   }
   .is-in .pf-journey-line {
     transform: scaleX(1);

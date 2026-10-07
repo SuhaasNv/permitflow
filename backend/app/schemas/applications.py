@@ -7,6 +7,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.clarification import ClarificationBlock, ClarificationOperatorView
+from app.schemas.site_visit import SiteVisitOperatorView
+from app.schemas.storage import StorageView
+
 
 class SectionView(BaseModel):
     key: str
@@ -124,6 +128,15 @@ class WithdrawIn(BaseModel):
     reason: str | None = Field(default=None, max_length=1000)
 
 
+class EarlierVisitOperatorView(BaseModel):
+    """A visit before the active one (UAT run 5, F18): its appointment rounds and its clarification
+    thread, read-only, so the operator's own answers and files stay on record."""
+
+    visit_no: int
+    site_visit: SiteVisitOperatorView | None = None
+    clarification: ClarificationOperatorView | None = None
+
+
 class ApplicationOperatorView(BaseModel):
     id: uuid.UUID
     reference_no: str
@@ -149,6 +162,13 @@ class ApplicationOperatorView(BaseModel):
     can_delete: bool = False
     licence: LicenceView | None = None
     withdrawal_reason: str | None = None
+    # The site visit appointment (US-084): present once the officer proposed a date.
+    site_visit: SiteVisitOperatorView | None = None
+    # The clarification rounds after the site visit (US-064): present once an item was released.
+    clarification: ClarificationBlock | None = None
+    # Earlier visits, latest first (a second visit after Return to review), read-only.
+    earlier_visits: list[EarlierVisitOperatorView] = []
+    storage: StorageView | None = None
     created_at: datetime
     updated_at: datetime
 

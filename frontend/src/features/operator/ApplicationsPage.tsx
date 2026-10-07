@@ -84,7 +84,7 @@ export function ApplicationsPage() {
         </div>
       ) : null}
       {apps.isPending ? (
-        <div className="pf-surface overflow-hidden" aria-busy="true" aria-label="Loading applications">
+        <div className="pf-surface overflow-hidden" role="status" aria-busy="true" aria-label="Loading applications">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="grid grid-cols-[168px_minmax(0,1fr)_220px_120px] gap-4 border-b border-line px-5 py-5 last:border-b-0">
               <Skeleton className="h-4 w-28" />

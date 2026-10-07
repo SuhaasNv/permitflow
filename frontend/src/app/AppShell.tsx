@@ -3,13 +3,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router-dom'
 
 import type { Role } from '@/api/auth'
+import { me } from '@/api/auth'
+import { lastActivity } from '@/api/client'
 import { useAuth } from '@/features/auth/AuthContext'
 import { Dialog } from '@/features/shared/Dialog'
 import { Logo } from '@/features/shared/Logo'
 import { NotificationsBell } from '@/features/shared/NotificationsBell'
+import { VersionChip } from '@/features/releases/VersionChip'
 import { hasUnsaved, setUnsaved } from '@/lib/unsaved'
 import { cn } from '@/lib/cn'
-import { sessionWarning } from '@/lib/session'
+import { formatDateTime } from '@/lib/format'
+import { idleWarning, sessionWarning } from '@/lib/session'
 
 interface NavItem {
   label: string
@@ -54,13 +58,24 @@ const NAV: Record<Role, NavItem[]> = {
       ),
     },
   ],
-  admin: [{ label: 'Overview', short: 'Overview', to: '/admin/overview', icon: icon('M22 12h-4l-3 9L9 3l-3 9H2') }],
+  admin: [
+    { label: 'Overview', short: 'Overview', to: '/admin/overview', icon: icon('M3 3v18h18M7 14l4-4 4 4 5-6') },
+    { label: 'Activity', short: 'Activity', to: '/admin/activity', icon: icon('M22 12h-4l-3 9L9 3l-3 9H2') },
+    {
+      label: 'Users',
+      short: 'Users',
+      to: '/admin/users',
+      icon: icon(
+        'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+      ),
+    },
+  ],
 }
 
 const ROLE_LABEL: Record<Role, string> = {
   operator: 'Operator',
   officer: 'Licensing officer',
-  admin: 'Administration',
+  admin: 'Administrator',
 }
 
 const NAV_KEY = 'permitflow.nav.collapsed'
@@ -74,8 +89,10 @@ function initials(name: string): string {
     .join('')
 }
 
-/** Masthead, top bar, collapsible side rail (232 → 64 px) on desktop, bottom tab bar on phones, route-keyed content transition. */
-export function AppShell() {
+/** Masthead, top bar, collapsible side rail (232 → 64 px) on desktop, bottom tab bar on phones, route-keyed content transition.
+ * Routes render through the Outlet; a page that lives outside the role groups (the policies, read while signed in)
+ * passes itself as children so it sits in the same shell and follows the rail (owner's request, 21 Sep). */
+export function AppShell({ children }: { children?: ReactNode }) {
   const { user, expiresAt, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -95,6 +112,9 @@ export function AppShell() {
     return () => clearInterval(id)
   }, [])
   const warning = useMemo(() => (expiresAt ? sessionWarning(expiresAt, now) : { level: 'none' as const }), [expiresAt, now])
+  // Idle warning (US-095, WCAG 2.2.1): any signed-in request keeps the session, so Stay signed in is one call.
+  const idle = idleWarning(lastActivity(), now)
+  const staySignedIn = () => void me().then(() => setNow(Date.now()), () => undefined)
   const doSignOut = () => {
     setUnsaved(false)
     signOut()
@@ -122,15 +142,36 @@ export function AppShell() {
       <div role="region" aria-label="Portal notice" className="flex h-7 items-center gap-2 bg-ink px-4 text-xs text-[#aeb6c2] sm:px-6">
         <span className="font-semibold text-white">Secure licensing portal</span>
         <span className="hidden sm:inline">· Food Establishments Unit</span>
-        {warning.level !== 'none' && expiresAt ? (
-          <span
-            role="status"
-            className={cn('ml-auto tabular-nums', warning.level === 'urgent' ? 'font-semibold text-white' : 'text-[#e6c8cc]')}
-            title={`Signed in until ${new Date(expiresAt).toLocaleString()}. Sign in again to continue afterwards.`}
-          >
-            {warning.text}
-          </span>
-        ) : null}
+        {/* The version lives in the rail footer; when there is none (phones) or it is folded away (collapsed
+            rail) it sits here at the right, unless a session warning needs the space (US-094). */}
+        {warning.level === 'none' && !idle ? <VersionChip variant="strip" className={cn('-mr-2 ml-auto', !collapsed && 'md:hidden')} /> : null}
+        {/* One live region, always present, so a warning that appears is announced (US-095). */}
+        <span role="status" className={cn('flex items-center gap-2.5', (idle || warning.level !== 'none') && 'ml-auto')}>
+          {idle ? (
+            <>
+              <span className="font-semibold text-white tabular-nums">
+                <span className="sm:hidden">Signed out in {idle}</span>
+                <span className="hidden sm:inline">You will be signed out in {idle} without activity</span>
+              </span>
+              <button
+                type="button"
+                onClick={staySignedIn}
+                className="h-[24px] shrink-0 rounded-[4px] border border-white/60 px-2.5 font-semibold text-white hover:bg-white/10 focus-visible:outline-white"
+              >
+                Stay signed in
+              </button>
+            </>
+          ) : warning.level !== 'none' && expiresAt ? (
+            <span
+              className={cn('tabular-nums', warning.level === 'urgent' ? 'font-semibold text-white' : 'text-[#e6c8cc]')}
+              title={`Signed in until ${formatDateTime(expiresAt)} (Singapore time). Sign in again to continue afterwards.`}
+            >
+              {warning.text}
+              {/* The 8-hour limit is not renewable, by the owner's choice for security (US-095, option B). */}
+              <span className="hidden sm:inline"> · sign in again to continue</span>
+            </span>
+          ) : null}
+        </span>
       </div>
       <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface/95 px-3 backdrop-blur sm:gap-4 sm:px-6">
         <button
@@ -203,7 +244,7 @@ export function AppShell() {
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
                   cn(
-                    'flex h-10 items-center gap-3 overflow-hidden rounded-md px-[11px] text-sm font-medium text-text-2 no-underline',
+                    'flex min-h-10 items-center gap-3 overflow-hidden rounded-md px-[11px] py-1 text-sm font-medium text-text-2 no-underline',
                     'transition-[background-color,color] duration-[var(--dur-fast)] ease-[var(--ease-out)] hover:bg-neutral-soft hover:text-text',
                     isActive && 'bg-surface-3 font-semibold text-text',
                   )
@@ -211,7 +252,7 @@ export function AppShell() {
               >
                 <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">{item.icon}</span>
                 <span
-                  className={cn('truncate transition-opacity duration-[var(--dur-fast)]', collapsed ? 'opacity-0' : 'opacity-100 delay-75')}
+                  className={cn('transition-opacity duration-[var(--dur-fast)]', collapsed ? 'truncate opacity-0' : 'break-words leading-5 opacity-100 delay-75')}
                 >
                   {item.label}
                 </span>
@@ -224,10 +265,8 @@ export function AppShell() {
               collapsed && 'hidden',
             )}
           >
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-text-2">PermitFlow</span>
-              <span className="rounded border border-line px-1.5 font-mono text-[10px] leading-4 text-text-3">v{__APP_VERSION__}</span>
-            </div>
+            <div className="font-medium text-text-2">PermitFlow</div>
+            <VersionChip variant="rail" />
             <div>Fictional assessment product</div>
             <nav aria-label="Policies" className="mt-1 flex gap-3">
               <Link to="/privacy" className="text-text-3 no-underline hover:text-text">
@@ -241,7 +280,7 @@ export function AppShell() {
         </nav>
         <main id="main" tabIndex={-1} className="min-w-0 flex-1 pb-24 outline-none md:pb-0">
           <div key={pageKey} className="pf-enter mx-auto w-full max-w-[1360px] px-4 py-6 sm:px-8 sm:py-8 lg:px-10">
-            <Outlet />
+            {children ?? <Outlet />}
           </div>
           {/* New pages open at the top; Back and Forward return to the remembered position. */}
           <ScrollRestoration />

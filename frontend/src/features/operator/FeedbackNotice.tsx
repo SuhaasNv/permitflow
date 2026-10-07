@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { ApplicationView, OperatorFeedback } from '@/api/applications'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import type { Tone } from '@/features/shared/StatusBadge'
+import { openItems } from '@/lib/feedback'
 import { cn } from '@/lib/cn'
 
 const RESOLUTION: Record<OperatorFeedback['resolution'], { label: string; tone: Tone; hint: string }> = {
@@ -21,8 +22,8 @@ export function targetHref(view: ApplicationView, item: OperatorFeedback): strin
 /** Feedback from the licensing office, on top of the application (S-15). Open items link to their target. */
 export function FeedbackNotice({ view, compact = false }: { view: ApplicationView; compact?: boolean }) {
   if (view.feedback.length === 0) return null
-  const open = view.feedback.filter((f) => f.resolution === 'open')
-  const rest = view.feedback.filter((f) => f.resolution !== 'open')
+  const open = openItems(view.feedback)
+  const rest = view.feedback.filter((f) => !open.includes(f))
   return (
     <section className={cn('pf-surface overflow-hidden', open.length > 0 && 'border-warning-line')} aria-labelledby="feedback-notice-title">
       <div

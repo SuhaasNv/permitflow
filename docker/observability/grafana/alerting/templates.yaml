@@ -12,7 +12,7 @@ templates:
 
     ━━━━━━━━━━━━━━━━━━━━━━{{- range .Alerts }}{{ if and (eq .Labels.kind "digest") (eq .Labels.environment "development") }}
 
-    <b>Development</b>  ·  API {{ .Annotations.api }}
+    <b>Development</b>  ·  API {{ .Annotations.api }}  ·  version <b>{{ .Annotations.build }}</b>
 
     Requests  <b>{{ .Annotations.requests_per_minute }}</b> / min   ·   p99.5  <b>{{ .Annotations.p995_ms }}</b> ms
 
@@ -24,7 +24,7 @@ templates:
 
     {{- end }}{{ end }}{{- range .Alerts }}{{ if and (eq .Labels.kind "digest") (eq .Labels.environment "production") }}
 
-    <b>Production</b>  ·  API {{ .Annotations.api }}
+    <b>Production</b>  ·  API {{ .Annotations.api }}  ·  version <b>{{ .Annotations.build }}</b>
 
     Requests  <b>{{ .Annotations.requests_per_minute }}</b> / min   ·   p99.5  <b>{{ .Annotations.p995_ms }}</b> ms
 
@@ -36,7 +36,7 @@ templates:
 
     {{- end }}{{ end }}{{- range .Alerts }}{{ if and (eq .Labels.kind "digest") (eq .Labels.environment "local") }}
 
-    <b>Local</b>  ·  API {{ .Annotations.api }}
+    <b>Local</b>  ·  API {{ .Annotations.api }}  ·  version <b>{{ .Annotations.build }}</b>
 
     Requests  <b>{{ .Annotations.requests_per_minute }}</b> / min   ·   p99.5  <b>{{ .Annotations.p995_ms }}</b> ms
 

@@ -9,6 +9,7 @@ import { StatusBadge } from '@/features/shared/StatusBadge'
 import type { Tone } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
 import { cn } from '@/lib/cn'
+import { UNDO_MS } from '@/lib/feedback'
 import { formatDateTime } from '@/lib/format'
 import {
   useCreateFeedback,
@@ -18,8 +19,8 @@ import {
   useRestoreFeedback,
   useWithdrawFeedback,
 } from './queries'
-
-const UNDO_MS = 10_000
+import { useReadOnly } from './readOnly'
+import { useCaseRefusal } from './refusal'
 
 const RESOLUTION: Record<FeedbackItem['resolution'], { label: string; tone: Tone }> = {
   open: { label: 'Open', tone: 'warning' },
@@ -37,16 +38,18 @@ export interface Target {
 
 /** Feedback rail: existing items by round, then the composer (template, target, message). */
 export function FeedbackPanel({ view, targets }: { view: OfficerApplication; targets: Target[] }) {
-  const templates = useFeedbackTemplates()
+  const readOnly = useReadOnly()
+  const templates = useFeedbackTemplates(!readOnly)
   const create = useCreateFeedback(view.id)
   const withdraw = useWithdrawFeedback(view.id)
   const resolve = useResolveFeedback(view.id)
   const restore = useRestoreFeedback(view.id)
   const reopen = useReopenFeedback(view.id)
-  const canResolve = ['under_review', 'pre_site_resubmitted', 'site_visit_scheduled', 'site_visit_done', 'pending_approval'].includes(
-    view.status,
-  )
+  // An administrator never edits: the composer and the item controls stay off whatever the status.
+  const editable = view.feedback_editable && !readOnly
   const toast = useToast()
+  // A 409 (the case moved under us: the operator withdrew, another officer decided): reload, shared sentence.
+  const refused = useCaseRefusal(view.id)
   const [composingRequested, setComposing] = useState(false)
   const [target, setTarget] = useState('')
   const [templateKey, setTemplateKey] = useState('')
@@ -54,7 +57,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   // The case can stop being editable under the officer (status moved, operator withdrew): the composer is derived closed.
-  const composing = composingRequested && view.feedback_editable
+  const composing = composingRequested && editable
 
   /** Undo for 10 s (the server accepts a little longer). */
   const offerUndo = (title: string, body: string, feedbackId: string) => {
@@ -68,7 +71,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
         onClick: () =>
           restore.mutate(feedbackId, {
             onSuccess: () => toast.push({ title: 'Undone', body: 'The item is back where it was.', tone: 'neutral' }),
-            onError: (e) => toast.push({ title: 'Could not undo', body: e.message, tone: 'error' }),
+            onError: refused('Could not undo'),
           }),
       },
     })
@@ -150,9 +153,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
             .sort((a, b) => b[0] - a[0])
             .map(([round, items]) => (
               <div key={round} className="px-5 py-3">
-                <div className="pf-eyebrow mb-2">
-                  Raised against Revision {round}
-                </div>
+                <div className="pf-eyebrow mb-2">Raised against Revision {round}</div>
                 <ul className="pf-stagger flex flex-col gap-2.5">
                   {items.map((f) => (
                     <li
@@ -194,7 +195,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                           {f.author_name} · {formatDateTime(f.created_at)}
                         </span>
                         {/* Resolve only what the operator has seen; an unsent draft can only be withdrawn (US-039). */}
-                        {(f.resolution === 'addressed' || f.resolution === 'open') && canResolve && f.released_to_operator_at ? (
+                        {f.can_resolve && !readOnly ? (
                           <button
                             type="button"
                             className="whitespace-nowrap py-1 font-semibold text-success hover:underline"
@@ -202,7 +203,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                             onClick={() =>
                               resolve.mutate(f.id, {
                                 onSuccess: () => offerUndo('Marked resolved', `${f.target_label} is resolved.`, f.id),
-                                onError: (e) => toast.push({ title: 'Could not resolve', body: e.message, tone: 'error' }),
+                                onError: refused('Could not resolve'),
                               })
                             }
                           >
@@ -210,7 +211,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                           </button>
                         ) : null}
                         {/* Not fixed (US-049): the operator's change did not settle it; reopen for the next round. */}
-                        {f.resolution === 'addressed' && view.feedback_editable ? (
+                        {f.resolution === 'addressed' && editable ? (
                           <button
                             type="button"
                             className="whitespace-nowrap py-1 font-semibold text-warning hover:underline"
@@ -219,14 +220,14 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                             onClick={() =>
                               reopen.mutate(f.id, {
                                 onSuccess: () => offerUndo('Marked not fixed', `${f.target_label} is open again for the next round.`, f.id),
-                                onError: (e) => toast.push({ title: 'Could not reopen', body: e.message, tone: 'error' }),
+                                onError: refused('Could not reopen'),
                               })
                             }
                           >
                             Not fixed
                           </button>
                         ) : null}
-                        {f.resolution === 'open' && view.feedback_editable ? (
+                        {f.resolution === 'open' && editable ? (
                           <button
                             type="button"
                             className="whitespace-nowrap py-1 font-semibold text-text-2 hover:text-text"
@@ -234,7 +235,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                             onClick={() =>
                               withdraw.mutate(f.id, {
                                 onSuccess: () => offerUndo('Feedback withdrawn', `${f.target_label} item removed.`, f.id),
-                                onError: (e) => toast.push({ title: 'Could not withdraw', body: e.message, tone: 'error' }),
+                                onError: refused('Could not withdraw'),
                               })
                             }
                           >
@@ -251,7 +252,9 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
       )}
 
       <div className="border-t border-line px-5 py-4">
-        {!view.feedback_editable ? (
+        {readOnly ? (
+          <p className="text-[13px] leading-[19px] text-text-3">Feedback is written by the licensing officer.</p>
+        ) : !view.feedback_editable ? (
           <p className="text-[13px] leading-[19px] text-text-3">{view.feedback_locked_reason}</p>
         ) : !composing ? (
           <Button variant="secondary" onClick={() => setComposing(true)} className="w-full">

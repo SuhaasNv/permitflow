@@ -5,10 +5,12 @@ import { Link, Navigate } from 'react-router-dom'
 import { homeFor, useAuth } from '@/features/auth/AuthContext'
 import { buttonClasses } from '@/features/shared/Button'
 import { Logo } from '@/features/shared/Logo'
+import { PolicyLinks } from '@/features/shared/PolicyLinks'
 import { Reveal } from '@/features/shared/Reveal'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import type { Tone } from '@/features/shared/StatusBadge'
 import { cn } from '@/lib/cn'
+import { VersionChip } from '@/features/releases/VersionChip'
 
 const glyph = (children: ReactNode) => (
   <svg
@@ -156,20 +158,6 @@ export function LandingPage() {
                   How it works
                 </a>
               </div>
-              <dl className="mt-10 grid max-w-[520px] grid-cols-3 gap-6 border-t border-line pt-6 text-[13px] leading-[18px] text-text-3">
-                <div>
-                  <dt className="font-semibold text-text">About 20 minutes</dt>
-                  <dd>to complete, with drafts saved</dd>
-                </div>
-                <div>
-                  <dt className="font-semibold text-text">4 documents</dt>
-                  <dd>checked automatically on upload</dd>
-                </div>
-                <div>
-                  <dt className="font-semibold text-text">One officer</dt>
-                  <dd>makes every decision</dd>
-                </div>
-              </dl>
             </div>
             {/* At lg the panel sits centred inside the ink band, which bleeds to the right edge; below lg it flows under the copy. */}
             <div
@@ -253,17 +241,17 @@ export function LandingPage() {
               <span className="pf-journey-line absolute left-0 top-0 hidden h-px w-full bg-ink lg:block" aria-hidden="true" />
               <ol className="grid grid-cols-1 gap-6 sm:grid-cols-3 lg:grid-cols-6">
                 {JOURNEY.map((s, i) => (
-                  <li key={s.label} className="relative pt-5" style={{ transitionDelay: `${200 + i * 180}ms` }}>
+                  <li key={s.label} className="relative pt-5" style={{ transitionDelay: `${200 + i * 60}ms` }}>
                     <span className="absolute left-0 top-0 h-px w-full bg-line lg:hidden" aria-hidden="true" />
                     <span
                       className={cn(
                         'pf-journey-dot absolute -top-[4px] left-0 h-[9px] w-[9px] rounded-full ring-4 ring-surface',
                         i === JOURNEY.length - 1 ? 'bg-success' : s.tone === 'warning' ? 'bg-warning' : 'bg-ink',
                       )}
-                      style={{ transitionDelay: `${260 + i * 200}ms` }}
+                      style={{ transitionDelay: `${260 + i * 60}ms` }}
                       aria-hidden="true"
                     />
-                    <div className="pf-reveal is-in" style={{ transitionDelay: `${300 + i * 200}ms` }}>
+                    <div className="pf-reveal is-in" style={{ transitionDelay: `${300 + i * 60}ms` }}>
                       <StatusBadge label={s.label} tone={s.tone} />
                       <p className="mt-2.5 text-[13px] leading-[18px] text-text-2">{s.note}</p>
                     </div>
@@ -304,20 +292,10 @@ export function LandingPage() {
       <footer className="mt-auto">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-5 py-8 text-[13px] text-text-3 sm:flex-row sm:items-center sm:px-10">
           <span>© 2026 PermitFlow</span>
-          <span className="rounded border border-line px-1.5 font-mono text-[11px] leading-[18px]">v{__APP_VERSION__}</span>
+          <VersionChip variant="rail" />
           <span className="hidden sm:inline">·</span>
           <span>A fictional licensing service built for an engineering assessment. Not a government service.</span>
-          <nav aria-label="Policies" className="flex gap-4 sm:ml-auto">
-            <Link to="/privacy" className="text-text-3 no-underline hover:text-text">
-              Privacy
-            </Link>
-            <Link to="/terms" className="text-text-3 no-underline hover:text-text">
-              Terms
-            </Link>
-            <Link to="/cookies" className="text-text-3 no-underline hover:text-text">
-              Cookies
-            </Link>
-          </nav>
+          <PolicyLinks className="sm:ml-auto" />
         </div>
       </footer>
     </div>

@@ -3,9 +3,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 import { AppError, setTokenProvider, setUnauthorizedHandler } from '@/api/client'
+import type { UnauthorizedInfo } from '@/api/client'
 import { setUploadTokenProvider } from '@/api/documents'
 import type { Role, TokenResponse, User } from '@/api/auth'
-import { me } from '@/api/auth'
+import { logout, me } from '@/api/auth'
+import { clearAllLocalDrafts } from '@/lib/localDraft'
 
 const STORAGE_KEY = 'permitflow.session'
 
@@ -15,15 +17,44 @@ interface StoredSession {
   expiresAt: string
 }
 
-export type EndedReason = 'expired' | 'unauthorized' | null
+/**
+ * `expired`: the token's 8 hours ran out here. `taken_over`, `idle`, `signed_out`: the server ended the
+ * session (another device signed in, an hour without activity, a sign-out elsewhere; US-093).
+ * `unauthorized`: any other rejection.
+ */
+export type EndedReason = 'expired' | 'unauthorized' | 'taken_over' | 'idle' | 'signed_out' | null
 
-interface AuthState {
+interface Ended {
+  reason: EndedReason
+  /** When the server ended the session, as an ISO instant (take-over and idle), for "at hh:mm". */
+  at: string | null
+  /** The server's own sentence, shown when the reason has no local wording. */
+  message: string | null
+}
+
+const NOT_ENDED: Ended = { reason: null, at: null, message: null }
+
+function endedFrom(info: UnauthorizedInfo): Ended {
+  if (info.code !== 'session_revoked') return { reason: 'unauthorized', at: null, message: null }
+  const reason = info.details?.reason
+  const at = info.details?.at
+  return {
+    reason: reason === 'taken_over' || reason === 'idle' || reason === 'signed_out' ? reason : 'unauthorized',
+    at: typeof at === 'string' ? at : null,
+    message: info.message ?? null,
+  }
+}
+
+export interface AuthState {
   user: User | null
   token: string | null
   expiresAt: string | null
   ready: boolean
   /** Why the last session ended without the user clicking Sign out, for the sign-in page to explain. */
   endedReason: EndedReason
+  /** When the server ended it (ISO instant) and its own sentence, when it said so. */
+  endedAt: string | null
+  endedMessage: string | null
   signIn: (response: TokenResponse) => void
   signOut: () => void
 }
@@ -45,6 +76,19 @@ function readStored(): StoredSession | null {
   }
 }
 
+/** A stored session that ran out while the tab was closed: the sign-in page should say so, the way the
+ * in-tab timer does, instead of a bare form (review finding, 21 Sep). */
+function storedExpired(): boolean {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return false
+    const s = JSON.parse(raw) as Partial<StoredSession>
+    return typeof s.expiresAt === 'string' && new Date(s.expiresAt).getTime() <= Date.now()
+  } catch {
+    return false
+  }
+}
+
 function writeStored(session: StoredSession | null): void {
   try {
     if (session) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session))
@@ -58,7 +102,7 @@ function writeStored(session: StoredSession | null): void {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<StoredSession | null>(() => readStored())
   const [ready, setReady] = useState(false)
-  const [endedReason, setEndedReason] = useState<EndedReason>(null)
+  const [ended, setEnded] = useState<Ended>(() => (storedExpired() ? { reason: 'expired', at: null, message: null } : NOT_ENDED))
 
   useEffect(() => {
     setTokenProvider(() => session?.token ?? null)
@@ -67,17 +111,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Every cached query belongs to the account that fetched it: drop the cache with the session.
   const queryClient = useQueryClient()
-  const signOut = useCallback(() => {
+  const clearSession = useCallback(() => {
     setSession(null)
     writeStored(null)
     queryClient.clear()
   }, [queryClient])
 
+  // The user's own Sign out: end the session on the server too (US-093), so the token dies with it.
+  // The request is fired and forgotten; the local state clears at once either way.
+  const signOut = useCallback(() => {
+    if (session) logout().catch(() => undefined)
+    // Unsaved entries kept on the device go with the user's own sign-out (UAT run 5, F11, F13).
+    clearAllLocalDrafts()
+    clearSession()
+  }, [session, clearSession])
+
   // A 401 from any request ends the session in one place; the sign-in page explains and keeps the return path.
   useEffect(() => {
-    setUnauthorizedHandler(() => {
+    setUnauthorizedHandler((info) => {
       setSession((current) => {
-        if (current) setEndedReason('unauthorized')
+        if (current) setEnded(endedFrom(info))
         return null
       })
       writeStored(null)
@@ -91,19 +144,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!session) return
     const ms = new Date(session.expiresAt).getTime() - Date.now()
     if (ms <= 0) {
-      setEndedReason('expired')
-      signOut()
+      setEnded({ reason: 'expired', at: null, message: null })
+      clearSession()
       return
     }
     const timer = setTimeout(
       () => {
-        setEndedReason('expired')
-        signOut()
+        setEnded({ reason: 'expired', at: null, message: null })
+        clearSession()
       },
       Math.min(ms, 2_147_000_000),
     )
     return () => clearTimeout(timer)
-  }, [session, signOut])
+  }, [session, clearSession])
 
   // Re-validate a restored session against the server once (role or active flag may have changed).
   useEffect(() => {
@@ -120,9 +173,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         // Only a definite rejection ends the session; a network blip keeps the token for a retry.
+        // A 401 already went through the handler above, which recorded the server's reason.
         if (!cancelled && error instanceof AppError && (error.status === 401 || error.status === 403)) {
-          setEndedReason('unauthorized')
-          signOut()
+          if (error.status === 403) setEnded({ reason: 'unauthorized', at: null, message: null })
+          clearSession()
         }
       })
       .finally(() => {
@@ -142,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setSession(next)
     writeStored(next)
-    setEndedReason(null)
+    setEnded(NOT_ENDED)
   }, [])
 
   const value = useMemo<AuthState>(
@@ -151,11 +205,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token: session?.token ?? null,
       expiresAt: session?.expiresAt ?? null,
       ready,
-      endedReason,
+      endedReason: ended.reason,
+      endedAt: ended.at,
+      endedMessage: ended.message,
       signIn,
       signOut,
     }),
-    [session, ready, endedReason, signIn, signOut],
+    [session, ready, ended, signIn, signOut],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
@@ -164,6 +220,11 @@ export function useAuth(): AuthState {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider')
   return ctx
+}
+
+/** The signed-in user's id, or null outside the provider: for keys on this device that must stay one person's. */
+export function useCurrentUserId(): string | null {
+  return useContext(AuthContext)?.user?.id ?? null
 }
 
 export function homeFor(role: Role): string {

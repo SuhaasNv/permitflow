@@ -1,0 +1,2 @@
+# False positive: a prototype board name compared in `if key == "respond-390-sheet"` matched the generic-api-key rule.
+ad77db26f7ed4ab617d0e529085ccf8d5d85f288:docs/04-design/prototype-src/v0-4-0/build.py:generic-api-key:858

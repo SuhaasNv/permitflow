@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import * as authApi from '@/api/auth'
+import * as client from '@/api/client'
 import * as notificationsApi from '@/api/notifications'
 import { AppProviders } from '@/app/providers'
 import * as auth from '@/features/auth/AuthContext'
@@ -23,6 +25,8 @@ function authState(role: 'operator' | 'officer', expiresInMs: number, signOut = 
     expiresAt: new Date(Date.now() + expiresInMs).toISOString(),
     ready: true,
     endedReason: null,
+    endedAt: null,
+    endedMessage: null,
     signIn: vi.fn(),
     signOut,
   }
@@ -82,6 +86,28 @@ describe('AppShell', () => {
     renderShell(authState('officer', 3 * 60 * 1000), '/officer/queue')
     const status = await screen.findByText(/Session ends in 3 min/)
     expect(status).toHaveClass('font-semibold')
+  })
+
+  it('warns 5 minutes before the idle sign-out, and Stay signed in keeps the session (US-095)', async () => {
+    const idleSince = Date.now() - 56 * 60 * 1000
+    const last = vi.spyOn(client, 'lastActivity').mockReturnValue(idleSince)
+    const me = vi.spyOn(authApi, 'me').mockImplementation(async () => {
+      last.mockReturnValue(Date.now())
+      return authState('officer', 0).user!
+    })
+    renderShell(authState('officer', 8 * 60 * 60 * 1000), '/officer/queue')
+    const warning = await screen.findByText('You will be signed out in 4 min without activity')
+    expect(warning.closest('[role="status"]')).not.toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Stay signed in' }))
+    expect(me).toHaveBeenCalledOnce()
+    await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'Stay signed in' })).not.toBeInTheDocument())
+  })
+
+  it('says the 8-hour limit is final: sign in again, no renewal (US-095, option B)', async () => {
+    renderShell(authState('officer', 12 * 60 * 1000), '/officer/queue')
+    const warning = await screen.findByText(/Session ends in 12 min/)
+    expect(warning).toHaveTextContent('Session ends in 12 min · sign in again to continue')
+    expect(screen.queryByRole('button', { name: 'Stay signed in' })).not.toBeInTheDocument()
   })
 
   it('signs out directly when nothing is unsaved, and asks first when a section is dirty', async () => {

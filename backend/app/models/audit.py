@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from sqlalchemy import JSON, ForeignKey, String
+from sqlalchemy import JSON, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, new_id
@@ -12,6 +12,12 @@ class AuditEvent(TimestampMixin, Base):
     draft purge in `AuditRepository.purge_draft` (SEC-009, US-045), enforced by a layering test."""
 
     __tablename__ = "audit_events"
+    # The admin overview and feed indexes of migration 0013, declared so autogenerate keeps them.
+    __table_args__ = (
+        Index("ix_audit_events_application_created", "application_id", "created_at"),
+        Index("ix_audit_events_created_id", "created_at", "id"),
+        Index("ix_audit_events_type_created", "event_type", "created_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_id)
     application_id: Mapped[uuid.UUID | None] = mapped_column(

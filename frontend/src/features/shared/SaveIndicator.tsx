@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
 
 import { cn } from '@/lib/cn'
+import { inSingapore } from '@/lib/format'
 
 export interface SaveIndicatorProps {
   dirty: boolean
   saving: boolean
   /** Epoch ms of the last successful save in this session, or null if none yet. */
   savedAt: number | null
+  /** A save failed on the way and will be tried again (US-061). */
+  retrying?: boolean
+  /** The browser reports no connection: nothing is tried until it returns (UAT run 5, F10). */
+  offline?: boolean
   className?: string
 }
 
@@ -16,12 +21,12 @@ function relative(savedAt: number, now: number): string {
   if (seconds < 60) return `Saved ${seconds} s ago`
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return `Saved ${minutes} min ago`
-  const d = new Date(savedAt)
-  return `Saved at ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  const p = inSingapore(new Date(savedAt))
+  return `Saved at ${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`
 }
 
 /** "Unsaved changes" / "Saving…" / "Saved just now" with a live relative time. Polite live region. */
-export function SaveIndicator({ dirty, saving, savedAt, className }: SaveIndicatorProps) {
+export function SaveIndicator({ dirty, saving, savedAt, retrying = false, offline = false, className }: SaveIndicatorProps) {
   const [now, setNow] = useState(() => Date.now())
   // savedAt changes only on a successful save; "now" then starts from that instant.
   const clock = savedAt !== null && savedAt > now ? savedAt : now
@@ -32,10 +37,17 @@ export function SaveIndicator({ dirty, saving, savedAt, className }: SaveIndicat
   }, [savedAt])
 
   let text: string
-  let tone: 'muted' | 'saving' | 'saved' | 'dirty'
-  if (saving) {
+  let tone: 'muted' | 'saving' | 'saved' | 'dirty' | 'retrying'
+  if (offline && (dirty || retrying || saving)) {
+    // Offline nothing is being retried: the save waits for the connection (the page's banner says why).
+    text = 'Waiting for the connection'
+    tone = 'dirty'
+  } else if (saving) {
     text = 'Saving…'
     tone = 'saving'
+  } else if (retrying) {
+    text = 'Could not save, retrying'
+    tone = 'retrying'
   } else if (dirty) {
     text = 'Unsaved changes'
     tone = 'dirty'
@@ -73,8 +85,16 @@ export function SaveIndicator({ dirty, saving, savedAt, className }: SaveIndicat
           </svg>
         ) : tone === 'dirty' ? (
           <span className="h-[7px] w-[7px] rounded-full bg-warning" aria-hidden="true" />
+        ) : tone === 'retrying' ? (
+          <span className="h-[7px] w-[7px] rounded-full bg-error" aria-hidden="true" />
         ) : null}
-        <span className={cn(tone === 'saved' ? 'text-text-2' : tone === 'dirty' ? 'text-warning' : 'text-text-3')}>{text}</span>
+        <span
+          className={cn(
+            tone === 'saved' ? 'text-text-2' : tone === 'dirty' ? 'text-warning' : tone === 'retrying' ? 'text-error' : 'text-text-3',
+          )}
+        >
+          {text}
+        </span>
       </span>
     </span>
   )

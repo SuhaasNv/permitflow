@@ -16,3 +16,6 @@ class User(TimestampMixin, Base):
     full_name: Mapped[str] = mapped_column(String(120), nullable=False)
     role: Mapped[Role] = mapped_column(str_enum(Role, "role", 16), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # The published demonstration accounts (US-073): no admin may change their role or deactivate them,
+    # so the next reviewer always finds them working.
+    is_protected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

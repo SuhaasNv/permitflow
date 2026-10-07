@@ -328,7 +328,7 @@
    "targets": [
     {
      "refId": "A",
-     "expr": "sum(permitflow_applications{environment=~\"$environment\", status=~\"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval\"})",
+     "expr": "sum(permitflow_applications{environment=~\"$environment\", status=~\"application_received|under_review|pre_site_resubmitted|site_visit_scheduled|site_visit_done|post_site_clarification_resubmitted|pending_approval\"})",
      "legendFormat": "Waiting on an officer",
      "datasource": {
       "type": "prometheus",
@@ -1330,7 +1330,7 @@
    "targets": [
     {
      "refId": "A",
-     "expr": "sum(permitflow_applications{environment=~\"$environment\", status=~\"application_received|pre_site_resubmitted|post_site_clarification_resubmitted|pending_approval\"})",
+     "expr": "sum(permitflow_applications{environment=~\"$environment\", status=~\"application_received|under_review|pre_site_resubmitted|site_visit_scheduled|site_visit_done|post_site_clarification_resubmitted|pending_approval\"})",
      "legendFormat": "officer's turn",
      "datasource": {
       "type": "prometheus",
@@ -1378,7 +1378,7 @@
    "targets": [
     {
      "refId": "A",
-     "expr": "sum(permitflow_applications{environment=~\"$environment\", status=~\"pending_pre_site_resubmission|pending_post_site_resubmission\"})",
+     "expr": "sum(permitflow_applications{environment=~\"$environment\", status=~\"pending_pre_site_resubmission|awaiting_post_site_clarification|pending_post_site_resubmission\"})",
      "legendFormat": "operator's turn",
      "datasource": {
       "type": "prometheus",
@@ -1407,6 +1407,364 @@
     "tooltip": {
      "mode": "multi"
     }
+   }
+  },
+  {
+   "id": 104,
+   "type": "row",
+   "title": "Is the site visit moving, and is the volume filling? (use case 3, US-089)",
+   "gridPos": {
+    "x": 0,
+    "y": 78,
+    "w": 24,
+    "h": 1
+   },
+   "collapsed": false
+  },
+  {
+   "id": 51,
+   "type": "timeseries",
+   "title": "Checklists submitted per day",
+   "gridPos": {
+    "x": 0,
+    "y": 79,
+    "w": 8,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(increase(permitflow_checklists_submitted_total{environment=~\"$environment\"}[1d]))",
+     "legendFormat": "checklists",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 12,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
+  },
+  {
+   "id": 52,
+   "type": "timeseries",
+   "title": "Clarification rounds per day, released and answered",
+   "gridPos": {
+    "x": 8,
+    "y": 79,
+    "w": 8,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (event) (increase(permitflow_clarification_rounds_total{environment=~\"$environment\"}[1d]))",
+     "legendFormat": "{{event}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 35,
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
+  },
+  {
+   "id": 53,
+   "type": "timeseries",
+   "title": "Post-site cases (now)",
+   "gridPos": {
+    "x": 16,
+    "y": 79,
+    "w": 8,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(permitflow_applications{environment=~\"$environment\", status=~\"site_visit_scheduled|site_visit_done|awaiting_post_site_clarification|pending_post_site_resubmission|post_site_clarification_resubmitted\"})",
+     "legendFormat": "in use case 3",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 12,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
+  },
+  {
+   "id": 54,
+   "type": "gauge",
+   "title": "Volume used (alert at 80 %)",
+   "gridPos": {
+    "x": 0,
+    "y": 86,
+    "w": 8,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(permitflow_storage_bytes{environment=~\"$environment\", kind=\"volume_used\"}) / sum(permitflow_storage_bytes{environment=~\"$environment\", kind=\"volume_total\"})",
+     "legendFormat": "used share",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "min": 0,
+     "max": 1,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.6
+       },
+       {
+        "color": "red",
+        "value": 0.8
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   }
+  },
+  {
+   "id": 55,
+   "type": "timeseries",
+   "title": "What the applications hold, by kind",
+   "gridPos": {
+    "x": 8,
+    "y": 86,
+    "w": 8,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "permitflow_storage_bytes{environment=~\"$environment\", kind=~\"documents|attachments\"}",
+     "legendFormat": "{{kind}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bytes",
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 35,
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
+  },
+  {
+   "id": 56,
+   "type": "timeseries",
+   "title": "Evidence bytes uploaded per day",
+   "gridPos": {
+    "x": 16,
+    "y": 86,
+    "w": 8,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(increase(permitflow_attachment_bytes_total{environment=~\"$environment\"}[1d]))",
+     "legendFormat": "bytes",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bytes",
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 12,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
+  },
+  {
+   "id": 57,
+   "type": "stat",
+   "title": "Signed in right now",
+   "gridPos": {
+    "x": 0,
+    "y": 93,
+    "w": 8,
+    "h": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(permitflow_sessions_active{environment=~\"$environment\"})",
+     "legendFormat": "Signed in right now",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "blue"
+     },
+     "decimals": 0
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "justifyMode": "center"
    }
   }
  ],

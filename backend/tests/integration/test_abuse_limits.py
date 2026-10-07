@@ -48,7 +48,7 @@ def _settings(monkeypatch: pytest.MonkeyPatch, **env: str) -> Iterator[None]:
 def test_sign_in_attempts_of_any_outcome_are_limited_per_client(limited: TestClient, db: Session) -> None:
     make_user(db, "op@example.sg", Role.OPERATOR)
     db.commit()
-    good = {"email": "op@example.sg", "password": DEFAULT_PASSWORD}
+    good = {"email": "op@example.sg", "password": DEFAULT_PASSWORD, "take_over": True}
     assert limited.post("/api/v1/auth/login", json=good).status_code == 200
     assert limited.post("/api/v1/auth/login", json=good).status_code == 200
     assert limited.post("/api/v1/auth/login", json=good).status_code == 200

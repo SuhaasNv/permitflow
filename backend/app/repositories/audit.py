@@ -1,10 +1,13 @@
 import uuid
+from collections.abc import Iterable
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
-from app.models import AuditEvent
+from app.domain.enums import ApplicationStatus
+from app.models import Application, AuditEvent
 
 
 class AuditRepository:
@@ -35,6 +38,67 @@ class AuditRepository:
             .order_by(AuditEvent.created_at.asc(), AuditEvent.id.asc())
         )
         return list(self.db.scalars(stmt))
+
+    def feed(self, *, limit: int, before: tuple[datetime, uuid.UUID] | None = None) -> list[AuditEvent]:
+        """The newest events across every application and every user change, keyset-paged on
+        (created_at, id) so a page deep in the history costs the same as the first (US-072). A draft's events
+        stay out until it is submitted: drafts are never visible to officers or admins (security audit,
+        24 Sep)."""
+        stmt = (
+            select(AuditEvent)
+            .outerjoin(Application, Application.id == AuditEvent.application_id)
+            .where(or_(AuditEvent.application_id.is_(None), Application.status != ApplicationStatus.DRAFT))
+        )
+        if before is not None:
+            stmt = stmt.where(tuple_(AuditEvent.created_at, AuditEvent.id) < before)
+        stmt = stmt.order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc()).limit(limit)
+        return list(self.db.scalars(stmt))
+
+    def idle_applications(
+        self, cutoff: datetime, statuses: Iterable[ApplicationStatus]
+    ) -> list[tuple[Application, datetime]]:
+        """Open applications (in `statuses`) whose newest audit event, or their `updated_at` when they
+        have none, is older than `cutoff`, oldest first (the admin's idle list, US-070, US-086). One
+        grouped query over the (application_id, created_at) index, never a row per application."""
+        last = func.coalesce(func.max(AuditEvent.created_at), Application.updated_at)
+        stmt = (
+            select(Application, last.label("last_activity"))
+            .outerjoin(AuditEvent, AuditEvent.application_id == Application.id)
+            .where(Application.status.in_(list(statuses)))
+            .group_by(Application.id)
+            .having(last < cutoff)
+            .order_by(last.asc(), Application.reference_no.asc())
+        )
+        return [(row[0], row[1]) for row in self.db.execute(stmt)]
+
+    def last_activity(self, application_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, datetime]:
+        """The newest event per application (the idle list, US-070)."""
+        ids = list(application_ids)
+        if not ids:
+            return {}
+        stmt = (
+            select(AuditEvent.application_id, func.max(AuditEvent.created_at))
+            .where(AuditEvent.application_id.in_(ids))
+            .group_by(AuditEvent.application_id)
+        )
+        return {row[0]: row[1] for row in self.db.execute(stmt) if row[0] is not None}
+
+    def count_since(self, event_type: str, since: datetime, until: datetime) -> int:
+        stmt = select(func.count()).where(
+            AuditEvent.event_type == event_type,
+            AuditEvent.created_at >= since,
+            AuditEvent.created_at < until,
+        )
+        return int(self.db.scalar(stmt) or 0)
+
+    def transitions_since(self, since: datetime, until: datetime) -> list[dict[str, Any]]:
+        """The `status.changed` payloads in a window (today's submissions and resubmissions)."""
+        stmt = select(AuditEvent.payload).where(
+            AuditEvent.event_type == "status.changed",
+            AuditEvent.created_at >= since,
+            AuditEvent.created_at < until,
+        )
+        return [dict(p) for p in self.db.scalars(stmt)]
 
     def purge_draft(self, application_id: uuid.UUID) -> None:
         """Remove the events of a draft that is being deleted outright (US-045). A draft was never submitted,

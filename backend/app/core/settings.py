@@ -26,11 +26,21 @@ class Settings(BaseSettings):
 
     jwt_secret: str = ""
     jwt_expires_minutes: int = 480
+    # US-093: a session unseen for this long ends by itself, so a device left signed in on site never
+    # locks the account. Sign-in and every request refresh "seen"; the token's own expiry is unchanged.
+    session_idle_minutes: int = 60
 
     cors_origins: str = "http://localhost:3000"
 
     upload_dir: str = "./data/uploads"
     upload_max_bytes: int = 10 * 1024 * 1024
+    # US-085: everything one application holds on the volume (every document version, clarification
+    # evidence, the licence). A 5 GB volume holds about 34 applications at the ceiling; most use a tenth.
+    storage_budget_bytes: int = 150 * 1024 * 1024
+
+    # Mark site visit done and the checklist submit wait for the visit day (Singapore date; UAT run 5, F12).
+    # Off only where a whole appointment must run in one sitting: the automated suites and a demonstration.
+    site_visit_day_guard: bool = True
 
     login_rate_limit_per_minute: int = 10
     # Request limits per client IP, sliding minute (US-058): every request, and sign-in attempts of any
@@ -45,6 +55,9 @@ class Settings(BaseSettings):
     # Comma-separated proxy addresses whose X-Forwarded-For is trusted, or "*" on a platform whose edge
     # proxy is the only thing that can reach the container (Railway, most PaaS).
     trusted_proxies: str = ""
+    # The header the trusted edge writes with the connecting client's address, read before
+    # X-Forwarded-For (Railway: X-Real-IP). Ignored without a trusted proxy; empty disables it (US-082).
+    client_ip_header: str = "X-Real-IP"
 
     ai_provider: Literal["mock", "openai"] = "mock"
     openai_api_key: str = ""

@@ -37,10 +37,19 @@ def _secret(value: str) -> str:
     return value
 
 
-def create_access_token(user_id: uuid.UUID, role: str) -> tuple[str, datetime]:
+def create_access_token(user_id: uuid.UUID, role: str, session_id: uuid.UUID) -> tuple[str, datetime]:
+    """`sid` ties the token to its sign-in (US-093): a revoked session makes the token useless before
+    `exp`, so a device signed out from elsewhere loses access on its next request."""
     settings = get_settings()
-    expires_at = datetime.now(UTC) + timedelta(minutes=settings.jwt_expires_minutes)
-    payload: dict[str, Any] = {"sub": str(user_id), "role": role, "exp": expires_at, "iat": datetime.now(UTC)}
+    now = datetime.now(UTC)
+    expires_at = now + timedelta(minutes=settings.jwt_expires_minutes)
+    payload: dict[str, Any] = {
+        "sub": str(user_id),
+        "role": role,
+        "sid": str(session_id),
+        "exp": expires_at,
+        "iat": now,
+    }
     return jwt.encode(payload, _secret(settings.jwt_secret), algorithm=ALGORITHM), expires_at
 
 

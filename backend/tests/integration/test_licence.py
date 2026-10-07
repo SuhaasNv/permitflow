@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.models import AuditEvent, Licence, Notification
 from app.models.enums import Role
 from tests.factories import login, make_user
-from tests.journeys import transition, under_review
+from tests.journeys import to_pending_approval, transition, under_review
 
 
 def _preview(client: TestClient, h: dict[str, str], app_id: str) -> int:
@@ -22,16 +22,15 @@ def _licence(client: TestClient, h: dict[str, str], app_id: str) -> int:
     return client.get(f"/api/v1/applications/{app_id}/licence", headers=h).status_code
 
 
-def _to_pending_approval(client: TestClient, off: dict[str, str], app_id: str) -> None:
-    for target in ("site_visit_scheduled", "site_visit_done", "pending_approval"):
-        transition(client, off, app_id, target)
+def _to_pending_approval(client: TestClient, off: dict[str, str], op: dict[str, str], app_id: str) -> None:
+    to_pending_approval(client, off, op, app_id)
 
 
 def test_preview_then_approve_issues_and_serves_the_licence(client: TestClient, db: Session) -> None:
     app_id, op, off, _ = under_review(client, db)
     # preview only while awaiting a decision
     assert _preview(client, off, app_id) == 409
-    _to_pending_approval(client, off, app_id)
+    _to_pending_approval(client, off, op, app_id)
     r = client.get(f"/api/v1/officer/applications/{app_id}/licence/preview", headers=off)
     assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
     assert "PREVIEW" in PdfReader(BytesIO(r.content)).pages[0].extract_text()
@@ -66,12 +65,14 @@ def test_preview_then_approve_issues_and_serves_the_licence(client: TestClient, 
 
 def test_licence_is_owner_or_officer_only_and_rejection_issues_none(client: TestClient, db: Session) -> None:
     app_id, op, off, _ = under_review(client, db)
-    _to_pending_approval(client, off, app_id)
+    _to_pending_approval(client, off, op, app_id)
     transition(client, off, app_id, "approved")
     make_user(db, "other@example.sg", Role.OPERATOR)
     make_user(db, "admin@example.sg", Role.ADMIN)
     assert _licence(client, login(client, "other@example.sg"), app_id) == 404
-    assert _licence(client, login(client, "admin@example.sg"), app_id) == 403
+    # an administrator reads the certificate (US-072) but never previews one (officer-only)
+    assert _licence(client, login(client, "admin@example.sg"), app_id) == 200
+    assert _preview(client, login(client, "admin@example.sg"), app_id) == 403
     assert _preview(client, op, app_id) == 403
 
 

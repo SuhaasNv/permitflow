@@ -8,7 +8,7 @@ from app.models import AuditEvent, VerificationRun
 from app.models.enums import Role, VerificationStatus
 from app.services.verification import run_verification
 from tests.factories import login, make_user
-from tests.journeys import VALID_BUSINESS
+from tests.journeys import VALID_BUSINESS, tiny_png
 from tests.journeys import upload as _upload
 
 PROFILE_TXT = (
@@ -48,15 +48,7 @@ def test_image_is_unreadable_without_model_call(client: TestClient, db: Session)
     make_user(db, "op@example.sg", Role.OPERATOR)
     h = login(client, "op@example.sg")
     app_id = _draft_with_business(client, h)
-    r = _upload(
-        client,
-        h,
-        app_id,
-        "food_hygiene_certificate",
-        "cert.png",
-        b"\x89PNG\r\n\x1a\n" + b"\x00" * 50,
-        "image/png",
-    )
+    r = _upload(client, h, app_id, "food_hygiene_certificate", "cert.png", tiny_png(), "image/png")
     assert r.status_code == 201
     run = db.scalar(select(VerificationRun))
     assert (
@@ -166,7 +158,7 @@ def test_operator_view_collapses_provider_reasons_but_keeps_file_reasons(
     h = login(client, "op@example.sg")
     app_id = _draft_with_business(client, h)
     _upload(client, h, app_id, "business_profile", "profile.txt", PROFILE_TXT, "text/plain")
-    _upload(client, h, app_id, "floor_plan", "plan.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 50, "image/png")
+    _upload(client, h, app_id, "floor_plan", "plan.png", tiny_png(), "image/png")
     slots = {
         s["type"]: s for s in client.get(f"/api/v1/applications/{app_id}", headers=h).json()["document_slots"]
     }

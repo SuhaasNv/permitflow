@@ -10,6 +10,19 @@ import { NotificationsBell } from './NotificationsBell'
 describe('NotificationsBell', () => {
   beforeEach(() => vi.restoreAllMocks())
 
+  it('names the bell with the count it shows, so voice control can say "9+" (WCAG 2.5.3, US-096)', async () => {
+    vi.spyOn(api, 'getNotifications').mockResolvedValue({ unread_count: 352, items: [] })
+    render(
+      <AppProviders>
+        <MemoryRouter>
+          <NotificationsBell role="operator" />
+        </MemoryRouter>
+      </AppProviders>,
+    )
+    const bell = await screen.findByRole('button', { name: 'Notifications, 9+ unread' })
+    expect(bell).toHaveTextContent('9+')
+  })
+
   it('shows the unread count, lists items and marks one read when opened', async () => {
     vi.spyOn(api, 'getNotifications').mockResolvedValue({
       unread_count: 1,

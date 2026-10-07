@@ -114,7 +114,7 @@ export const CheckboxField = forwardRef<HTMLInputElement, CheckboxFieldProps>(fu
             className={cn(
               'peer h-[18px] w-[18px] cursor-pointer appearance-none rounded-[4px] border bg-surface',
               'transition-[background-color,border-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
-              'checked:border-text checked:bg-text focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(23,92,211,0.2)]',
+              'checked:border-text checked:bg-text focus-visible:outline-hidden focus-visible:shadow-[0_0_0_3px_rgba(23,92,211,0.2)]',
               'disabled:cursor-not-allowed disabled:bg-surface-2',
               error ? 'border-error' : 'border-line-strong group-hover:border-text-3',
             )}

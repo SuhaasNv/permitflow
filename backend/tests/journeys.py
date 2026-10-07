@@ -54,6 +54,17 @@ def draft(client: TestClient, h: Headers) -> str:
     return str(client.post("/api/v1/applications", headers=h).json()["id"])
 
 
+def tiny_png() -> bytes:
+    """A real 4 x 4 PNG: since US-085 an image the server cannot decode is refused at upload."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    out = BytesIO()
+    Image.new("RGB", (4, 4), (255, 255, 255)).save(out, "PNG")
+    return out.getvalue()
+
+
 def upload(
     client: TestClient,
     h: Headers,
@@ -103,6 +114,32 @@ def transition(client: TestClient, off: Headers, app_id: str, target: str, note:
     return r.json()
 
 
+def next_working_day(days_ahead: int = 3) -> str:
+    """An ISO date `days_ahead` working days from today in Singapore: valid for both sides' rules."""
+    from app.domain.site_visit import add_working_days, today_in_singapore
+
+    return add_working_days(today_in_singapore(), days_ahead).isoformat()
+
+
+def propose_visit(
+    client: TestClient, off: Headers, app_id: str, *, date: str | None = None, slot: str = "morning"
+) -> dict:  # type: ignore[type-arg]
+    """The officer proposes the visit (US-084); from Under Review this also moves the case."""
+    version = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()["version"]
+    body = {"date": date or next_working_day(), "slot": slot, "expected_version": version}
+    r = client.post(f"/api/v1/officer/applications/{app_id}/site-visit", headers=off, json=body)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def arrange_visit(client: TestClient, off: Headers, op: Headers, app_id: str) -> dict:  # type: ignore[type-arg]
+    """Officer proposes, operator accepts: the case is Site Visit Scheduled with a confirmed date."""
+    propose_visit(client, off, app_id)
+    r = client.post(f"/api/v1/applications/{app_id}/site-visit/accept", headers=op)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
 def under_review(client: TestClient, db: Session) -> tuple[str, Headers, Headers, int]:
     app_id, op, off = submitted(client, db)
     view = transition(client, off, app_id, "under_review")
@@ -131,3 +168,33 @@ def flag_and_request(client: TestClient, db: Session) -> tuple[str, Headers, Hea
     )
     transition(client, off, app_id, "pending_pre_site_resubmission")
     return app_id, op, off
+
+
+def submit_clean_checklist(client: TestClient, off: Headers, app_id: str) -> dict:  # type: ignore[type-arg]
+    """Open the current visit's checklist, mark every item satisfactory, submit (US-063): the case moves
+    to Awaiting Post-Site Clarification with nothing flagged, the way to approval since US-063."""
+    from app.domain.checklist_schema import ITEM_KEYS
+
+    r = client.post(f"/api/v1/officer/applications/{app_id}/checklist", headers=off)
+    assert r.status_code in (200, 201), r.text
+    version = r.json()["version"]
+    items = [
+        {"key": k, "result": "satisfactory", "comment": None, "needs_clarification": False} for k in ITEM_KEYS
+    ]
+    r = client.put(
+        f"/api/v1/officer/applications/{app_id}/checklist",
+        headers=off,
+        json={"items": items, "version": version},
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(f"/api/v1/officer/applications/{app_id}/checklist/submit", headers=off)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def to_pending_approval(client: TestClient, off: Headers, op: Headers, app_id: str) -> dict:  # type: ignore[type-arg]
+    """From Under Review to Route to Approval the way the product does it since v0.4.0: the visit
+    arranged and accepted, the checklist submitted clean, then Route to approval."""
+    arrange_visit(client, off, op, app_id)
+    submit_clean_checklist(client, off, app_id)
+    return transition(client, off, app_id, "pending_approval")

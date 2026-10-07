@@ -7,8 +7,16 @@ from typing import Any
 from app.core.rate_limit import RequestLimiter, WindowLimiter, client_key
 
 
-def _request(path: str, method: str = "GET", host: str = "203.0.113.5", forwarded: str | None = None) -> Any:
+def _request(
+    path: str,
+    method: str = "GET",
+    host: str = "203.0.113.5",
+    forwarded: str | None = None,
+    real_ip: str | None = None,
+) -> Any:
     headers = {"x-forwarded-for": forwarded} if forwarded else {}
+    if real_ip:
+        headers["x-real-ip"] = real_ip
     return SimpleNamespace(
         url=SimpleNamespace(path=path), method=method, client=SimpleNamespace(host=host), headers=headers
     )
@@ -45,6 +53,37 @@ def test_client_key_takes_the_hop_the_trusted_proxy_appended_not_the_one_the_cal
     chain = _request("/x", host="203.0.113.5", forwarded="10.0.0.9, 198.51.100.1, 203.0.113.6")
     assert client_key(chain, "203.0.113.5,203.0.113.6") == "198.51.100.1"
     assert client_key(_request("/x", host="1.2.3.4"), "*") == "1.2.3.4"
+
+
+def test_client_key_prefers_the_edge_client_header_behind_a_trusted_proxy() -> None:
+    """Railway writes the connecting address in X-Real-IP and leaves the edge instance as the last hop
+    of X-Forwarded-For (readiness row 25): behind the edge the header wins, the chain is the fallback."""
+    hdr = "X-Real-IP"
+    edge = _request("/x", host="10.10.0.1", forwarded="198.51.100.1, 10.10.0.1", real_ip="198.51.100.1")
+    assert client_key(edge, "*", hdr) == "198.51.100.1"
+    assert client_key(edge, "*", "") == "10.10.0.1"  # the old behaviour, without the header configured
+    # A caller cannot pick a bucket by sending the header: without a trusted proxy the socket wins.
+    forged = _request("/x", host="203.0.113.5", forwarded="10.0.0.9", real_ip="10.0.0.7")
+    assert client_key(forged, "", hdr) == "203.0.113.5"
+    # Behind the edge but without the header (an older platform): the forwarded logic as before.
+    older = _request("/x", host="10.10.0.1", forwarded="10.0.0.9, 198.51.100.1")
+    assert client_key(older, "*", hdr) == "198.51.100.1"
+    # A multi-value header keeps the first address; a blank header falls through.
+    multi = _request("/x", host="10.10.0.1", real_ip="198.51.100.1, 10.10.0.1")
+    assert client_key(multi, "*", hdr) == "198.51.100.1"
+    assert client_key(_request("/x", host="10.10.0.1", real_ip=" "), "*", hdr) == "10.10.0.1"
+
+
+def test_request_limiter_buckets_by_the_edge_client_header() -> None:
+    limiter = RequestLimiter(
+        per_minute=2, login_per_minute=1, trusted_proxies="*", client_ip_header="X-Real-IP"
+    )
+    path = "/api/v1/applications"
+    a = _request(path, host="10.10.0.1", forwarded="198.51.100.1, 10.10.0.1", real_ip="198.51.100.1")
+    b = _request(path, host="10.10.0.1", forwarded="198.51.100.2, 10.10.0.1", real_ip="198.51.100.2")
+    assert limiter.check(a) is None and limiter.check(a) is None
+    assert limiter.check(a) is not None  # the third request from the same caller
+    assert limiter.check(b) is None  # another caller behind the same edge keeps its own bucket
 
 
 def test_limiter_map_stays_bounded_under_many_distinct_clients() -> None:
