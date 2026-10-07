@@ -1,7 +1,5 @@
 # PermitFlow
 
-*This branch (`dev`) carries v0.4.0 (use case 3, one session per account, the storage budget and the admin panel, planned in `docs/05-planning/RELEASE_PLAN_V0_4_0.md`), built, reviewed and tagged as the release candidate `v0.4.0-rc.2` on 21 Sep 2026 (`rc.1` the same build without the What's new page). The submitted release is tag `v0.3.0` on `main`, live at permitflow.space; the development copy of this branch runs at dev.permitflow.space.*
-
 ## Live: [permitflow.space](https://permitflow.space)
 
 ![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/14-debrief/video/02-launch/poster.jpg)
@@ -12,7 +10,7 @@ https://github.com/user-attachments/assets/942739f7-e2bd-4360-b525-ecf960a7e796
 
 A regulatory licensing platform built for a 3-day full-stack assessment. An operator (the business owner, or an agent applying for the business) applies for a Food Establishment Licence through a guided form with checked uploads; a licensing officer reviews the submission, leaves feedback tied to a section or a document, and requests a resubmission in which only the flagged parts reopen. Every status change, feedback round and decision is audited; approval issues a licence certificate. An advisory AI verifier reads each uploaded document against the form before submission. It never decides anything.
 
-**Try it:** production, v0.3.0, at https://permitflow.space (one example application waiting in the officer's queue); development at https://dev.permitflow.space. Demo accounts below. Local setup takes about ten minutes.
+**Try it:** production, v0.4.0, at https://permitflow.space (one example application waiting in the officer's queue); development at https://dev.permitflow.space. Demo accounts below. Local setup takes about ten minutes.
 
 **Ten minutes to review it:** the technical deck's handout PDF in `docs/14-debrief/technical-deck/`, then `SCOPE.md`, then `docs/11-reviews/ASSESSMENT_TRACEABILITY.md` (every line of the brief mapped to code, test and evidence).
 
@@ -59,7 +57,7 @@ The first three are protected: no administrator can change their role or deactiv
 `SCOPE.md` is the decision record: what is built, simplified, mocked and deferred, and every assumption made where the brief is ambiguous.
 
 - Use cases 1 and 2 are complete: sectioned form with validation and draft save, drag-and-drop uploads with a live AI check per document, submission as an immutable revision, officer queue and case view with the AI findings, feedback tied to a section or a document with templates, resubmission in which only the flagged parts reopen, revision compare, resolution tracking, role-specific status labels, notifications, audit trail, licence certificate on approval.
-- Use case 3 is built on `dev` (v0.4.0, not yet released): the site-visit appointment with rounds, the officer's checklist with autosave and extra findings, the clarification rounds with evidence, one live session per account, the storage budget, and the administrator's overview, activity feed, read-only case and user management. Production still serves v0.3.0, where use case 3 stops at the statuses and transitions.
+- Use case 3 is complete (v0.4.0): the site-visit appointment with rounds, the officer's checklist with autosave and extra findings, the clarification rounds with evidence, one live session per account, the storage budget, and the administrator's overview, activity feed, read-only case and user management.
 - Beyond the brief: withdrawal, draft deletion, feedback undo and reopen, a public landing page, policy pages, an accessibility gate.
 
 ## Stack and architecture
@@ -118,15 +116,14 @@ The full record, with the prompts grouped by the decision they carry, what was d
 
 ## Release notes
 
-v0.3.0 (19 September 2026) is the version at https://permitflow.space. Next, v0.4.0: the admin panel and use case 3. An entry per release, in the users' words: `RELEASE_NOTES.md`; the engineering record: `CHANGELOG.md`.
+v0.4.0 (8 October 2026) is the version at https://permitflow.space. Next, v0.5.0: virus scanning, a separate worker for the document checks, AI usage per check and limits the administrator can tune. An entry per release, in the users' words: `RELEASE_NOTES.md`; the engineering record: `CHANGELOG.md`.
 
 ## What I would do next
 
 Each item has a row with severity in `docs/11-reviews/PRODUCTION_READINESS_REVIEW.md`.
 
-1. Release v0.4.0 (use case 3, sessions, storage, the administrator) from `dev` once the assessment process allows it: the release ritual, the seed on each environment, the dev UAT record.
-2. A worker for the AI checks (Redis or a Postgres `SKIP LOCKED` queue) so checks survive deploys and scale apart from the API; ADR-004 has one call site to change.
-3. Object storage with signed URLs and a virus scan, a backup and restore drill, a retention policy.
-4. httpOnly cookie sessions with CSRF protection, CSP nonces, the rate windows in Redis or at the edge.
-5. Observability, second half: acknowledgement and escalation for the Telegram alerts, nginx and Postgres exporters, one Prometheus per environment, a runbook per alert (readiness row 24).
-6. AI assurance beyond 14 golden cases: a labelled set grown from officer overrides, a red-team suite, calibrated confidence, in-region tracing, a multilingual injection classifier, Project Moonshot as the Singapore assurance evidence (`docs/07-ai/AI_ASSURANCE.md`, Limits).
+1. A worker for the AI checks (Redis or a Postgres `SKIP LOCKED` queue) so checks survive deploys and scale apart from the API; ADR-004 has one call site to change.
+2. Object storage with signed URLs and a virus scan, a backup and restore drill, a retention policy.
+3. httpOnly cookie sessions with CSRF protection, CSP nonces, the rate windows in Redis or at the edge.
+4. Observability, second half: acknowledgement and escalation for the Telegram alerts, nginx and Postgres exporters, one Prometheus per environment, a runbook per alert (readiness row 24).
+5. AI assurance beyond 14 golden cases: a labelled set grown from officer overrides, a red-team suite, calibrated confidence, in-region tracing, a multilingual injection classifier, Project Moonshot as the Singapore assurance evidence (`docs/07-ai/AI_ASSURANCE.md`, Limits).

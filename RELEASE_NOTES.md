@@ -10,11 +10,11 @@ Format: the product reads this file at build time for its What's new page (the v
 
 ## Coming next
 
-**v0.4.0 reaches production once the assessment is over.** Until then it runs on the development environment as the release candidate v0.4.0-rc.2; production stays on v0.3.0. The build record is in `CHANGELOG.md` and the plan in `docs/05-planning/RELEASE_PLAN_V0_4_0.md`.
+**v0.5.0, planned: safe intake.** Every uploaded file is checked for viruses before an officer can open it, and a file that fails is blocked with a clear message. The automatic document check runs on its own worker, so a slow file never slows the rest of the service. The licensing office sees what each check cost and can tune the limits (requests, daily checks, upload size) from the overview, with every change recorded. Sign-in moves to a more secure cookie.
 
-**v0.5.0, planned:** an administrator can raise the daily quota for automatic checks from the overview; officers can be assigned cases; a public page to verify a licence by its number; email notifications; the automatic check reads clarification photos.
+**After that:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
 
-## v0.4.0, 21 September 2026 (release candidate v0.4.0-rc.2 on the development environment; production release to follow): the site visit, the clarification and the office's own view
+## v0.4.0, 8 October 2026: the site visit, the clarification and the office's own view
 
 **New for licensing officers**
 - Arrange the site visit inside the case: propose a date and a morning or afternoon slot, see the operator accept or propose another date, keep or accept, ask to move a confirmed visit; six proposals at most per visit; every round on the record.
