@@ -7,7 +7,7 @@
 | `reel.html` | The film as one page. `seek(t)` sets every element for time `t`, so any frame can be drawn on its own. Open `reel.html?play` through a local server to watch it, or `?t=12.5` for one frame. Brand tokens, fonts and the mark come from `docs/04-design/`. |
 | `render.mjs` | Draws the page in headless Chromium at 120 fps across four workers and pipes the frames into ffmpeg. Fonts are served from `frontend/public/fonts`. |
 | `audio.py` | Synthesises the score with numpy and scipy (120 BPM, A minor), with each hit, tick and whoosh placed on a visual event. Writes `score.wav`. |
-| `assemble.sh` | Blends each pair of 120 fps frames into one 60 fps frame (motion blur), adds the score and writes the MP4 and the poster frame. |
+| `assemble.sh` | Blends each pair of 120 fps frames into one 60 fps frame (motion blur), adds the score and writes `../permitflow-showreel.mp4` and `../poster.jpg`. |
 | `voiceover.sh` | Lays the seven narrated lines in `voice/` (Kokoro `af_heart`, the launch video's narrator) over the finished film, each on its scene, with the score ducked under the voice. Writes `../permitflow-showreel-voiceover.mp4`; the picture is copied, not re-encoded. |
 
 ```bash

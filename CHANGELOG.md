@@ -38,7 +38,7 @@ The owner approved six findings from a design audit looking for the tells of a g
 
 ## Security audit fixes (24 Sep 2026)
 
-The Cloudflare security-audit skill ran over the repository at `ee67688` (standard profile, 15 agents, source-only; report kept outside the repository). No critical, high or medium finding; the two confirmed low findings and one hardening note from my own UAT run 5 change are fixed on `fix/security-audit-findings`, not yet merged into `dev`, nothing pushed (threat model T29, T28).
+The Cloudflare security-audit skill ran over the repository at `ee67688` (standard profile, 15 agents, source-only; report kept outside the repository). No critical, high or medium finding; the two confirmed low findings and one hardening note from my own UAT run 5 change are fixed on `fix/security-audit-findings`, merged into `dev` as `338cfa1` (PR #13) and deployed to the development environment (threat model T29, T28).
 
 - **The admin activity feed leaves out drafts.** A draft's events (file names of uploads, sections saved) no longer appear in `/admin/audit-feed` until it is submitted, matching every other admin read of a draft.
 - **A role change clears the user's notifications.** An officer demoted to operator no longer keeps officer notifications naming other operators and quoting their reasons.
@@ -47,7 +47,7 @@ The Cloudflare security-audit skill ran over the repository at `ee67688` (standa
 
 ## UAT run 5 and its fixes (24 Sep 2026)
 
-A full browser run of use case 3 and the UAT plan on the development environment (Claude in Chrome: an iPad-width officer tab, a laptop tab after a take-over, a second officer, the operator, the administrator) found 20 things; every one is fixed or explained on the branch `fix/uc3-uat-findings`, not yet merged into `dev` (the owner merges after review), nothing pushed. Record: `docs/10-uat/UAT_PLAN.md` runs 5 and 6.
+A full browser run of use case 3 and the UAT plan on the development environment (Claude in Chrome: an iPad-width officer tab, a laptop tab after a take-over, a second officer, the operator, the administrator) found 20 things; every one is fixed or explained on the branch `fix/uc3-uat-findings`, merged into `dev` as `ee67688` (PR #12) and deployed to the development environment. Record: `docs/10-uat/UAT_PLAN.md` runs 5 and 6.
 
 - **A second site visit works for everyone (F15 to F18).** The case views now read one *active* visit (`services/visit_scope.py`: none while the case is back in the pre-visit review, otherwise the latest) and list the others as `earlier_visits`, read-only. The operator answers visit 2's appointment (it was hidden behind visit 1's clarification notice); a case returned to review is a review again (Feedback panel, Request resubmission); visit 2 opens a blank checklist; visit 1's appointment, checklist (`/checklist?visit=1`) and clarification thread stay readable in the officer's new "Earlier visits" section and on the operator's History (`/clarifications?visit=1`).
 - **Nothing typed on site is lost (F10, F11, F13).** Checklist entries and clarification answers the server has not confirmed are kept on the device (`lib/localDraft.ts`), restored after a reload or a discarded tab and saved; cleared on save and by the user's own Sign out (threat model T28). The clarification page now warns before leaving while an answer is unsaved. Offline the save line reads "Waiting for the connection".

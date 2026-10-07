@@ -1,0 +1,299 @@
+1
+00:00:01,040 --> 00:00:01,870
+Singapore.
+
+2
+00:00:01,890 --> 00:00:03,160
+Almost midnight.
+
+3
+00:00:07,440 --> 00:00:08,920
+This is Wei Ling.
+
+4
+00:00:08,940 --> 00:00:11,800
+She runs a kopi shop in Jalan Besar.
+
+5
+00:00:11,820 --> 00:00:13,190
+The shop closed at nine.
+
+6
+00:00:13,210 --> 00:00:15,380
+Now the second job starts.
+
+7
+00:00:16,420 --> 00:00:18,740
+The licence needs a form and four documents.
+
+8
+00:00:18,760 --> 00:00:20,052
+She has them all.
+
+9
+00:00:21,520 --> 00:00:23,520
+She attaches them, one by one,
+
+10
+00:00:23,540 --> 00:00:25,469
+and checks the address twice.
+
+11
+00:00:26,110 --> 00:00:26,590
+WEI LING: Okay.
+
+12
+00:00:26,610 --> 00:00:27,520
+WEI LING: Send.
+
+13
+00:00:28,740 --> 00:00:30,400
+Her email joins all the others
+
+14
+00:00:30,420 --> 00:00:32,205
+heading for the same desk.
+
+15
+00:00:33,020 --> 00:00:35,620
+This is Rahim, a licensing officer.
+
+16
+00:00:35,640 --> 00:00:37,880
+Hers is one of thirty-eight.
+
+17
+00:00:39,220 --> 00:00:40,990
+He checks the only way he can:
+
+18
+00:00:41,010 --> 00:00:42,310
+the form on one side,
+
+19
+00:00:42,330 --> 00:00:43,980
+the documents on the other.
+
+20
+00:00:45,210 --> 00:00:46,080
+RAHIM: Twelve.
+
+21
+00:00:46,100 --> 00:00:47,420
+RAHIM: Or twenty-one?
+
+22
+00:00:48,330 --> 00:00:49,370
+The unit number on the
+
+23
+00:00:49,390 --> 00:00:51,729
+tenancy doesn't match the form.
+
+24
+00:00:52,600 --> 00:00:53,680
+He writes back.
+
+25
+00:00:53,700 --> 00:00:56,370
+Short, because forty more are waiting.
+
+26
+00:00:57,480 --> 00:00:58,660
+He knows what he means.
+
+27
+00:00:58,680 --> 00:00:59,830
+She doesn't.
+
+28
+00:01:01,560 --> 00:01:04,810
+UNCLE: Kopi-O kosong, one kaya toast!
+
+29
+00:01:06,810 --> 00:01:08,130
+WEI LING: Which document?
+
+30
+00:01:08,360 --> 00:01:09,400
+She can't tell.
+
+31
+00:01:09,420 --> 00:01:11,270
+So she guesses, changes the form,
+
+32
+00:01:11,290 --> 00:01:13,210
+and sends everything again.
+
+33
+00:01:14,670 --> 00:01:15,760
+On the next pass,
+
+34
+00:01:15,780 --> 00:01:18,695
+he notices the hygiene certificate has expired.
+
+35
+00:01:21,870 --> 00:01:23,830
+RAHIM: Which version is this?
+
+36
+00:01:24,910 --> 00:01:26,350
+Hundreds of emails.
+
+37
+00:01:26,370 --> 00:01:27,750
+Dozens of applicants.
+
+38
+00:01:27,770 --> 00:01:30,030
+One spreadsheet trying to hold it all.
+
+39
+00:01:42,470 --> 00:01:43,550
+PermitFlow.
+
+40
+00:01:43,570 --> 00:01:45,510
+One application, from draft to licence,
+
+41
+00:01:45,530 --> 00:01:47,450
+with every step on record.
+
+42
+00:01:48,970 --> 00:01:50,530
+In PermitFlow, whoever applies for
+
+43
+00:01:50,550 --> 00:01:52,210
+the business is the operator.
+
+44
+00:01:52,230 --> 00:01:54,470
+Here, that's Wei Ling.
+
+45
+00:01:56,090 --> 00:01:57,880
+Nine nineteen, same table.
+
+46
+00:01:57,900 --> 00:02:01,330
+Four sections, then four documents, one slot each.
+
+47
+00:02:01,890 --> 00:02:04,530
+Every PDF is read against her form.
+
+48
+00:02:04,550 --> 00:02:06,130
+The unit number matches.
+
+49
+00:02:06,150 --> 00:02:07,460
+The expired certificate is
+
+50
+00:02:07,480 --> 00:02:08,930
+flagged the same evening,
+
+51
+00:02:08,950 --> 00:02:10,630
+not in week six.
+
+52
+00:02:10,650 --> 00:02:12,470
+Her renewal is on its way.
+
+53
+00:02:12,490 --> 00:02:15,630
+The check never blocks, so she submits.
+
+54
+00:02:15,650 --> 00:02:17,550
+Rahim's queue: already checked.
+
+55
+00:02:17,570 --> 00:02:20,150
+His note names the exact document, and why.
+
+56
+00:02:20,170 --> 00:02:21,770
+When he requests resubmission,
+
+57
+00:02:21,790 --> 00:02:23,310
+only that slot reopens.
+
+58
+00:02:23,330 --> 00:02:23,470
+WEI LING: Oh.
+
+59
+00:02:23,490 --> 00:02:25,110
+WEI LING: Just the certificate.
+
+60
+00:02:25,130 --> 00:02:26,490
+She replaces one file.
+
+61
+00:02:26,510 --> 00:02:28,030
+Checked again: verified.
+
+62
+00:02:28,050 --> 00:02:30,717
+Revision 2, nothing else re-entered.
+
+63
+00:02:30,737 --> 00:02:33,077
+RAHIM: Only the certificate changed.
+
+64
+00:02:33,097 --> 00:02:34,568
+He resolves it.
+
+65
+00:02:35,900 --> 00:02:39,330
+He approves, and the licence is issued at once.
+
+66
+00:02:41,890 --> 00:02:43,770
+The AI check helps both of them.
+
+67
+00:02:43,790 --> 00:02:45,990
+She gets plain words and what to do.
+
+68
+00:02:46,010 --> 00:02:48,190
+He gets the proof, quoted from the document:
+
+69
+00:02:48,210 --> 00:02:50,050
+no more side by side.
+
+70
+00:02:51,000 --> 00:02:53,970
+And the AI never decides.
+
+71
+00:02:53,990 --> 00:02:56,050
+Every status change and every
+
+72
+00:02:56,070 --> 00:02:58,390
+decision carries a person's name.
+
+73
+00:03:01,440 --> 00:03:02,910
+WEI LING: Morning, Uncle.
+
+74
+00:03:03,230 --> 00:03:04,150
+Checks help you.
+
+75
+00:03:04,170 --> 00:03:05,590
+Officers decide.

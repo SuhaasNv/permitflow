@@ -6,7 +6,7 @@ import path from 'node:path';
 const dir = path.dirname(new URL(import.meta.url).pathname);
 const FF = process.env.FFMPEG || 'ffmpeg';
 const types = { '.html': 'text/html', '.woff2': 'font/woff2' };
-const fonts = path.resolve(dir, '../../../../frontend/public/fonts');
+const fonts = path.resolve(dir, '../../../../../frontend/public/fonts');
 const srv = http.createServer((q, r) => { const u = decodeURIComponent(q.url.split('?')[0]); const f = u.endsWith('.woff2') ? path.join(fonts, path.basename(u)) : path.join(dir, u); if (!fs.existsSync(f)) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': types[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(r); });
 await new Promise(r => srv.listen(8765, r));
 const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined, args: ['--disable-gpu-vsync', '--font-render-hinting=none', '--force-color-profile=srgb'] });

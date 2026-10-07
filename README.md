@@ -4,11 +4,11 @@
 
 ## Live: [permitflow.space](https://permitflow.space)
 
-![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/14-debrief/video/permitflow-launch-poster.jpg)
+![PermitFlow: the officer's review queue with the application, checks and feedback of a licence case](docs/14-debrief/video/02-launch/poster.jpg)
 
 https://github.com/user-attachments/assets/942739f7-e2bd-4360-b525-ecf960a7e796
 
-*Launch video, 70 seconds. The narrated walkthrough (4 min 36 s) and the technical video (5 min 40 s) are in `docs/14-debrief/video/`.*
+*Launch video, 70 seconds. The intro film (3 min 14 s), the narrated walkthrough (4 min 36 s) and the technical video (5 min 40 s) are in `docs/14-debrief/video/`.*
 
 A regulatory licensing platform built for a 3-day full-stack assessment. An operator (the business owner, or an agent applying for the business) applies for a Food Establishment Licence through a guided form with checked uploads; a licensing officer reviews the submission, leaves feedback tied to a section or a document, and requests a resubmission in which only the flagged parts reopen. Every status change, feedback round and decision is audited; approval issues a licence certificate. An advisory AI verifier reads each uploaded document against the form before submission. It never decides anything.
 
