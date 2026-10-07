@@ -70,7 +70,16 @@ Then prompt the user with a one-line status: what is Done, what is next, and any
 - A story that adds or changes a screen starts with its artboards on the prototype canvas, drawn from the shipped product (take fresh screenshots of the development environment: shell, fonts, tokens, spacing), not from the design documents alone. The owner reviews the artboards and says yes before any code for that screen is written.
 - The prototype generator lives in `docs/04-design/prototype-src/`; artboards are regenerated from it, never edited by hand. The canvas fonts are the product's own files uploaded as assets, so weights render as they ship.
 - Nothing merges into `dev` before the story is whole (rule 10 above). Nothing is pushed without a yes in that turn. The owner may be away on Remote Control: post the link and the one-line question, then wait.
-- **`main` is frozen while Xtremax assesses the submission (owner's rule, 20 Sep 2026):** no pull request into `main`, no tag, no production deploy, no hotfix, until the owner lifts the freeze in so many words. Everything for v0.4.0 lands on `dev` and shows on the development environment only. A request that would touch `main` is answered with this rule, not carried out.
+- **The `main` freeze was lifted on 8 Oct 2026** (it applied while Xtremax assessed the submission, 20 Sep to 8 Oct). `main` still only receives releases: a pull request from `dev`, a tag on the merge, a production deploy, each after its own yes from the owner in that turn.
+
+## 4b. Plans and decisions carry their full context (owner's rule, 8 Oct 2026)
+
+Any session, or any builder, must be able to pick the work up later without the owner re-explaining it.
+
+- **Plans.** Every plan is written down and kept current as the work moves. It includes the starting state (commits, environments, what is deployed), the goal, each story with its files, tests and Definition of Done, the order and the dependencies, the risks, the open questions, the decisions already taken, and the sources consulted. When a step finishes or the plan changes, update the plan in the same turn, with the date and the reason. The current plan is in the owner's Obsidian vault (`WannabeBob/PermitFlow/Improvement plan.md`). A plan approved for building is also copied into `docs/05-planning/` (for example `RELEASE_PLAN_V0_5_0.md`).
+- **Architectural decisions.** Every architectural decision gets an ADR in `docs/03-architecture/decisions/`, written when it is decided, not afterwards. An ADR records the context, the options considered with their trade-offs, the decision, the consequences, what would make us revisit it, and links to the stories and documents it affects. An ADR that a later decision changes is amended or superseded, never silently edited.
+- **Decision log.** Every decision the owner takes (scope, priority, release, design, architecture) is appended, dated, to the Obsidian `WannabeBob/PermitFlow/Decisions.md`. `Status.md` and `Next steps.md` are updated in the same turn. Read `Decisions.md` and the current plan at the start of every PermitFlow session.
+- **Handover.** If a session ends mid-plan, the plan's "Where we are" section names the last finished step, the next command to run, and anything half-done on a branch.
 
 ## 5. Sprint close (end of each day, or when the user says the sprint is over)
 
