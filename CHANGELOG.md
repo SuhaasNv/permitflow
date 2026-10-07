@@ -2,6 +2,16 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## v0.4.0 released (US-081, 8 Oct 2026)
+
+The assessment is over and the `main` freeze is lifted, so v0.4.0 moves from the development environment to production through the release ritual (`docs/09-operations/BRANCHING.md`, rule 5).
+
+- **Version.** `0.4.0-rc.2` becomes `0.4.0` in `frontend/package.json`, `package-lock.json`, `backend/pyproject.toml`, `uv.lock` and `backend/app/core/version.py`.
+- **Release notes.** The v0.4.0 entry is dated 8 Oct 2026, and "Coming next" now describes v0.5.0 "Safe intake" (virus scanning, a separate worker for the document checks, AI usage per check, limits the administrator can tune, cookie sessions) and the releases after it.
+- **README.** The dev-branch notice is gone; production is v0.4.0 and use case 3 is complete. "What I would do next" no longer lists the release itself.
+- **Since `v0.4.0-rc.2`.** The release also carries the UAT run 5 fixes (PR #12), the security audit fixes (PR #13), WCAG 2.2 AA (US-095), the persona audit fixes (US-096), PyJWT 2.15.1, the four red-team evaluation cases outside the gate, and the final debrief material.
+- **Still to do after the merge.** Tag `v0.4.0` on the merge commit, deploy production from the release image, seed once, and record the image in `OPERATIONS.md`. Each step waits for the owner's yes.
+
 ## Persona audit and its fixes (US-096, 1 Oct 2026)
 
 Nine personas (keyboard only, screen reader, low vision, colour blind, Windows High Contrast, motion sensitive, cognitive, voice control, deaf) were run against the build after US-095. It showed the "0 failures of 55" claim had been premature; the review document is corrected (`docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`). Fixed on `feat/us-096-persona-fixes`, each with a gate test that failed before the fix.
