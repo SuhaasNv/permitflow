@@ -70,6 +70,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | `10-uat/UAT_PLAN.md` | written (19 Sep; U13 to U16 and runs 4 and the route smoke test added 20 and 21 Sep) | Sixteen acceptance scenarios, environments and accounts, the record of every run (local, development, CI, production after v0.3.0, the two-device run), the edge-case driver |
 | `09-operations/OPERATIONS.md` | written (grows per story) | Setup, env vars, health, logs, migrations, deployment environments |
 | `09-operations/BRANCHING.md` | written | Git branching strategy: main / dev / feat / fix / hotfix / release; two Railway environments |
+| `09-operations/RELEASING.md` | written | How a version moves from `dev` to production: release candidates on `dev`, the release as the tested candidate with the label removed, the release guard, approvals |
 | `11-reviews/EDGE_CASE_REVIEW.md` | written (Sprint 2) | Three devil's-advocate reviews: every finding, its fix or its plan |
 | `11-reviews/BUG_HUNT_REVIEW.md` | written (19 Sep) | Three parallel bug hunts (backend, frontend, seams): 39 findings (36 fixed, 3 kept as decisions); browser run-through findings R1 to R12 |
 | `11-reviews/LAYOUT_AUDIT.md` | written (19 Sep) | Layout audit at 390, 820, 1024, 1280 and 1440; findings tracked as US-043 and US-044 |
