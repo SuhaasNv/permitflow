@@ -22,7 +22,7 @@ DAY_KEYS: tuple[str, ...] = tuple(k for k, _ in DAYS)
 _DAY_LABEL = dict(DAYS)
 STEP_MINUTES = 30
 _HOURS_KEYS = frozenset({"days", "opens", "closes", "open_24h"})
-_TIME = re.compile(r"^([01][0-9]|2[0-3]):([0-5][0-9])$")
+_TIME = re.compile(r"([01][0-9]|2[0-3]):([0-5][0-9])")
 
 LEGACY_MESSAGE = "Pick your opening days and hours."
 NO_DAYS_MESSAGE = "Choose at least one day you open."
@@ -38,7 +38,7 @@ def time_options(step_minutes: int = STEP_MINUTES) -> list[str]:
 def _is_slot(value: Any) -> bool:
     if not isinstance(value, str):
         return False
-    m = _TIME.match(value)
+    m = _TIME.fullmatch(value)
     return m is not None and int(m.group(2)) % STEP_MINUTES == 0
 
 

@@ -86,6 +86,20 @@ def test_a_snapshot_ignores_rules_that_depend_on_today() -> None:
     )
 
 
+def test_a_time_with_a_trailing_newline_is_not_a_time() -> None:
+    bad = "Choose a time on the half hour, from 00:00 to 23:30."
+    assert validate_hours({"days": ["mon"], "opens": "07:00\n", "closes": "21:00", "open_24h": False}) == bad
+    assert validate_hours({"days": ["mon"], "opens": "07:00", "closes": "21:00\n", "open_24h": False}) == bad
+
+
+def test_decimals_are_counted_on_the_shortest_text_of_the_number() -> None:
+    message = "Use at most 2 decimal places."
+    assert field_rules.check_decimals(1.0000000000000002, 2) == message
+    assert field_rules.check_decimals(1e-7, 2) == message
+    assert field_rules.check_decimals(48.25, 2) is None
+    assert field_rules.check_decimals(1e21, 2) is None
+
+
 def test_time_options_are_48_half_hours() -> None:
     options = time_options()
     assert len(options) == 48 and options[0] == "00:00" and options[1] == "00:30" and options[-1] == "23:30"
