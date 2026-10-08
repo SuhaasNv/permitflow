@@ -152,10 +152,15 @@ export function checkAddress(value: string): string | null {
 
 // ---------- numbers ----------
 
-/** At most `maxDecimals` digits after the point (the float error of x * 100 is far below 1e-9). */
+/**
+ * At most `maxDecimals` digits after the point, counted on the number's shortest decimal text exactly as
+ * the server does (so 1.0000000000000002 and 1e-7 are too long). No float tolerance.
+ */
 export function checkDecimals(value: number, maxDecimals: number): string | null {
-  const scale = 10 ** maxDecimals
-  return Math.abs(value * scale - Math.round(value * scale)) < 1e-9 ? null : decimalsMessage(maxDecimals)
+  const m = /^-?\d+(?:\.(\d+))?(?:e([+-]\d+))?$/i.exec(String(value))
+  if (!m) return decimalsMessage(maxDecimals)
+  const decimals = (m[1]?.length ?? 0) - Number(m[2] ?? 0)
+  return decimals > maxDecimals ? decimalsMessage(maxDecimals) : null
 }
 
 /** Rule name from the form definition to its text check. Rules that need more than the text are handled by the caller. */

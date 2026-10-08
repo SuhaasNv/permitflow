@@ -1470,6 +1470,20 @@
   {
    "section": "premises",
    "field": "floor_area_sqm",
+   "value": 1.0000000000000002,
+   "valid": false,
+   "message": "Use at most 2 decimal places."
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 48.000000001,
+   "valid": false,
+   "message": "Use at most 2 decimal places."
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
    "value": "48",
    "valid": false,
    "message": "Must be a number."

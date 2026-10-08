@@ -111,6 +111,16 @@ describe('building blocks', () => {
     expect(checkDecimals(1.005, 2)).not.toBeNull()
   })
 
+  it('counts decimals the way the server does, with no float tolerance', () => {
+    expect(checkDecimals(1.0000000000000002, 2)).not.toBeNull()
+    expect(checkDecimals(48.000000001, 2)).not.toBeNull()
+    expect(checkDecimals(1e-7, 2)).not.toBeNull()
+    expect(checkDecimals(1.5e-7, 2)).not.toBeNull()
+    expect(checkDecimals(1e21, 2)).toBeNull()
+    expect(checkDecimals(48, 2)).toBeNull()
+    expect(checkDecimals(-0.5, 2)).toBeNull()
+  })
+
   it('lists 48 half-hour times', () => {
     const times = timeOptions()
     expect(times).toHaveLength(48)
