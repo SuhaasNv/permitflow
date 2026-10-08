@@ -20,8 +20,9 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `UPLOAD_DIR` | `./data/uploads` | backend | Local disk storage; Railway volume at `/data/uploads`. |
 | `UPLOAD_MAX_BYTES` | `10485760` | backend | 10 MB per file. |
 | `SITE_VISIT_DAY_GUARD` | `true` | backend | UAT run 5 (F12): Mark site visit done and the checklist submit wait for the confirmed visit date (Singapore date); the checklist draft can be filled before. `false` where a whole appointment must run in one sitting: the CI browser suite, `uat_edges.py` and `smoke_routes.py`, a demonstration environment. |
-| `SEED_PASSWORD` | `PermitFlow!2026` | `scripts/seed.py` only | The operator, officer and spare officer demo accounts' password. Published on purpose for the demonstration. |
+| `SEED_PASSWORD` | `PermitFlow!2026` | `scripts/seed.py` only | The operator, officer and spare officer demo accounts' password. Published on purpose for the local and development demonstration. In production a private value is the way to seed reviewer accounts; the published value is refused there unless `SEED_PUBLIC_DEMO=true`. |
 | `SEED_ADMIN_PASSWORD` | falls back to `SEED_PASSWORD` outside production | `scripts/seed.py` only | The administrator's password. With `APP_ENV=production` the seed exits non-zero unless this is set and is not `PermitFlow!2026`. Never published. |
+| `SEED_PUBLIC_DEMO` | unset (false) | `scripts/seed.py` only | US-103. Production demo accounts are opt-in. With `APP_ENV=production` and no `SEED_PUBLIC_DEMO=true` (and no private `SEED_PASSWORD`) the seed creates the administrator only; `true` (also `1`, `yes`, `on`) seeds the operator, officer and spare officer and allows the published password. Ignored outside production. |
 | `STORAGE_BUDGET_BYTES` | `157286400` | backend | 150 MB per application across every document version, the clarification evidence and the licence (US-085); a further upload is refused with 422 `storage_budget` naming the room left. The Railway `uploads` volume is 5,000 MB (`describe-environment`, 21 Sep 2026): 33 applications at the ceiling, several hundred at the usual few megabytes each. Watch `permitflow_storage_bytes` and the `PermitFlowVolumeFilling` alert (US-089, at 80 %) and raise the volume before it fills; locally the gauge reads the whole disk. |
 | `STORAGE_BACKEND` | `local` | backend | US-097, ADR-015: where uploads live. `local` is the disk under `UPLOAD_DIR` (today's behaviour). `s3` is an S3-compatible bucket; with it the app refuses to start unless `S3_BUCKET`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` are set. The switch, not a redeploy, is the rollback. See "Object storage" below. |
 | `S3_ENDPOINT_URL` | empty | backend, copy script | The bucket's S3 endpoint. Empty means AWS. MinIO locally: `http://localhost:9000` (`http://minio:9000` inside Compose). A Railway bucket: the endpoint on its Credentials tab. |
@@ -72,6 +73,58 @@ Eight of the variables above are the **default and the hard ceiling** of a setti
 
 `cd backend && uv run python scripts/seed.py` creates the demo operator (`operator@permitflow.example.sg`), officer (`officer@permitflow.example.sg`), administrator (`admin@permitflow.example.sg`, US-073) and the unprotected spare officer (`officer2@permitflow.example.sg`) if they do not exist, and marks the first three protected. `scripts/create_user.py --email ... --name ... --role officer` creates any other account (password from `CREATE_USER_PASSWORD` or a prompt, never an argument); the Users page does the same for a signed-in administrator. `SEED_PASSWORD` sets the operator, officer and spare officer password (default `PermitFlow!2026`). The public demonstration keeps that password on purpose (README, privacy policy); any deployment that is not a demonstration must set its own value and reset it on a schedule. The administrator password is separate: `SEED_ADMIN_PASSWORD`. Outside production it falls back to `SEED_PASSWORD`; with `APP_ENV=production` the script exits non-zero unless it is set to a private value other than the published one. **Production admin password: it must be rotated and must never be the published value.** The seed only creates missing accounts and leaves an existing password alone, so the administrator account already seeded in an environment keeps the published password until it is rotated by hand: write a new argon2 hash (`app.core.security.hash_password`) into that user's `password_hash` from a one-off command on the backend service, then confirm the old password is refused at sign-in. There is no in-app password reset by design. Share the private value with reviewers directly, never in the repository.
 
+### Demo passwords per environment, and rotating an account (US-103)
+
+| Environment | Operator, officer, spare officer | Administrator |
+|---|---|---|
+| Local, CI, browser suite | `SEED_PASSWORD`, default `PermitFlow!2026` (published) | falls back to `SEED_PASSWORD` unless `SEED_ADMIN_PASSWORD` is set |
+| Development (Railway) | `SEED_PASSWORD` on the backend service, unset today, so the published default: a shared demonstration, documented in the README | `SEED_ADMIN_PASSWORD`, private |
+| Production (Railway) | opt-in: not created unless `SEED_PUBLIC_DEMO=true` or a private `SEED_PASSWORD` is set; never printed in the README | `SEED_ADMIN_PASSWORD`, private, required |
+
+How the seed behaves with `APP_ENV=production`:
+
+| `SEED_PUBLIC_DEMO` | `SEED_PASSWORD` | Result |
+|---|---|---|
+| unset or not true | unset | the administrator only; operator, officer and spare officer are not created |
+| unset or not true | private value | all four accounts; the three demo accounts get that private password |
+| unset or not true | `PermitFlow!2026` | refused (exit non-zero, nothing created) |
+| `true` | unset | all four accounts; the demo accounts get the published password |
+| `true` | any | all four accounts with that value |
+
+The seed never deletes or re-passwords an account that already exists, so the production demo accounts seeded on 19 Sep 2026 keep working and keep the published password until they are rotated or deactivated. To turn a production demo account off, deactivate it on the Users page (the operator, officer and administrator accounts are protected and cannot be deactivated there; the spare officer and any hand-made account can). To change its password, rotate it as below.
+
+**Rotating an account's password (one environment at a time; owner-approved, not part of any deploy).** The app has no password reset by design, so rotation is a one-off command on the backend service, run interactively so the new value never lands in shell history, a ticket or the repository:
+
+```bash
+railway ssh --environment <development|production> --service backend -- .venv/bin/python - <<'PY'
+import getpass
+from datetime import UTC, datetime
+
+from app.core.security import hash_password
+from app.infra.db import session_factory
+from app.repositories.sessions import SessionRepository
+from app.repositories.users import UserRepository
+
+emails = ["<account email>", "<another account email>"]  # the accounts to rotate, from the private notes
+with session_factory()() as db:
+    users, sessions = UserRepository(db), SessionRepository(db)
+    for email in emails:
+        user = users.get_by_email(email)
+        assert user is not None, f"no such account: {email}"
+        password = getpass.getpass(f"new password for {email} (12+ characters): ")
+        assert len(password) >= 12
+        user.password_hash = hash_password(password)
+        sessions.revoke_live(user.id, datetime.now(UTC), "rotated")
+    db.commit()
+PY
+```
+
+Then, for each account: confirm the old password is refused at sign-in (401, "Email or password is incorrect.") and the new one works, and record the date in the private notes (never the value).
+
+**The four hand-made backup accounts (created on 6 Oct 2026: two operators, two officers; they share the published password in both environments).** Their addresses are in the owner's private notes (`notes/demo/`, outside the repository). Rotate them in development and in production with the command above, one environment at a time, each time after the owner's yes. If a backup account is no longer wanted, deactivate it on the Users page instead; a deactivated account cannot sign in and its sessions end at once. The published-password accounts that are protected by the seed (`operator@`, `officer@`, `admin@permitflow.example.sg`) are rotated with the same command; production's administrator was rotated on 9 Oct 2026.
+
+**Opting production in to the public demonstration.** Set `SEED_PUBLIC_DEMO=true` on the production backend service, run `scripts/seed.py` once, then remove the variable if the demonstration is over. Do this only for a deliberate public demonstration; the sign-in page and the privacy policy already say the demonstration accounts are shared.
+
 ## Uploads
 
 Files are written under `UPLOAD_DIR` as `<application_id>/<random>.<ext>` (never the client file name), atomically via a `.part` temp file. Issued licence certificates live beside them as `<application_id>/licence-<licence_no>.pdf`, written by the approval transaction and referenced from `licences.stored_key` with a `sha256` (US-051). Deleting a document only clears `is_current`; the file stays for the revision history. Tests use `./data/test-uploads` and clean it after every test.
@@ -113,7 +166,17 @@ Compatibility rule (since 20 Sep 2026): a migration must leave the schema readab
 
 ![CI/CD: the four GitHub Actions workflows and their jobs](../03-architecture/diagrams/views/ci-cd-pipeline.png)
 
-`.github/workflows/ci.yml`, seven jobs: backend (ruff, mypy, pytest on a Postgres service), frontend (lint, typecheck, vitest, build, the 250 KB bundle check), AI gate (calls `ai-gate.yml`: model approval, contracts, golden set, adversarial, fairness, verdict; all on the mock provider, blocking), dependency and code audit (pip-audit, bandit, npm audit, all blocking since US-058), E2E (the full stack started inside the job: Postgres service, `alembic upgrade head`, `scripts/seed.py`, uvicorn on :8000 with `AI_PROVIDER=mock` and a CI-only `JWT_SECRET`, `vite preview` on :3000, then `npm run e2e`), gitleaks, and images (both Docker images built; on `dev` and `main` pushed to GHCR, after every other job is green). The E2E job needs the two test suites first. On failure it prints the last 200 lines of both server logs and uploads `playwright-report` and `test-results` as an artifact for seven days. CI does not deploy; `deploy.yml` does, after CI (see Deployment). `ai-eval.yml` is the fourth workflow (with `ai-gate.yml`, which CI calls): the golden set and the fairness check against the real OpenAI model, nightly at 04:00 Singapore, by hand, and on pushes to `dev` or `main` that touch the AI module or the set; blocking at 14 of 14; needs the `OPENAI_API_KEY` repository secret and skips nothing silently (it fails with a clear error when the secret is missing).
+`.github/workflows/ci.yml`, eight jobs (the diagram above predates US-103 and shows the pipeline as of v0.4.1: it does not yet show the Semgrep job, the Trivy steps in the images job, the ZAP job in `deploy.yml` or `secret-history.yml`): backend (ruff, mypy, pytest on a Postgres service), frontend (lint, typecheck, vitest, build, the 250 KB bundle check), AI gate (calls `ai-gate.yml`: model approval, contracts, golden set, adversarial, fairness, verdict; all on the mock provider, blocking), dependency and code audit (pip-audit, bandit, npm audit, all blocking since US-058), E2E (the full stack started inside the job: Postgres service, `alembic upgrade head`, `scripts/seed.py`, uvicorn on :8000 with `AI_PROVIDER=mock` and a CI-only `JWT_SECRET`, `vite preview` on :3000, then `npm run e2e`), gitleaks, Semgrep (US-103: `p/owasp-top-ten`, `p/python` and `p/typescript` over `backend/app`, `backend/scripts` and `frontend/src`, pinned and run through `uvx`; blocking at ERROR severity, lower severities are only listed), and images (both Docker images built; on `dev` and `main` pushed to GHCR, after every other job, Semgrep included, is green). In the images job each image is first built into the runner and scanned by Trivy (US-103: HIGH and CRITICAL vulnerabilities that have a fixed version fail the job; accepted exceptions live in `.trivyignore` with a reason and a review date, and the file has no entries today), and only then built again for the push, which is a cache hit. The frontend Dockerfile runs `apk upgrade` so the nginx base image's packages are patched at build time. The E2E job needs the two test suites first. On failure it prints the last 200 lines of both server logs and uploads `playwright-report` and `test-results` as an artifact for seven days. CI does not deploy; `deploy.yml` does, after CI (see Deployment). `ai-eval.yml` is the fourth workflow (with `ai-gate.yml`, which CI calls): the golden set and the fairness check against the real OpenAI model, nightly at 04:00 Singapore, by hand, and on pushes to `dev` or `main` that touch the AI module or the set; blocking at 14 of 14; needs the `OPENAI_API_KEY` repository secret and skips nothing silently (it fails with a clear error when the secret is missing).
+
+**Scheduled and post-deploy scanners (US-103).**
+- `.github/workflows/secret-history.yml`: a gitleaks scan of the whole history of every branch and tag (`gitleaks detect --source . --log-opts="--all"`, the release binary pinned by version and SHA-256), weekly on Sunday 19:17 UTC (Monday 03:17 in Singapore) and by hand (`gh workflow run secret-history.yml`). It fails on any finding that is not in `.gitleaksignore` and uploads a redacted report on failure. How it was proven against a planted secret: `docs/06-security/SECURITY_REVIEW.md`, "Secret history scan".
+- `deploy.yml`, job `zap-baseline`: after a successful development deploy, an OWASP ZAP baseline scan of https://dev.permitflow.space. Report only: the step is `continue-on-error`, no issue is written and the workflow stays green whatever ZAP finds; read the `zap-baseline-report` artifact on the run page. It never scans production.
+- `.github/dependabot.yml`: weekly pull requests into `dev` for the backend (`uv`), the frontend (`npm`) and the workflows' actions, one grouped pull request per ecosystem. Each runs the full CI. Dependabot security alerts and security updates are switched on in the repository settings (below).
+
+**Owner settings in GitHub (not set by any file in the repository).**
+- Settings, Code security: enable *Dependency graph*, *Dependabot alerts* and *Dependabot security updates* (the version updates in `dependabot.yml` need none of these, but alerts and security updates do).
+- Settings, Branches (the `main` protection rule): add `Semgrep` to the required status checks if it should be required by name. `Images` already needs it, so a failing Semgrep blocks `Images` either way.
+- The scheduled scan, Dependabot and the post-deploy ZAP job read their files from the default branch (`main`); they start when this change reaches it with the release. Until then, `gh workflow run secret-history.yml --ref <branch>` runs the history scan from a branch where the file exists.
 
 **Release guard.** On every `v*` tag the `images` job first runs `python3 scripts/release_guard.py "$GITHUB_REF_NAME"` (full history and tags fetched), before any image is built. A candidate tag `vX.Y.Z-rc.N` passes when the five version files carry `X.Y.Z-rc.N`. A release tag `vX.Y.Z` passes only when the files carry `X.Y.Z`, a candidate tag exists, and between the highest candidate and the release nothing under `backend/`, `frontend/`, `docker/` or `docker-compose.yml` changed except the version lines. Any other tag shape fails. The guard covers the older check that a tag equals the `frontend/package.json` version; the `Tags` step keeps that check too. The rules and the reasoning are in `RELEASING.md`.
 
@@ -165,7 +228,7 @@ The GitHub `production` environment only accepts deployments from `main`. Develo
 
 ### Seeding
 
-The database starts empty. `scripts/seed.py` creates the four demo accounts only (idempotent; the administrator and the spare officer since US-073, 21 Sep 2026: re-run it once per environment when v0.4.0 deploys). It is not part of a deploy on purpose, a deploy must never touch data; run it once per environment: `railway ssh --environment development --service backend -- .venv/bin/python scripts/seed.py` (and `--environment production` for production). Development was seeded on 19 Sep 2026; production on 19 Sep 2026 after the v0.3.0 deploy. Accounts and password in every environment: `operator@permitflow.example.sg` and `officer@permitflow.example.sg`, password `PermitFlow!2026` (the `SEED_PASSWORD` default; deliberately public for the demonstration, see the privacy policy). The administrator account is the exception: its password is `SEED_ADMIN_PASSWORD`, private, and the seed refuses to run in production without it (see Seeding). To change a password, set the variable and re-run the seed: existing accounts keep their password (the script is create-only), so a rotation is a new seed plus a manual update, or a reset of the environment.
+The database starts empty. `scripts/seed.py` creates the four demo accounts only (idempotent; the administrator and the spare officer since US-073, 21 Sep 2026: re-run it once per environment when v0.4.0 deploys). It is not part of a deploy on purpose, a deploy must never touch data; run it once per environment: `railway ssh --environment development --service backend -- .venv/bin/python scripts/seed.py` (and `--environment production` for production). Development was seeded on 19 Sep 2026; production on 19 Sep 2026 after the v0.3.0 deploy. Accounts in the development environment: `operator@permitflow.example.sg` and `officer@permitflow.example.sg`, password `PermitFlow!2026` (the `SEED_PASSWORD` default; deliberately public for the demonstration, see the privacy policy). Production's demonstration accounts are opt-in since US-103 and its password is no longer printed in the README (see Seeding, "Demo passwords per environment"). The administrator account is the exception: its password is `SEED_ADMIN_PASSWORD`, private, and the seed refuses to run in production without it (see Seeding). To change a password, set the variable and re-run the seed: existing accounts keep their password (the script is create-only), so a rotation is a new seed plus a manual update, or a reset of the environment.
 
 ### Custom domain (US-052)
 

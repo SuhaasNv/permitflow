@@ -30,6 +30,39 @@ Reviewed by an engineer against the code, with the tools named in each row. It i
 | 3 | "Hit your most expensive endpoint until the API bill is $950,000" | Every upload and every re-run was a model call (up to 20,000 characters); the only brake was "one run at a time per document" | Verification runs are counted in the database over a rolling day, per applicant (60) and per platform (1,000, the cost ceiling). Over quota, the run is stored as `unavailable` with the reason `daily_limit_reached`, nothing is sent to the model, the document stays, the application can still be submitted, and the officer sees why. Counting in the database means the ceiling survives restarts and applies across workers. At `gpt-4.1-mini` prices the platform ceiling is under two dollars a day | `test_verification_runs_over_the_daily_quota_are_stored_unavailable` |
 | 4 | "Scrape all your data so that you don't even notice" | Every endpoint behind authentication; operators see only their own applications; officers see all, which is their job | The general limiter caps any one client at 240 requests a minute; every request is logged with client, path, status and timing; every read of an application by an officer is a request-log line and every action an audit event. A stolen officer token remains the real scraping risk, which is why sessions expire in eight hours and the role is re-checked on every request | `test_every_request_counts_against_the_general_bucket_but_health_does_not` |
 
+## Scanners in the pipeline (US-103, v0.5.0)
+
+| Scanner | What it looks at | When it runs | Blocks? | Where |
+|---------|------------------|--------------|---------|-------|
+| gitleaks (push) | the commits of the push or pull request | every push and pull request | yes | `ci.yml`, job `secrets` |
+| gitleaks (history) | every commit on every branch and tag | weekly (Monday 03:17 Singapore) and by hand | yes, as a failed run (there is no merge to hold) | `secret-history.yml` |
+| pip-audit | production Python dependencies | every push and pull request | yes | `ci.yml`, job `audit` |
+| bandit | `backend/app`, medium and above | every push and pull request | yes | `ci.yml`, job `audit` |
+| npm audit | production frontend dependencies, high and above | every push and pull request | yes | `ci.yml`, job `audit` |
+| Semgrep | `backend/app`, `backend/scripts`, `frontend/src` with `p/owasp-top-ten`, `p/python`, `p/typescript` | every push and pull request (so every pull request into `dev` and `main`, and every push to them) | yes at ERROR severity; WARNING and INFO are listed in the log | `ci.yml`, job `semgrep` (the `images` job needs it) |
+| Trivy | the built backend and frontend images, operating-system packages and libraries | every push and pull request, before the image is pushed | yes at HIGH and CRITICAL when a fixed version exists (`ignore-unfixed`) | `ci.yml`, job `images` |
+| OWASP ZAP baseline | https://dev.permitflow.space, passive scan, no attack payloads | after every successful development deploy (automatic or manual) | no: report only; the HTML, Markdown and JSON report is the `zap-baseline-report` artifact of the run | `deploy.yml`, job `zap-baseline` |
+| Dependabot | Python (`uv`), npm and GitHub Actions versions | weekly (Monday 06:00 Singapore), one grouped pull request per ecosystem into `dev` | no: it opens pull requests that run the full CI | `.github/dependabot.yml` |
+
+Accepted findings: a Trivy finding that cannot be fixed yet goes in `.trivyignore` with its reason, who accepted it and a review date (the file has no entries today); a gitleaks false positive goes in `.gitleaksignore` with its reason (one entry today, a design-board name). Semgrep has no ignore file: a real finding is fixed, a false positive is silenced on its line with `# nosemgrep: <rule id>` and a reason.
+
+**First local runs (9 Oct 2026, before the workflows existed).**
+- Semgrep 1.172.0 with the three packs over `backend/app`, `backend/scripts` and `frontend/src` (298 files, 82 rules): 0 findings at ERROR, so the gate is green on day one. One WARNING, `python.django.security.injection.raw-html-format`, on the f-string that builds the model prompt in `backend/app/infra/ai/openai_provider.py` (line 77): a false positive (the rule is for Django HTML; this string goes to a language model, not a browser). It does not block, and it was left alone because that function belongs to US-102 (AI input hardening). A scratch file with `subprocess.call(cmd, shell=True)` and an `eval` made the same command exit 1 with three ERROR findings, so the gate does fail when it should.
+- Trivy 0.70.0 on images built from the repository: the backend image (`python:3.12-slim`, Debian 13.7) had no HIGH or CRITICAL finding with a fix. The frontend image (`nginx:1.27-alpine`, Alpine 3.21.3) had 45 (openssl, libexpat, libpng, libxml2, musl, zlib and others, two CRITICAL entries in libcrypto3 and libssl3 for the same CVE); the Dockerfile now runs `apk upgrade --no-cache`, so the build takes the patched packages, and the rebuilt image has none and still serves `/healthz`. Without that change the first run of the images job would have failed. A cached build layer can keep an old package set: if Trivy reports a fixable finding on an unchanged Dockerfile, change the cache scope or the base tag to force a rebuild.
+- Full-history gitleaks over the real repository (`gitleaks detect --source . --log-opts="--all"`, 350 commits): no leaks.
+
+### Secret history scan: how it was proven to catch a planted secret
+
+The push scan reads only the commits of the push. A secret that was committed and removed in a later commit is gone from the working tree but not from history. The proof used a throwaway repository outside this one, so no secret entered the PermitFlow history or any of its branches:
+
+1. Initialise a scratch repository, commit a file `config.txt` holding `GITHUB_TOKEN=ghp_` and 36 random characters (a made-up value in the shape of a GitHub token, the approach gitleaks' own test fixtures take), then remove the file and commit again. The working tree is clean.
+2. `gitleaks detect --source . --no-git` (the working tree only) reported `no leaks found`, exit 0.
+3. `gitleaks detect --source . --log-opts="--all" --redact --exit-code 1`, the command in `secret-history.yml`, reported `RuleID: github-pat`, the file, the line and the commit that added it, `leaks found: 1`, exit 1.
+4. The same command over this repository reported `no leaks found`, exit 0.
+5. The scratch directory was deleted.
+
+To repeat the proof against the workflow itself, push a throwaway branch (never `dev` or `main`) with one commit that adds a made-up token and one that removes it, run the workflow on it by hand (`gh workflow run secret-history.yml --ref <branch>`), expect a red run and the `gitleaks-history-report` artifact, then delete the branch. `--all` scans every ref, so a forgotten branch keeps every later run red. Use a value that was never a real secret: a pushed object can linger on GitHub after its branch is deleted.
+
 ## What production would add
 
 - Rate limiting at the edge (Cloudflare or Railway's proxy rules) and the same windows in Redis, so the limit holds across processes and regions. The in-process limiter is the MVP simplification recorded in `SCOPE.md` since Sprint 1.

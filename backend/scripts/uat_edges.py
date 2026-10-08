@@ -1964,6 +1964,57 @@ def rc2_checks(op: dict[str, str], op2: dict[str, str], off: dict[str, str]) -> 
     )
 
 
+def us103_checks() -> None:
+    """US-103: demonstration accounts are opt-in in production; the published password is not printed for it."""
+    import importlib.util
+
+    check_seed = Numbered("US103-")
+    repo = Path(__file__).resolve().parents[2]
+    spec = importlib.util.spec_from_file_location("uat_seed_103", Path(__file__).resolve().parent / "seed.py")
+    assert spec is not None and spec.loader is not None
+    seed = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(seed)
+
+    def emails(env: str, environ: dict[str, str]) -> set[str]:
+        return {u[0] for u in seed.seed_users_for(env, environ)}
+
+    def refuses(environ: dict[str, str]) -> bool:
+        try:
+            seed.resolve_passwords("production", environ)
+        except SystemExit:
+            return True
+        return False
+
+    admin = {"SEED_ADMIN_PASSWORD": "a-private-value"}
+    check_seed(
+        "production seeds the administrator only unless the demonstration is opted in",
+        emails("production", admin) == {"admin@permitflow.example.sg"},
+    )
+    check_seed(
+        "production with SEED_PUBLIC_DEMO=true or a private SEED_PASSWORD seeds all four accounts",
+        len(emails("production", {**admin, "SEED_PUBLIC_DEMO": "true"})) == 4
+        and len(emails("production", {**admin, "SEED_PASSWORD": "Reviewer-Only-9!"})) == 4,
+    )
+    check_seed(
+        "production refuses the published password named explicitly without the opt-in, and accepts it with it",
+        refuses({**admin, "SEED_PASSWORD": "PermitFlow!2026"})
+        and not refuses({**admin, "SEED_PASSWORD": "PermitFlow!2026", "SEED_PUBLIC_DEMO": "true"}),
+    )
+    check_seed(
+        "outside production all four accounts are seeded with the defaults (local, CI and the browser suite)",
+        len(emails("development", {})) == 4 and len(emails("test", {})) == 4,
+    )
+    readme = (repo / "README.md").read_text(encoding="utf-8")
+    demo = readme[readme.index("## Demo accounts") : readme.index("The first three are protected")]
+    check_seed(
+        "the README prints the shared password only under the development and local table, and says production does not",
+        "Development and local sign-ins" in demo
+        and demo.count("PermitFlow!2026") == 3
+        and "does not publish a password" in demo,
+        f"{demo.count('PermitFlow!2026')} occurrences",
+    )
+
+
 def main() -> None:
     ensure_second_operator()
     try:
@@ -3467,6 +3518,7 @@ def run_checks() -> None:
     op2 = login(OPERATOR2)
     fv_checks(op, off)
     rc2_checks(op, op2, off)
+    us103_checks()
 
     # ---------- Summary ----------
     failed = [x for x in RESULTS if not x[2]]

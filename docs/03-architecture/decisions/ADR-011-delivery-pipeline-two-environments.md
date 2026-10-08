@@ -47,3 +47,22 @@ Build once, promote by tag, gate on a person and on health: the shortest pipelin
 - `deploy.yml` runs #3 and #4 green on development (automatic and manual), including the wait-for-rollout fix after run #2 tested the old container.
 - Development URLs answer their health checks; `config.js` names the development API.
 - Production: variables, volume, domains and the approval rule are configured; first deploy at v0.3.0 (`docs/09-operations/OPERATIONS.md`).
+
+## Amendment: security scanners join the pipeline (US-103, v0.5.0, 9 Oct 2026)
+
+Context. The decision above left Semgrep and Trivy for "what I would do next" because a static-analysis pass needs a triage the schedule did not have. By v0.4.1 the gates (pip-audit, bandit, npm audit, gitleaks) were stable, and the second security audit named the container images, the source rules and the deployed site as the unscanned parts.
+
+Decision. Add five stages, none of them a new service to host:
+- **Semgrep** (`p/owasp-top-ten`, `p/python`, `p/typescript`) as a `semgrep` job in `ci.yml`, blocking at ERROR severity; `images` needs it. It runs through `uvx` at a pinned version, so no third-party action is in the path.
+- **Trivy** on both built images inside the `images` job, before the push: the image is built into the runner, scanned, then built again for the push (a cache hit). Blocking at HIGH and CRITICAL where a fix exists; `.trivyignore` holds accepted findings with a reason and a date.
+- **gitleaks over the whole history** as its own workflow (`secret-history.yml`), weekly and on demand, using the pinned release binary with a checksum so it can scan every ref (`--log-opts="--all"`). The push scan in `ci.yml` stays.
+- **OWASP ZAP baseline** against the development site as a job after `deploy` in `deploy.yml`, report only (`continue-on-error`, no issues written), with the report uploaded as an artifact. It sits in `deploy.yml` and not in a workflow of its own because a `workflow_run` trigger runs the default branch's copy, and the scan must follow the deploy that was just made.
+- **Dependabot** (`uv`, `npm`, `github-actions`), weekly, grouped, into `dev`.
+
+Options considered. A Semgrep GitHub Action or Semgrep Cloud (needs an account and a token; the CLI needs neither). Trivy against the registry image after the push (it would scan on `dev` only, after a vulnerable image already exists in GHCR, and never on a pull request). CodeQL (a second static-analysis engine; deferred, the Semgrep packs cover the same classes for this stack). A ZAP full or active scan (it sends attack traffic; not against a site others use, and not without the owner's yes). The gitleaks action for the history scan (its behaviour on scheduled events is not documented as a full-history scan; the binary with `--all` is explicit).
+
+Consequences. A fixable HIGH in a base image now fails the build until the Dockerfile or the base tag moves (the frontend image needed `apk upgrade` before the first run). A vulnerability published tomorrow can break a green `dev` without any code change, which is the point. The required checks on `main` are set in the repository settings: the `Semgrep` job is not a required check until the owner adds it, but `Images` (which needs it and runs Trivy) is already one, so it is gated either way. The new actions are pinned to commit SHAs with the version in a comment and Dependabot keeps them current; the older actions in `ci.yml` still use version tags. The scheduled history scan, Dependabot and the `workflow_run`-driven ZAP job take effect only once their files are on the default branch.
+
+Revisit when: the ZAP report shows the same alerts for a month with nothing actionable (tune it with a rules file, or stop), a real finding needs an ignore mechanism Semgrep lacks, or a staging environment exists and an active scan can run against it.
+
+Links: US-103 (`docs/05-planning/USER_STORIES.md`), `docs/06-security/SECURITY_REVIEW.md` (scanner table and the planted-secret proof), `docs/09-operations/OPERATIONS.md` (CI section).

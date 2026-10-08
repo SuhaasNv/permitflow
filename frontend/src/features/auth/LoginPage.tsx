@@ -10,6 +10,7 @@ import { AppError } from '@/api/client'
 import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
 import { Field } from '@/features/shared/Field'
+import { useBuildInfo } from '@/features/releases/queries'
 import { Logo } from '@/features/shared/Logo'
 import { PolicyLinks } from '@/features/shared/PolicyLinks'
 import { formatDateTime } from '@/lib/format'
@@ -67,6 +68,10 @@ export function LoginPage() {
   const [otherDevice, setOtherDevice] = useState<OtherDevice | null>(null)
   const [takingOver, setTakingOver] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  // US-103: the passwords are published for the shared demonstration environments only. Production
+  // demonstration accounts are opt-in, so the sentence appears only once /health says it is not production.
+  const { data: build } = useBuildInfo()
+  const passwordsPublished = build !== undefined && build.environment !== 'production'
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { email: '', password: '' },
@@ -230,8 +235,8 @@ export function LoginPage() {
         </div>
         <div className="flex flex-col gap-2 text-[13px] text-text-3">
           <p>
-            Demonstration only: accounts are shared and their passwords are published. Use the fictional demonstration documents, never real
-            personal data. See the <Link to="/privacy">privacy policy</Link> and the <Link to="/terms">terms</Link>.
+            Demonstration only{passwordsPublished ? ': accounts are shared and their passwords are published' : ''}. Use the fictional
+            demonstration documents, never real personal data. See the <Link to="/privacy">privacy policy</Link> and the <Link to="/terms">terms</Link>.
           </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <Link to="/" className="text-text-2 no-underline hover:text-text">
