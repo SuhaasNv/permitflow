@@ -4,7 +4,7 @@ What each version of PermitFlow brings, written for the people who use it. Newes
 
 Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for fixes on a release, `v0.4.0` for the two epics below, `v0.4.0-rc.N` for a release candidate tagged on `dev` for the development environment before the release.
 
-Format: the product reads this file at build time for its What's new page (the version number in the corner opens it; `frontend/src/features/releases/notes.ts`), so the lines keep four shapes. A release heading is `## vX.Y.Z, D Month YYYY (optional note): title`; a bold line such as `**New for operators**` opens an audience block and the bullets under it belong to it; text before the first block is the release's introduction; `## Coming next` holds the plan. Inline, only backticks, bold and bare links are rendered. A heading of another shape fails the frontend tests.
+Format: the product reads this file at build time for its What's new page (the version number in the corner opens it; `frontend/src/features/releases/notes.ts`), so the lines keep four shapes. A release heading is `## vX.Y.Z, D Month YYYY (optional note): title`; a release candidate has the same heading with `-rc.N` after the version (`## vX.Y.Z-rc.N, D Month YYYY: title`) and the same blocks and bullets below it, written for what that candidate changed. Candidates sit among the releases in date order, newest first; the development environment lists them with a Release candidate label, and production hides them completely (while the build information is still loading they stay hidden). A released version's own notes never mention candidates. A bold line such as `**New for operators**` opens an audience block and the bullets under it belong to it; text before the first block is the release's introduction; `## Coming next` holds the plan. Inline, only backticks, bold and bare links are rendered. A heading of another shape fails the frontend tests.
 
 ---
 
@@ -37,6 +37,32 @@ Format: the product reads this file at build time for its What's new page (the v
 - Checked against every WCAG 2.2 AA rule: the control you reach with the keyboard is never hidden behind a sticky bar, input and checkbox borders are easier to see, screen readers name the dashboard groups and a locked step, your contact details can be filled in by the browser, and five minutes before you would be signed out for inactivity the top strip warns you with a Stay signed in button. A second pass with nine kinds of user (voice control, Windows High Contrast and large text among them) fixed three more things: controls are named by the words they show, keyboard focus stays visible in High Contrast, and nothing is cut off at 200% text size.
 - The version number in the corner opens What's new: this page, with your own changes first and every earlier release below; the word New sits beside the version until you have read it once.
 - Reviewed twice before release (a code review on 21 Sep and a stability review of the whole build with a smoke test of every route the same morning): a case can no longer end with Reject as the only move after every question of a round is withdrawn, a visit date that has passed cannot be confirmed, the last taps on the checklist are saved when you leave the page by a link, and typing while an answer saves no longer loses what you typed.
+
+---
+
+## v0.4.0-rc.2, 21 September 2026: the What's new page, on the same build
+
+The build of v0.4.0-rc.1 plus the page you are reading.
+
+**New**
+- The version number in the corner opens What's new, with the word New beside it until you have read the page once.
+- The page lists every version newest first and marks the one you are using as This build.
+- Your own changes come first; the changes for the other audiences are folded below them.
+
+---
+
+## v0.4.0-rc.1, 21 September 2026: use case 3, sessions, storage and the office's own view
+
+The first build with everything planned for v0.4.0, on the development environment for testing.
+
+**New for licensing officers**
+- The site visit, the inspection checklist on a tablet and the clarification rounds on the case, with one device signed in at a time.
+
+**New for operators**
+- Answer the flagged items after the visit, with text and up to three files; the pages say how much of the application's 150 MB of storage is left.
+
+**New for the licensing office (administrators)**
+- The operations overview, the activity feed, any case read as the officer sees it, and user management.
 
 ---
 

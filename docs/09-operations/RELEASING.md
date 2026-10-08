@@ -20,7 +20,7 @@ The five version files are `frontend/package.json`, `frontend/package-lock.json`
 
 Do this when `dev` holds everything the version should contain and the full local run is green.
 
-1. On a `chore/rc-X.Y.Z-rc.N` branch from `dev`, set the version to `X.Y.Z-rc.N` in the five files. Add or update the version's entry in `RELEASE_NOTES.md`. The heading note names the candidate, for example `## v0.4.1, 9 October 2026 (release candidate v0.4.1-rc.1 on the development environment): ...`.
+1. On a `chore/rc-X.Y.Z-rc.N` branch from `dev`, set the version to `X.Y.Z-rc.N` in the five files. Add a candidate section to `RELEASE_NOTES.md`: `## vX.Y.Z-rc.N, D Month YYYY: title`, with the usual audience blocks, describing what this candidate changed, in the users' words. It sits among the releases in date order, newest first. The development environment lists it on What's new with a Release candidate label; production hides every candidate section, so the notes of a released version never mention candidates.
 2. Merge it into `dev` with `--no-ff`. Run the full local run (pytest, ruff, mypy, the AI gate, vitest, lint, typecheck, build, Playwright). Push `dev`, which needs the owner's yes.
 3. Once CI is green on that commit, tag it: `git tag -a vX.Y.Z-rc.N -m "PermitFlow vX.Y.Z-rc.N"` and `git push origin vX.Y.Z-rc.N` (yes). The tag's CI run writes the `:vX.Y.Z-rc.N` images.
 4. Wait for the development deploy. Check that `https://api.dev.permitflow.space/api/v1/health` reports `X.Y.Z-rc.N` and the tagged commit.
@@ -37,7 +37,7 @@ A candidate is **stable** when the full local run is green, CI on its commit is 
 
 1. On a `chore/release-vX.Y.Z` branch from the stable candidate's commit, change only:
    - the five version files: `X.Y.Z-rc.N` becomes `X.Y.Z`
-   - `RELEASE_NOTES.md`: the heading is dated with the release day, and its note reads `(tested as vX.Y.Z-rc.1 to rc.N)`
+   - `RELEASE_NOTES.md`: the release section `## vX.Y.Z, D Month YYYY: title`, gathering what the candidates changed (the release day and the title only in the heading, never a mention of candidates; the candidates stay listed on the development environment)
    - `CHANGELOG.md`: the release entry
    - the README and other documents, if they name the current production version
 

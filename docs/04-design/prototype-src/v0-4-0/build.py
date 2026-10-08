@@ -1014,7 +1014,7 @@ def build_operator_confirmed(width: int, height: int) -> str:
 import re
 
 NOTES_PATH = Path(__file__).resolve().parents[4] / "RELEASE_NOTES.md"
-RELEASE_RE = re.compile(r"^## (v\d+\.\d+\.\d+), (\d{1,2} [A-Z][a-z]+ \d{4})(?: \(([^)]*)\))?: (.+)$")
+RELEASE_RE = re.compile(r"^## (v\d+\.\d+\.\d+(?:-rc\.\d+)?), (\d{1,2} [A-Z][a-z]+ \d{4})(?: \(([^)]*)\))?: (.+)$")
 
 
 def parse_notes() -> tuple[list[str], list[dict[str, object]]]:
@@ -1033,10 +1033,14 @@ def parse_notes() -> tuple[list[str], list[dict[str, object]]]:
                 continue
             m = RELEASE_RE.match(line)
             assert m, line
+            if "-rc." in m.group(1):
+                # Release candidates are listed on the development environment only; the artboards show releases (US-110).
+                section = "candidate"
+                continue
             releases.append({"version": m.group(1), "date": m.group(2), "note": m.group(3), "title": m.group(4), "intro": [], "blocks": []})
             section = "release"
             continue
-        if section == "preamble":
+        if section in ("preamble", "candidate"):
             continue
         if section == "coming":
             coming.append(line)
