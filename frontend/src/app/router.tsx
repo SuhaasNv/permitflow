@@ -1,6 +1,7 @@
 import { Outlet, createBrowserRouter } from 'react-router-dom'
 
 import { AppShell } from './AppShell'
+import { EnvironmentStrip } from './EnvironmentStrip'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { LandingPage } from '@/features/landing/LandingPage'
 import { PolicyPage } from '@/features/legal/PolicyPage'
@@ -26,10 +27,20 @@ import { ApplicationsPage } from '@/features/operator/ApplicationsPage'
 import { NotFoundPage } from '@/features/shared/NotFoundPage'
 import { RouteTitle, titled } from './RouteTitle'
 
+/** The one root layout: the environment notice above every page (US-109), then the page under its tab title. */
+function RootLayout() {
+  return (
+    <>
+      <EnvironmentStrip />
+      <RouteTitle />
+    </>
+  )
+}
+
 export const router = createBrowserRouter([
   {
     // Every screen names its browser tab through its route's handle (RouteTitle).
-    element: <RouteTitle />,
+    element: <RootLayout />,
     children: [
       { path: '/', element: <LandingPage />, handle: titled('PermitFlow | Food Establishment Licence', true) },
       { path: '/login', element: <LoginPage />, handle: titled('Sign in') },

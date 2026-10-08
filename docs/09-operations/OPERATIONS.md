@@ -58,6 +58,8 @@ Files are written under `UPLOAD_DIR` as `<application_id>/<random>.<ext>` (never
 
 `GET /api/v1/health` → `200 {"status":"ok","database":"ok"}` or `503 {"status":"degraded","database":"unreachable"}`. Provider configuration is never exposed here.
 
+The response also carries `version`, `commit` and `environment` (`APP_ENV`). The frontend reads `environment` and shows an amber "Development environment: test data only" strip above every page whenever it is not `production` (US-109); production shows no strip, so `APP_ENV=production` must be set there.
+
 ## Logs
 
 JSON lines on stdout: one `request` line per request with `request_id`, method, path, status, duration and user id. The request id is echoed in the `X-Request-ID` response header and shown to users on 500 responses. No payloads or document text are logged.
