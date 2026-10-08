@@ -169,3 +169,19 @@ def test_five_resubmission_rounds_keep_every_revision_and_comment(client: TestCl
     )
     events = [e.event_type for e in db.scalars(select(AuditEvent).where(AuditEvent.application_id == app_id))]
     assert events.count("revision.submitted") == 6 and events.count("feedback.addressed") == 5
+
+
+def test_reconfirming_stamps_the_server_time_not_the_clients(client: TestClient, db: Session) -> None:
+    app_id, op, off, _ = under_review(client, db)
+    add_feedback(
+        client, off, app_id, target_type="section", section_key="declarations", message="Please re-confirm."
+    )
+    transition(client, off, app_id, "pending_pre_site_resubmission")
+    r = client.patch(
+        f"/api/v1/applications/{app_id}/sections/declarations",
+        headers=op,
+        json={"information_accurate": True, "consent_to_inspection": True, "confirmed_at": "2000-01-01"},
+    )
+    assert r.status_code == 200, r.text
+    stamp = next(s for s in r.json()["sections"] if s["key"] == "declarations")["data"]["confirmed_at"]
+    assert not stamp.startswith("2000-01-01")

@@ -296,7 +296,12 @@ def _validate_field(  # noqa: PLR0911, PLR0912 - one return per rule
             return "Choose one of the options."
         return None
     if f.kind in ("number", "integer"):
-        if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        # math.isfinite converts to float and raises OverflowError for an int beyond ~1.8e308.
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int | float)
+            or (isinstance(value, float) and not math.isfinite(value))
+        ):
             return "Must be a number."
         if f.kind == "integer" and int(value) != value:
             return "Must be a whole number."

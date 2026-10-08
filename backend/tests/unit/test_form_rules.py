@@ -141,3 +141,19 @@ def test_schema_declares_the_new_rules() -> None:
     )
     assert fields["floor_area_sqm"]["max_decimals"] == 2
     assert fields["food_handlers_count"]["min_value"] == 1
+
+
+def test_a_huge_integer_is_a_field_error_not_a_crash() -> None:
+    """10**400 does not fit a float: the number check must not convert it (it was an OverflowError, a 500)."""
+    huge = 10**400
+    for snapshot in (False, True):
+        premises = validate_section(
+            "premises", {"floor_area_sqm": huge}, allow_missing=True, snapshot=snapshot
+        )
+        operations = validate_section(
+            "operations", {"seating_capacity": huge}, allow_missing=True, snapshot=snapshot
+        )
+        assert premises["floor_area_sqm"] == "Must be at most 10000."
+        assert operations["seating_capacity"] == "Must be at most 2000."
+    negative = validate_section("operations", {"seating_capacity": -huge}, allow_missing=True)
+    assert negative["seating_capacity"] == "Must be at least 0."
