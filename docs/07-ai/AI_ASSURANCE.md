@@ -19,8 +19,8 @@ The AI reads a supporting document and says whether it matches the application f
 
 1. Model approval: the model is the pinned `gpt-4.1-mini`, the confidence threshold is sane, the text cap has not grown, the prompt says the model does not make decisions, every enum on the wire is closed, the domain model forbids unknown fields, tests use the mock, no tracing key in CI.
 2. Contracts: unit tests for the rules, the wire schema, the provider's failure paths (timeout, refusal, malformed answer), the mock, extraction, tracing and the rate limiter. (Found on 19 Sep after the first runs: this stage had reported "pass" while every test errored at setup, because the job had no database and the exit code was hidden behind a pipe. Fixed the same day: a Postgres service, `pipefail`, and a guard that fails the stage unless pytest reports passes.)
-3. Golden set: 24 cases, blocking at 100 % of the 22 counted (two documented mock gaps are reported, not counted).
-4. Adversarial: the eight counted injection cases (plain, hidden in an HTML comment, zero-width, Tag block, bidi, look-alike, fullwidth, accented) must land on `needs_review` with `possible_prompt_injection`.
+3. Golden set: 26 gate-set cases, blocking at 100 % of the 24 counted (two documented mock gaps are reported, not counted); `cases.json` holds 29 with the 3 red-team cases outside the gate.
+4. Adversarial: the ten counted injection cases (plain, hidden in an HTML comment, zero-width, Tag block, bidi, look-alike, fullwidth, accented, variation selectors, a closing `</document>` tag) must land on `needs_review` with `possible_prompt_injection`.
 5. Fairness: 18 name-swapped runs must match their 3 baselines (21 rows).
 6. Verdict: one table, approved or blocked.
 
@@ -34,7 +34,7 @@ Two of 21 runs differed: "Lim Boon Keat" and "Emily Johnson" got issues on a cle
 
 ## Limits
 
-- The golden set is 24 cases and the fairness set is 7 names. Enough to catch a broken prompt, not enough to estimate accuracy to a percentage point. The set is meant to grow from officer overrides (each is a candidate case; with tracing on, it can be found by run id and added to the LangSmith dataset).
+- The golden set is 26 cases and the fairness set is 7 names. Enough to catch a broken prompt, not enough to estimate accuracy to a percentage point. The set is meant to grow from officer overrides (each is a candidate case; with tracing on, it can be found by run id and added to the LangSmith dataset).
 - Fairness here means invariance to names. It does not cover documents in Chinese, Malay or Tamil, image-only documents (reported as unreadable, never guessed), or confidence calibration (the 0.6 threshold is a policy choice, not a measured one).
 - The injection defence is a phrase list (read over cleaned, de-obfuscated text since US-102) plus the prompt's instruction; it is English-only, and a multilingual classifier (Llama Prompt Guard 2) would be the production step.
 - Redaction covers NRIC/FIN and Singapore phone numbers. Names, addresses and other personal data in a document still reach the provider.
