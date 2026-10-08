@@ -2,9 +2,13 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## v0.4.1-rc.1: release candidate on the development environment (8 Oct 2026)
+
+The first version cut under `docs/09-operations/RELEASING.md`: a release candidate on `dev`, tested on dev.permitflow.space, released to `main` only when stable. Contents: US-108 (form validation and the operating hours pick list), US-109 (the development environment strip on every page outside production), US-110 (release candidates listed on the development What's new page, hidden in production; retro entries for v0.4.0-rc.1 and rc.2), the release guard (`scripts/release_guard.py`, run in CI on every `v*` tag) and the production image record of v0.4.0 in `OPERATIONS.md`. Version `0.4.1-rc.1` in the five files. Security audit run 2 reviews this source before the release.
+
 ## US-108, v0.4.1: every field of the application form checked for its Singapore format (8 Oct 2026)
 
-On `feat/us-108-form-validation`, not merged, not pushed. The owner decided phone numbers are Singapore only and that operating hours become a pick list with the same hours on every open day (artboards S-46, approved first). Version not bumped and `RELEASE_NOTES.md` not touched: the release step does both.
+Merged into `dev` on 8 Oct 2026 after an independent review (one medium finding, re-saving an untouched legacy section counted as a change, and three low ones fixed on the branch) and shipped in the release candidate `v0.4.1-rc.1`. The owner decided phone numbers are Singapore only and that operating hours become a pick list with the same hours on every open day (artboards S-46, approved first). 
 
 - **One definition, two enforcers.** Each field declares its rule once in `backend/app/domain/form_schema.py` (`min_length`, `max_decimals`, `min_months_ahead`, `max_years_ahead`, `step_minutes` and a named `rule`); the rules are pure functions in `domain/field_rules.py`, `domain/hours.py` and `domain/text_clean.py`, mirrored in `frontend/src/lib/fieldRules.ts`, `hours.ts` and `cleanText.ts`, and both are held to one JSON table of good and bad values.
 - **Rules.** Phone: Singapore only, stored `+65 XXXX XXXX`. UEN: the three ACRA formats, stored upper-case. Email lower-cased. Postal code sectors 01 to 82. Address needs a letter and a digit, a `#05-12` style unit, no postal code inside. Names, business name, description length (10 to 1000), food handlers 1 to 500, floor area at most two decimals, tenancy expiry a real date 3 months to 30 years ahead on the Singapore calendar. Every text value is cleaned of zero-width, bidi, Tag-block and control characters before it is checked and stored. Messages are in `UI_STATES.md`.
