@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { OFFICER, OPERATOR, acceptVisit, fillSection, proposeVisit, signIn, signOut, status, submitCleanChecklist, uploadTxt as upload } from './helpers.js'
+import { OFFICER, OPERATOR, acceptVisit, fillSection, tenancyExpiry, proposeVisit, signIn, signOut, status, submitCleanChecklist, uploadTxt as upload } from './helpers.js'
 
 /**
  * The critical journey the brief describes: operator submits, officer flags, operator fixes only the
@@ -30,16 +30,20 @@ test('submit, flag, fix only flagged, resubmit, compare, resolve, approve', asyn
   await expect(page).toHaveURL(/\/form\/premises$/)
   await fillSection(
     page,
-    { address_line_1: '10 Jalan Besar #01-12', postal_code: '208787', floor_area_sqm: '48', tenancy_expiry: '2027-10-31' },
+    { address_line_1: '10 Jalan Besar #01-12', postal_code: '208787', floor_area_sqm: '48', tenancy_expiry: tenancyExpiry() },
     { premises_type: 'shophouse' },
   )
   await expect(page).toHaveURL(/\/form\/operations$/)
-  await fillSection(page, {
-    cuisine_description: 'Kaya toast, soft-boiled eggs, kopi and teh.',
-    seating_capacity: '24',
-    operating_hours: 'Mon-Sun 7am-9pm',
-    food_handlers_count: '4',
-  })
+  await fillSection(
+    page,
+    {
+      cuisine_description: 'Kaya toast, soft-boiled eggs, kopi and teh.',
+      seating_capacity: '24',
+      food_handlers_count: '4',
+    },
+    {},
+    { quick: 'Every day', opens: '07:00', closes: '21:00' },
+  )
   await expect(page).toHaveURL(/\/form\/declarations$/)
   await page.locator('[name="information_accurate"]').check()
   await page.locator('[name="consent_to_inspection"]').check()

@@ -21,17 +21,39 @@ export const BUSINESS = {
   contact_email: 'weiling@scenario.sg',
   contact_phone: '+65 9123 4567',
 }
+/** Two years from today on the Singapore calendar: always inside the 3 months to 30 years window (US-108). */
+export function tenancyExpiry(): string {
+  const d = new Date(Date.now() + 8 * 60 * 60 * 1000)
+  d.setUTCFullYear(d.getUTCFullYear() + 2)
+  return d.toISOString().slice(0, 10)
+}
 export const PREMISES = {
   address_line_1: '10 Jalan Besar #01-12',
   postal_code: '208787',
   floor_area_sqm: '48',
-  tenancy_expiry: '2027-10-31',
+  tenancy_expiry: tenancyExpiry(),
 }
 export const OPERATIONS = {
   cuisine_description: 'Kaya toast, soft-boiled eggs, kopi and teh.',
   seating_capacity: '24',
-  operating_hours: 'Mon-Sun 7am-9pm',
   food_handlers_count: '4',
+}
+/** The same hours as the API sees them, and as the picker makes them (Every day, 07:00 to 21:00). */
+export const HOURS = { days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], opens: '07:00', closes: '21:00', open_24h: false }
+export const HOURS_SUMMARY = 'Every day, 07:00 to 21:00'
+
+export interface HoursPick {
+  /** A quick link: Every day, Mon to Fri or Clear. */
+  quick?: 'Every day' | 'Mon to Fri' | 'Clear'
+  opens?: string
+  closes?: string
+}
+
+/** Operates the operating-hours picker (S-46): quick link first, then the two time lists. */
+export async function pickHours(page: Page, pick: HoursPick = { quick: 'Every day', opens: '07:00', closes: '21:00' }) {
+  if (pick.quick) await page.getByRole('button', { name: pick.quick, exact: true }).click()
+  if (pick.opens) await page.getByLabel('Opens', { exact: true }).selectOption(pick.opens)
+  if (pick.closes) await page.getByLabel('Closes', { exact: true }).selectOption(pick.closes)
 }
 
 // ---- UI helpers ----
@@ -55,9 +77,15 @@ export async function signOut(page: Page) {
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
 }
 
-export async function fillSection(page: Page, values: Record<string, string>, selects: Record<string, string> = {}) {
+export async function fillSection(
+  page: Page,
+  values: Record<string, string>,
+  selects: Record<string, string> = {},
+  hours?: HoursPick,
+) {
   for (const [name, value] of Object.entries(values)) await page.locator(`[name="${name}"]`).fill(value)
   for (const [name, value] of Object.entries(selects)) await page.locator(`select[name="${name}"]`).selectOption(value)
+  if (hours) await pickHours(page, hours)
   await page.getByRole('button', { name: /Save and (continue|go to)/ }).click()
 }
 
@@ -158,7 +186,7 @@ export async function seedSubmitted(): Promise<Seeded> {
   })
   await call(op, `/applications/${id}/sections/operations`, {
     method: 'PATCH',
-    body: JSON.stringify({ ...OPERATIONS, seating_capacity: 24, food_handlers_count: 4 }),
+    body: JSON.stringify({ ...OPERATIONS, seating_capacity: 24, food_handlers_count: 4, operating_hours: HOURS }),
   })
   await call(op, `/applications/${id}/sections/declarations`, {
     method: 'PATCH',
