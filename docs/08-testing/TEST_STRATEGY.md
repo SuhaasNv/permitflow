@@ -122,7 +122,7 @@ The E2E test signs in with the seeded `operator@permitflow.example.sg` and `offi
 | Gap | Reason | Plan |
 |-----|--------|------|
 | Visual regression | No screenshot comparison; layouts are verified by hand at 1440, 820 and 390 per story and captured in `../04-design/screens/as-built/` | Deferred; a Playwright screenshot assertion per screen would be the next step |
-| Live AI on every push | Costs money and is non-deterministic | Covered separately (US-054, US-056): `ai-eval.yml` runs the golden set and the fairness check against OpenAI nightly, by hand, and when the AI module or the set changes; blocking at 14 of 14 and 21 of 21, results kept 90 days. The mock-provider AI gate (`ai-gate.yml`, six stages) runs on every push from CI |
+| Live AI on every push | Costs money and is non-deterministic | Covered separately (US-054, US-056): `ai-eval.yml` runs the golden set and the fairness check against OpenAI nightly, by hand, and when the AI module or the set changes; blocking at 24 of 24 once the US-102 cases have been run live (14 of 14 until then) and 21 of 21, results kept 90 days. The mock-provider AI gate (`ai-gate.yml`, six stages) runs on every push from CI |
 | Load and soak | Out of scope for the assessment | Noted in `../11-reviews/PRODUCTION_READINESS_REVIEW.md` (Day 3) |
 | Accessibility, assistive technology | axe covers what a rule can check; no screen-reader session has been run with VoiceOver or NVDA | A VoiceOver pass over the apply and review journeys would be the next step |
 
