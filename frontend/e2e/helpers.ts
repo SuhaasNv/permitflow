@@ -2,6 +2,9 @@ import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 export const PASSWORD = process.env.SEED_PASSWORD ?? 'PermitFlow!2026'
+/** The administrator's password is private on a real deployment (SEED_ADMIN_PASSWORD); it falls back to the shared one. */
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || PASSWORD
+const passwordFor = (email: string) => (email === ADMIN ? ADMIN_PASSWORD : PASSWORD)
 export const OPERATOR = 'operator@permitflow.example.sg'
 export const OFFICER = 'officer@permitflow.example.sg'
 export const ADMIN = 'admin@permitflow.example.sg'
@@ -63,7 +66,7 @@ export async function pickHours(page: Page, pick: HoursPick = { quick: 'Every da
 export async function signIn(page: Page, email: string) {
   await page.goto('/login')
   await page.getByLabel(/Email address/).fill(email)
-  await page.getByLabel(/^Password/).fill(PASSWORD)
+  await page.getByLabel(/^Password/).fill(passwordFor(email))
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   const takeOver = page.getByRole('button', { name: 'Sign out the other device and continue' })
   const signedIn = page.getByRole('button', { name: 'Sign out', exact: true })
@@ -135,7 +138,7 @@ async function login(email: string): Promise<Headers> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     // Seeding takes the account over: the scenario signs in through the page afterwards and does the same.
-    body: JSON.stringify({ email, password: PASSWORD, take_over: true }),
+    body: JSON.stringify({ email, password: passwordFor(email), take_over: true }),
   })
   if (!r.ok) throw new Error(`login ${email}: ${r.status}`)
   const body = (await r.json()) as { access_token?: string; token?: string }

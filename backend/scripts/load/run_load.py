@@ -51,7 +51,9 @@ def main() -> int:
     password = os.environ.get("SEED_PASSWORD", "PermitFlow!2026")
     with httpx.Client(timeout=30) as c:
         officer = login(c, args.base, "officer@permitflow.example.sg", password)
-        admin = login(c, args.base, "admin@permitflow.example.sg", password)
+        admin = login(
+            c, args.base, "admin@permitflow.example.sg", os.environ.get("SEED_ADMIN_PASSWORD") or password
+        )
         schema = c.get(f"{args.base}/checklist-schema", headers=officer).json()
         keys = [i["key"] for s in schema["sections"] for i in s["items"]]
         c.post(f"{args.base}/officer/applications/{args.app}/checklist", headers=officer)
