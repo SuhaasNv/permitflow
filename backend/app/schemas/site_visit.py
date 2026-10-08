@@ -6,6 +6,8 @@ import datetime as dt
 
 from pydantic import BaseModel, Field
 
+from app.schemas.clean import CleanBlock
+
 
 class SiteVisitProposalOut(BaseModel):
     round: int
@@ -74,7 +76,7 @@ class SiteVisitOperatorView(BaseModel):
 class SiteVisitProposeIn(BaseModel):
     date: dt.date
     slot: str
-    note: str | None = Field(default=None, max_length=500)
+    note: CleanBlock | None = Field(default=None, max_length=500)
     # The transition to Site Visit Scheduled happens in the same request; the version guards it.
     expected_version: int
 
@@ -83,19 +85,19 @@ class SiteVisitDecideIn(BaseModel):
     action: str  # accept_operator | keep_original | propose
     date: dt.date | None = None
     slot: str | None = None
-    note: str | None = Field(default=None, max_length=500)
+    note: CleanBlock | None = Field(default=None, max_length=500)
 
 
 class SiteVisitRescheduleIn(BaseModel):
     date: dt.date
     slot: str
-    reason: str | None = Field(default=None, max_length=500)
+    reason: CleanBlock | None = Field(default=None, max_length=500)
 
 
 class SiteVisitCounterIn(BaseModel):
     date: dt.date
     slot: str
-    reason: str | None = Field(default=None, max_length=500)
+    reason: CleanBlock | None = Field(default=None, max_length=500)
 
 
 __all__ = [

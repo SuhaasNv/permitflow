@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.schemas.clarification import ClarificationBlock, ClarificationOperatorView
+from app.schemas.clean import CleanBlock
 from app.schemas.site_visit import SiteVisitOperatorView
 from app.schemas.storage import StorageView
 
@@ -125,7 +126,7 @@ class LicenceView(BaseModel):
 
 
 class WithdrawIn(BaseModel):
-    reason: str | None = Field(default=None, max_length=1000)
+    reason: CleanBlock | None = Field(default=None, max_length=1000)
 
 
 class EarlierVisitOperatorView(BaseModel):

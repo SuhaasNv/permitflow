@@ -96,7 +96,9 @@ def summary(
     visit_awaits_operator: bool = False,
     open_clarifications: int = 0,
 ) -> ApplicationSummaryOut:
-    comp = completeness_rules.compute(app.draft_data, _present_types(app, present_types))
+    comp = completeness_rules.compute(
+        app.draft_data, _present_types(app, present_types), snapshot=app.status != ApplicationStatus.DRAFT
+    )
     business = (app.draft_data.get("business") or {}).get("business_name")
     premises = (app.draft_data.get("premises") or {}).get("address_line_1")
     return ApplicationSummaryOut(
@@ -206,7 +208,9 @@ def operator_view(
 ) -> ApplicationOperatorView:
     documents = documents or []
     docs_by_type = {d.document_type: (d, r) for d, r in documents}
-    comp = completeness_rules.compute(app.draft_data, set(docs_by_type))
+    comp = completeness_rules.compute(
+        app.draft_data, set(docs_by_type), snapshot=app.status != ApplicationStatus.DRAFT
+    )
     editable_sections = editable_sections or set()
     editable_document_types = editable_document_types or set()
     sections = [

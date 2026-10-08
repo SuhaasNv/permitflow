@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.schemas.applications import LicenceView
 from app.schemas.checklist import ChecklistSummaryOut
 from app.schemas.clarification import ClarificationOfficerView
+from app.schemas.clean import CleanBlock
 from app.schemas.site_visit import SiteVisitOut
 
 
@@ -136,7 +137,7 @@ class FeedbackIn(BaseModel):
     target_type: str
     section_key: str | None = None
     document_type: str | None = None
-    message: str = Field(max_length=2000)
+    message: CleanBlock = Field(max_length=2000)
     template_key: str | None = None
 
 
@@ -210,7 +211,7 @@ class OfficerApplicationOut(BaseModel):
 class TransitionIn(BaseModel):
     target: str
     # Stored as the decision note for `approved` and `rejected` (required for reject); ignored otherwise.
-    note: str | None = Field(default=None, max_length=2000)
+    note: CleanBlock | None = Field(default=None, max_length=2000)
     expected_version: int
 
 
