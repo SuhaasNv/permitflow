@@ -123,8 +123,8 @@ export function LoginPage() {
 
   return (
     <div className="grid min-h-screen bg-surface lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <main id="main" className="flex flex-col px-6 py-8 sm:px-12 lg:px-20 lg:py-10">
-        <div>
+      <main id="main" className="flex flex-col px-5 pb-8 sm:px-10 lg:pb-10">
+        <div className="flex h-[72px] items-center">
           <Logo />
         </div>
         <div className="pf-enter my-auto w-full max-w-[400px] py-12">
