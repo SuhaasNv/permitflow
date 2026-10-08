@@ -17,6 +17,7 @@ import math
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 
 from fastapi import Request
 
@@ -52,12 +53,25 @@ def client_key(request: Request, trusted_proxies: str, client_ip_header: str = "
     return hops[-1] if hops else host
 
 
+Limit = int | Callable[[], int]
+
+
 class _Window:
-    def __init__(self, limit: int, window_seconds: float = 60.0) -> None:
-        self.limit = limit
+    """`limit` is a number, or a callable read on every hit so the live value (US-101) applies at once."""
+
+    def __init__(self, limit: Limit, window_seconds: float = 60.0) -> None:
+        self._limit = limit
         self.window = window_seconds
         self._hits: dict[str, deque[float]] = {}
         self._lock = threading.Lock()
+
+    @property
+    def limit(self) -> int:
+        return self._limit() if callable(self._limit) else self._limit
+
+    @limit.setter
+    def limit(self, value: int) -> None:
+        self._limit = value
 
     @property
     def enabled(self) -> bool:
@@ -81,7 +95,7 @@ class _Window:
 class FailedLoginLimiter(_Window):
     """Blocks a client after `limit` failed sign-ins within a minute."""
 
-    def __init__(self, limit_per_minute: int) -> None:
+    def __init__(self, limit_per_minute: Limit) -> None:
         super().__init__(limit_per_minute)
 
     def is_blocked(self, key: str) -> bool:
@@ -120,7 +134,7 @@ class RequestLimiter:
     """The two request buckets the middleware consults, replaceable on `app.state` in tests."""
 
     def __init__(
-        self, *, per_minute: int, login_per_minute: int, trusted_proxies: str, client_ip_header: str = ""
+        self, *, per_minute: Limit, login_per_minute: Limit, trusted_proxies: str, client_ip_header: str = ""
     ) -> None:
         self.general = WindowLimiter(per_minute)
         self.login = WindowLimiter(login_per_minute)

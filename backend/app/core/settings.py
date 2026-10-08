@@ -74,6 +74,14 @@ class Settings(BaseSettings):
     langsmith_project: str = "permitflow"
     langsmith_hide_inputs: bool = True
 
+    # US-101: the limits above are the defaults and the hard ceilings of the admin settings panel. The
+    # worker's concurrency has no consumer yet (US-098) but is a panel setting, so its ceiling lives here.
+    worker_concurrency: int = 2
+    # US-101: the API announces every settings change in the Telegram chat the monitoring bot already
+    # uses. Both empty: no message and no network call.
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

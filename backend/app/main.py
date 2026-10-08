@@ -22,6 +22,7 @@ from app.core.rate_limit import RequestLimiter
 from app.core.settings import get_settings
 from app.core.version import APP_VERSION
 from app.domain.uploads import too_large_message
+from app.services.platform_settings import live
 
 logger = logging.getLogger("permitflow")
 
@@ -67,6 +68,19 @@ def _error_response(
     )
 
 
+def build_request_limiter(*, enabled: bool = True) -> RequestLimiter:
+    """The per-client request windows, reading the live platform settings (US-101): an administrator's
+    change applies on the next request after the cache refreshes. `enabled=False` is the test environment's
+    "off"; the environment values are still the ceilings of what the panel may set."""
+    settings = get_settings()
+    return RequestLimiter(
+        per_minute=(lambda: live().int_value("rate_limit_per_minute")) if enabled else 0,
+        login_per_minute=(lambda: live().int_value("login_attempts_per_minute")) if enabled else 0,
+        trusted_proxies=settings.trusted_proxies,
+        client_ip_header=settings.client_ip_header,
+    )
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     # Interactive docs stay available outside production (THREAT_MODEL: no public schema in production).
@@ -97,12 +111,7 @@ def create_app() -> FastAPI:
 
     # Per-client request limits (US-058), inside CORS so a 429 carries the headers the browser needs.
     # Off in the test environment; tests that exercise it install their own limiter on app.state.
-    app.state.limiter = RequestLimiter(
-        per_minute=0 if settings.app_env == "test" else settings.rate_limit_per_minute,
-        login_per_minute=0 if settings.app_env == "test" else settings.login_attempts_per_minute,
-        trusted_proxies=settings.trusted_proxies,
-        client_ip_header=settings.client_ip_header,
-    )
+    app.state.limiter = build_request_limiter(enabled=settings.app_env != "test")
 
     @app.middleware("http")
     async def rate_limit(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -121,8 +130,8 @@ def create_app() -> FastAPI:
     # body without a length refused outright (review finding, 21 Sep).
     app.add_middleware(
         BodyLimitMiddleware,
-        upload_limit=settings.upload_max_bytes + _MULTIPART_OVERHEAD,
-        upload_message=too_large_message(settings.upload_max_bytes),
+        upload_limit=lambda: live().int_value("upload_max_bytes") + _MULTIPART_OVERHEAD,
+        upload_message=lambda: too_large_message(live().int_value("upload_max_bytes")),
     )
 
     app.add_middleware(

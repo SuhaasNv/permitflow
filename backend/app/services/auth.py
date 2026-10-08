@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import SessionActive, SessionRevoked, Unauthorized
+from app.core.errors import SessionActive, SessionRevoked, StepUpFailed, Unauthorized
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.settings import get_settings
 from app.models import User, UserSession
@@ -114,6 +114,12 @@ class AuthService:
             session.last_seen_at = now
             self.db.commit()
         return user
+
+    def confirm_password(self, user: User, password: str) -> None:
+        """Step-up (US-101): re-verify the signed-in user's own password before a sensitive change. The
+        caller counts a failure against the sign-in limiter."""
+        if not verify_password(password, user.password_hash):
+            raise StepUpFailed("Your password is incorrect. The change was not made.")
 
     def sign_out(self, user: User, session_id: uuid.UUID) -> None:
         session = self.sessions.get(session_id)

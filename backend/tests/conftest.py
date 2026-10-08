@@ -20,6 +20,9 @@ if os.environ.get("TEST_LIVE_AI") != "1":
 # The suite runs whole appointments in one sitting; the visit-day rule (F12) is switched on by the tests
 # that exercise it (the `visit_day_guard` fixture).
 os.environ["SITE_VISIT_DAY_GUARD"] = "false"
+# Tests never announce on a real Telegram chat, whatever the developer's .env says (US-101).
+os.environ["TELEGRAM_BOT_TOKEN"] = ""
+os.environ["TELEGRAM_CHAT_ID"] = ""
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -30,6 +33,7 @@ from app.core.settings import get_settings  # noqa: E402
 from app.infra import db as dbmod  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Base  # noqa: E402
+from app.services.platform_settings import reset_live  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
@@ -65,6 +69,14 @@ def clean_tables() -> Iterator[None]:
     tables = ", ".join(f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables))
     with engine.begin() as conn:
         conn.execute(text(f"TRUNCATE TABLE {tables} RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture(autouse=True)
+def fresh_platform_settings() -> Iterator[None]:
+    """The live settings cache (US-101) is per process; a test must not see another test's override."""
+    reset_live()
+    yield
+    reset_live()
 
 
 @pytest.fixture

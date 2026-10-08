@@ -71,4 +71,6 @@ def canonical_content_type(ext: str) -> str:
 
 
 def too_large_message(limit_bytes: int) -> str:
-    return f"The file is larger than {limit_bytes // (1024 * 1024)} MB."
+    # Whole megabytes read as before ("10 MB"); a limit set between two (US-101) reads "1.5 MB".
+    shown = f"{limit_bytes / (1024 * 1024):.1f}".removesuffix(".0")
+    return f"The file is larger than {shown} MB."
