@@ -6,9 +6,11 @@ import hashlib
 import os
 from collections.abc import Iterator
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import boto3
 import pytest
+from botocore.exceptions import ClientError
 from moto import mock_aws
 
 from app.core import settings as settings_module
@@ -138,6 +140,25 @@ def test_an_unreachable_bucket_is_a_storage_error() -> None:
         with pytest.raises(StorageError):
             broken.check_bucket()
     assert issubclass(StorageError, OSError)
+
+
+@pytest.mark.parametrize("code", ["403", "AccessDenied"])
+def test_access_denied_is_a_storage_error_never_an_absent_key(code: str) -> None:
+    """Without s3:ListBucket a missing key answers 403, which looks the same as a forbidden one. Treating it
+    as absent would hide a permission problem as "no such document"; it must surface as a storage error
+    whose message names the code and the fix, not the service's own message."""
+    denied = ClientError({"Error": {"Code": code, "Message": "do-not-leak-this"}}, "HeadObject")
+    client = MagicMock()
+    client.head_object.side_effect = denied
+    client.get_object.side_effect = denied
+    store = S3Storage(client, BUCKET)
+    with pytest.raises(StorageError, match="s3:ListBucket") as head_error:
+        store.exists("app-1/doc.pdf")
+    with pytest.raises(StorageError, match="s3:ListBucket") as get_error:
+        _read(store, "app-1/doc.pdf")
+    for error in (head_error, get_error):
+        assert code in str(error.value)
+        assert "do-not-leak-this" not in str(error.value)
 
 
 def test_the_switch_defaults_to_local_disk() -> None:

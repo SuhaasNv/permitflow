@@ -24,6 +24,10 @@ if TYPE_CHECKING:
 
 CHUNK = 64 * 1024
 _NOT_FOUND = {"404", "NoSuchKey", "NotFound"}
+# A 403 is never read as "absent". Without s3:ListBucket, S3 answers AccessDenied for a key that does not
+# exist as well as for one the credentials may not read, and the two cannot be told apart, so it is a storage
+# error. The bucket credentials must include s3:ListBucket so a missing key answers 404 (OPERATIONS.md).
+_ACCESS_DENIED = {"403", "AccessDenied", "Forbidden"}
 # Single-threaded transfers: no thread pool is started inside a request, and memory stays bounded by one
 # 8 MiB part (the upload ceiling is 10 MB, so at most one multipart upload of two parts).
 _TRANSFER = TransferConfig(
@@ -56,6 +60,18 @@ class _ChunkReader(io.RawIOBase):
 
 def _error_code(exc: ClientError) -> str:
     return str(exc.response.get("Error", {}).get("Code", ""))
+
+
+def _read_error(action: str, exc: ClientError) -> StorageError:
+    """A failed GET or HEAD that is not "not found". Names the code only, never a credential or a message
+    from the service."""
+    code = _error_code(exc)
+    if code in _ACCESS_DENIED:
+        return StorageError(
+            f"object storage {action} was refused ({code}): the bucket credentials need read access and "
+            "s3:ListBucket, otherwise a missing key is indistinguishable from a forbidden one"
+        )
+    return StorageError(f"object storage {action} failed: {code}")
 
 
 class S3Storage:
@@ -92,7 +108,7 @@ class S3Storage:
         except ClientError as exc:
             if _error_code(exc) in _NOT_FOUND:
                 raise FileNotFoundError(key) from exc
-            raise StorageError(f"object storage get failed: {_error_code(exc)}") from exc
+            raise _read_error("get", exc) from exc
         except BotoCoreError as exc:
             raise StorageError(f"object storage get failed: {type(exc).__name__}") from exc
         try:
@@ -117,7 +133,7 @@ class S3Storage:
         except ClientError as exc:
             if _error_code(exc) in _NOT_FOUND:
                 return None
-            raise StorageError(f"object storage head failed: {_error_code(exc)}") from exc
+            raise _read_error("head", exc) from exc
         except BotoCoreError as exc:
             raise StorageError(f"object storage head failed: {type(exc).__name__}") from exc
 
