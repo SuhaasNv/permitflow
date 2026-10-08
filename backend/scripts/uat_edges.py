@@ -2030,7 +2030,7 @@ def us103_checks() -> None:
         "the README prints the shared password only under the development and local table, and says production does not",
         "Development and local sign-ins" in demo
         and demo.count("PermitFlow!2026") == 3
-        and "does not publish a password" in demo,
+        and "does not print a password" in demo,
         f"{demo.count('PermitFlow!2026')} occurrences",
     )
 
