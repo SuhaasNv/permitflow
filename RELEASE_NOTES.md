@@ -14,6 +14,23 @@ Format: the product reads this file at build time for its What's new page (the v
 
 **After that:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
 
+## v0.5.0-rc.1, 9 October 2026: safer documents, tunable limits and clearer focus
+
+**New for operators**
+- Text hidden inside an uploaded document (invisible characters, look-alike letters, hidden instructions) is now caught and sent to a licensing officer to look at, and identity and phone numbers are masked before a document is checked automatically.
+- The hours picker, the save buttons and the error summary keep your place when you use a keyboard, and the focus ring is clearly visible on every button.
+
+**New for licensing officers**
+- Comparing two revisions is now a proper table that screen readers can follow, and "Add feedback" puts you straight in the message box.
+
+**New for administrators**
+- The administrator can lower the request, sign-in, draft, upload and automatic-check limits, or pause the automatic checks, from the service itself: every change needs a reason and your password, is recorded and can be undone, and no change can go above the limits set for the environment.
+- Creating an account or changing a role now asks for your password again.
+
+**Also**
+- Production's demonstration accounts are no longer published, and new ones there are opt-in.
+- The build now scans the code and the container images for known weaknesses before anything is released.
+
 ## v0.4.1, 9 October 2026: Singapore formats on the form, hours you pick, and steadier checks
 
 **New for operators**
