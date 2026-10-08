@@ -54,13 +54,23 @@ A candidate is **stable** when the full local run is green, CI on its commit is 
    - metrics answer 401 without the token
    - the site and `/releases` answer with the new bundle
    - one request that uses something new in this version
-6. Run the seed once if the version adds seeded accounts. Record the image row in `OPERATIONS.md`. Mark the release story Done in Notion.
+6. Run the seed once if the version adds seeded accounts. For the version that carries US-103, also rotate production's `operator@`, `officer@` and `officer2@` demonstration accounts, which still hold the published password (owner's yes in that turn; `OPERATIONS.md`, "Release step: the production demonstration accounts"). Record the image row in `OPERATIONS.md`. Mark the release story Done in Notion.
 
 **Rollback:** set both production services back to the previous release's `sha-` tag and redeploy (`OPERATIONS.md`, Rollback).
 
 ## Approvals
 
 Every push, merge into `main`, tag and deploy needs the owner's yes at that moment (project `CLAUDE.md` and BRANCHING rule 7). An advance approval given for a chain of steps, such as "when it is stable, push it to main", holds only while every check passes. The first failure stops the chain and is reported.
+
+## When the image scan or a scanner fails on a release tag
+
+The `images` job builds each image, scans it with Trivy (HIGH and CRITICAL with a fix) and only then logs in to GHCR and pushes. A failure on a `vX.Y.Z` tag therefore means **no image was pushed**. Triage it on `dev`, like any problem found in a candidate:
+
+1. Read the finding in the run log. If a package in the base image has a fix, bump the base image or add the upgrade step in the Dockerfile on a `fix/` branch from `dev`, merge it, and cut a new candidate (section 1).
+2. If the finding cannot be fixed yet or does not apply, add it to `.trivyignore` on `dev`: the id, the reason it does not apply, who accepted it, and an expiry date (review within 30 days), then cut a new candidate. A bare id without a reason and a date is not accepted.
+3. Release the new candidate under the next version number. **Never delete, move or re-push the failed tag, and never re-tag the same version** on a different commit: a version names exactly one commit, and the release guard and the `:vX.Y.Z` image depend on it. The failed tag stays as the record.
+
+Re-running the failed job on the same tag run is not a re-tag: it is the right move when the cause was the scanner's own infrastructure. The Trivy database is fetched from the public ECR mirror with three attempts, and Semgrep is retried once; if both attempts fail the job fails rather than skipping the scan, so re-run it once the mirror or the Semgrep registry answers again. A scan that did not run never clears a release.
 
 ## Not yet: building once and promoting
 

@@ -66,3 +66,17 @@ Consequences. A fixable HIGH in a base image now fails the build until the Docke
 Revisit when: the ZAP report shows the same alerts for a month with nothing actionable (tune it with a rules file, or stop), a real finding needs an ignore mechanism Semgrep lacks, or a staging environment exists and an active scan can run against it.
 
 Links: US-103 (`docs/05-planning/USER_STORIES.md`), `docs/06-security/SECURITY_REVIEW.md` (scanner table and the planted-secret proof), `docs/09-operations/OPERATIONS.md` (CI section).
+
+## Amendment: the scanned image is the pushed image, and the pipeline's supply chain is pinned (9 Oct 2026, wave 1 review)
+
+Context. The review of the US-103 pipeline found four weaknesses in the `images` job: Trivy ran as a third-party action after `docker/login-action` had written a `packages: write` token to the runner; the scanned image and the pushed image were two separate builds, so the scan proved a cache hit, not the artefact; a Trivy database or Semgrep rules outage could block a release tag; and the older actions were pinned to tags (movable), not commit SHAs.
+
+Options considered. (a) Scan the pushed image by digest after the push, to a staging tag: the scan then covers the exact artefact, but a vulnerable image already exists in GHCR, and a failed scan leaves a tag to clean up. (b) Keep two builds and rely on the cache: the status quo, rejected because nothing proves they are the same image. (c) Build once, load into the runner, scan, then push the loaded image: the artefact is the scanned one and nothing reaches GHCR unless the scan passed. Chosen: (c). The cost is that a pushed image carries no buildx provenance attestation (`docker push` of a loaded image has none), which nothing here consumes.
+
+Decision. Trivy is the pinned release binary (version and SHA-256 in the job's `env`, as gitleaks is in `secret-history.yml`), replacing `aquasecurity/trivy-action`; the GHCR login moves after both scans; the image that was scanned is tagged and pushed with `docker push`. The Trivy database comes from the public ECR mirror with three attempts, and the job fails, never skips, if they all fail. Semgrep is retried once when a run cannot complete. Every action in `ci.yml`, `deploy.yml`, `ai-gate.yml`, `ai-eval.yml` and `secret-history.yml` is pinned to a commit SHA with the version in a comment, and the Railway CLI in `deploy.yml` is installed at an exact version. This supersedes "scanned, then built again for the push" and "the older actions still use version tags" in the amendment above.
+
+Consequences. A Trivy failure on a release tag is triaged on `dev` (base image bump, or a `.trivyignore` entry with a reason, an owner and an expiry) and released as a new candidate; the tag is never moved or re-used (`docs/09-operations/RELEASING.md`). Dependabot's weekly `github-actions` pull request now rewrites a SHA and its comment together.
+
+Revisit when: the pipeline needs image attestations or an SBOM (then push by digest from buildx and attest), or the public ECR mirror stops being maintained.
+
+Links: `docs/09-operations/OPERATIONS.md` (CI section), `docs/09-operations/RELEASING.md`, `docs/06-security/SECURITY_REVIEW.md`.

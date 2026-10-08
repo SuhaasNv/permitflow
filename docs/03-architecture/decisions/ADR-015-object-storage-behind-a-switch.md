@@ -56,7 +56,8 @@ Option C, behind a switch.
 - Two sources of truth exist during the migration. The order is: copy, verify, flip, and keep the volume until the bucket has held for a release. Files uploaded between the last copy and the flip must be copied again, so the copy is run once more immediately before the flip (it is idempotent) and the flip is done in a quiet moment.
 - Flipping back to `local` after uploads have landed only in the bucket loses sight of those files. The rollback therefore includes copying back (the reverse copy is not scripted; see "Revisit when").
 - The volume gauges (`volume_used`, `volume_total`) read 0 on a bucket, so the "volume above 80%" alert cannot fire; the dashboard row shows no data. They are left alone in this change and removed or replaced when the volume is retired.
-- Latency: every `exists`, `size` and `open` is a network call. `storage_usage` makes one HEAD per document of an application; with at most a few dozen files per application this is acceptable and is the first thing to measure on development.
+- Latency: every `exists`, `size` and `open` is a network call. `storage_usage` makes one HEAD, for the licence certificate only (the document and attachment sizes come from the database), so an application page costs at most one extra round trip to the bucket; that is acceptable and is the first thing to measure on development.
+- A 403 on a read is never "absent". Without `s3:ListBucket` a bucket answers 403 for a key that does not exist, indistinguishable from a forbidden one, so `S3Storage` raises `StorageError` (message names the code and the missing permission, nothing from the service) and `OPERATIONS.md` requires the bucket credentials to include `s3:ListBucket`, so that a missing key answers 404.
 - Backups: a bucket is not a backup by itself. Versioning or a second bucket is a follow-up (readiness rows 13 and 14).
 
 ## Validation

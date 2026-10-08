@@ -43,9 +43,11 @@ services:
 
   # Object storage for uploads (US-097): `docker compose --profile storage up -d`. S3 API on :9000, console
   # on :9001 (sign in permitflow / permitflow-local). Used only when STORAGE_BACKEND=s3; nothing else
-  # depends on it. MinIO no longer publishes images of its own, so this is the Chainguard build of it.
+  # depends on it. MinIO no longer publishes images of its own, so this is the Chainguard build of it, pinned by
+  # digest (the `latest` build of 9 Oct 2026); bump it on purpose with `docker pull` and `docker inspect`.
+  # The ports are bound to this machine only: the development credentials below must not face the network.
   minio:
-    image: cgr.dev/chainguard/minio:latest
+    image: cgr.dev/chainguard/minio@sha256:59667194421209c2c1eacbe761e24787e047985c5dfa96b15da9b59fe9b55cd0
     container_name: permitflow-minio
     profiles: ["storage"]
     command: ["server", "/data", "--console-address", ":9001"]
@@ -53,15 +55,15 @@ services:
       MINIO_ROOT_USER: permitflow
       MINIO_ROOT_PASSWORD: permitflow-local
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio:/data
 
   # One-shot: creates the bucket, then exits. The image has no shell, so the wait for MinIO is the
   # restart policy: it fails until MinIO answers, and stops once the bucket exists.
   minio-init:
-    image: cgr.dev/chainguard/minio-client:latest
+    image: cgr.dev/chainguard/minio-client@sha256:7a5387f27d1aa8fc11286acde9e024b7b1b77585e17c36378552eeafcccf2ba3
     container_name: permitflow-minio-init
     profiles: ["storage"]
     environment:
