@@ -6,3 +6,9 @@ declare module 'virtual:release-notes' {
   const raw: string
   export default raw
 }
+
+/** backend/tests/fixtures/form_rules.json as one string, for the client's rule tests (US-108). */
+declare module 'virtual:form-rules-fixture' {
+  const raw: string
+  export default raw
+}
