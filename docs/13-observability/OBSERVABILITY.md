@@ -95,6 +95,8 @@ Three things reach one Telegram chat, all through one bot (`@permitflow_space_mo
 
 Messages are Telegram HTML: bold labels, italic objectives, a rule line between sections, the dashboard URL as bare text (an anchor tag was not tappable in every client). The bot token and the chat id are secrets set on the Grafana and bot services; the local Compose profile reads them from `.env` and provisions nothing when they are empty. The local bot is stopped once the Railway one runs: two pollers on one token compete for updates.
 
+**A fourth message, from the API (US-101).** When an administrator changes or reverts a platform setting, the API posts one plain-text message to the same chat after the change is committed: `PermitFlow [dev] setting changed`, the setting, `old -> new`, who, and the reason they gave. It is sent by `backend/app/infra/notifier.py` from a short-lived thread with a 5-second timeout and never fails the change; plain text, so a typed reason cannot inject markup; the bot token is never logged. It needs `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` on the backend service (the same values the monitoring services use); without them nothing is sent. There is no new metric, rule, dashboard row or bot command. The audit trail is the record; the message is the alarm for a change the owner did not make.
+
 What it is not: an on-call system. There is no acknowledgement, no escalation, no silence window; a rule fires, a phone buzzes, a person decides.
 
 ## 6. Locally
