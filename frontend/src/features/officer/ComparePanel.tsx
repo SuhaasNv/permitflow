@@ -16,6 +16,10 @@ const CHANGE_LABEL: Record<string, string> = {
   unchanged: 'Unchanged',
 }
 
+const HEADER = 'block text-left align-top text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3'
+/** Stacked below sm, where the column headers are hidden: each value says which revision it is from. */
+const MOBILE_LABEL = 'mb-0.5 block text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 sm:hidden'
+
 /** Revision compare (S-23, FR-022): field-level old → new for changed sections, document add/remove/replace.
  *  Defaults to current vs previous; any two revisions can be picked (SCOPE S4). */
 export function ComparePanel({ view }: { view: OfficerApplication }) {
@@ -113,29 +117,55 @@ export function ComparePanel({ view }: { view: OfficerApplication }) {
                   )}
                 </div>
                 {s.fields.length > 0 ? (
-                  <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[200px_minmax(0,1fr)_minmax(0,1fr)]">
-                    <dt className="hidden text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 sm:block">Field</dt>
-                    <dt className="hidden text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 sm:block">
-                      Revision {compare.data.from_revision}
-                    </dt>
-                    <dt className="hidden text-[11px] font-semibold uppercase tracking-[0.06em] text-text-3 sm:block">
-                      Revision {compare.data.to_revision}
-                    </dt>
-                    {s.fields.map((f) => {
-                      const def = fieldDef(s.key, f.key)
-                      return (
-                        <div key={f.key} className="contents">
-                          <dt className="text-text-3">{f.label}</dt>
-                          <dd className="rounded bg-error-soft/60 px-2 py-1 text-text-2 line-through decoration-error/60">
-                            {def ? displayValue(def, f.old) : String(f.old ?? 'Not entered')}
-                          </dd>
-                          <dd className="rounded bg-success-soft px-2 py-1 font-medium">
-                            {def ? displayValue(def, f.new) : String(f.new ?? 'Not entered')}
-                          </dd>
-                        </div>
-                      )
-                    })}
-                  </dl>
+                  // A real table: column headers name the two revisions, the field name heads its row. Below sm the
+                  // cells stack (display: block), so the roles are restated to keep the table semantics.
+                  <table role="table" className="-mb-2 block w-full text-left text-sm sm:table sm:table-fixed">
+                    <caption className="sr-only">Fields changed in {s.title}</caption>
+                    <colgroup>
+                      <col className="sm:w-[200px]" />
+                      <col />
+                      <col />
+                    </colgroup>
+                    <thead role="rowgroup" className="sr-only sm:not-sr-only sm:table-header-group">
+                      <tr role="row" className="sm:table-row">
+                        <th role="columnheader" scope="col" className={cn(HEADER, 'sm:table-cell')}>
+                          Field
+                        </th>
+                        <th role="columnheader" scope="col" className={cn(HEADER, 'sm:table-cell sm:pl-6')}>
+                          Revision {compare.data.from_revision}
+                        </th>
+                        <th role="columnheader" scope="col" className={cn(HEADER, 'sm:table-cell sm:pl-6')}>
+                          Revision {compare.data.to_revision}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody role="rowgroup" className="block sm:table-row-group">
+                      {s.fields.map((f) => {
+                        const def = fieldDef(s.key, f.key)
+                        return (
+                          <tr key={f.key} role="row" className="block sm:table-row">
+                            <th role="rowheader" scope="row" className="block pb-2 text-left align-top font-normal text-text-3 sm:table-cell">
+                              {f.label}
+                            </th>
+                            <td role="cell" className="block pb-2 align-top sm:table-cell sm:pl-6">
+                              <div className="rounded bg-error-soft/60 px-2 py-1 text-text-2">
+                                <span className={MOBILE_LABEL}>Revision {compare.data.from_revision}</span>
+                                <span className="line-through decoration-error/60">
+                                  {def ? displayValue(def, f.old) : String(f.old ?? 'Not entered')}
+                                </span>
+                              </div>
+                            </td>
+                            <td role="cell" className="block pb-2 align-top sm:table-cell sm:pl-6">
+                              <div className="rounded bg-success-soft px-2 py-1 font-medium">
+                                <span className={MOBILE_LABEL}>Revision {compare.data.to_revision}</span>
+                                {def ? displayValue(def, f.new) : String(f.new ?? 'Not entered')}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 ) : null}
               </div>
             ))}
