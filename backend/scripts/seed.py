@@ -4,6 +4,12 @@ The operator and officer passwords come from SEED_PASSWORD (default: the publish
 password, shared on purpose). The administrator password comes from SEED_ADMIN_PASSWORD: outside
 production it falls back to SEED_PASSWORD so local runs, CI and the browser suite keep working; in
 production the script refuses to run without a private value.
+
+Demo accounts in production are opt-in (US-103). With APP_ENV=production the operator, officer and spare
+officer are seeded only when SEED_PUBLIC_DEMO=true (the published default password is then allowed) or when
+SEED_PASSWORD is set to a private value; with neither, only the administrator is seeded. An explicit
+SEED_PASSWORD equal to the published default without SEED_PUBLIC_DEMO=true is refused. The seed never
+removes or re-passwords an account that already exists.
 """
 
 import os
@@ -30,14 +36,37 @@ SEED_USERS = [
     ("officer2@permitflow.example.sg", "Lim Jun Hao", Role.OFFICER, False),
 ]
 DEMO_PASSWORD = "PermitFlow!2026"
+TRUTHY = {"1", "true", "yes", "on"}
+
+
+def public_demo_opted_in(environ: Mapping[str, str]) -> bool:
+    """True only for an explicit SEED_PUBLIC_DEMO=true: the published password is then allowed."""
+    return environ.get("SEED_PUBLIC_DEMO", "").strip().lower() in TRUTHY
+
+
+def seed_users_for(app_env: str, environ: Mapping[str, str]) -> list[tuple[str, str, Role, bool]]:
+    """The accounts to create. Outside production: all four. In production the demo accounts are opt-in
+    (SEED_PUBLIC_DEMO=true, or a private SEED_PASSWORD); without that only the administrator is created."""
+    if app_env != "production":
+        return list(SEED_USERS)
+    shared = environ.get("SEED_PASSWORD") or ""
+    if public_demo_opted_in(environ) or (shared and shared != DEMO_PASSWORD):
+        return list(SEED_USERS)
+    return [user for user in SEED_USERS if user[2] == Role.ADMIN]
 
 
 def resolve_passwords(app_env: str, environ: Mapping[str, str]) -> tuple[str, str]:
     """(shared demonstration password, administrator password). Exits non-zero in production unless the
-    administrator password is set and is not the published one."""
+    administrator password is set and is not the published one, or when SEED_PASSWORD is explicitly the
+    published value without the SEED_PUBLIC_DEMO=true opt-in."""
     password = environ.get("SEED_PASSWORD") or DEMO_PASSWORD
     admin_password = environ.get("SEED_ADMIN_PASSWORD") or ""
     if app_env == "production":
+        if environ.get("SEED_PASSWORD") == DEMO_PASSWORD and not public_demo_opted_in(environ):
+            raise SystemExit(
+                "refusing to seed in production: SEED_PASSWORD is the published demonstration password. "
+                "Set a private SEED_PASSWORD, or set SEED_PUBLIC_DEMO=true to opt in to the public demo."
+            )
         if not admin_password or admin_password == DEMO_PASSWORD:
             raise SystemExit(
                 "refusing to seed in production: set SEED_ADMIN_PASSWORD to a private value "
@@ -48,11 +77,17 @@ def resolve_passwords(app_env: str, environ: Mapping[str, str]) -> tuple[str, st
 
 
 def main() -> None:
-    password, admin_password = resolve_passwords(get_settings().app_env, os.environ)
+    app_env = get_settings().app_env
+    password, admin_password = resolve_passwords(app_env, os.environ)
+    users = seed_users_for(app_env, os.environ)
+    if len(users) < len(SEED_USERS):
+        print(
+            "production: demo accounts not seeded (SEED_PUBLIC_DEMO=true or a private SEED_PASSWORD opts in)"
+        )
     with session_factory()() as db:
         repo = UserRepository(db)
         created = 0
-        for email, name, role, protected in SEED_USERS:
+        for email, name, role, protected in users:
             existing = repo.get_by_email(email)
             if existing is None:
                 repo.add(
@@ -73,7 +108,7 @@ def main() -> None:
                 existing.is_active = True
                 existing.is_protected = protected
         db.commit()
-    print(f"seeded {created} new user(s); {len(SEED_USERS)} total in the seed list")
+    print(f"seeded {created} new user(s); {len(users)} total in the seed list")
 
 
 if __name__ == "__main__":

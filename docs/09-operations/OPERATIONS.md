@@ -20,8 +20,9 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `UPLOAD_DIR` | `./data/uploads` | backend | Local disk storage; Railway volume at `/data/uploads`. |
 | `UPLOAD_MAX_BYTES` | `10485760` | backend | 10 MB per file. |
 | `SITE_VISIT_DAY_GUARD` | `true` | backend | UAT run 5 (F12): Mark site visit done and the checklist submit wait for the confirmed visit date (Singapore date); the checklist draft can be filled before. `false` where a whole appointment must run in one sitting: the CI browser suite, `uat_edges.py` and `smoke_routes.py`, a demonstration environment. |
-| `SEED_PASSWORD` | `PermitFlow!2026` | `scripts/seed.py` only | The operator, officer and spare officer demo accounts' password. Published on purpose for the demonstration. |
+| `SEED_PASSWORD` | `PermitFlow!2026` | `scripts/seed.py` only | The operator, officer and spare officer demo accounts' password. Published on purpose for the local and development demonstration. In production a private value is the way to seed reviewer accounts; the published value is refused there unless `SEED_PUBLIC_DEMO=true`. |
 | `SEED_ADMIN_PASSWORD` | falls back to `SEED_PASSWORD` outside production | `scripts/seed.py` only | The administrator's password. With `APP_ENV=production` the seed exits non-zero unless this is set and is not `PermitFlow!2026`. Never published. |
+| `SEED_PUBLIC_DEMO` | unset (false) | `scripts/seed.py` only | US-103. Production demo accounts are opt-in. With `APP_ENV=production` and no `SEED_PUBLIC_DEMO=true` (and no private `SEED_PASSWORD`) the seed creates the administrator only; `true` (also `1`, `yes`, `on`) seeds the operator, officer and spare officer and allows the published password. Ignored outside production. |
 | `STORAGE_BUDGET_BYTES` | `157286400` | backend | 150 MB per application across every document version, the clarification evidence and the licence (US-085); a further upload is refused with 422 `storage_budget` naming the room left. The Railway `uploads` volume is 5,000 MB (`describe-environment`, 21 Sep 2026): 33 applications at the ceiling, several hundred at the usual few megabytes each. Watch `permitflow_storage_bytes` and the `PermitFlowVolumeFilling` alert (US-089, at 80 %) and raise the volume before it fills; locally the gauge reads the whole disk. |
 | `LOGIN_RATE_LIMIT_PER_MINUTE` | `10` | backend | Failed attempts per IP per minute. |
 | `RATE_LIMIT_PER_MINUTE` | `240` | backend | Every request per client IP, sliding minute; 429 with `Retry-After` beyond it. 0 disables. Per process (US-058). |
@@ -51,6 +52,58 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 ## Seeding
 
 `cd backend && uv run python scripts/seed.py` creates the demo operator (`operator@permitflow.example.sg`), officer (`officer@permitflow.example.sg`), administrator (`admin@permitflow.example.sg`, US-073) and the unprotected spare officer (`officer2@permitflow.example.sg`) if they do not exist, and marks the first three protected. `scripts/create_user.py --email ... --name ... --role officer` creates any other account (password from `CREATE_USER_PASSWORD` or a prompt, never an argument); the Users page does the same for a signed-in administrator. `SEED_PASSWORD` sets the operator, officer and spare officer password (default `PermitFlow!2026`). The public demonstration keeps that password on purpose (README, privacy policy); any deployment that is not a demonstration must set its own value and reset it on a schedule. The administrator password is separate: `SEED_ADMIN_PASSWORD`. Outside production it falls back to `SEED_PASSWORD`; with `APP_ENV=production` the script exits non-zero unless it is set to a private value other than the published one. **Production admin password: it must be rotated and must never be the published value.** The seed only creates missing accounts and leaves an existing password alone, so the administrator account already seeded in an environment keeps the published password until it is rotated by hand: write a new argon2 hash (`app.core.security.hash_password`) into that user's `password_hash` from a one-off command on the backend service, then confirm the old password is refused at sign-in. There is no in-app password reset by design. Share the private value with reviewers directly, never in the repository.
+
+### Demo passwords per environment, and rotating an account (US-103)
+
+| Environment | Operator, officer, spare officer | Administrator |
+|---|---|---|
+| Local, CI, browser suite | `SEED_PASSWORD`, default `PermitFlow!2026` (published) | falls back to `SEED_PASSWORD` unless `SEED_ADMIN_PASSWORD` is set |
+| Development (Railway) | `SEED_PASSWORD` on the backend service, unset today, so the published default: a shared demonstration, documented in the README | `SEED_ADMIN_PASSWORD`, private |
+| Production (Railway) | opt-in: not created unless `SEED_PUBLIC_DEMO=true` or a private `SEED_PASSWORD` is set; never printed in the README | `SEED_ADMIN_PASSWORD`, private, required |
+
+How the seed behaves with `APP_ENV=production`:
+
+| `SEED_PUBLIC_DEMO` | `SEED_PASSWORD` | Result |
+|---|---|---|
+| unset or not true | unset | the administrator only; operator, officer and spare officer are not created |
+| unset or not true | private value | all four accounts; the three demo accounts get that private password |
+| unset or not true | `PermitFlow!2026` | refused (exit non-zero, nothing created) |
+| `true` | unset | all four accounts; the demo accounts get the published password |
+| `true` | any | all four accounts with that value |
+
+The seed never deletes or re-passwords an account that already exists, so the production demo accounts seeded on 19 Sep 2026 keep working and keep the published password until they are rotated or deactivated. To turn a production demo account off, deactivate it on the Users page (the operator, officer and administrator accounts are protected and cannot be deactivated there; the spare officer and any hand-made account can). To change its password, rotate it as below.
+
+**Rotating an account's password (one environment at a time; owner-approved, not part of any deploy).** The app has no password reset by design, so rotation is a one-off command on the backend service, run interactively so the new value never lands in shell history, a ticket or the repository:
+
+```bash
+railway ssh --environment <development|production> --service backend -- .venv/bin/python - <<'PY'
+import getpass
+from datetime import UTC, datetime
+
+from app.core.security import hash_password
+from app.infra.db import session_factory
+from app.repositories.sessions import SessionRepository
+from app.repositories.users import UserRepository
+
+emails = ["<account email>", "<another account email>"]  # the accounts to rotate, from the private notes
+with session_factory()() as db:
+    users, sessions = UserRepository(db), SessionRepository(db)
+    for email in emails:
+        user = users.get_by_email(email)
+        assert user is not None, f"no such account: {email}"
+        password = getpass.getpass(f"new password for {email} (12+ characters): ")
+        assert len(password) >= 12
+        user.password_hash = hash_password(password)
+        sessions.revoke_live(user.id, datetime.now(UTC), "rotated")
+    db.commit()
+PY
+```
+
+Then, for each account: confirm the old password is refused at sign-in (401, "Email or password is incorrect.") and the new one works, and record the date in the private notes (never the value).
+
+**The four hand-made backup accounts (created on 6 Oct 2026: two operators, two officers; they share the published password in both environments).** Their addresses are in the owner's private notes (`notes/demo/`, outside the repository). Rotate them in development and in production with the command above, one environment at a time, each time after the owner's yes. If a backup account is no longer wanted, deactivate it on the Users page instead; a deactivated account cannot sign in and its sessions end at once. The published-password accounts that are protected by the seed (`operator@`, `officer@`, `admin@permitflow.example.sg`) are rotated with the same command; production's administrator was rotated on 9 Oct 2026.
+
+**Opting production in to the public demonstration.** Set `SEED_PUBLIC_DEMO=true` on the production backend service, run `scripts/seed.py` once, then remove the variable if the demonstration is over. Do this only for a deliberate public demonstration; the sign-in page and the privacy policy already say the demonstration accounts are shared.
 
 ## Uploads
 
@@ -128,7 +181,7 @@ The GitHub `production` environment only accepts deployments from `main`. Develo
 
 ### Seeding
 
-The database starts empty. `scripts/seed.py` creates the four demo accounts only (idempotent; the administrator and the spare officer since US-073, 21 Sep 2026: re-run it once per environment when v0.4.0 deploys). It is not part of a deploy on purpose, a deploy must never touch data; run it once per environment: `railway ssh --environment development --service backend -- .venv/bin/python scripts/seed.py` (and `--environment production` for production). Development was seeded on 19 Sep 2026; production on 19 Sep 2026 after the v0.3.0 deploy. Accounts and password in every environment: `operator@permitflow.example.sg` and `officer@permitflow.example.sg`, password `PermitFlow!2026` (the `SEED_PASSWORD` default; deliberately public for the demonstration, see the privacy policy). The administrator account is the exception: its password is `SEED_ADMIN_PASSWORD`, private, and the seed refuses to run in production without it (see Seeding). To change a password, set the variable and re-run the seed: existing accounts keep their password (the script is create-only), so a rotation is a new seed plus a manual update, or a reset of the environment.
+The database starts empty. `scripts/seed.py` creates the four demo accounts only (idempotent; the administrator and the spare officer since US-073, 21 Sep 2026: re-run it once per environment when v0.4.0 deploys). It is not part of a deploy on purpose, a deploy must never touch data; run it once per environment: `railway ssh --environment development --service backend -- .venv/bin/python scripts/seed.py` (and `--environment production` for production). Development was seeded on 19 Sep 2026; production on 19 Sep 2026 after the v0.3.0 deploy. Accounts in the development environment: `operator@permitflow.example.sg` and `officer@permitflow.example.sg`, password `PermitFlow!2026` (the `SEED_PASSWORD` default; deliberately public for the demonstration, see the privacy policy). Production's demonstration accounts are opt-in since US-103 and its password is no longer printed in the README (see Seeding, "Demo passwords per environment"). The administrator account is the exception: its password is `SEED_ADMIN_PASSWORD`, private, and the seed refuses to run in production without it (see Seeding). To change a password, set the variable and re-run the seed: existing accounts keep their password (the script is create-only), so a rotation is a new seed plus a manual update, or a reset of the environment.
 
 ### Custom domain (US-052)
 

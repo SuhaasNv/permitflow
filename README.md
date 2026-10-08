@@ -10,7 +10,7 @@ https://github.com/user-attachments/assets/942739f7-e2bd-4360-b525-ecf960a7e796
 
 A regulatory licensing platform built for a 3-day full-stack assessment. An operator (the business owner, or an agent applying for the business) applies for a Food Establishment Licence through a guided form with checked uploads; a licensing officer reviews the submission, leaves feedback tied to a section or a document, and requests a resubmission in which only the flagged parts reopen. Every status change, feedback round and decision is audited; approval issues a licence certificate. An advisory AI verifier reads each uploaded document against the form before submission. It never decides anything.
 
-**Try it:** production, v0.4.1, at https://permitflow.space (one example application waiting in the officer's queue); development at https://dev.permitflow.space. Demo accounts below. Local setup takes about ten minutes.
+**Try it:** production, v0.4.1, at https://permitflow.space (one example application waiting in the officer's queue; sign-in details are shared with reviewers); development at https://dev.permitflow.space (shared demo accounts below). Local setup takes about ten minutes.
 
 **Ten minutes to review it:** the technical deck's handout PDF in `docs/14-debrief/technical-deck/`, then `SCOPE.md`, then `docs/11-reviews/ASSESSMENT_TRACEABILITY.md` (every line of the brief mapped to code, test and evidence).
 
@@ -41,7 +41,9 @@ A site visit is recorded on or after its day (`SITE_VISIT_DAY_GUARD=true`, the d
 
 ## Demo accounts
 
-`backend/scripts/seed.py` creates four accounts (idempotent); sample documents, clean and with planted issues, are in `docs/12-demo/documents/`. The same accounts exist in every environment. The operator and officer password is shared on purpose: this is a demonstration, the sign-in page and the privacy policy say so, and no real personal data should be entered. The administrator password is not published: it is set privately (`SEED_ADMIN_PASSWORD`) and shared with reviewers directly.
+`backend/scripts/seed.py` creates four accounts (idempotent); sample documents, clean and with planted issues, are in `docs/12-demo/documents/`. The **development** environment (https://dev.permitflow.space) and a local run are shared demonstrations: the operator and officer password below is published on purpose, the sign-in page and the privacy policy say so, and no real personal data should be entered. **Production** does not publish a password: its demonstration accounts are opt-in (`SEED_PUBLIC_DEMO`, `docs/09-operations/OPERATIONS.md`), and the sign-in details for reviewers are shared with them directly. The administrator password is private in every deployed environment (`SEED_ADMIN_PASSWORD`).
+
+Development and local sign-ins:
 
 | Role | Email | Password |
 |------|-------|----------|
@@ -88,7 +90,7 @@ cd frontend && npm run e2e          # Playwright against the running stack (back
 
 ## Environment variables
 
-`.env.example` documents every variable; `docs/09-operations/OPERATIONS.md` explains each one, per environment. `JWT_SECRET` is required everywhere, tests included. `SEED_PASSWORD` (operator, officer and spare officer demo accounts) and `SEED_ADMIN_PASSWORD` (the administrator) are read by `backend/scripts/seed.py` only; with `APP_ENV=production` the seed refuses to run unless `SEED_ADMIN_PASSWORD` is set to a private value, outside production it falls back to `SEED_PASSWORD`. The frontend needs no `.env` locally (it defaults to `http://localhost:8000/api/v1`).
+`.env.example` documents every variable; `docs/09-operations/OPERATIONS.md` explains each one, per environment. `JWT_SECRET` is required everywhere, tests included. `SEED_PASSWORD` (operator, officer and spare officer demo accounts), `SEED_ADMIN_PASSWORD` (the administrator) and `SEED_PUBLIC_DEMO` are read by `backend/scripts/seed.py` only; with `APP_ENV=production` the seed refuses to run unless `SEED_ADMIN_PASSWORD` is set to a private value, seeds the operator and officer accounts only when `SEED_PUBLIC_DEMO=true` or `SEED_PASSWORD` is private, and refuses the published password without that opt-in; outside production it falls back to `SEED_PASSWORD`. The frontend needs no `.env` locally (it defaults to `http://localhost:8000/api/v1`).
 
 ## CI/CD and deployment
 
