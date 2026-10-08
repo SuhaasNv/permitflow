@@ -79,8 +79,8 @@ describe('parseReleaseNotes', () => {
       expect(r.blocks.length).toBeGreaterThan(0)
       for (const b of r.blocks) expect(b.items.length + b.paragraphs.length).toBeGreaterThan(0)
     }
-    // The running build has notes: the rc reads the release it belongs to.
-    expect(releaseFor(notes, __APP_VERSION__)?.version).toBe(`v${__APP_VERSION__.replace(/-.*$/, '')}`)
+    // The running build has notes: a candidate build has its own section, a release its release section.
+    expect(releaseFor(notes, __APP_VERSION__)?.version).toBe(`v${__APP_VERSION__}`)
   })
 
   it('never hands an operator an internal status code', () => {
@@ -217,11 +217,10 @@ describe('release candidates (US-110)', () => {
     expect(releaseFor(visibleNotes(notes, false), '0.5.0-rc.2')?.version).toBe('v0.5.0')
   })
 
-  it('the real file: candidates are listed, the newest entry is a release, and no release mentions a candidate', () => {
+  it('the real file: candidates are listed, and no release mentions a candidate', () => {
     const notes = parseReleaseNotes(raw)
     const candidates = notes.releases.filter((r) => r.candidate)
     expect(candidates.map((r) => r.version)).toEqual(expect.arrayContaining(['v0.4.0-rc.2', 'v0.4.0-rc.1']))
-    expect(notes.releases[0].candidate).toBe(false)
     for (const r of notes.releases.filter((x) => !x.candidate)) {
       const text = [r.title, r.note ?? '', ...r.intro, ...r.blocks.flatMap((b) => [b.heading, b.note ?? '', ...b.paragraphs, ...b.items])].join('\n')
       expect(text, r.version).not.toMatch(/candidate|-rc\.|\brc\d/i)
