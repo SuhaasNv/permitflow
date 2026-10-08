@@ -23,6 +23,7 @@ import httpx
 API = os.environ.get("UAT_API_URL", "http://localhost:8000/api/v1")
 PW = os.environ.get("SEED_PASSWORD", "PermitFlow!2026")
 ADMIN = "admin@permitflow.example.sg"
+ADMIN_PW = os.environ.get("SEED_ADMIN_PASSWORD") or PW
 OFFICER2 = "officer2@permitflow.example.sg"
 NEW_OP_PW = "Smoke-Run-Only-2026!"
 
@@ -118,7 +119,7 @@ def main() -> None:
     call(None, "GET", "/checklist-schema", "/checklist-schema", (200, 401))
 
     # ---- admin: create a fresh operator ----
-    adm = login(ADMIN)
+    adm = login(ADMIN, ADMIN_PW)
     call(adm, "GET", "/auth/me", "/auth/me", 200)
     stamp = int(time.time())
     email = f"smoke{stamp}@permitflow.example.sg"

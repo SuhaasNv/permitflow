@@ -1,6 +1,6 @@
 [project]
 name = "permitflow-backend"
-version = "0.4.1rc1"
+version = "0.4.1rc2"
 description = "PermitFlow licensing platform API"
 requires-python = ">=3.12"
 dependencies = [
