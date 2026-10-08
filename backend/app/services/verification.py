@@ -71,7 +71,8 @@ def run_verification(run_id: uuid.UUID) -> None:
 
         try:
             data = b"".join(get_storage().open(doc.stored_key))
-            extracted = extract_text(doc.content_type, data, max_chars=live().int_value("ai_max_text_chars"))
+            max_chars = live().int_value("ai_max_text_chars")
+            extracted = extract_text(doc.content_type, data, max_chars=max_chars)
             doc.extracted_text = extracted.text or None
             if extracted.reason:
                 _finish(
@@ -113,7 +114,8 @@ def run_verification(run_id: uuid.UUID) -> None:
                 return
 
             # Clean, check and redact before anything reaches the provider (US-102).
-            prepared = prepare_text(extracted.text)
+            # The cap is applied again after NFKC, which can expand a character many times over.
+            prepared = prepare_text(extracted.text, max_chars=max_chars)
             section_key = SECTION_FOR_DOCUMENT[doc.document_type.value]
             request = VerificationRequest(
                 document_type=doc.document_type.value,

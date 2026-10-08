@@ -86,7 +86,7 @@ def _verify(
     provider: VerificationProvider, doc_type: str, text: str, form: dict[str, Any]
 ) -> tuple[str, list[str]]:
     settings = get_settings()
-    prepared = prepare_text(text)
+    prepared = prepare_text(text, max_chars=settings.ai_max_text_chars)
     request = VerificationRequest(
         document_type=doc_type,
         document_type_description=DOCUMENT_TYPE_DESCRIPTIONS[doc_type],

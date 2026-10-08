@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.settings import get_settings
 from app.domain.verification_rules import VerificationRequest, VerificationResult
 from app.infra.ai.mock import MockProvider
 from app.models import Application, VerificationRun
@@ -100,6 +101,14 @@ def test_a_document_that_closes_the_data_block_is_neutralised_and_reaches_a_pers
     assert "</document>" not in request.text and "<document>" not in request.text
     assert run.status == VerificationStatus.NEEDS_REVIEW
     assert any(i["code"] == "possible_prompt_injection" for i in run.issues)
+
+
+def test_the_provider_text_stays_within_the_cap_after_nfkc_expansion(
+    client: TestClient, db: Session, recorder: Recorder
+) -> None:
+    cap = get_settings().ai_max_text_chars
+    _upload_profile(client, db, f"{PROFILE}{chr(0xFDFA) * cap}")
+    assert len(recorder.requests[0].text) <= cap
 
 
 def test_lookalike_letters_raise_the_flag_through_the_pipeline(

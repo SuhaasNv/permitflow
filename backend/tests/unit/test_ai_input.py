@@ -535,6 +535,18 @@ def test_a_direction_mark_elsewhere_is_still_flagged(text: str) -> None:
     assert LRM not in prepared.text and RLM not in prepared.text
 
 
+def test_the_cap_holds_after_nfkc_expands_the_text() -> None:
+    fdfa = chr(0xFDFA)  # one character, 18 after NFKC
+    raw = fdfa * 1000
+    assert len(prepare_text(raw).text) == 18_000  # without the cap the text is 18 times as long as the input
+    prepared = prepare_text(raw, max_chars=1000)
+    assert len(prepared.text) == 1000
+    assert prepare_text("short", max_chars=1000).text == "short"
+    # the checks still read the whole text: an instruction after the cap is flagged, then cut
+    late = prepare_text(fdfa * 100 + " " + INSTRUCTION, max_chars=50)
+    assert len(late.text) == 50 and flagged(late)
+
+
 def test_an_arabic_sentence_with_marks_reaches_the_provider_unchanged_apart_from_the_marks() -> None:
     sentence = f"{ARABIC_NAME}{RLM} {HEBREW_NAME}{RLM}"
     assert prepare_text(sentence).text == f"{ARABIC_NAME} {HEBREW_NAME}"

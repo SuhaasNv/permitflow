@@ -95,8 +95,12 @@ class PreparedText:
     redactions: int  # numbers masked
 
 
-def prepare_text(raw: str) -> PreparedText:
-    """Clean, check and redact one document's extracted text."""
+def prepare_text(raw: str, *, max_chars: int | None = None) -> PreparedText:
+    """Clean, check and redact one document's extracted text.
+
+    `max_chars` caps what the provider receives, counted after cleaning: NFKC can expand a character (U+FDFA
+    becomes 18), so a cap applied only to the extracted text does not bound the prompt. The checks above run
+    on the whole text first; only the returned `text` is cut."""
     unflagged = _without_ordinary_flags(raw)
     suspicious = _suspicious_hidden(unflagged)
     decoded = " ".join(
@@ -122,6 +126,8 @@ def prepare_text(raw: str) -> PreparedText:
             signals.append(phrase)
 
     text, redactions = redact(cleaned)
+    if max_chars is not None:
+        text = text[:max_chars]
     return PreparedText(text=text, injection=signals, hidden_count=len(suspicious), redactions=redactions)
 
 
