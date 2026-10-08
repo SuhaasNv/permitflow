@@ -24,11 +24,11 @@ from pathlib import Path
 from typing import Any
 
 from app.core.settings import get_settings
+from app.domain.ai_input import prepare_text, redact_form_section
 from app.domain.verification_rules import (
     DOCUMENT_TYPE_DESCRIPTIONS,
     VerificationRequest,
     apply_rules,
-    find_injection_phrases,
 )
 from app.infra.ai.base import VerificationProvider
 from app.infra.ai.openai_provider import PROMPT_VERSION
@@ -86,16 +86,17 @@ def _verify(
     provider: VerificationProvider, doc_type: str, text: str, form: dict[str, Any]
 ) -> tuple[str, list[str]]:
     settings = get_settings()
+    prepared = prepare_text(text)
     request = VerificationRequest(
         document_type=doc_type,
         document_type_description=DOCUMENT_TYPE_DESCRIPTIONS[doc_type],
-        form_section=form,
-        text=text,
+        form_section=redact_form_section(form),
+        text=prepared.text,
     )
     outcome = apply_rules(
         provider.verify(request),
         confidence_threshold=settings.ai_confidence_threshold,
-        injection_phrases=find_injection_phrases(text),
+        injection_phrases=prepared.injection,
     )
     return outcome.status.value, sorted({str(i["code"]) for i in outcome.issues})
 

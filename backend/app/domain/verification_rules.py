@@ -90,7 +90,8 @@ def apply_rules(
             {
                 "code": IssueCode.POSSIBLE_PROMPT_INJECTION.value,
                 "severity": "high",
-                "message": "The document contains text that looks like instructions to the checker.",
+                "message": "The document contains hidden characters or text that looks like instructions "
+                "to the checker.",
                 "evidence": injection_phrases[0][:300],
             }
         )
