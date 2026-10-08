@@ -64,6 +64,10 @@ The first run missed the overview budget at 2.8 s: the idle list loaded every op
 
 `npm run size` (`scripts/check-bundle-size.mjs`) runs in the frontend CI job after the build and fails above 250 KB gzipped for the JavaScript the respond page loads; the app ships one bundle, so the figure is the whole app: 215 KB gzipped (763 KB raw) on 21 Sep 2026.
 
+## Release guard
+
+`scripts/release_guard.py` (run in CI on every `v*` tag, see `RELEASING.md`) is covered by `scripts/test_release_guard.py` (standard-library `unittest`, no git needed): `python3 -m unittest scripts/test_release_guard.py`, run in the backend CI job on every push.
+
 ## API smoke and edge scripts
 
 Two scripts drive the running API rather than the test client, so they see the real server, the middleware order and the limits as deployed: `backend/scripts/uat_edges.py` (246 refusal paths and boundaries, grouped in `docs/10-uat/UAT_PLAN.md`) and, since 21 Sep 2026, `backend/scripts/smoke_routes.py`, which reads the OpenAPI document and calls every route at least once with the right role on one lifecycle (a fresh operator created by the administrator, appointment rounds, the checklist, two clarification rounds with a withdrawn question, approval and the licence, withdrawal, draft deletion, notifications, sign-out, deactivation) plus wrong-role and unauthenticated probes: 105 checks over the 61 routes, and an uncalled route fails the run. Both run against the local stack with the limits and the daily check quotas off; neither runs against production (they create data and take the demo accounts' sessions over, which signs any browser on those accounts out).
