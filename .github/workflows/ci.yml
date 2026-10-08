@@ -40,6 +40,9 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+      - name: Release guard unit test
+        working-directory: .
+        run: python3 -m unittest scripts/test_release_guard.py
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -231,7 +234,13 @@ jobs:
       REGISTRY: ghcr.io
       OWNER: ${{ github.repository_owner }}
     steps:
+      # Full history and tags: the release guard compares a release tag with its release candidate.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Release guard (v* tags only)
+        if: github.ref_type == 'tag'
+        run: python3 scripts/release_guard.py "$GITHUB_REF_NAME"
       - uses: docker/setup-buildx-action@v3
       - name: Log in to GHCR
         if: github.event_name == 'push'
