@@ -161,7 +161,7 @@ def _assemble(
 ) -> OfficerApplicationOut:
     now = datetime.now(UTC)
     form = current.form_data if current else app.draft_data
-    comp = completeness_rules.compute(form, {d.document_type for d in docs})
+    comp = completeness_rules.compute(form, {d.document_type for d in docs}, snapshot=current is not None)
     sections = [
         OfficerSectionOut(
             key=s.key,

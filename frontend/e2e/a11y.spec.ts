@@ -102,6 +102,7 @@ test('operator screens have no axe violations', async ({ page }) => {
     '/app/applications',
     app.url,
     `${app.url}/form/premises`,
+    `${app.url}/form/operations`,
     `${app.url}/documents`,
     `${app.url}/review`,
     `${app.url}/history`,

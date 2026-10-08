@@ -10,6 +10,20 @@ checks use (operator2@permitflow.example.sg, same password; removed again when t
 account outlives the run), `UAT_API_URL` for another host, and the
 per-client limits off (`RATE_LIMIT_PER_MINUTE=0`, `LOGIN_ATTEMPTS_PER_MINUTE=0`) or the run trips them.
 The script creates a handful of applications for the seeded operator and leaves them in place.
+
+Groups, in run order: A auth, D draft and sections, U uploads, V and S submission, O officer guards, R and C
+resubmission and compare, L licence, SV site visit appointment, CK site visit checklist, W and X withdrawal and
+deletion, N, Q, Z, H notifications, queue, quota, health, SE one live session per account, then the v0.4.1 groups:
+
+    FV   form validation and operating hours (US-108): every field's Singapore format, what is stored and read
+         back, the tenancy window on the Singapore calendar, hours as an object, and applications saved before
+         v0.4.1 (written straight to the database) through every officer and operator step.
+    RC2  the release-candidate-2 fixes and what else could go wrong with them: the operator-only re-run route,
+         the server-held Confirmed on stamp, huge numbers and odd JSON shapes in every field and query
+         parameter (sent as raw JSON text), /health `environment`, the production seed refusal.
+
+RC2 also signs in the seeded administrator (admin@permitflow.example.sg) with the same password; where the
+administrator's password is private and differs, its administrator checks are marked skipped, not failed.
 """
 
 # ruff: noqa: E501 - one check per line, the titles read better unwrapped
@@ -17,6 +31,7 @@ The script creates a handful of applications for the seeded operator and leaves 
 from __future__ import annotations
 
 import concurrent.futures as cf
+import datetime as dt
 import json
 import os
 import sys
@@ -102,12 +117,17 @@ PREMISES = {
     "postal_code": "123456",
     "premises_type": "shophouse",
     "floor_area_sqm": 40,
-    "tenancy_expiry": "2027-12-31",
+    "tenancy_expiry": (dt.date.today() + dt.timedelta(days=730)).isoformat(),
 }
 OPERATIONS = {
     "cuisine_description": "Kopi and toast.",
     "seating_capacity": 10,
-    "operating_hours": "7am-7pm",
+    "operating_hours": {
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "opens": "07:00",
+        "closes": "19:00",
+        "open_24h": False,
+    },
     "food_handlers_count": 2,
 }
 DECL = {"information_accurate": True, "consent_to_inspection": True}
@@ -295,6 +315,1653 @@ def retire_second_operator() -> None:
         if user is not None:
             user.is_active = False
             db.commit()
+
+
+# ---------- v0.4.1 helpers (FV and RC2 groups) ----------
+
+SG = dt.timezone(dt.timedelta(hours=8))
+PHONE_MSG = "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+UEN_MSG = "Enter a valid UEN, for example 202312345K."
+EMAIL_MSG = "Enter a valid email address, for example name@example.com."
+POSTAL_FORMAT_MSG = "Enter the 6-digit postal code, for example 208787."
+POSTAL_SECTOR_MSG = "Postal codes start with 01 to 82. Check the first two digits."
+ADDR_PARTS_MSG = "Include the street name and the house or unit number."
+ADDR_UNIT_MSG = "Write the unit as #05-12: a floor of 2 or 3 digits, a dash, a unit of 2 to 5 digits."
+ADDR_POSTAL_MSG = "Leave the postal code out of the address; it has its own field."
+DECIMALS_MSG = "Use at most 2 decimal places."
+NAME_ALNUM_MSG = "Include at least one letter or number."
+PERSON_CHARS_MSG = "Use letters, spaces and these marks only: ' - . , /"
+PERSON_LETTER_MSG = "Include at least one letter."
+DATE_FORMAT_MSG = "Enter a real date as YYYY-MM-DD."
+DATE_PAST_MSG = "Enter a date after today."
+DATE_MIN_MSG = "Enter a date at least 3 months from today."
+DATE_MAX_MSG = "Enter a date no more than 30 years from today."
+HOURS_LEGACY_MSG = "Pick your opening days and hours."
+HOURS_NO_DAYS_MSG = "Choose at least one day you open."
+HOURS_NO_TIMES_MSG = "Choose an opening and a closing time."
+HOURS_BAD_TIME_MSG = "Choose a time on the half hour, from 00:00 to 23:30."
+HOURS_SAME_MSG = "Opening and closing time cannot be the same."
+DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+HUGE_DIGITS = "1" + "0" * 4999  # 5,000 digits, beyond Python's 4,300-digit int parsing limit
+# Raw JSON texts for a number the way a client could write it; sent as text so Python does not encode them.
+HUGE_NUMBERS: dict[str, str] = {
+    "10**400": "1" + "0" * 400,
+    "-10**400": "-1" + "0" * 400,
+    "1e400": "1e400",
+    "-1e400": "-1e400",
+    "5000-digit int": HUGE_DIGITS,
+    "-5000-digit int": "-" + HUGE_DIGITS,
+    "1e309": "1e309",
+    "2**63": str(2**63),
+    "-2**63-1": str(-(2**63) - 1),
+    "1e-400": "1e-400",
+    "NaN": "NaN",
+    "Infinity": "Infinity",
+    "-Infinity": "-Infinity",
+}
+
+
+class Numbered:
+    """A group of checks numbered in the order they are written: FV1, FV2, ..."""
+
+    def __init__(self, prefix: str) -> None:
+        self.prefix = prefix
+        self.n = 0
+
+    def __call__(self, title: str, cond: bool, note: str = "") -> None:
+        self.n += 1
+        check(f"{self.prefix}{self.n}", title, cond, note)
+
+
+def sg_today() -> dt.date:
+    return dt.datetime.now(SG).date()
+
+
+def months_after(day: dt.date, months: int) -> dt.date:
+    """Calendar months ahead, the day clamped to the end of a shorter month (written out here on purpose:
+    the check must not borrow the rule it is checking)."""
+    import calendar
+
+    index = day.year * 12 + (day.month - 1) + months
+    year, month = divmod(index, 12)
+    month += 1
+    return dt.date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
+
+
+def fields_of(r: httpx.Response) -> dict[str, str]:
+    try:
+        return r.json().get("error", {}).get("details", {}).get("fields", {}) or {}
+    except Exception:
+        return {}
+
+
+def error_code(r: httpx.Response) -> str:
+    try:
+        return str(r.json()["error"]["code"])
+    except Exception:
+        return ""
+
+
+def section_state(h: dict[str, str], aid: str, key: str) -> dict:  # type: ignore[type-arg]
+    v = req(h, "GET", f"/applications/{aid}").json()
+    return next(s for s in v["sections"] if s["key"] == key)
+
+
+def raw_body(base: dict, key: str, raw: str) -> str:  # type: ignore[type-arg]
+    """The JSON text of `base` with `key` set to `raw`, written verbatim (a number Python would not encode)."""
+    return json.dumps({**base, key: "@@RAW@@"}).replace('"@@RAW@@"', raw)
+
+
+def send_raw(h: dict[str, str], method: str, path: str, text: str) -> httpx.Response:
+    return req(h, method, path, content=text.encode(), headers={"Content-Type": "application/json"})
+
+
+def survives(r: httpx.Response) -> bool:
+    """The server answered in the envelope with a 4xx, or accepted the value: never a 5xx."""
+    return r.status_code < 500 and envelope_ok(r)
+
+
+def db_edit_form(aid: str, edit, *, draft: bool = True, revision: bool = True) -> None:  # type: ignore[no-untyped-def]
+    """Rewrite a stored application the way data saved before v0.4.1 looks: the working copy and the latest
+    submitted revision. `edit` mutates the form dict in place. Straight to the database, past every rule."""
+    import copy
+
+    from sqlalchemy import select
+
+    from app.infra.db import session_factory
+    from app.models import Application, ApplicationRevision
+
+    with session_factory()() as db:
+        app = db.get(Application, uuid.UUID(aid))
+        assert app is not None
+        if draft:
+            data = copy.deepcopy(app.draft_data)
+            edit(data)
+            app.draft_data = data
+        if revision:
+            rev = db.scalars(
+                select(ApplicationRevision)
+                .where(ApplicationRevision.application_id == app.id)
+                .order_by(ApplicationRevision.revision_number.desc())
+                .limit(1)
+            ).first()
+            if rev is not None:
+                form = copy.deepcopy(rev.form_data)
+                edit(form)
+                rev.form_data = form
+        db.commit()
+
+
+def submitted_case(op: dict[str, str]) -> str:
+    """A new application filled, checked and submitted: Application Received, Revision 1."""
+    aid = req(op, "POST", "/applications").json()["id"]
+    fill_all(op, aid)
+    upload_all(op, aid)
+    wait_checks(op, aid)
+    r = req(op, "POST", f"/applications/{aid}/submit")
+    assert r.status_code == 200, r.text
+    return aid
+
+
+def flag(off: dict[str, str], aid: str, **target: str) -> httpx.Response:
+    """Officer feedback on a section (`section_key=`) or a document (`document_type=`)."""
+    body = {
+        "target_type": "section" if "section_key" in target else "document",
+        "message": "Please check this.",
+        **target,
+    }
+    return req(off, "POST", f"/officer/applications/{aid}/feedback", json=body)
+
+
+def incomplete_sections(sections: list[dict]) -> set[str]:  # type: ignore[type-arg]
+    return {s["key"] for s in sections if not s["complete"]}
+
+
+def fv_checks(op: dict[str, str], off: dict[str, str]) -> None:
+    """FV: every form field checked for its Singapore format, hours, normalisation and old data (v0.4.1, US-108)."""
+    fv = Numbered("FV")
+    aid = req(op, "POST", "/applications").json()["id"]
+
+    def put(key: str, base: dict, **kw) -> httpx.Response:  # type: ignore[type-arg,no-untyped-def]
+        return req(op, "PATCH", f"/applications/{aid}/sections/{key}", json={**base, **kw})
+
+    def stored(key: str, field: str):  # type: ignore[no-untyped-def]
+        return section_state(op, aid, key)["data"].get(field)
+
+    def accepts(key, base, field, pairs):  # type: ignore[no-untyped-def]
+        """(sent, expected stored) pairs, all 200 and read back from GET as expected."""
+        bad = []
+        for sent, want in pairs:
+            r = put(key, base, **{field: sent})
+            got = stored(key, field) if r.status_code == 200 else r.text[:80]
+            if r.status_code != 200 or got != want:
+                bad.append(f"{sent!r}: {r.status_code} stored {got!r}, wanted {want!r}")
+        return bad
+
+    def refuses(key, base, field, cases):  # type: ignore[no-untyped-def]
+        """(sent, expected message or None) pairs, all 422 naming the field with that message."""
+        bad = []
+        for sent, msg in cases:
+            r = put(key, base, **{field: sent})
+            got = fields_of(r).get(field)
+            if r.status_code != 422 or got is None or (msg is not None and got != msg):
+                bad.append(f"{str(sent)[:40]!r}: {r.status_code} {got!r}")
+        return bad
+
+    # ---- phone ----
+    bad = accepts(
+        "business",
+        BUSINESS,
+        "contact_phone",
+        [
+            ("+65 9123 4567", "+65 9123 4567"),
+            ("91234567", "+65 9123 4567"),
+            ("6591234567", "+65 9123 4567"),
+            ("+6591234567", "+65 9123 4567"),
+            ("+65-9123-4567", "+65 9123 4567"),
+            ("3123 4567", "+65 3123 4567"),
+            ("+65 6123 4567", "+65 6123 4567"),
+            ("8123-4567", "+65 8123 4567"),
+        ],
+    )
+    fv(
+        "phone in any common Singapore form is stored as +65 XXXX XXXX and read back so from GET",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = refuses(
+        "business",
+        BUSINESS,
+        "contact_phone",
+        [
+            ("51234567", PHONE_MSG),
+            ("71234567", PHONE_MSG),
+            ("+1 415 555 0100", PHONE_MSG),
+            ("9123456", PHONE_MSG),
+            ("912345678", PHONE_MSG),
+            ("+65 9123 4567 ext 2", PHONE_MSG),
+            ("+65 (9123) 4567", PHONE_MSG),
+            ("９１２３４５６７", PHONE_MSG),
+            ("hello", PHONE_MSG),
+        ],
+    )
+    fv(
+        "phone not starting 3, 6, 8 or 9, not 8 digits, abroad, with an extension, in full-width digits is 422 with the form's sentence",
+        not bad,
+        "; ".join(bad),
+    )
+
+    # ---- UEN ----
+    this_year = sg_today().year
+    bad = accepts(
+        "business",
+        BUSINESS,
+        "uen",
+        [
+            ("202312345K", "202312345K"),
+            ("202312345k", "202312345K"),
+            (" 202312345k ", "202312345K"),
+            ("53123456A", "53123456A"),
+            ("199912345K", "199912345K"),
+            (f"{this_year}12345A", f"{this_year}12345A"),
+            ("S08LL0001A", "S08LL0001A"),
+            ("t08ll0001a", "T08LL0001A"),
+            ("R99AB1234Z", "R99AB1234Z"),
+        ],
+    )
+    fv("UEN in each of the three ACRA formats is accepted and stored in capitals", not bad, "; ".join(bad))
+    bad = refuses(
+        "business",
+        BUSINESS,
+        "uen",
+        [
+            (f"{this_year + 3}12345K", UEN_MSG),
+            ("179912345K", UEN_MSG),
+            ("X08LL0001A", UEN_MSG),
+            ("2023123456K", UEN_MSG),
+            ("2023123K", UEN_MSG),
+            ("202312345", UEN_MSG),
+            ("12A", UEN_MSG),
+            ("T08L10001A", UEN_MSG),
+            ("２０２３１２３４５K", UEN_MSG),
+        ],
+    )
+    fv(
+        "UEN with a future or pre-1800 year, a wrong letter prefix or a wrong length is 422 with the form's sentence",
+        not bad,
+        "; ".join(bad),
+    )
+
+    # ---- email ----
+    bad = accepts(
+        "business",
+        BUSINESS,
+        "contact_email",
+        [
+            ("A@B.SG", "a@b.sg"),
+            ("  Tan.Wei@Shop.Com.SG ", "tan.wei@shop.com.sg"),
+            ("x+y@xn--p1ai.xn--p1ai", "x+y@xn--p1ai.xn--p1ai"),
+        ],
+    )
+    fv("email is lower-cased and trimmed, and an xn-- top-level domain is allowed", not bad, "; ".join(bad))
+    bad = refuses(
+        "business",
+        BUSINESS,
+        "contact_email",
+        [
+            ("a@b.c", EMAIL_MSG),
+            ("a..b@shop.sg", EMAIL_MSG),
+            ("a b@shop.sg", EMAIL_MSG),
+            ("x@shop..sg", EMAIL_MSG),
+            (".a@shop.sg", EMAIL_MSG),
+            ("a.@shop.sg", EMAIL_MSG),
+            ("a@shop", EMAIL_MSG),
+            ("a@@shop.sg", EMAIL_MSG),
+            ("a@shop.s1", EMAIL_MSG),
+            ("a@" + "b" * 250 + ".sg", None),
+        ],
+    )
+    fv(
+        "email with a one-letter top-level domain, double dots, a space, no dot or two @ is 422; 255 characters is 422",
+        not bad,
+        "; ".join(bad),
+    )
+
+    # ---- names ----
+    bad = accepts(
+        "business",
+        BUSINESS,
+        "contact_name",
+        [
+            (n, n)
+            for n in (
+                "Ravi s/o Kumar",
+                "陈伟",
+                "O'Brien-Lee",
+                "محمد علي",
+                "José Núñez",
+                "Tan Wei Ling, Jr.",
+                "நான் குமார்",
+            )
+        ],
+    )
+    fv(
+        "contact names in Latin, Chinese, Arabic and Tamil script, with ' - . , / marks, are accepted",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = refuses(
+        "business",
+        BUSINESS,
+        "contact_name",
+        [
+            ("1234", PERSON_CHARS_MSG),
+            ("Tan 3rd", PERSON_CHARS_MSG),
+            ("Tan_Wei", PERSON_CHARS_MSG),
+            ("😀😀", PERSON_CHARS_MSG),
+            ("..", PERSON_LETTER_MSG),
+            ("A", None),
+            ("́́", PERSON_LETTER_MSG),
+        ],
+    )
+    fv(
+        "contact names with digits, an underscore, emoji, no letter or one character are 422 with the form's sentence",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = accepts(
+        "business",
+        BUSINESS,
+        "business_name",
+        [
+            ("7-Eleven", "7-Eleven"),
+            ("Café 123", "Café 123"),
+            ("🍜 Noodles", "🍜 Noodles"),
+            ("深夜食堂", "深夜食堂"),
+            ("A" * 120, "A" * 120),
+        ],
+    )
+    fv(
+        "business names with digits, accents, an emoji beside letters or Chinese are accepted; 120 characters is the limit",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = refuses(
+        "business",
+        BUSINESS,
+        "business_name",
+        [
+            ("!!", NAME_ALNUM_MSG),
+            ("🍜🍜", NAME_ALNUM_MSG),
+            ("---", NAME_ALNUM_MSG),
+            ("A" * 121, None),
+            ("K", None),
+        ],
+    )
+    fv(
+        "business name of only symbols or emoji, 121 characters or 1 character is 422",
+        not bad,
+        "; ".join(bad),
+    )
+
+    # ---- hidden characters and spacing ----
+    r = put(
+        "business",
+        BUSINESS,
+        business_name="﻿ Kopi​  ‮Edge⁦\t\u0007 Café",
+        contact_name="Tan‍ Wei⁠   Ling\U000e0041",
+        contact_email=" Tan@Shop.SG​",
+        contact_phone="+65​ 9123 4567",
+        uen="​202312345k",
+    )
+    st = section_state(op, aid, "business")["data"]
+    want = {
+        "business_name": "Kopi Edge Café",
+        "contact_name": "Tan Wei Ling",
+        "contact_email": "tan@shop.sg",
+        "contact_phone": "+65 9123 4567",
+        "uen": "202312345K",
+    }
+    fv(
+        "zero-width, bidi, tag and control characters are stripped, spaces collapsed, then lower, upper and +65 forms applied; GET shows the stored form",
+        r.status_code == 200 and all(st.get(k) == v for k, v in want.items()),
+        f"{r.status_code} {json.dumps({k: st.get(k) for k in want}, ensure_ascii=False)}",
+    )
+    decomposed = "Café Bar"
+    put("business", BUSINESS, business_name=decomposed)
+    got = stored("business", "business_name")
+    fv("text is stored in NFC (e + combining acute becomes one é)", got == "Café Bar", repr(got))
+    r = put("business", BUSINESS, business_name="​​​")
+    sec = section_state(op, aid, "business")
+    fv(
+        "a business name of only zero-width characters is never stored as a name (422, or saved empty and the section incomplete)",
+        r.status_code == 422
+        or (r.status_code == 200 and not sec["data"].get("business_name") and not sec["complete"]),
+        f"{r.status_code} {sec['data'].get('business_name')!r} complete={sec['complete']}",
+    )
+    r = put("business", BUSINESS)  # restore a complete business section
+    bad = refuses("business", BUSINESS, "entity_type", [("bogus", None), ("Other", None), (1, None)])
+    fv(
+        "an entity type outside the list is 422",
+        not bad and r.status_code == 200,
+        "; ".join(bad) + r.text[:80],
+    )
+
+    # ---- premises ----
+    today = sg_today()
+    three = months_after(today, 3)
+    thirty = months_after(today, 360)
+    one_day = dt.timedelta(days=1)
+    bad = accepts("premises", PREMISES, "tenancy_expiry", [(three.isoformat(), three.isoformat())])
+    fv(
+        f"tenancy expiry exactly 3 months ahead on the Singapore calendar ({three}) is accepted",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = refuses("premises", PREMISES, "tenancy_expiry", [((three - one_day).isoformat(), DATE_MIN_MSG)])
+    fv(
+        f"tenancy expiry a day short of 3 months ({three - one_day}) is 422: at least 3 months",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = accepts("premises", PREMISES, "tenancy_expiry", [(thirty.isoformat(), thirty.isoformat())])
+    fv(f"tenancy expiry exactly 30 years ahead ({thirty}) is accepted", not bad, "; ".join(bad))
+    bad = refuses("premises", PREMISES, "tenancy_expiry", [((thirty + one_day).isoformat(), DATE_MAX_MSG)])
+    fv(
+        f"tenancy expiry a day beyond 30 years ({thirty + one_day}) is 422: no more than 30 years",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = refuses(
+        "premises",
+        PREMISES,
+        "tenancy_expiry",
+        [
+            (today.isoformat(), DATE_PAST_MSG),
+            ((today - one_day).isoformat(), DATE_PAST_MSG),
+            ("2001-01-01", DATE_PAST_MSG),
+            ((today + one_day).isoformat(), DATE_MIN_MSG),
+        ],
+    )
+    fv(
+        "tenancy expiry today, yesterday, long past or tomorrow is 422 with its own sentence",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = refuses(
+        "premises",
+        PREMISES,
+        "tenancy_expiry",
+        [
+            ("2027-02-30", DATE_FORMAT_MSG),
+            ("31/10/2027", DATE_FORMAT_MSG),
+            ("20271031", DATE_FORMAT_MSG),
+            ("2027-1-5", DATE_FORMAT_MSG),
+            ("2027-10-31T00:00:00", DATE_FORMAT_MSG),
+            ("0000-00-00", DATE_FORMAT_MSG),
+            ("２０２７-１０-３１", DATE_FORMAT_MSG),
+        ],
+    )
+    fv(
+        "tenancy expiry that is not a real YYYY-MM-DD date (30 Feb, day first, no dashes, a time, full-width digits) is 422",
+        not bad,
+        "; ".join(bad),
+    )
+    r = put("premises", PREMISES)
+    bad = accepts(
+        "premises",
+        PREMISES,
+        "postal_code",
+        [("018989", "018989"), ("208787", "208787"), ("828000", "828000"), (" 208787 ", "208787")],
+    )
+    fv("postal codes in sectors 01 to 82 are accepted", not bad and r.status_code == 200, "; ".join(bad))
+    bad = refuses(
+        "premises",
+        PREMISES,
+        "postal_code",
+        [("830000", POSTAL_SECTOR_MSG), ("000000", POSTAL_SECTOR_MSG), ("990123", POSTAL_SECTOR_MSG)],
+    )
+    fv("postal codes in sector 00 or 83 and above are 422: start with 01 to 82", not bad, "; ".join(bad))
+    bad = refuses(
+        "premises",
+        PREMISES,
+        "postal_code",
+        [
+            ("20878", POSTAL_FORMAT_MSG),
+            ("2087877", POSTAL_FORMAT_MSG),
+            ("20878A", POSTAL_FORMAT_MSG),
+            ("２０８７８７", POSTAL_FORMAT_MSG),
+            (208787, None),
+        ],
+    )
+    fv(
+        "a postal code that is not 6 ASCII digits (5, 7, a letter, full-width, a number instead of text) is 422",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = accepts(
+        "premises",
+        PREMISES,
+        "address_line_1",
+        [
+            ("Blk 123 Ang Mo Kio Ave 3 #05-123", "Blk 123 Ang Mo Kio Ave 3 #05-123"),
+            ("10 Jalan Besar #01-12", "10 Jalan Besar #01-12"),
+            ("1 Edge Road", "1 Edge Road"),
+            ("10 Jalan   Besar  #01-12 ", "10 Jalan Besar #01-12"),
+        ],
+    )
+    fv(
+        "addresses with a street, a number and a #floor-unit are accepted; one without a unit is accepted; spaces collapse",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = refuses(
+        "premises",
+        PREMISES,
+        "address_line_1",
+        [
+            ("#01-12", ADDR_PARTS_MSG),
+            ("Jalan Besar", ADDR_PARTS_MSG),
+            ("12345", ADDR_PARTS_MSG),
+            ("10 Jalan Besar #1-12", ADDR_UNIT_MSG),
+            ("10 Jalan Besar #01-123456", ADDR_UNIT_MSG),
+            ("10 Jalan Besar #01-", ADDR_UNIT_MSG),
+            ("10 Jalan Besar #", ADDR_UNIT_MSG),
+            ("10 Jalan Besar 208787", ADDR_POSTAL_MSG),
+            ("1 A", None),
+            ("10 Jalan Besar " + "x" * 200, None),
+        ],
+    )
+    fv(
+        "address with no digit or no letter, a malformed #unit, the postal code inside it, under 5 or over 200 characters is 422 with its sentence",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = accepts(
+        "premises",
+        PREMISES,
+        "floor_area_sqm",
+        [(45.25, 45.25), (1, 1), (10000, 10000), (45.2, 45.2), (85, 85)],
+    )
+    fv("floor area from 1 to 10000 with up to 2 decimals is accepted", not bad, "; ".join(bad))
+    bad = refuses(
+        "premises",
+        PREMISES,
+        "floor_area_sqm",
+        [
+            (0.5, None),
+            (0, None),
+            (-1, None),
+            (10000.01, None),
+            (45.255, DECIMALS_MSG),
+            (45.123456, DECIMALS_MSG),
+            ("45", None),
+        ],
+    )
+    fv(
+        "floor area under 1, over 10000, with 3 or more decimals, or written as text is 422",
+        not bad,
+        "; ".join(bad),
+    )
+
+    # ---- operations ----
+    bad = accepts(
+        "operations",
+        OPERATIONS,
+        "cuisine_description",
+        [
+            ("x" * 10, "x" * 10),
+            ("x" * 1000, "x" * 1000),
+            ("Kopi   and\n\n\n\n toast  \n all day", "Kopi and\n\ntoast\nall day"),
+        ],
+    )
+    fv(
+        "description of 10 and 1000 characters is accepted; blank-line runs shrink to one and line edges are trimmed",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = refuses(
+        "operations",
+        OPERATIONS,
+        "cuisine_description",
+        [
+            ("x" * 9, "Enter at least 10 characters."),
+            ("x" * 1001, None),
+            ("         x", None),
+            ("x​" * 9, None),
+        ],
+    )
+    fv(
+        "description of 9 or 1001 characters, or padding around fewer than 10, is 422",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = accepts("operations", OPERATIONS, "food_handlers_count", [(1, 1), (500, 500)]) + accepts(
+        "operations", OPERATIONS, "seating_capacity", [(0, 0), (2000, 2000)]
+    )
+    fv("food handlers 1 to 500 and seating 0 to 2000 are accepted at both ends", not bad, "; ".join(bad))
+    bad = refuses(
+        "operations", OPERATIONS, "food_handlers_count", [(0, None), (501, None), (-1, None), (2.5, None)]
+    ) + refuses("operations", OPERATIONS, "seating_capacity", [(-1, None), (2001, None)])
+    fv("food handlers 0 or 501 and seating -1 or 2001 are 422", not bad, "; ".join(bad))
+
+    # ---- operating hours ----
+    hrs = {
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "opens": "07:00",
+        "closes": "21:00",
+        "open_24h": False,
+    }
+    r = put("operations", OPERATIONS, operating_hours=hrs)
+    fv(
+        "hours as an object {days, opens, closes, open_24h} are stored as sent and read back from GET",
+        r.status_code == 200 and stored("operations", "operating_hours") == hrs,
+        f"{r.status_code} {stored('operations', 'operating_hours')}",
+    )
+    bad = accepts(
+        "operations",
+        OPERATIONS,
+        "operating_hours",
+        [
+            ({**hrs, "opens": o, "closes": c}, {**hrs, "opens": o, "closes": c})
+            for o, c in (("00:00", "23:30"), ("07:30", "21:00"), ("18:00", "02:00"), ("23:30", "00:00"))
+        ],
+    )
+    fv(
+        "times on the half hour from 00:00 to 23:30 are accepted, and closing earlier than opening (after midnight) is accepted as given",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = refuses(
+        "operations",
+        OPERATIONS,
+        "operating_hours",
+        [
+            ({**hrs, "opens": t}, HOURS_BAD_TIME_MSG)
+            for t in (
+                "07:15",
+                "07:10",
+                "07:45",
+                "07:29",
+                "24:00",
+                "7:00",
+                "07:00:00",
+                "07:00\n",
+                "0700",
+                "25:00",
+                "07:60",
+                " 07:00",
+            )
+        ],
+    )
+    fv(
+        "opening times off the half hour (07:15, 07:10), 24:00, 7:00, with seconds, a newline or a space are 422: choose a time on the half hour",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = refuses(
+        "operations",
+        OPERATIONS,
+        "operating_hours",
+        [
+            ({**hrs, "days": []}, HOURS_NO_DAYS_MSG),
+            ({**hrs, "closes": "07:00"}, HOURS_SAME_MSG),
+            ({**hrs, "opens": None}, HOURS_NO_TIMES_MSG),
+            ({**hrs, "closes": ""}, HOURS_NO_TIMES_MSG),
+            ({"days": ["mon"], "open_24h": False}, HOURS_NO_TIMES_MSG),
+        ],
+    )
+    fv(
+        "hours with no days, opens equal to closes, or a missing or blank time are 422 with their own sentence",
+        not bad,
+        "; ".join(bad),
+    )
+    bad = refuses(
+        "operations",
+        OPERATIONS,
+        "operating_hours",
+        [
+            ({**hrs, "note": "x"}, HOURS_LEGACY_MSG),
+            ({**hrs, "days": ["funday"]}, HOURS_LEGACY_MSG),
+            ({**hrs, "days": "mon"}, HOURS_LEGACY_MSG),
+            ({**hrs, "days": [1]}, HOURS_LEGACY_MSG),
+            ({**hrs, "open_24h": "true"}, HOURS_LEGACY_MSG),
+            ({**hrs, "open_24h": 1}, HOURS_LEGACY_MSG),
+            ({**hrs, "open_24h": None}, HOURS_LEGACY_MSG),
+            ({**hrs, "opens": 700}, None),
+            ({**hrs, "opens": ["07:00"]}, None),
+            ({**hrs, "opens": {"h": 7}}, None),
+            ("Mon-Sun 7am-9pm", HOURS_LEGACY_MSG),
+            ([], HOURS_LEGACY_MSG),
+            (5, HOURS_LEGACY_MSG),
+            (True, HOURS_LEGACY_MSG),
+            ([hrs], HOURS_LEGACY_MSG),
+        ],
+    )
+    fv(
+        "hours with an extra key, an unknown day, wrong types, a free-text string or a list are 422 ('Pick your opening days and hours.')",
+        not bad,
+        "; ".join(bad),
+    )
+    r = put("operations", OPERATIONS, operating_hours={**hrs, "days": ["sun", "mon", "mon", "fri", "wed"]})
+    got = stored("operations", "operating_hours")
+    fv(
+        "days are de-duplicated and stored in week order",
+        r.status_code == 200 and got and got["days"] == ["mon", "wed", "fri", "sun"],
+        f"{r.status_code} {got}",
+    )
+    r = put(
+        "operations",
+        OPERATIONS,
+        operating_hours={"days": ["mon"], "opens": None, "closes": None, "open_24h": True},
+    )
+    got1 = stored("operations", "operating_hours")
+    r2 = put(
+        "operations",
+        OPERATIONS,
+        operating_hours={"days": DAY_KEYS, "opens": "07:00", "closes": "21:00", "open_24h": True},
+    )
+    got2 = stored("operations", "operating_hours")
+    fv(
+        "open 24 hours is accepted with null times and with times given; the times are dropped when stored",
+        r.status_code == 200
+        and r2.status_code == 200
+        and got1["opens"] is None
+        and got2["opens"] is None
+        and got2["closes"] is None
+        and got2["open_24h"] is True,
+        f"{got1} {got2}",
+    )
+    r = put("operations", OPERATIONS, operating_hours=None)
+    sec = section_state(op, aid, "operations")
+    fv(
+        "hours left out (null) save in a draft as an incomplete section, never as a value",
+        r.status_code in (200, 422) and not sec["complete"],
+        f"{r.status_code} complete={sec['complete']}",
+    )
+
+    # ---- the whole form together ----
+    fill_all(op, aid)
+    v = req(op, "GET", f"/applications/{aid}").json()
+    fv(
+        "a clean application fills all four sections as complete",
+        all(s["complete"] for s in v["sections"]),
+        json.dumps([(s["key"], s["errors"]) for s in v["sections"] if not s["complete"]]),
+    )
+    fs = req(op, "GET", "/form-schema").json()
+    byk = {f["key"]: f for s in fs["sections"] for f in s["fields"]}
+    fv(
+        "GET /form-schema carries the rules the form builds from",
+        byk["contact_phone"]["rule"] == "sg_phone"
+        and byk["uen"]["rule"] == "uen"
+        and byk["floor_area_sqm"]["max_decimals"] == 2
+        and byk["tenancy_expiry"]["min_months_ahead"] == 3
+        and byk["tenancy_expiry"]["max_years_ahead"] == 30
+        and byk["operating_hours"]["kind"] == "hours"
+        and byk["operating_hours"]["step_minutes"] == 30
+        and [o["value"] for o in byk["operating_hours"]["options"]] == DAY_KEYS,
+        json.dumps({k: byk[k] for k in ("operating_hours",)})[:300],
+    )
+    r = req(
+        op, "PATCH", f"/applications/{aid}/sections/business", json={**BUSINESS, "contact_phone": "12345"}
+    )
+    fv(
+        "the refusal on save is the sentence the form shows under the field (details.fields.contact_phone)",
+        r.status_code == 422
+        and error_code(r) == "validation_failed"
+        and fields_of(r) == {"contact_phone": PHONE_MSG},
+        r.text[:200],
+    )
+    r = req(
+        op,
+        "PATCH",
+        f"/applications/{aid}/sections/business",
+        json={
+            **BUSINESS,
+            "contact_phone": "12345",
+            "uen": "bad",
+            "contact_email": "x",
+            "contact_name": "1",
+            "business_name": "!",
+        },
+    )
+    fv(
+        "five bad fields in one save are all named in one 422",
+        r.status_code == 422
+        and set(fields_of(r)) == {"contact_phone", "uen", "contact_email", "contact_name", "business_name"},
+        r.text[:300],
+    )
+
+    # ---- data saved before v0.4.1 (written straight to the database) ----
+    legacy_hours = "Mon-Sun 7am-9pm"
+    sid = req(op, "POST", "/applications").json()["id"]
+    fill_all(op, sid)
+    upload_all(op, sid)
+    wait_checks(op, sid)
+    db_edit_form(sid, lambda f: f["operations"].update(operating_hours=legacy_hours), revision=False)
+    ops = section_state(op, sid, "operations")
+    fv(
+        "a draft holding free-text hours reads back as written, and the section is incomplete with 'Pick your opening days and hours.' (the operator re-picks once)",
+        ops["data"].get("operating_hours") == legacy_hours
+        and not ops["complete"]
+        and ops["errors"].get("operating_hours") == HOURS_LEGACY_MSG,
+        json.dumps(ops)[:300],
+    )
+    r = req(
+        op,
+        "PATCH",
+        f"/applications/{sid}/sections/business",
+        json={**BUSINESS, "business_name": "Edge Case Kopi Two"},
+    )
+    fv(
+        "saving an unrelated section leaves the free-text hours untouched",
+        r.status_code == 200
+        and section_state(op, sid, "operations")["data"].get("operating_hours") == legacy_hours,
+        r.text[:200],
+    )
+    r = req(op, "POST", f"/applications/{sid}/submit")
+    fv(
+        "submitting with free-text hours is 422 and names the Operations section",
+        r.status_code == 422 and "Section: Operations" in json.dumps(r.json()["error"].get("details", {})),
+        r.text[:200],
+    )
+    soon = (today + dt.timedelta(days=30)).isoformat()
+    db_edit_form(sid, lambda f: f["premises"].update(tenancy_expiry=soon), revision=False)
+    r = req(op, "POST", f"/applications/{sid}/submit")
+    detail = json.dumps(r.json()["error"].get("details", {})) if r.status_code == 422 else ""
+    fv(
+        "a draft whose saved tenancy date has since slipped inside 3 months is refused at submit and names Premises",
+        r.status_code == 422 and "Section: Premises" in detail,
+        r.text[:200],
+    )
+    r = req(op, "PATCH", f"/applications/{sid}/sections/premises", json={**PREMISES, "tenancy_expiry": soon})
+    fv(
+        "and the same date is refused on save with the 3-month sentence",
+        r.status_code == 422 and fields_of(r).get("tenancy_expiry") == DATE_MIN_MSG,
+        r.text[:200],
+    )
+    r1 = req(op, "PATCH", f"/applications/{sid}/sections/premises", json=PREMISES)
+    r2 = req(op, "PATCH", f"/applications/{sid}/sections/operations", json=OPERATIONS)
+    r3 = req(op, "POST", f"/applications/{sid}/submit")
+    fv(
+        "re-picking the hours and the date lets the same draft submit as Revision 1",
+        r1.status_code == r2.status_code == 200 and r3.status_code == 200,
+        f"{r1.status_code} {r2.status_code} {r3.status_code} {r3.text[:150]}",
+    )
+
+    # An application submitted before v0.4.1: the stored form is read as a snapshot (its own record), never re-judged
+    # by today's rules except to mark which section would not pass.
+    past = "2020-01-01"
+    a_id = submitted_case(op)
+
+    def old_valid(f: dict) -> None:  # type: ignore[type-arg]
+        f["business"].update(contact_phone="91234567", uen="202388888e", contact_email="Edge@Example.SG")
+        f["premises"].update(address_line_1="1 Edge Road", tenancy_expiry=past)
+        f["operations"].update(operating_hours=legacy_hours)
+
+    db_edit_form(a_id, old_valid)
+    mine = req(op, "GET", f"/applications/{a_id}").json()
+    theirs = officer_view(off, a_id)
+    fv(
+        "submitted before v0.4.1 with an unnormalised phone, lower-case UEN, free-text hours and a tenancy now in the past: every section still reads complete (operator and officer views)",
+        not incomplete_sections(mine["sections"])
+        and not incomplete_sections(theirs["sections"])
+        and mine["completeness"]["percent"] == 100,
+        f"op={incomplete_sections(mine['sections'])} off={incomplete_sections(theirs['sections'])} {mine['completeness']['percent']}",
+    )
+    fv(
+        "the officer reads the old values exactly as submitted (hours text, phone as typed)",
+        next(s for s in theirs["sections"] if s["key"] == "operations")["data"]["operating_hours"]
+        == legacy_hours
+        and next(s for s in theirs["sections"] if s["key"] == "business")["data"]["contact_phone"]
+        == "91234567",
+        "",
+    )
+    steps = walk_to_licence(op, off, a_id)
+    fv(
+        "that case goes through Start review, the visit, the checklist, Route to approval and Approve with a licence",
+        all(c == 200 for _, c, _ in steps),
+        "; ".join(f"{n}={c} {t}" for n, c, t in steps if c != 200),
+    )
+
+    # The worst case: values that fail today's rules (an invalid phone, postal sector 99, an address with no number).
+    def old_invalid(f: dict) -> None:  # type: ignore[type-arg]
+        f["business"].update(contact_phone="12345", uen="202388888e")
+        f["premises"].update(address_line_1="Edge Road", postal_code="990123", tenancy_expiry=past)
+        f["operations"].update(operating_hours=legacy_hours)
+
+    b_id = submitted_case(op)
+    db_edit_form(b_id, old_invalid)
+    mine = req(op, "GET", f"/applications/{b_id}").json()
+    theirs = officer_view(off, b_id)
+    inc_op, inc_off = incomplete_sections(mine["sections"]), incomplete_sections(theirs["sections"])
+    fv(
+        "submitted with values that fail today's rules: both views mark exactly Business and Premises (a cosmetic marker, the old phone, postal code and address are still shown)",
+        inc_op == inc_off == {"business", "premises"}
+        and mine["sections"][0]["data"]["contact_phone"] == "12345",
+        f"op={inc_op} off={inc_off}",
+    )
+    fv(
+        "the operator still sees the case as submitted: editing off, no 'incomplete' status, a public label",
+        not mine["can_edit"] and not mine["can_submit"] and bool(mine["status_label"]),
+        json.dumps({k: mine[k] for k in ("status_label", "can_edit", "can_submit")}),
+    )
+    steps = walk_to_licence(op, off, b_id)
+    for name, code, text in steps:
+        fv(f"invalid old values: {name} is not blocked (200)", code == 200, f"{code} {text}")
+
+    # Officer flags documents only: the operator replaces a document and resubmits; the old sections are untouched.
+    d_id = submitted_case(op)
+    db_edit_form(d_id, old_invalid)
+    before = {s["key"]: s["data"] for s in req(op, "GET", f"/applications/{d_id}").json()["sections"]}
+    t1 = transition(off, d_id, "under_review")
+    f1 = flag(off, d_id, document_type="floor_plan")
+    t2 = transition(off, d_id, "pending_pre_site_resubmission")
+    up = upload(op, d_id, "floor_plan", "new.txt", TXT + b"replacement")
+    rs = req(op, "POST", f"/applications/{d_id}/resubmit")
+    after_v = req(op, "GET", f"/applications/{d_id}").json()
+    after = {s["key"]: s["data"] for s in after_v["sections"]}
+    fv(
+        "officer flags only a document; the operator replaces it and resubmits: Revision 2 is recorded although the old sections fail today's rules",
+        (t1.status_code, f1.status_code, t2.status_code, up.status_code, rs.status_code)
+        == (200, 201, 200, 201, 200)
+        and after_v["revision_count"] == 2,
+        f"{t1.status_code} {f1.status_code} {t2.status_code} {up.status_code} {rs.status_code} {rs.text[:200]}",
+    )
+    fv(
+        "and the unflagged sections are unchanged and still readable by both roles",
+        after == before
+        and next(s for s in officer_view(off, d_id)["sections"] if s["key"] == "business")["data"][
+            "contact_phone"
+        ]
+        == "12345",
+        "",
+    )
+
+    # Officer flags the business section: the operator must fix what is wrong, in the form's own words.
+    e_id = submitted_case(op)
+    db_edit_form(e_id, old_invalid)
+    old_business = next(
+        s for s in req(op, "GET", f"/applications/{e_id}").json()["sections"] if s["key"] == "business"
+    )
+    transition(off, e_id, "under_review")
+    flag(off, e_id, section_key="business")
+    transition(off, e_id, "pending_pre_site_resubmission")
+    r = req(op, "PATCH", f"/applications/{e_id}/sections/business", json=old_business["data"])
+    fv(
+        "officer flags Business; the operator saves it with the old values unchanged: 422 naming contact_phone with the form's sentence",
+        r.status_code == 422 and fields_of(r) == {"contact_phone": PHONE_MSG},
+        r.text[:300],
+    )
+    fv(
+        "and that sentence is the one the section already showed as its error",
+        old_business["errors"].get("contact_phone") == PHONE_MSG,
+        json.dumps(old_business["errors"]),
+    )
+    r = req(
+        op,
+        "PATCH",
+        f"/applications/{e_id}/sections/business",
+        json={**old_business["data"], "contact_phone": "9123 4567"},
+    )
+    r2 = req(op, "POST", f"/applications/{e_id}/resubmit")
+    fv(
+        "fixing only the phone saves, normalised, and resubmits as Revision 2",
+        r.status_code == 200
+        and r2.status_code == 200
+        and next(s for s in r2.json()["sections"] if s["key"] == "business")["data"]["contact_phone"]
+        == "+65 9123 4567",
+        f"{r.status_code} {r2.status_code} {r2.text[:150]}",
+    )
+
+    # A phone that is valid but was saved unnormalised, a lower-case UEN: saving them again is the change asked for.
+    g_id = submitted_case(op)
+    db_edit_form(g_id, old_valid)
+    gb = next(s for s in req(op, "GET", f"/applications/{g_id}").json()["sections"] if s["key"] == "business")
+    transition(off, g_id, "under_review")
+    flag(off, g_id, section_key="business")
+    transition(off, g_id, "pending_pre_site_resubmission")
+    r = req(op, "PATCH", f"/applications/{g_id}/sections/business", json=gb["data"])
+    rd = req(op, "GET", f"/applications/{g_id}").json()
+    stored_b = next(s for s in rd["sections"] if s["key"] == "business")["data"]
+    fv(
+        "old values that are only unnormalised (phone 91234567, UEN in lower case) save as they are and come back normalised",
+        r.status_code == 200
+        and stored_b["contact_phone"] == "+65 9123 4567"
+        and stored_b["uen"] == "202388888E"
+        and stored_b["contact_email"] == "edge@example.sg",
+        f"{r.status_code} {stored_b}",
+    )
+    fv(
+        "and the same content in its new form is not counted as the change the officer asked for (nothing to resubmit yet)",
+        not rd["resubmit"]["can_resubmit"] and rd["resubmit"]["changed_sections"] == [],
+        json.dumps(rd.get("resubmit")),
+    )
+    r = req(
+        op,
+        "PATCH",
+        f"/applications/{g_id}/sections/business",
+        json={**gb["data"], "contact_name": "Edge Tester Two"},
+    )
+    r2 = req(op, "POST", f"/applications/{g_id}/resubmit")
+    fv(
+        "a real change then resubmits as Revision 2",
+        r.status_code == 200 and r2.status_code == 200 and r2.json()["revision_count"] == 2,
+        f"{r.status_code} {r2.status_code} {r2.text[:150]}",
+    )
+    req(op, "DELETE", f"/applications/{aid}")
+
+
+def walk_to_licence(op: dict[str, str], off: dict[str, str], aid: str) -> list[tuple[str, int, str]]:
+    """Application Received to a licence, stopping at the first refusal. Returns (step, status, text) per step."""
+    steps: list[tuple[str, int, str]] = []
+
+    def step(name: str, r: httpx.Response) -> bool:
+        steps.append((name, r.status_code, r.text[:160]))
+        return r.status_code == 200
+
+    if not step("Start review", transition(off, aid, "under_review")):
+        return steps
+    if not step("Propose visit", propose(off, aid, working_day(3))):
+        return steps
+    if not step("Accept visit", req(op, "POST", f"/applications/{aid}/site-visit/accept")):
+        return steps
+    if not step("Site visit done", transition(off, aid, "site_visit_done")):
+        return steps
+    r = req(off, "POST", CHECKLIST.format(aid))
+    req(off, "PUT", CHECKLIST.format(aid), json={"items": clean_items(), "version": r.json()["version"]})
+    if not step("Submit checklist", req(off, "POST", CHECKLIST.format(aid) + "/submit")):
+        return steps
+    if not step("Route to approval", transition(off, aid, "pending_approval")):
+        return steps
+    step("Approve with licence", transition(off, aid, "approved", note="Approved."))
+    return steps
+
+
+GARBAGE = [
+    {"a": 1},
+    [1, 2],
+    [[]],
+    [],
+    None,
+    True,
+    False,
+    1.5,
+    "",
+    "   ",
+    "​",
+    "x\u0000y",
+    "\ud800" if False else "‮",
+]
+BAD_SHAPES = [{"a": 1}, [1, 2], [[]], []]
+SECTION_BASES = {"business": BUSINESS, "premises": PREMISES, "operations": OPERATIONS, "declarations": DECL}
+QUERY_VALUES = [
+    HUGE_NUMBERS[k] for k in ("10**400", "-10**400", "1e400", "5000-digit int", "2**63", "-2**63-1")
+] + [
+    str(2**31),
+    "-1",
+    "0",
+    "abc",
+    "",
+    "1.5",
+    " 1",
+    "nan",
+    "inf",
+    "\x00",
+]
+
+
+def rc2_checks(op: dict[str, str], op2: dict[str, str], off: dict[str, str]) -> None:
+    """RC2: the release-candidate-2 fixes, and what else could go wrong with them (v0.4.1)."""
+    rc = Numbered("RC2-")
+
+    # ---- /health ----
+    r = client.get("/health")
+    body = r.json() if r.status_code == 200 else {}
+    rc(
+        "/health carries `environment` as a non-empty word next to status, database, version and commit",
+        r.status_code == 200
+        and isinstance(body.get("environment"), str)
+        and bool(body["environment"])
+        and {"status", "database", "version", "commit"} <= set(body),
+        r.text[:200],
+    )
+    rc(
+        "/health says nothing secret: no key, URL or password in its body",
+        all(w not in r.text.lower() for w in ("postgres", "secret", "password", "api_key", "token")),
+        r.text[:200],
+    )
+
+    # ---- the operator-only re-run ----
+    vid = submitted_case(op)
+    doc = req(op, "GET", f"/applications/{vid}").json()["document_slots"][0]["document"]["id"]
+    ver = f"/applications/{vid}/documents/{doc}/verify"
+    r = req(off, "POST", ver)
+    rc(
+        "an officer on the operator's re-run route is 403 in the envelope",
+        r.status_code == 403 and error_code(r) == "forbidden",
+        r.text[:200],
+    )
+    ad = client.post(
+        "/auth/login", json={"email": "admin@permitflow.example.sg", "password": PW, "take_over": True}
+    )
+    admin = {"Authorization": "Bearer " + ad.json()["access_token"]} if ad.status_code == 200 else None
+    if admin is None:
+        rc(
+            "the administrator is not allowed on the operator's re-run route (skipped: admin sign-in unavailable on this stack)",
+            True,
+        )
+    else:
+        r = req(admin, "POST", ver)
+        rc("the administrator on the operator's re-run route is 403", r.status_code == 403, r.text[:200])
+    r = req(op2, "POST", ver)
+    rc("another operator on the re-run route is 404, not 403", r.status_code == 404, r.text[:200])
+    r = client.post(ver)
+    rc(
+        "no token on the re-run route is 401 in the envelope",
+        r.status_code == 401 and envelope_ok(r),
+        r.text[:200],
+    )
+    r = req(op, "POST", ver)
+    rc(
+        "the owner's re-run after submission is refused as 403 'with the licensing office' (not a role error)",
+        r.status_code == 403 and "licensing office" in r.text,
+        r.text[:200],
+    )
+    dd = req(op, "POST", "/applications").json()["id"]
+    dr = upload(op, dd, "floor_plan", "floor_plan.txt", TXT)
+    ddoc = dr.json()["id"] if dr.status_code in (200, 201) and "id" in dr.json() else ""
+    if not ddoc:
+        ddoc = next(
+            s["document"]["id"]
+            for s in req(op, "GET", f"/applications/{dd}").json()["document_slots"]
+            if s["document"]
+        )
+    wait_checks(op, dd)
+    r = req(off, "POST", f"/applications/{dd}/documents/{ddoc}/verify")
+    rc("an officer on the re-run route of a draft's document is 403 too", r.status_code == 403, r.text[:200])
+    r = req(op, "POST", f"/applications/{dd}/documents/{ddoc}/verify")
+    rc("the owner's own re-run on a draft still works", r.status_code in (200, 202), r.text[:200])
+    req(op, "DELETE", f"/applications/{dd}")
+    r = req(off, "POST", f"/officer/applications/{vid}/documents/{doc}/verify")
+    rc("the officer's route still works for the officer", r.status_code in (200, 202), r.text[:200])
+    r = req(op, "POST", f"/officer/applications/{vid}/documents/{doc}/verify")
+    rc("the operator on the officer's route is 403", r.status_code == 403, r.text[:200])
+    r = req(off, "POST", f"/officer/applications/{vid}/documents/{uuid.uuid4()}/verify")
+    rc("the officer's route with an unknown document is 404", r.status_code == 404, r.text[:200])
+    r = req(off, "POST", f"/applications/{vid}/documents/not-a-uuid/verify")
+    rc(
+        "the operator's route with a malformed document id is 4xx in the envelope, officer or not",
+        400 <= r.status_code < 500 and envelope_ok(r),
+        r.text[:200],
+    )
+
+    # ---- Confirmed on ----
+    held = "2026-02-03T04:05:06+00:00"
+    did = req(op, "POST", "/applications").json()["id"]
+    fill_all(op, did)
+    db_edit_form(did, lambda f: f["declarations"].update(confirmed_at=held), revision=False)
+    r = req(
+        op,
+        "PATCH",
+        f"/applications/{did}/sections/declarations",
+        json={**DECL, "confirmed_at": "2019-01-01T00:00:00+00:00"},
+    )
+    got = section_state(op, did, "declarations")["data"].get("confirmed_at")
+    rc(
+        "a confirmed_at sent by the client is ignored: the held stamp stays",
+        r.status_code == 200 and got == held,
+        f"{r.status_code} stored {got!r}",
+    )
+    r = req(op, "PATCH", f"/applications/{did}/sections/declarations", json=DECL)
+    got = section_state(op, did, "declarations")["data"].get("confirmed_at")
+    rc(
+        "a normal save with no confirmed_at keeps the held stamp",
+        r.status_code == 200 and got == held,
+        f"{r.status_code} stored {got!r}",
+    )
+    bad = []
+    for label, raw in (
+        ("null", "null"),
+        ("int", "5"),
+        ("list", "[1]"),
+        ("object", '{"a":1}'),
+        ("10**400", HUGE_NUMBERS["10**400"]),
+        ("1e400", "1e400"),
+        ("text", '"tomorrow"'),
+        ("empty", '""'),
+    ):
+        r = send_raw(
+            op, "PATCH", f"/applications/{did}/sections/declarations", raw_body(DECL, "confirmed_at", raw)
+        )
+        got = section_state(op, did, "declarations")["data"].get("confirmed_at")
+        if not survives(r) or got != held:
+            bad.append(f"{label}: {r.status_code} stored {got!r}")
+    rc(
+        "a confirmed_at of any type (null, number, list, object, huge, text, empty) never errors and never replaces the held stamp",
+        not bad,
+        "; ".join(bad),
+    )
+    nid = req(op, "POST", "/applications").json()["id"]
+    r = req(
+        op, "PATCH", f"/applications/{nid}/sections/declarations", json={**DECL, "confirmed_at": "2019-01-01"}
+    )
+    rc(
+        "on a draft with no stamp yet, a client confirmed_at is not stored",
+        r.status_code == 200 and "confirmed_at" not in section_state(op, nid, "declarations")["data"],
+        r.text[:200],
+    )
+    req(op, "DELETE", f"/applications/{nid}")
+    req(op, "DELETE", f"/applications/{did}")
+
+    cid = submitted_case(op)
+    transition(off, cid, "under_review")
+    flag(off, cid, section_key="declarations")
+    flag(off, cid, section_key="business")
+    transition(off, cid, "pending_pre_site_resubmission")
+    r = req(
+        op,
+        "PATCH",
+        f"/applications/{cid}/sections/declarations",
+        json={**DECL, "confirmed_at": "2019-01-01T00:00:00+00:00"},
+    )
+    s1 = section_state(op, cid, "declarations")["data"].get("confirmed_at") or ""
+    try:
+        age = abs((dt.datetime.now(dt.UTC) - dt.datetime.fromisoformat(s1)).total_seconds())
+    except ValueError:
+        age = 1e9
+    rc(
+        "re-confirming the declarations during a resubmission stamps the server's time, not the client's 2019",
+        r.status_code == 200 and age < 120,
+        f"{r.status_code} {s1!r} age {age:.0f}s",
+    )
+    r = req(
+        op,
+        "PATCH",
+        f"/applications/{cid}/sections/business",
+        json={**BUSINESS, "business_name": "Stamp Keeper Kopi"},
+    )
+    rc(
+        "saving the other flagged section leaves the stamp as it was",
+        r.status_code == 200 and section_state(op, cid, "declarations")["data"].get("confirmed_at") == s1,
+        r.text[:200],
+    )
+    time.sleep(1.1)
+    r = req(
+        op,
+        "PATCH",
+        f"/applications/{cid}/sections/declarations",
+        json={**DECL, "confirmed_at": "2030-01-01T00:00:00+00:00"},
+    )
+    s2 = section_state(op, cid, "declarations")["data"].get("confirmed_at") or ""
+    rc(
+        "a client stamp in the future is ignored too: the new stamp is the server's, later than the first",
+        r.status_code == 200 and s2 > s1 and not s2.startswith("2030"),
+        f"{s1!r} then {s2!r}",
+    )
+    rd = req(op, "GET", f"/applications/{cid}").json()
+    rc(
+        "and the change counts: the flagged declarations section is listed as changed",
+        "declarations" in rd["resubmit"]["changed_sections"],
+        json.dumps(rd["resubmit"]),
+    )
+
+    # ---- huge numbers in every number and integer field ----
+    fs = req(op, "GET", "/form-schema").json()
+    probe = req(op, "POST", "/applications").json()["id"]
+    for sec in fs["sections"]:
+        for f in sec["fields"]:
+            if f["kind"] not in ("number", "integer"):
+                continue
+            bad, wrong_code = [], []
+            for label, raw in HUGE_NUMBERS.items():
+                r = send_raw(
+                    op,
+                    "PATCH",
+                    f"/applications/{probe}/sections/{sec['key']}",
+                    raw_body(SECTION_BASES[sec["key"]], f["key"], raw),
+                )
+                if label == "1e-400":  # rounds to 0.0: a valid number for some fields, a refusal for others
+                    if not survives(r):
+                        bad.append(f"{label}: {r.status_code}")
+                elif not (400 <= r.status_code < 500 and envelope_ok(r)):
+                    bad.append(f"{label}: {r.status_code}")
+                elif error_code(r) != "validation_failed" and not r.status_code == 400:
+                    wrong_code.append(f"{label}: {error_code(r)}")
+            rc(
+                f"{f['key']} ({f['kind']}): 10**400, -10**400, 1e400, a 5,000-digit integer, 2**63, NaN and Infinity are all 4xx in the envelope, never 500",
+                not bad,
+                "; ".join(bad),
+            )
+            rc(f"{f['key']}: a huge number is a 422 validation_failed", not wrong_code, "; ".join(wrong_code))
+    r = send_raw(
+        op,
+        "PATCH",
+        f"/applications/{probe}/sections/operations",
+        raw_body(OPERATIONS, "seating_capacity", "1" + "0" * 400),
+    )
+    rc(
+        "10**400 in seating_capacity names the field in a 422 validation_failed",
+        r.status_code == 422 and error_code(r) == "validation_failed" and "seating_capacity" in fields_of(r),
+        r.text[:200],
+    )
+    r = send_raw(
+        op,
+        "PATCH",
+        f"/applications/{probe}/sections/operations",
+        raw_body(OPERATIONS, "cuisine_description", "1" + "0" * 400),
+    )
+    rc(
+        "10**400 where text is expected is a 422, not a 500",
+        r.status_code == 422 and "cuisine_description" in fields_of(r),
+        r.text[:200],
+    )
+    r = send_raw(
+        op,
+        "PATCH",
+        f"/applications/{probe}/sections/operations",
+        raw_body(
+            OPERATIONS,
+            "operating_hours",
+            '{"days":["mon"],"opens":"07:00","closes":"21:00","open_24h":false,"x":' + "1" + "0" * 400 + "}",
+        ),
+    )
+    rc("10**400 inside the hours object is a 422, not a 500", r.status_code == 422, r.text[:200])
+
+    # ---- an object, an array, null or odd text where a scalar is expected, in every field ----
+    for sec in fs["sections"]:
+        base = SECTION_BASES[sec["key"]]
+        bad = []
+        for f in sec["fields"]:
+            for val in GARBAGE:
+                r = req(
+                    op, "PATCH", f"/applications/{probe}/sections/{sec['key']}", json={**base, f["key"]: val}
+                )
+                if not survives(r):
+                    bad.append(f"{f['key']}={str(val)[:12]!r}: {r.status_code}")
+                elif val in BAD_SHAPES and r.status_code != 422:
+                    bad.append(f"{f['key']}={str(val)[:12]!r}: {r.status_code} (wanted 422)")
+                elif r.status_code == 200 and "\\u0000" in json.dumps(
+                    section_state(op, probe, sec["key"])["data"]
+                ):
+                    bad.append(f"{f['key']}={str(val)[:12]!r}: a NUL byte was stored")
+        rc(
+            f"{sec['key']}: an object, array, null, boolean, float, blank or NUL text in each of {len(sec['fields'])} fields never gives a 5xx; objects and arrays are 422",
+            not bad,
+            "; ".join(bad[:6]),
+        )
+    bad = []
+    for fkey, sec_key in (("entity_type", "business"), ("premises_type", "premises")):
+        for val in BAD_SHAPES:
+            r = req(
+                op,
+                "PATCH",
+                f"/applications/{probe}/sections/{sec_key}",
+                json={**SECTION_BASES[sec_key], fkey: val},
+            )
+            if r.status_code != 422:
+                bad.append(f"{fkey}={val!r}: {r.status_code}")
+    rc(
+        "a list or object in a select field (entity type, premises type) is 422, not an unhashable-value 500",
+        not bad,
+        "; ".join(bad),
+    )
+    r = req(op, "PATCH", f"/applications/{probe}/sections/business", json={**BUSINESS, "a\u0000b": 1})
+    rc("an unknown key holding a NUL byte is a 422 naming it, not a 500", r.status_code == 422, r.text[:200])
+    r = req(
+        op,
+        "PATCH",
+        f"/applications/{probe}/sections/business",
+        content=b'{"business_name": "\\ud800"}',
+        headers={"Content-Type": "application/json"},
+    )
+    rc("a lone surrogate in a JSON string is 4xx or cleaned, never 500", survives(r), r.text[:200])
+    for raw in (b"[" * 5000, b'{"a":' * 3000, b"\xff\xfe", b""):
+        r = req(
+            op,
+            "PATCH",
+            f"/applications/{probe}/sections/business",
+            content=raw,
+            headers={"Content-Type": "application/json"},
+        )
+        if not survives(r):
+            break
+    rc(
+        "deeply nested, non-UTF-8 and empty bodies are 4xx in the envelope",
+        survives(r),
+        f"{r.status_code} {r.text[:100]}",
+    )
+    req(op, "DELETE", f"/applications/{probe}")
+
+    # ---- the same inputs on every other endpoint that takes a number or a body ----
+    nid = submitted_case(op)  # Application Received: every write below is refused or ignored
+    wd = req(op, "POST", "/applications").json()["id"]
+    bodies = [
+        (
+            "sign-in",
+            "POST",
+            "/auth/login",
+            {"email": OPERATOR, "password": "wrong-password", "take_over": False},
+            {},
+        ),
+        ("withdraw", "POST", f"/applications/{wd}/withdraw", {"reason": "x"}, op),
+        (
+            "officer transition",
+            "POST",
+            f"/officer/applications/{nid}/transition",
+            {"target": "approved", "note": None, "expected_version": 1},
+            off,
+        ),
+        (
+            "officer feedback",
+            "POST",
+            f"/officer/applications/{nid}/feedback",
+            {"target_type": "section", "section_key": "premises", "message": "x", "template_key": None},
+            off,
+        ),
+        (
+            "site-visit proposal",
+            "POST",
+            f"/officer/applications/{nid}/site-visit",
+            {"date": working_day(3), "slot": "morning", "note": None, "expected_version": 1},
+            off,
+        ),
+        ("resubmit", "POST", f"/applications/{nid}/resubmit", {}, op),
+    ]
+    for name, method, path, base, h in bodies:
+        bad = []
+        for key in base or ["_"]:
+            for val in GARBAGE:
+                r = req(h, method, path, json={**base, key: val})
+                if not survives(r):
+                    bad.append(f"{key}={str(val)[:12]!r}: {r.status_code}")
+            for label, raw in HUGE_NUMBERS.items():
+                r = send_raw(h, method, path, raw_body(base, key, raw))
+                if not survives(r):
+                    bad.append(f"{key}={label}: {r.status_code}")
+        rc(
+            f"{name}: every field given an object, array, null, odd text or a huge number answers 4xx in the envelope, never 5xx",
+            not bad,
+            "; ".join(bad[:6]),
+        )
+    bad = []
+    for label, raw in HUGE_NUMBERS.items():
+        r = send_raw(
+            off,
+            "POST",
+            f"/officer/applications/{nid}/transition",
+            raw_body({"target": "under_review", "expected_version": 1}, "expected_version", raw),
+        )
+        if not survives(r) or r.status_code == 200:
+            bad.append(f"{label}: {r.status_code}")
+    rc(
+        "a huge expected_version on Start review is 4xx (409 or 422), never a success or a 500",
+        not bad,
+        "; ".join(bad),
+    )
+
+    # ---- huge numbers and odd text in query parameters ----
+    xid = submitted_case(op)
+    walk_to_licence(op, off, xid)
+    queries = [
+        ("compare `from`", op, f"/applications/{xid}/compare", "from", {"to": 1}),
+        ("compare `to`", op, f"/applications/{xid}/compare", "to", {"from": 1}),
+        ("operator clarifications `visit`", op, f"/applications/{xid}/clarifications", "visit", {}),
+        ("officer checklist `visit`", off, f"/officer/applications/{xid}/checklist", "visit", {}),
+    ]
+    if admin is not None:
+        queries += [
+            ("admin audit feed `limit`", admin, "/admin/audit-feed", "limit", {}),
+            ("admin audit feed `before`", admin, "/admin/audit-feed", "before", {}),
+        ]
+    for name, h, path, param, extra in queries:
+        bad = []
+        for val in QUERY_VALUES + ["0" * 5000 + "1", "9" * 5000]:
+            r = req(h, "GET", path, params={**extra, param: val})
+            if not survives(r):
+                bad.append(f"{val[:14]!r}: {r.status_code}")
+        rc(
+            f"{name}: 10**400, -10**400, 1e400, 5,000 digits, 2**63, nan, inf, a NUL and text give 4xx or an answer, never a 5xx",
+            not bad,
+            "; ".join(bad[:6]),
+        )
+    if admin is not None:
+        r = req(admin, "GET", "/admin/audit-feed", params={"limit": 100})
+        r2 = req(admin, "GET", "/admin/audit-feed", params={"limit": 101})
+        r3 = req(admin, "GET", "/admin/audit-feed", params={"limit": 0})
+        rc(
+            "the audit feed limit holds its bounds: 100 is fine, 101 and 0 are 422",
+            r.status_code == 200 and r2.status_code == 422 and r3.status_code == 422,
+            f"{r.status_code} {r2.status_code} {r3.status_code}",
+        )
+    else:
+        rc("the audit feed checks need the administrator's sign-in (skipped on this stack)", True)
+    bad = []
+    for path in (
+        "1" + "0" * 400,
+        "9" * 5000,
+        "%00",
+        "0" * 36,
+        "../../etc/passwd",
+        "%ff",
+        "00000000-0000-0000-0000-000000000000",
+    ):
+        for h, base in ((op, "/applications/"), (off, "/officer/applications/")):
+            r = req(h, "GET", base + path)
+            if not survives(r):
+                bad.append(f"{base}{path[:12]}: {r.status_code}")
+    rc(
+        "a huge number, a NUL, a path escape or a bad UUID in the application id is 4xx in the envelope",
+        not bad,
+        "; ".join(bad),
+    )
+
+    # ---- NUL bytes in the free text of other endpoints ----
+    transition(off, nid, "under_review")
+    r = flag(off, nid, section_key="premises", message="check\u0000this")
+    rc(
+        "officer feedback holding a NUL byte is refused or cleaned, never a 500",
+        survives(r)
+        and "\\u0000" not in json.dumps(req(off, "GET", f"/officer/applications/{nid}").json()["feedback"]),
+        f"{r.status_code} {r.text[:150]}",
+    )
+    r = propose(off, nid, working_day(3), note="see\u0000you")
+    rc(
+        "a site-visit note holding a NUL byte is refused or cleaned, never a 500",
+        survives(r),
+        f"{r.status_code} {r.text[:150]}",
+    )
+    wid = submitted_case(op)
+    r = req(op, "POST", f"/applications/{wid}/withdraw", json={"reason": "changed\u0000my mind"})
+    rc(
+        "a withdrawal reason holding a NUL byte is refused or cleaned, never a 500",
+        survives(r),
+        f"{r.status_code} {r.text[:150]}",
+    )
+    r = transition(off, nid, "rejected", note="no\u0000thanks")
+    rc(
+        "a decision note holding a NUL byte is refused or cleaned, never a 500",
+        survives(r),
+        f"{r.status_code} {r.text[:150]}",
+    )
+    r = client.post("/auth/login", json={"email": "a\u0000b@example.sg", "password": "p\u0000q"})
+    rc(
+        "a sign-in holding NUL bytes is a 4xx in the envelope",
+        400 <= r.status_code < 500 and envelope_ok(r),
+        r.text[:150],
+    )
+    req(op, "DELETE", f"/applications/{wd}")
+
+    # ---- the seed script and the sign-in the README publishes ----
+    import importlib.util
+    import subprocess
+
+    seed_path = Path(__file__).resolve().parent / "seed.py"
+    spec = importlib.util.spec_from_file_location("uat_seed", seed_path)
+    assert spec is not None and spec.loader is not None
+    seed = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(seed)
+
+    def refuses_seed(env: str, environ: dict[str, str]) -> bool:
+        try:
+            seed.resolve_passwords(env, environ)
+        except SystemExit:
+            return True
+        return False
+
+    rc(
+        "seed in production without SEED_ADMIN_PASSWORD refuses",
+        refuses_seed("production", {})
+        and refuses_seed("production", {"SEED_PASSWORD": "private-shared-one"}),
+    )
+    rc(
+        "seed in production with the published demonstration password for the administrator refuses",
+        refuses_seed("production", {"SEED_ADMIN_PASSWORD": "PermitFlow!2026"})
+        and refuses_seed("production", {"SEED_ADMIN_PASSWORD": ""}),
+    )
+    rc(
+        "seed in production with a private administrator password goes ahead and gives the others the shared password",
+        seed.resolve_passwords("production", {"SEED_ADMIN_PASSWORD": "a-private-value"})
+        == ("PermitFlow!2026", "a-private-value")
+        and seed.resolve_passwords(
+            "production", {"SEED_ADMIN_PASSWORD": "a-private-value", "SEED_PASSWORD": "shared-2"}
+        )
+        == ("shared-2", "a-private-value"),
+    )
+    rc(
+        "seed outside production keeps working: the administrator falls back to the shared password unless one is set",
+        seed.resolve_passwords("development", {}) == ("PermitFlow!2026", "PermitFlow!2026")
+        and seed.resolve_passwords("development", {"SEED_PASSWORD": "s"}) == ("s", "s")
+        and seed.resolve_passwords("development", {"SEED_ADMIN_PASSWORD": "a"}) == ("PermitFlow!2026", "a")
+        and seed.resolve_passwords("test", {}) == ("PermitFlow!2026", "PermitFlow!2026"),
+    )
+    env = {**os.environ, "APP_ENV": "production"}
+    env.pop("SEED_ADMIN_PASSWORD", None)
+    run = subprocess.run(
+        [sys.executable, str(seed_path)], env=env, capture_output=True, text=True, timeout=120, check=False
+    )
+    rc(
+        "running scripts/seed.py itself with APP_ENV=production and no administrator password exits non-zero, says why and seeds nothing",
+        run.returncode != 0 and "refusing to seed" in (run.stderr + run.stdout),
+        f"exit {run.returncode}: {(run.stderr + run.stdout)[-300:]}",
+    )
+    repo = Path(__file__).resolve().parents[2]
+    readme = (repo / "README.md").read_text(encoding="utf-8")
+    admin_rows = [ln for ln in readme.splitlines() if "admin@permitflow.example.sg" in ln]
+    rc(
+        "the README lists the administrator account without a password ('shared privately')",
+        bool(admin_rows)
+        and all("PermitFlow!2026" not in ln and "private" in ln.lower() for ln in admin_rows),
+        " | ".join(admin_rows)[:200],
+    )
+    login_src = (repo / "frontend" / "src" / "features" / "auth" / "LoginPage.tsx").read_text(
+        encoding="utf-8"
+    )
+    rc(
+        "the sign-in page source publishes no administrator address or the demonstration password",
+        "admin@" not in login_src and "PermitFlow!2026" not in login_src,
+        "",
+    )
 
 
 def main() -> None:
@@ -1795,6 +3462,11 @@ def run_checks() -> None:
         r.status_code == 401 and envelope_ok(r),
         r.text[:120],
     )
+
+    # ---------- v0.4.1: form validation and hours (US-108), then the release-candidate-2 fixes ----------
+    op2 = login(OPERATOR2)
+    fv_checks(op, off)
+    rc2_checks(op, op2, off)
 
     # ---------- Summary ----------
     failed = [x for x in RESULTS if not x[2]]

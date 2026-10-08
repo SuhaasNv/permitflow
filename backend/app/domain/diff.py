@@ -4,7 +4,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.domain.enums import DocumentType
-from app.domain.form_schema import DOCUMENT_TYPE_LABELS, REQUIRED_DOCUMENT_TYPES, SECTIONS, STAMPED_FIELDS
+from app.domain.form_schema import (
+    DOCUMENT_TYPE_LABELS,
+    REQUIRED_DOCUMENT_TYPES,
+    SECTIONS,
+    STAMPED_FIELDS,
+    normalise_section,
+)
 
 
 @dataclass(frozen=True)
@@ -44,8 +50,9 @@ def diff_forms(previous: dict[str, Any], current: dict[str, Any]) -> list[Sectio
     """Compare every schema field (plus the stamped extras); sections not in the schema are ignored."""
     out: list[SectionDiff] = []
     for section in SECTIONS:
-        before = previous.get(section.key) or {}
-        after = current.get(section.key) or {}
+        # Both sides in the stored form: a revision saved before the normalising rules shows no false change.
+        before = normalise_section(section.key, previous.get(section.key) or {})
+        after = normalise_section(section.key, current.get(section.key) or {})
         pairs = [(f.key, f.label) for f in section.fields] + list(STAMPED_FIELDS.get(section.key, ()))
         fields = [
             FieldChange(key=key, label=label, old=before.get(key), new=after.get(key))

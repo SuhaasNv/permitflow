@@ -31,10 +31,29 @@ function releaseNotes(): Plugin {
   }
 }
 
+/** `virtual:form-rules-fixture` is the backend's good/bad table for the form rules (US-108), so the client suite
+ * checks the same examples the server does. Tests only: nothing in the app imports it. */
+function formRulesFixture(): Plugin {
+  const id = 'virtual:form-rules-fixture'
+  const resolved = `\0${id}`
+  return {
+    name: 'permitflow-form-rules-fixture',
+    resolveId(source) {
+      return source === id ? resolved : undefined
+    },
+    load(moduleId) {
+      if (moduleId !== resolved) return undefined
+      const file = fileURLToPath(new URL('../backend/tests/fixtures/form_rules.json', import.meta.url))
+      this.addWatchFile(file)
+      return `export default ${JSON.stringify(readFileSync(file, 'utf8'))}`
+    },
+  }
+}
+
 export default defineConfig({
   // Release version shown in the app shell and landing footer; bumped with every `v0.<sprint>.0` tag.
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
-  plugins: [react(), tailwindcss(), releaseNotes()],
+  plugins: [react(), tailwindcss(), releaseNotes(), formRulesFixture()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

@@ -18,7 +18,7 @@
     "operations": {
       "cuisine_description": "Kaya toast, soft-boiled eggs, kopi and teh.",
       "seating_capacity": 24,
-      "operating_hours": "Mon-Sun 7am-9pm",
+      "operating_hours": {"days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], "opens": "07:00", "closes": "21:00", "open_24h": false},
       "food_handlers_count": 4
     }
   },

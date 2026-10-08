@@ -23,6 +23,7 @@ import httpx
 API = os.environ.get("UAT_API_URL", "http://localhost:8000/api/v1")
 PW = os.environ.get("SEED_PASSWORD", "PermitFlow!2026")
 ADMIN = "admin@permitflow.example.sg"
+ADMIN_PW = os.environ.get("SEED_ADMIN_PASSWORD") or PW
 OFFICER2 = "officer2@permitflow.example.sg"
 NEW_OP_PW = "Smoke-Run-Only-2026!"
 
@@ -118,7 +119,7 @@ def main() -> None:
     call(None, "GET", "/checklist-schema", "/checklist-schema", (200, 401))
 
     # ---- admin: create a fresh operator ----
-    adm = login(ADMIN)
+    adm = login(ADMIN, ADMIN_PW)
     call(adm, "GET", "/auth/me", "/auth/me", 200)
     stamp = int(time.time())
     email = f"smoke{stamp}@permitflow.example.sg"
@@ -164,13 +165,18 @@ def main() -> None:
             "address_line_1": "11 Jalan Besar #01-13",
             "postal_code": "208787",
             "floor_area_sqm": 40,
-            "tenancy_expiry": "2027-10-31",
+            "tenancy_expiry": (dt.date.today() + dt.timedelta(days=730)).isoformat(),
             "premises_type": "shophouse",
         },
         "operations": {
             "cuisine_description": "Kopi and toast.",
             "seating_capacity": 20,
-            "operating_hours": "Mon-Sun 7am-9pm",
+            "operating_hours": {
+                "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+                "opens": "07:00",
+                "closes": "21:00",
+                "open_24h": False,
+            },
             "food_handlers_count": 3,
         },
         "declarations": {"information_accurate": True, "consent_to_inspection": True},

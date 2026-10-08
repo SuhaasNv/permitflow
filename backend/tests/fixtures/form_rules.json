@@ -1,0 +1,2630 @@
+{
+ "about": "Shared good/bad examples for the form rules (US-108). Read by backend/tests/unit/test_form_rules.py and frontend/src/lib/formRules.test.ts. `schema` is GET /form-schema as the code serves it today (a test fails when it drifts); `today` is the Singapore date the date rules run against unless a case sets its own.",
+ "today": "2026-10-08",
+ "schema": {
+  "licence_type": "food_establishment",
+  "licence_title": "Food Establishment Licence",
+  "sections": [
+   {
+    "key": "business",
+    "title": "Business details",
+    "description": "The registered business applying for the licence",
+    "fields": [
+     {
+      "key": "business_name",
+      "label": "Business name",
+      "kind": "text",
+      "required": true,
+      "min_length": 2,
+      "max_length": 120,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": null,
+      "max_value": null,
+      "help": null,
+      "must_be_true": false,
+      "rule": "business_name",
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "uen",
+      "label": "UEN",
+      "kind": "text",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": null,
+      "max_value": null,
+      "help": "Unique Entity Number as registered with ACRA.",
+      "must_be_true": false,
+      "rule": "uen",
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "entity_type",
+      "label": "Entity type",
+      "kind": "select",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [
+       {
+        "value": "sole_proprietorship",
+        "label": "Sole proprietorship"
+       },
+       {
+        "value": "partnership",
+        "label": "Partnership"
+       },
+       {
+        "value": "private_limited",
+        "label": "Private limited company"
+       },
+       {
+        "value": "other",
+        "label": "Other"
+       }
+      ],
+      "min_value": null,
+      "max_value": null,
+      "help": null,
+      "must_be_true": false,
+      "rule": null,
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "contact_name",
+      "label": "Contact person",
+      "kind": "text",
+      "required": true,
+      "min_length": 2,
+      "max_length": 120,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": null,
+      "max_value": null,
+      "help": null,
+      "must_be_true": false,
+      "rule": "person_name",
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "contact_email",
+      "label": "Contact email",
+      "kind": "email",
+      "required": true,
+      "min_length": null,
+      "max_length": 254,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": null,
+      "max_value": null,
+      "help": null,
+      "must_be_true": false,
+      "rule": null,
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "contact_phone",
+      "label": "Contact phone",
+      "kind": "tel",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": null,
+      "max_value": null,
+      "help": "A Singapore number, for example +65 9123 4567.",
+      "must_be_true": false,
+      "rule": "sg_phone",
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     }
+    ]
+   },
+   {
+    "key": "premises",
+    "title": "Premises",
+    "description": "Where the food will be prepared and sold",
+    "fields": [
+     {
+      "key": "address_line_1",
+      "label": "Premises address",
+      "kind": "text",
+      "required": true,
+      "min_length": 5,
+      "max_length": 200,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": null,
+      "max_value": null,
+      "help": "Include the unit number as shown on the tenancy agreement, for example #01-12.",
+      "must_be_true": false,
+      "rule": "sg_address",
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "postal_code",
+      "label": "Postal code",
+      "kind": "text",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": null,
+      "max_value": null,
+      "help": null,
+      "must_be_true": false,
+      "rule": "sg_postal",
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "premises_type",
+      "label": "Premises type",
+      "kind": "select",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [
+       {
+        "value": "shophouse",
+        "label": "Shophouse"
+       },
+       {
+        "value": "mall_unit",
+        "label": "Mall unit"
+       },
+       {
+        "value": "hawker_stall",
+        "label": "Hawker stall"
+       },
+       {
+        "value": "standalone",
+        "label": "Standalone building"
+       }
+      ],
+      "min_value": null,
+      "max_value": null,
+      "help": null,
+      "must_be_true": false,
+      "rule": null,
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "floor_area_sqm",
+      "label": "Floor area (sqm)",
+      "kind": "number",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": 1,
+      "max_value": 10000,
+      "help": "Total area under the tenancy, including kitchen and seating.",
+      "must_be_true": false,
+      "rule": null,
+      "max_decimals": 2,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "tenancy_expiry",
+      "label": "Tenancy expiry date",
+      "kind": "date",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": null,
+      "max_value": null,
+      "help": "Must be at least 3 months from today.",
+      "must_be_true": false,
+      "rule": null,
+      "max_decimals": null,
+      "min_months_ahead": 3,
+      "max_years_ahead": 30,
+      "step_minutes": null
+     }
+    ]
+   },
+   {
+    "key": "operations",
+    "title": "Operations",
+    "description": "What you serve and how you operate",
+    "fields": [
+     {
+      "key": "cuisine_description",
+      "label": "Description of food and cuisine",
+      "kind": "textarea",
+      "required": true,
+      "min_length": 10,
+      "max_length": 1000,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": null,
+      "max_value": null,
+      "help": "10 to 1000 characters.",
+      "must_be_true": false,
+      "rule": null,
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "seating_capacity",
+      "label": "Seating capacity",
+      "kind": "integer",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": 0,
+      "max_value": 2000,
+      "help": null,
+      "must_be_true": false,
+      "rule": null,
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "food_handlers_count",
+      "label": "Number of food handlers",
+      "kind": "integer",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": 1,
+      "max_value": 500,
+      "help": "Each handler must hold a valid food hygiene certificate.",
+      "must_be_true": false,
+      "rule": null,
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "operating_hours",
+      "label": "Operating hours",
+      "kind": "hours",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [
+       {
+        "value": "mon",
+        "label": "Mon"
+       },
+       {
+        "value": "tue",
+        "label": "Tue"
+       },
+       {
+        "value": "wed",
+        "label": "Wed"
+       },
+       {
+        "value": "thu",
+        "label": "Thu"
+       },
+       {
+        "value": "fri",
+        "label": "Fri"
+       },
+       {
+        "value": "sat",
+        "label": "Sat"
+       },
+       {
+        "value": "sun",
+        "label": "Sun"
+       }
+      ],
+      "min_value": null,
+      "max_value": null,
+      "help": "Pick the days you open, then the times. The same hours apply to every day you pick.",
+      "must_be_true": false,
+      "rule": null,
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": 30
+     }
+    ]
+   },
+   {
+    "key": "declarations",
+    "title": "Declarations",
+    "description": "Confirm before you submit",
+    "fields": [
+     {
+      "key": "information_accurate",
+      "label": "I confirm that the information provided is accurate and complete to the best of my knowledge.",
+      "kind": "checkbox",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": null,
+      "max_value": null,
+      "help": null,
+      "must_be_true": true,
+      "rule": null,
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     },
+     {
+      "key": "consent_to_inspection",
+      "label": "I consent to an inspection of the premises by a licensing officer at a mutually arranged time.",
+      "kind": "checkbox",
+      "required": true,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null,
+      "pattern_message": null,
+      "options": [],
+      "min_value": null,
+      "max_value": null,
+      "help": null,
+      "must_be_true": true,
+      "rule": null,
+      "max_decimals": null,
+      "min_months_ahead": null,
+      "max_years_ahead": null,
+      "step_minutes": null
+     }
+    ]
+   }
+  ],
+  "required_documents": [
+   {
+    "type": "business_profile",
+    "label": "Business profile (ACRA)"
+   },
+   {
+    "type": "floor_plan",
+    "label": "Floor plan"
+   },
+   {
+    "type": "tenancy_agreement",
+    "label": "Tenancy agreement"
+   },
+   {
+    "type": "food_hygiene_certificate",
+    "label": "Food hygiene certificate"
+   }
+  ]
+ },
+ "cases": [
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "+65 9123 4567",
+   "valid": true,
+   "stored": "+65 9123 4567"
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "+6591234567",
+   "valid": true,
+   "stored": "+65 9123 4567"
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "65 9123 4567",
+   "valid": true,
+   "stored": "+65 9123 4567"
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "6591234567",
+   "valid": true,
+   "stored": "+65 9123 4567"
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "91234567",
+   "valid": true,
+   "stored": "+65 9123 4567"
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "9123-4567",
+   "valid": true,
+   "stored": "+65 9123 4567"
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "+65-6123-4567",
+   "valid": true,
+   "stored": "+65 6123 4567"
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "3123 4567",
+   "valid": true,
+   "stored": "+65 3123 4567"
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "8123 4567",
+   "valid": true,
+   "stored": "+65 8123 4567"
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "  +65   9123   4567  ",
+   "valid": true,
+   "stored": "+65 9123 4567"
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "6512 3456",
+   "valid": true,
+   "stored": "+65 6512 3456"
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "+65 1234 5678",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "+65 5123 4567",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "+65 9123 456",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "+65 9123 45678",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "+60 9123 4567",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "+1 212 555 0100",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "abcd efgh",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "+65 9123 4567 ext 2",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "9123 4567 8",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "+65+65 9123 4567",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "0091234567",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "(65) 91234567",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "contact_phone",
+   "value": "12345678",
+   "valid": false,
+   "message": "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "202355555E",
+   "valid": true,
+   "stored": "202355555E"
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "202312345K",
+   "valid": true,
+   "stored": "202312345K"
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "53123456A",
+   "valid": true,
+   "stored": "53123456A"
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "t08ll0001a",
+   "valid": true,
+   "stored": "T08LL0001A"
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "  202355555e  ",
+   "valid": true,
+   "stored": "202355555E"
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "T08LL0001A",
+   "valid": true,
+   "stored": "T08LL0001A"
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "S99SS0001B",
+   "valid": true,
+   "stored": "S99SS0001B"
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "R12AB3456C",
+   "valid": true,
+   "stored": "R12AB3456C"
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "180012345A",
+   "valid": true,
+   "stored": "180012345A"
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "202612345A",
+   "valid": true,
+   "stored": "202612345A"
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "202712345A",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "179912345A",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "12345678",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "1234567A",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "2023123K",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "2023123456K",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "T08LL001A",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "X08LL0001A",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "T08L10001A",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "T8LL0001A",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "ABCDEFGHI",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "202312345",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K."
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "202712345A",
+   "valid": false,
+   "message": "Enter a valid UEN, for example 202312345K.",
+   "today": "2026-12-31"
+  },
+  {
+   "section": "business",
+   "field": "uen",
+   "value": "202712345A",
+   "valid": true,
+   "stored": "202712345A",
+   "today": "2027-01-01"
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "Kopi & Kaya Toast House Pte. Ltd.",
+   "valid": true,
+   "stored": "Kopi & Kaya Toast House Pte. Ltd."
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "A1",
+   "valid": true,
+   "stored": "A1"
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "99",
+   "valid": true,
+   "stored": "99"
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "  Ah   Seng   Kopi  ",
+   "valid": true,
+   "stored": "Ah Seng Kopi"
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "Cafe\u0301 Leon",
+   "valid": true,
+   "stored": "Caf\u00e9 Leon"
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "\u8001\u738b\u8336\u5ba4",
+   "valid": true,
+   "stored": "\u8001\u738b\u8336\u5ba4"
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "Zero\u200bWidth\u202e Kopi",
+   "valid": true,
+   "stored": "ZeroWidth Kopi"
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "A",
+   "valid": false,
+   "message": "Enter at least 2 characters."
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "--",
+   "valid": false,
+   "message": "Include at least one letter or number."
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "!!!",
+   "valid": false,
+   "message": "Include at least one letter or number."
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "...",
+   "valid": false,
+   "message": "Include at least one letter or number."
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "valid": false,
+   "message": "Must be 120 characters or fewer."
+  },
+  {
+   "section": "business",
+   "field": "business_name",
+   "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "valid": true,
+   "stored": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "Tan Wei Ling",
+   "valid": true,
+   "stored": "Tan Wei Ling"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "Muhammad Hafiz bin Ismail",
+   "valid": true,
+   "stored": "Muhammad Hafiz bin Ismail"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "O'Brien",
+   "valid": true,
+   "stored": "O'Brien"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "O\u2019Brien",
+   "valid": true,
+   "stored": "O\u2019Brien"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "Anne-Marie",
+   "valid": true,
+   "stored": "Anne-Marie"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "J. R. Tolkien",
+   "valid": true,
+   "stored": "J. R. Tolkien"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "Tan, Wei Ling",
+   "valid": true,
+   "stored": "Tan, Wei Ling"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "Wei/Ling",
+   "valid": true,
+   "stored": "Wei/Ling"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "\u674e\u5c0f\u9f8d",
+   "valid": true,
+   "stored": "\u674e\u5c0f\u9f8d"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "Li",
+   "valid": true,
+   "stored": "Li"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "M\u00fcller",
+   "valid": true,
+   "stored": "M\u00fcller"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "\u092a\u094d\u0930\u093f\u092f\u093e \u0936\u0930\u094d\u092e\u093e",
+   "valid": true,
+   "stored": "\u092a\u094d\u0930\u093f\u092f\u093e \u0936\u0930\u094d\u092e\u093e"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "A",
+   "valid": false,
+   "message": "Enter at least 2 characters."
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "Tan123",
+   "valid": false,
+   "message": "Use letters, spaces and these marks only: ' - . , /"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "Tan_Wei",
+   "valid": false,
+   "message": "Use letters, spaces and these marks only: ' - . , /"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "@tan",
+   "valid": false,
+   "message": "Use letters, spaces and these marks only: ' - . , /"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "Tan <b>",
+   "valid": false,
+   "message": "Use letters, spaces and these marks only: ' - . , /"
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "..",
+   "valid": false,
+   "message": "Include at least one letter."
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "' - '",
+   "valid": false,
+   "message": "Include at least one letter."
+  },
+  {
+   "section": "business",
+   "field": "contact_name",
+   "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "valid": false,
+   "message": "Must be 120 characters or fewer."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "weiling.tan@kopikaya.sg",
+   "valid": true,
+   "stored": "weiling.tan@kopikaya.sg"
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "A.B@Example.COM",
+   "valid": true,
+   "stored": "a.b@example.com"
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a@b.co",
+   "valid": true,
+   "stored": "a@b.co"
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "first+tag@sub.example.com.sg",
+   "valid": true,
+   "stored": "first+tag@sub.example.com.sg"
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "  wei@kopi.sg  ",
+   "valid": true,
+   "stored": "wei@kopi.sg"
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a@b.xn--p1ai",
+   "valid": true,
+   "stored": "a@b.xn--p1ai"
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "nope",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a@b",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a@b.c",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a b@c.com",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a@@b.com",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a@b..com",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "@b.com",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a@.com",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a@b.com.",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a@b.c1",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a@b@c.com",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": ".a@b.com",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a.@b.com",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "a..b@c.com",
+   "valid": false,
+   "message": "Enter a valid email address, for example name@example.com."
+  },
+  {
+   "section": "business",
+   "field": "contact_email",
+   "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@b.com",
+   "valid": false,
+   "message": "Must be 254 characters or fewer."
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "208787",
+   "valid": true,
+   "stored": "208787"
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "010101",
+   "valid": true,
+   "stored": "010101"
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "820000",
+   "valid": true,
+   "stored": "820000"
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "569933",
+   "valid": true,
+   "stored": "569933"
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": " 208787 ",
+   "valid": true,
+   "stored": "208787"
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "12345",
+   "valid": false,
+   "message": "Enter the 6-digit postal code, for example 208787."
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "1234567",
+   "valid": false,
+   "message": "Enter the 6-digit postal code, for example 208787."
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "20878a",
+   "valid": false,
+   "message": "Enter the 6-digit postal code, for example 208787."
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "\uff12\uff10\uff18\uff17\uff18\uff17",
+   "valid": false,
+   "message": "Enter the 6-digit postal code, for example 208787."
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "20 8787",
+   "valid": false,
+   "message": "Enter the 6-digit postal code, for example 208787."
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "000000",
+   "valid": false,
+   "message": "Postal codes start with 01 to 82. Check the first two digits."
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "009999",
+   "valid": false,
+   "message": "Postal codes start with 01 to 82. Check the first two digits."
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "830000",
+   "valid": false,
+   "message": "Postal codes start with 01 to 82. Check the first two digits."
+  },
+  {
+   "section": "premises",
+   "field": "postal_code",
+   "value": "999999",
+   "valid": false,
+   "message": "Postal codes start with 01 to 82. Check the first two digits."
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "10 Jalan Besar #01-12",
+   "valid": true,
+   "stored": "10 Jalan Besar #01-12"
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "1 Edge Road #02-03",
+   "valid": true,
+   "stored": "1 Edge Road #02-03"
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "Blk 123 Ang Mo Kio Ave 6 #12-345",
+   "valid": true,
+   "stored": "Blk 123 Ang Mo Kio Ave 6 #12-345"
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "1 Raffles Place #100-12345 Tower 1",
+   "valid": true,
+   "stored": "1 Raffles Place #100-12345 Tower 1"
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "88 Market Street",
+   "valid": true,
+   "stored": "88 Market Street"
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "5A Orchard Road",
+   "valid": true,
+   "stored": "5A Orchard Road"
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "Jalan Besar",
+   "valid": false,
+   "message": "Include the street name and the house or unit number."
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "12345",
+   "valid": false,
+   "message": "Include the street name and the house or unit number."
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "1 Ab",
+   "valid": false,
+   "message": "Enter at least 5 characters."
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "10 Jalan Besar #1-12",
+   "valid": false,
+   "message": "Write the unit as #05-12: a floor of 2 or 3 digits, a dash, a unit of 2 to 5 digits."
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "10 Jalan Besar #01-1",
+   "valid": false,
+   "message": "Write the unit as #05-12: a floor of 2 or 3 digits, a dash, a unit of 2 to 5 digits."
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "10 Jalan Besar #01-123456",
+   "valid": false,
+   "message": "Write the unit as #05-12: a floor of 2 or 3 digits, a dash, a unit of 2 to 5 digits."
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "10 Jalan Besar #01",
+   "valid": false,
+   "message": "Write the unit as #05-12: a floor of 2 or 3 digits, a dash, a unit of 2 to 5 digits."
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "10 Jalan Besar # 01-12",
+   "valid": false,
+   "message": "Write the unit as #05-12: a floor of 2 or 3 digits, a dash, a unit of 2 to 5 digits."
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "10 Jalan Besar 208787",
+   "valid": false,
+   "message": "Leave the postal code out of the address; it has its own field."
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "10 Jalan Besar #01-12, Singapore 208787",
+   "valid": false,
+   "message": "Leave the postal code out of the address; it has its own field."
+  },
+  {
+   "section": "premises",
+   "field": "address_line_1",
+   "value": "1 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "valid": false,
+   "message": "Must be 200 characters or fewer."
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 48,
+   "valid": true,
+   "stored": 48
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 48.5,
+   "valid": true,
+   "stored": 48.5
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 48.25,
+   "valid": true,
+   "stored": 48.25
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 1,
+   "valid": true,
+   "stored": 1
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 10000,
+   "valid": true,
+   "stored": 10000
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 1.5,
+   "valid": true,
+   "stored": 1.5
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 0,
+   "valid": false,
+   "message": "Must be at least 1."
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 0.99,
+   "valid": false,
+   "message": "Must be at least 1."
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 10000.01,
+   "valid": false,
+   "message": "Must be at most 10000."
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 48.123,
+   "valid": false,
+   "message": "Use at most 2 decimal places."
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 1.005,
+   "valid": false,
+   "message": "Use at most 2 decimal places."
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 1.0000000000000002,
+   "valid": false,
+   "message": "Use at most 2 decimal places."
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": 48.000000001,
+   "valid": false,
+   "message": "Use at most 2 decimal places."
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": "48",
+   "valid": false,
+   "message": "Must be a number."
+  },
+  {
+   "section": "premises",
+   "field": "floor_area_sqm",
+   "value": true,
+   "valid": false,
+   "message": "Must be a number."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2027-01-08",
+   "valid": true,
+   "stored": "2027-01-08"
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2027-01-09",
+   "valid": true,
+   "stored": "2027-01-09"
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2027-10-31",
+   "valid": true,
+   "stored": "2027-10-31"
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2056-10-08",
+   "valid": true,
+   "stored": "2056-10-08"
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2026-10-08",
+   "valid": false,
+   "message": "Enter a date after today."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2026-10-07",
+   "valid": false,
+   "message": "Enter a date after today."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2025-01-01",
+   "valid": false,
+   "message": "Enter a date after today."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2027-01-07",
+   "valid": false,
+   "message": "Enter a date at least 3 months from today."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2026-12-31",
+   "valid": false,
+   "message": "Enter a date at least 3 months from today."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2056-10-09",
+   "valid": false,
+   "message": "Enter a date no more than 30 years from today."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2026-02-31",
+   "valid": false,
+   "message": "Enter a real date as YYYY-MM-DD."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2027-02-30",
+   "valid": false,
+   "message": "Enter a real date as YYYY-MM-DD."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2027-13-01",
+   "valid": false,
+   "message": "Enter a real date as YYYY-MM-DD."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2027-00-10",
+   "valid": false,
+   "message": "Enter a real date as YYYY-MM-DD."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "31/10/2027",
+   "valid": false,
+   "message": "Enter a real date as YYYY-MM-DD."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "20271031",
+   "valid": false,
+   "message": "Enter a real date as YYYY-MM-DD."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2027-1-5",
+   "valid": false,
+   "message": "Enter a real date as YYYY-MM-DD."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2027-10-31T00:00",
+   "valid": false,
+   "message": "Enter a real date as YYYY-MM-DD."
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2027-02-28",
+   "valid": true,
+   "stored": "2027-02-28",
+   "today": "2026-11-30"
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2027-02-27",
+   "valid": false,
+   "message": "Enter a date at least 3 months from today.",
+   "today": "2026-11-30"
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2058-02-28",
+   "valid": true,
+   "stored": "2058-02-28",
+   "today": "2028-02-29"
+  },
+  {
+   "section": "premises",
+   "field": "tenancy_expiry",
+   "value": "2058-03-01",
+   "valid": false,
+   "message": "Enter a date no more than 30 years from today.",
+   "today": "2028-02-29"
+  },
+  {
+   "section": "operations",
+   "field": "cuisine_description",
+   "value": "Kopi toast",
+   "valid": true,
+   "stored": "Kopi toast"
+  },
+  {
+   "section": "operations",
+   "field": "cuisine_description",
+   "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "valid": true,
+   "stored": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+   "section": "operations",
+   "field": "cuisine_description",
+   "value": "Line one here\nLine two here",
+   "valid": true,
+   "stored": "Line one here\nLine two here"
+  },
+  {
+   "section": "operations",
+   "field": "cuisine_description",
+   "value": "Kopi\u200b toast",
+   "valid": true,
+   "stored": "Kopi toast"
+  },
+  {
+   "section": "operations",
+   "field": "cuisine_description",
+   "value": "Kaya  toast,\r\nsoft-boiled eggs.\n\n\n\nAnd kopi.",
+   "valid": true,
+   "stored": "Kaya toast,\nsoft-boiled eggs.\n\nAnd kopi."
+  },
+  {
+   "section": "operations",
+   "field": "cuisine_description",
+   "value": "Short",
+   "valid": false,
+   "message": "Enter at least 10 characters."
+  },
+  {
+   "section": "operations",
+   "field": "cuisine_description",
+   "value": "123456789",
+   "valid": false,
+   "message": "Enter at least 10 characters."
+  },
+  {
+   "section": "operations",
+   "field": "cuisine_description",
+   "value": "Kopi\u200b\u200b",
+   "valid": false,
+   "message": "Enter at least 10 characters."
+  },
+  {
+   "section": "operations",
+   "field": "cuisine_description",
+   "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "valid": false,
+   "message": "Must be 1000 characters or fewer."
+  },
+  {
+   "section": "operations",
+   "field": "seating_capacity",
+   "value": 0,
+   "valid": true,
+   "stored": 0
+  },
+  {
+   "section": "operations",
+   "field": "seating_capacity",
+   "value": 24,
+   "valid": true,
+   "stored": 24
+  },
+  {
+   "section": "operations",
+   "field": "seating_capacity",
+   "value": 2000,
+   "valid": true,
+   "stored": 2000
+  },
+  {
+   "section": "operations",
+   "field": "seating_capacity",
+   "value": 2.5,
+   "valid": false,
+   "message": "Must be a whole number."
+  },
+  {
+   "section": "operations",
+   "field": "seating_capacity",
+   "value": -1,
+   "valid": false,
+   "message": "Must be at least 0."
+  },
+  {
+   "section": "operations",
+   "field": "seating_capacity",
+   "value": 2001,
+   "valid": false,
+   "message": "Must be at most 2000."
+  },
+  {
+   "section": "operations",
+   "field": "seating_capacity",
+   "value": true,
+   "valid": false,
+   "message": "Must be a number."
+  },
+  {
+   "section": "operations",
+   "field": "seating_capacity",
+   "value": "24",
+   "valid": false,
+   "message": "Must be a number."
+  },
+  {
+   "section": "operations",
+   "field": "food_handlers_count",
+   "value": 1,
+   "valid": true,
+   "stored": 1
+  },
+  {
+   "section": "operations",
+   "field": "food_handlers_count",
+   "value": 4,
+   "valid": true,
+   "stored": 4
+  },
+  {
+   "section": "operations",
+   "field": "food_handlers_count",
+   "value": 500,
+   "valid": true,
+   "stored": 500
+  },
+  {
+   "section": "operations",
+   "field": "food_handlers_count",
+   "value": 0,
+   "valid": false,
+   "message": "Must be at least 1."
+  },
+  {
+   "section": "operations",
+   "field": "food_handlers_count",
+   "value": 501,
+   "valid": false,
+   "message": "Must be at most 500."
+  },
+  {
+   "section": "operations",
+   "field": "food_handlers_count",
+   "value": 2.5,
+   "valid": false,
+   "message": "Must be a whole number."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "valid": true,
+   "stored": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   }
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "wed",
+     "fri"
+    ],
+    "opens": "00:00",
+    "closes": "23:30",
+    "open_24h": false
+   },
+   "valid": true,
+   "stored": {
+    "days": [
+     "mon",
+     "wed",
+     "fri"
+    ],
+    "opens": "00:00",
+    "closes": "23:30",
+    "open_24h": false
+   }
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "18:00",
+    "closes": "02:00",
+    "open_24h": false
+   },
+   "valid": true,
+   "stored": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "18:00",
+    "closes": "02:00",
+    "open_24h": false
+   }
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "sat"
+    ],
+    "opens": "23:30",
+    "closes": "00:00",
+    "open_24h": false
+   },
+   "valid": true,
+   "stored": {
+    "days": [
+     "sat"
+    ],
+    "opens": "23:30",
+    "closes": "00:00",
+    "open_24h": false
+   }
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "fri",
+     "mon",
+     "mon"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "valid": true,
+   "stored": {
+    "days": [
+     "mon",
+     "fri"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   }
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": null,
+    "closes": null,
+    "open_24h": true
+   },
+   "valid": true,
+   "stored": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": null,
+    "closes": null,
+    "open_24h": true
+   }
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": true
+   },
+   "valid": true,
+   "stored": {
+    "days": [
+     "mon"
+    ],
+    "opens": null,
+    "closes": null,
+    "open_24h": true
+   }
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon"
+    ],
+    "opens": "07:00",
+    "closes": "21:00"
+   },
+   "valid": true,
+   "stored": {
+    "days": [
+     "mon"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   }
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Choose at least one day you open."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [],
+    "opens": null,
+    "closes": null,
+    "open_24h": true
+   },
+   "valid": false,
+   "message": "Choose at least one day you open."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "09:00",
+    "closes": "09:00",
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Opening and closing time cannot be the same."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "07:15",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Choose a time on the half hour, from 00:00 to 23:30."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "07:00",
+    "closes": "21:45",
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Choose a time on the half hour, from 00:00 to 23:30."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "24:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Choose a time on the half hour, from 00:00 to 23:30."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "7:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Choose a time on the half hour, from 00:00 to 23:30."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "07:00",
+    "closes": "9pm",
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Choose a time on the half hour, from 00:00 to 23:30."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "07:00",
+    "closes": null,
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Choose an opening and a closing time."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": null,
+    "closes": null,
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Choose an opening and a closing time."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "",
+    "closes": "",
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Choose an opening and a closing time."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": "Mon-Sun 7am-9pm",
+   "valid": false,
+   "message": "Pick your opening days and hours."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "monday"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Pick your opening days and hours."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false,
+    "extra": 1
+   },
+   "valid": false,
+   "message": "Pick your opening days and hours."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": "yes"
+   },
+   "valid": false,
+   "message": "Pick your opening days and hours."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": {
+    "days": "mon",
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "valid": false,
+   "message": "Pick your opening days and hours."
+  },
+  {
+   "section": "operations",
+   "field": "operating_hours",
+   "value": [
+    "mon"
+   ],
+   "valid": false,
+   "message": "Pick your opening days and hours."
+  }
+ ],
+ "summaries": [
+  {
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "text": "Every day, 07:00 to 21:00"
+  },
+  {
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "text": "Mon to Sat, 07:00 to 21:00"
+  },
+  {
+   "value": {
+    "days": [
+     "mon",
+     "wed",
+     "fri"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "text": "Mon, Wed, Fri, 07:00 to 21:00"
+  },
+  {
+   "value": {
+    "days": [
+     "sat",
+     "sun"
+    ],
+    "opens": "10:00",
+    "closes": "18:30",
+    "open_24h": false
+   },
+   "text": "Sat, Sun, 10:00 to 18:30"
+  },
+  {
+   "value": {
+    "days": [
+     "mon",
+     "tue"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "text": "Mon, Tue, 07:00 to 21:00"
+  },
+  {
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "text": "Mon to Wed, 07:00 to 21:00"
+  },
+  {
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "fri"
+    ],
+    "opens": "09:00",
+    "closes": "17:00",
+    "open_24h": false
+   },
+   "text": "Mon to Wed, Fri, 09:00 to 17:00"
+  },
+  {
+   "value": {
+    "days": [
+     "mon",
+     "wed",
+     "thu",
+     "fri",
+     "sun"
+    ],
+    "opens": "09:00",
+    "closes": "17:00",
+    "open_24h": false
+   },
+   "text": "Mon, Wed to Fri, Sun, 09:00 to 17:00"
+  },
+  {
+   "value": {
+    "days": [
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "text": "Tue to Sun, 07:00 to 21:00"
+  },
+  {
+   "value": {
+    "days": [
+     "fri",
+     "sat"
+    ],
+    "opens": "18:00",
+    "closes": "02:00",
+    "open_24h": false
+   },
+   "text": "Fri, Sat, 18:00 to 02:00 (next day)"
+  },
+  {
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "18:00",
+    "closes": "02:00",
+    "open_24h": false
+   },
+   "text": "Every day, 18:00 to 02:00 (next day)"
+  },
+  {
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": null,
+    "closes": null,
+    "open_24h": true
+   },
+   "text": "Every day, open 24 hours"
+  },
+  {
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri"
+    ],
+    "opens": null,
+    "closes": null,
+    "open_24h": true
+   },
+   "text": "Mon to Fri, open 24 hours"
+  },
+  {
+   "value": {
+    "days": [
+     "fri",
+     "mon"
+    ],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "text": "Mon, Fri, 07:00 to 21:00"
+  },
+  {
+   "value": "Mon-Sun 7am-9pm",
+   "text": "Mon-Sun 7am-9pm"
+  },
+  {
+   "value": {
+    "days": [],
+    "opens": "07:00",
+    "closes": "21:00",
+    "open_24h": false
+   },
+   "text": ""
+  },
+  {
+   "value": {
+    "days": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ],
+    "opens": "09:00",
+    "closes": "09:00",
+    "open_24h": false
+   },
+   "text": ""
+  },
+  {
+   "value": {
+    "nonsense": true
+   },
+   "text": ""
+  },
+  {
+   "value": null,
+   "text": ""
+  }
+ ],
+ "cleaning": [
+  {
+   "input": "  a   b  ",
+   "multiline": false,
+   "output": "a b"
+  },
+  {
+   "input": "Cafe\u0301",
+   "multiline": false,
+   "output": "Caf\u00e9"
+  },
+  {
+   "input": "a\u200bb\u200cc\u200dd\u2060e\ufefff",
+   "multiline": false,
+   "output": "abcdef"
+  },
+  {
+   "input": "x\u202ay\u202bz\u202c\u202d\u202e",
+   "multiline": false,
+   "output": "xyz"
+  },
+  {
+   "input": "x\u2066y\u2067z\u2068\u2069",
+   "multiline": false,
+   "output": "xyz"
+  },
+  {
+   "input": "A\udb40\udc41B\udb40\udc7f\udb40\udc00",
+   "multiline": false,
+   "output": "AB"
+  },
+  {
+   "input": "a\u0000b\u0007c\u001fd\u007fe\u0085f\u009fg",
+   "multiline": false,
+   "output": "abcdefg"
+  },
+  {
+   "input": "a\tb\u00a0c\u3000d\u2003e",
+   "multiline": false,
+   "output": "a b c d e"
+  },
+  {
+   "input": "a\nb\r\nc\rd\u2028e",
+   "multiline": false,
+   "output": "a b c d e"
+  },
+  {
+   "input": "a  \n\n\n\n b",
+   "multiline": true,
+   "output": "a\n\nb"
+  },
+  {
+   "input": "line1\r\nline2\rline3",
+   "multiline": true,
+   "output": "line1\nline2\nline3"
+  },
+  {
+   "input": " \n a b \n ",
+   "multiline": true,
+   "output": "a b"
+  },
+  {
+   "input": "\u200b\u200b",
+   "multiline": false,
+   "output": ""
+  },
+  {
+   "input": "plain",
+   "multiline": false,
+   "output": "plain"
+  }
+ ]
+}

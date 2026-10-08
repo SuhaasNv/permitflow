@@ -1,6 +1,6 @@
 import { request } from './client'
 
-export type FieldKind = 'text' | 'email' | 'tel' | 'number' | 'integer' | 'date' | 'select' | 'textarea' | 'checkbox'
+export type FieldKind = 'text' | 'email' | 'tel' | 'number' | 'integer' | 'date' | 'select' | 'textarea' | 'checkbox' | 'hours'
 
 export interface FieldDef {
   key: string
@@ -15,6 +15,15 @@ export interface FieldDef {
   max_value: number | null
   help: string | null
   must_be_true: boolean
+  /** US-108. Optional so a definition written before them still type-checks; the server always sends them. */
+  min_length?: number | null
+  /** Named Singapore rule (sg_phone, uen, business_name, person_name, sg_postal, sg_address). */
+  rule?: string | null
+  max_decimals?: number | null
+  min_months_ahead?: number | null
+  max_years_ahead?: number | null
+  /** hours: the time lists run in steps of this many minutes. */
+  step_minutes?: number | null
 }
 
 export interface SectionDef {

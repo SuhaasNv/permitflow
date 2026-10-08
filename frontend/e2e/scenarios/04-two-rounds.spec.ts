@@ -60,7 +60,8 @@ test('two resubmission rounds: fix, resubmit, compare, resolve, again, then appr
   await page.locator('[name="address_line_1"]').fill('10 Jalan Besar #01-12')
   await page.getByRole('button', { name: 'Save and continue' }).click()
   await expect(page).toHaveURL(/\/form\/operations$/)
-  await page.locator('[name="operating_hours"]').fill('Mon-Sun 7:00am to 9:00pm')
+  // Sunday off, same times: the picker keeps the rest of the saved choice
+  await page.getByRole('button', { name: 'Sun', exact: true }).click()
   await page.getByRole('button', { name: 'Save and go to resubmit' }).click()
   await page.getByRole('button', { name: 'Resubmit' }).click()
   await confirmDialog(page, 'Resubmit')
@@ -68,7 +69,7 @@ test('two resubmission rounds: fix, resubmit, compare, resolve, again, then appr
   await page.goto(`${app.url}/history`)
   await expect(page.getByText('Revision 3', { exact: true }).first()).toBeVisible()
   await page.getByRole('button', { name: 'What changed from Revision 2' }).click()
-  await expect(page.getByText('Mon-Sun 7:00am to 9:00pm').first()).toBeVisible()
+  await expect(page.getByText('Mon to Sat, 07:00 to 21:00').first()).toBeVisible()
   await signOut(page)
 
   // ---- officer: compare 2 to 3, resolve, decide ----

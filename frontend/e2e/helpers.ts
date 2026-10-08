@@ -2,6 +2,9 @@ import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 export const PASSWORD = process.env.SEED_PASSWORD ?? 'PermitFlow!2026'
+/** The administrator's password is private on a real deployment (SEED_ADMIN_PASSWORD); it falls back to the shared one. */
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || PASSWORD
+const passwordFor = (email: string) => (email === ADMIN ? ADMIN_PASSWORD : PASSWORD)
 export const OPERATOR = 'operator@permitflow.example.sg'
 export const OFFICER = 'officer@permitflow.example.sg'
 export const ADMIN = 'admin@permitflow.example.sg'
@@ -21,17 +24,39 @@ export const BUSINESS = {
   contact_email: 'weiling@scenario.sg',
   contact_phone: '+65 9123 4567',
 }
+/** Two years from today on the Singapore calendar: always inside the 3 months to 30 years window (US-108). */
+export function tenancyExpiry(): string {
+  const d = new Date(Date.now() + 8 * 60 * 60 * 1000)
+  d.setUTCFullYear(d.getUTCFullYear() + 2)
+  return d.toISOString().slice(0, 10)
+}
 export const PREMISES = {
   address_line_1: '10 Jalan Besar #01-12',
   postal_code: '208787',
   floor_area_sqm: '48',
-  tenancy_expiry: '2027-10-31',
+  tenancy_expiry: tenancyExpiry(),
 }
 export const OPERATIONS = {
   cuisine_description: 'Kaya toast, soft-boiled eggs, kopi and teh.',
   seating_capacity: '24',
-  operating_hours: 'Mon-Sun 7am-9pm',
   food_handlers_count: '4',
+}
+/** The same hours as the API sees them, and as the picker makes them (Every day, 07:00 to 21:00). */
+export const HOURS = { days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], opens: '07:00', closes: '21:00', open_24h: false }
+export const HOURS_SUMMARY = 'Every day, 07:00 to 21:00'
+
+export interface HoursPick {
+  /** A quick link: Every day, Mon to Fri or Clear. */
+  quick?: 'Every day' | 'Mon to Fri' | 'Clear'
+  opens?: string
+  closes?: string
+}
+
+/** Operates the operating-hours picker (S-46): quick link first, then the two time lists. */
+export async function pickHours(page: Page, pick: HoursPick = { quick: 'Every day', opens: '07:00', closes: '21:00' }) {
+  if (pick.quick) await page.getByRole('button', { name: pick.quick, exact: true }).click()
+  if (pick.opens) await page.getByLabel('Opens', { exact: true }).selectOption(pick.opens)
+  if (pick.closes) await page.getByLabel('Closes', { exact: true }).selectOption(pick.closes)
 }
 
 // ---- UI helpers ----
@@ -41,7 +66,7 @@ export const OPERATIONS = {
 export async function signIn(page: Page, email: string) {
   await page.goto('/login')
   await page.getByLabel(/Email address/).fill(email)
-  await page.getByLabel(/^Password/).fill(PASSWORD)
+  await page.getByLabel(/^Password/).fill(passwordFor(email))
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   const takeOver = page.getByRole('button', { name: 'Sign out the other device and continue' })
   const signedIn = page.getByRole('button', { name: 'Sign out', exact: true })
@@ -55,9 +80,15 @@ export async function signOut(page: Page) {
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
 }
 
-export async function fillSection(page: Page, values: Record<string, string>, selects: Record<string, string> = {}) {
+export async function fillSection(
+  page: Page,
+  values: Record<string, string>,
+  selects: Record<string, string> = {},
+  hours?: HoursPick,
+) {
   for (const [name, value] of Object.entries(values)) await page.locator(`[name="${name}"]`).fill(value)
   for (const [name, value] of Object.entries(selects)) await page.locator(`select[name="${name}"]`).selectOption(value)
+  if (hours) await pickHours(page, hours)
   await page.getByRole('button', { name: /Save and (continue|go to)/ }).click()
 }
 
@@ -107,7 +138,7 @@ async function login(email: string): Promise<Headers> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     // Seeding takes the account over: the scenario signs in through the page afterwards and does the same.
-    body: JSON.stringify({ email, password: PASSWORD, take_over: true }),
+    body: JSON.stringify({ email, password: passwordFor(email), take_over: true }),
   })
   if (!r.ok) throw new Error(`login ${email}: ${r.status}`)
   const body = (await r.json()) as { access_token?: string; token?: string }
@@ -158,7 +189,7 @@ export async function seedSubmitted(): Promise<Seeded> {
   })
   await call(op, `/applications/${id}/sections/operations`, {
     method: 'PATCH',
-    body: JSON.stringify({ ...OPERATIONS, seating_capacity: 24, food_handlers_count: 4 }),
+    body: JSON.stringify({ ...OPERATIONS, seating_capacity: 24, food_handlers_count: 4, operating_hours: HOURS }),
   })
   await call(op, `/applications/${id}/sections/declarations`, {
     method: 'PATCH',

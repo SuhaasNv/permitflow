@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { Resolver } from 'react-hook-form'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 
 import { AppError } from '@/api/client'
 import type { OperatorFeedback } from '@/api/applications'
@@ -10,8 +10,10 @@ import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
 import { CheckboxField, SelectField, TextAreaField } from '@/features/shared/Controls'
 import { Field } from '@/features/shared/Field'
+import { HoursField } from '@/features/operator/HoursField'
 import { SaveIndicator } from '@/features/shared/SaveIndicator'
 import { useToast } from '@/features/shared/Toast'
+import type { HoursValue } from '@/lib/hours'
 import type { SectionValues } from '@/lib/zodFromSchema'
 import { defaultsFor, sectionSchema, toPayload } from '@/lib/zodFromSchema'
 import { openItems } from '@/lib/feedback'
@@ -44,6 +46,17 @@ const AUTOCOMPLETE: Partial<Record<string, string>> = {
   contact_phone: 'tel',
 }
 
+/** On-screen keyboard hints (US-108): a number pad for the postal code, a phone pad for the phone number. */
+const INPUT_MODE: Partial<Record<string, 'numeric' | 'tel'>> = {
+  postal_code: 'numeric',
+  contact_phone: 'tel',
+}
+
+/** Narrow a form value to the hours picker's value (anything else, such as an older free-text entry, is "nothing picked"). */
+function hoursOf(value: SectionValues[string]): HoursValue | undefined {
+  return typeof value === 'object' ? value : undefined
+}
+
 function fieldError(errors: Record<string, { message?: string } | undefined>, key: string): string | undefined {
   return errors[key]?.message
 }
@@ -71,7 +84,8 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
   const form = useForm<SectionValues>({
     resolver,
     defaultValues: defaultsFor(section, data),
-    mode: 'onBlur',
+    // Checked as the operator types (US-108): a Singapore number or UEN that is wrong says so straight away.
+    mode: 'onChange',
   })
   const toast = useToast()
   const [summary, setSummary] = useState<string[]>([])
@@ -171,7 +185,7 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
       error: fieldError(errors, f.key),
       disabled: !editable,
     }
-    const wide = f.kind === 'textarea' || f.key === 'address_line_1' || f.kind === 'checkbox'
+    const wide = f.kind === 'textarea' || f.key === 'address_line_1' || f.kind === 'checkbox' || f.kind === 'hours'
     const className = wide ? 'sm:col-span-2' : undefined
     switch (f.kind) {
       case 'select':
@@ -208,6 +222,32 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
         )
       case 'date':
         return <Field key={f.key} {...common} className={className} type="date" {...form.register(f.key)} />
+      case 'hours': {
+        const saved = data[f.key]
+        return (
+          <Controller
+            key={f.key}
+            control={form.control}
+            name={f.key}
+            render={({ field }) => (
+              <div className={className}>
+                <HoursField
+                  label={f.label}
+                  help={f.help ?? undefined}
+                  required={f.required}
+                  value={hoursOf(field.value)}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  error={common.error}
+                  disabled={!editable}
+                  stepMinutes={f.step_minutes}
+                  legacy={typeof saved === 'string' && saved.trim() !== '' && field.value === undefined ? saved : undefined}
+                />
+              </div>
+            )}
+          />
+        )
+      }
       default:
         return (
           <Field
@@ -215,7 +255,7 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
             {...common}
             className={className}
             type={f.kind === 'email' ? 'email' : f.kind === 'tel' ? 'tel' : 'text'}
-            inputMode={f.key === 'postal_code' ? 'numeric' : undefined}
+            inputMode={INPUT_MODE[f.key]}
             autoComplete={AUTOCOMPLETE[f.key]}
             maxLength={f.max_length ?? undefined}
             {...form.register(f.key)}

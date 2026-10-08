@@ -7,6 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.schemas.clean import CleanBlock
 from app.schemas.storage import StorageView
 
 
@@ -66,7 +67,7 @@ class ClarificationOperatorView(BaseModel):
 
 
 class ClarificationResponseIn(BaseModel):
-    message: str = Field(max_length=2000)
+    message: CleanBlock = Field(max_length=2000)
 
 
 class ClarificationAttachOut(BaseModel):
@@ -119,7 +120,7 @@ class ClarificationOfficerView(BaseModel):
 
 
 class ClarificationReopenIn(BaseModel):
-    message: str = Field(max_length=2000)
+    message: CleanBlock = Field(max_length=2000)
 
 
 class ClarificationBlock(BaseModel):

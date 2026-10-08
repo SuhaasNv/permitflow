@@ -6,6 +6,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.enums import Role
+from app.schemas.clean import CleanLine
 
 
 class StatusCountOut(BaseModel):
@@ -113,7 +114,7 @@ class UserPatchIn(BaseModel):
 
 class UserCreateIn(BaseModel):
     email: EmailStr
-    full_name: str = Field(min_length=1, max_length=120)
+    full_name: CleanLine = Field(min_length=1, max_length=120)
     role: Role
     password: str = Field(min_length=12, max_length=200)
 

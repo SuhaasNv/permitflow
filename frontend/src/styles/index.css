@@ -409,3 +409,8 @@
     transform: translateX(260%);
   }
 }
+/* The environment strip (US-109) is 28 px above each page's own full-height wrapper; take it off their
+   minimum height so a short page (sign in, 404) does not gain a scrollbar just for the strip. */
+body:has(.pf-env-strip) .min-h-screen {
+  min-height: calc(100vh - 28px);
+}

@@ -4,7 +4,7 @@ What each version of PermitFlow brings, written for the people who use it. Newes
 
 Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for fixes on a release, `v0.4.0` for the two epics below, `v0.4.0-rc.N` for a release candidate tagged on `dev` for the development environment before the release.
 
-Format: the product reads this file at build time for its What's new page (the version number in the corner opens it; `frontend/src/features/releases/notes.ts`), so the lines keep four shapes. A release heading is `## vX.Y.Z, D Month YYYY (optional note): title`; a bold line such as `**New for operators**` opens an audience block and the bullets under it belong to it; text before the first block is the release's introduction; `## Coming next` holds the plan. Inline, only backticks, bold and bare links are rendered. A heading of another shape fails the frontend tests.
+Format: the product reads this file at build time for its What's new page (the version number in the corner opens it; `frontend/src/features/releases/notes.ts`), so the lines keep four shapes. A release heading is `## vX.Y.Z, D Month YYYY (optional note): title`; a release candidate has the same heading with `-rc.N` after the version (`## vX.Y.Z-rc.N, D Month YYYY: title`) and the same blocks and bullets below it, written for what that candidate changed. Candidates sit among the releases in date order, newest first; the development environment lists them with a Release candidate label, and production hides them completely (while the build information is still loading they stay hidden). A released version's own notes never mention candidates. A bold line such as `**New for operators**` opens an audience block and the bullets under it belong to it; text before the first block is the release's introduction; `## Coming next` holds the plan. Inline, only backticks, bold and bare links are rendered. A heading of another shape fails the frontend tests.
 
 ---
 
@@ -13,6 +13,60 @@ Format: the product reads this file at build time for its What's new page (the v
 **v0.5.0, planned: safe intake.** Every uploaded file is checked for viruses before an officer can open it, and a file that fails is blocked with a clear message. The automatic document check runs on its own worker, so a slow file never slows the rest of the service. The licensing office sees what each check cost and can tune the limits (requests, daily checks, upload size) from the overview, with every change recorded. Sign-in moves to a more secure cookie.
 
 **After that:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
+
+## v0.4.1, 9 October 2026: Singapore formats on the form, hours you pick, and steadier checks
+
+**New for operators**
+- Every field on the application form is checked as you type, with the same rules the service applies: a Singapore phone number (+65 and eight digits starting with 3, 6, 8 or 9), any of the three UEN formats, a postal code from a real sector, an address with a unit number written like #01-12, and a tenancy that ends at least three months from today.
+- Operating hours are picked instead of typed: choose the days you open, then the opening and closing time from a list, or tick Open 24 hours; closing after midnight is fine and the form says so.
+- What you type is tidied before it is saved: the phone number in one format, the UEN in capitals, the email in lower case, and invisible characters removed.
+- An answer the form cannot use, such as a very large number, now gets a clear message instead of an error page, and the date you confirmed your declaration is always set by the service.
+
+**New for licensing officers**
+- The hours read the same way everywhere, for example "Mon to Sat, 07:00 to 21:00"; older applications keep the hours exactly as they were written.
+- Re-checking a document is done from the case page, and opening an earlier visit that does not exist says so instead of showing an error page.
+
+**Also**
+- The administrator's sign-in is no longer published with the demonstration accounts.
+- The PermitFlow name sits in the same place on the sign-in page as on the home page.
+
+## v0.4.1-rc.3, 9 October 2026: steadier form checks and a tidier sign-in page
+
+**New for operators**
+- A form answer sent in the wrong shape now gets a clear message instead of an error page.
+- The declaration boxes accept only a tick or no tick.
+
+**New for licensing officers**
+- Opening an earlier visit with an impossible visit number now says so instead of showing an error page.
+
+**Also**
+- The PermitFlow name sits in the same place on the sign-in page as on the home page.
+
+## v0.4.1-rc.2, 8 October 2026: safer sign-ins and sturdier checks
+
+**New for operators**
+- A very large number typed into a number field now gets a clear message instead of an error page.
+- The date your declaration was confirmed is always set by the service when you confirm it.
+
+**New for licensing officers**
+- Re-checking a document is done from the case page; the applicant's own re-check stays on the application.
+
+**Also**
+- The administrator's sign-in is no longer published with the demonstration accounts.
+
+## v0.4.1-rc.1, 8 October 2026: Singapore formats on the form, hours you pick, and a clear test environment
+
+**New for operators**
+- Every field on the application form is checked as you type, with the same rules the service applies: a Singapore phone number (+65 and eight digits starting with 3, 6, 8 or 9), any of the three UEN formats, a postal code from a real sector, an address with a unit number written like #01-12, and a tenancy that ends at least three months from today.
+- Operating hours are picked instead of typed: choose the days you open, then the opening and closing time from a list, or tick Open 24 hours; closing after midnight is fine and the form says so.
+- What you type is tidied before it is saved: the phone number in one format, the UEN in capitals, the email in lower case, and invisible characters removed.
+
+**New for licensing officers**
+- The hours read the same way everywhere, for example "Mon to Sat, 07:00 to 21:00"; older applications keep the hours exactly as they were written.
+
+**Also**
+- On the development environment a strip across the top of every page says it is not the live service.
+- This page lists each release candidate on the development environment; the live service shows released versions only.
 
 ## v0.4.0, 8 October 2026: the site visit, the clarification and the office's own view
 
@@ -37,6 +91,32 @@ Format: the product reads this file at build time for its What's new page (the v
 - Checked against every WCAG 2.2 AA rule: the control you reach with the keyboard is never hidden behind a sticky bar, input and checkbox borders are easier to see, screen readers name the dashboard groups and a locked step, your contact details can be filled in by the browser, and five minutes before you would be signed out for inactivity the top strip warns you with a Stay signed in button. A second pass with nine kinds of user (voice control, Windows High Contrast and large text among them) fixed three more things: controls are named by the words they show, keyboard focus stays visible in High Contrast, and nothing is cut off at 200% text size.
 - The version number in the corner opens What's new: this page, with your own changes first and every earlier release below; the word New sits beside the version until you have read it once.
 - Reviewed twice before release (a code review on 21 Sep and a stability review of the whole build with a smoke test of every route the same morning): a case can no longer end with Reject as the only move after every question of a round is withdrawn, a visit date that has passed cannot be confirmed, the last taps on the checklist are saved when you leave the page by a link, and typing while an answer saves no longer loses what you typed.
+
+---
+
+## v0.4.0-rc.2, 21 September 2026: the What's new page, on the same build
+
+The build of v0.4.0-rc.1 plus the page you are reading.
+
+**New**
+- The version number in the corner opens What's new, with the word New beside it until you have read the page once.
+- The page lists every version newest first and marks the one you are using as This build.
+- Your own changes come first; the changes for the other audiences are folded below them.
+
+---
+
+## v0.4.0-rc.1, 21 September 2026: use case 3, sessions, storage and the office's own view
+
+The first build with everything planned for v0.4.0, on the development environment for testing.
+
+**New for licensing officers**
+- The site visit, the inspection checklist on a tablet and the clarification rounds on the case, with one device signed in at a time.
+
+**New for operators**
+- Answer the flagged items after the visit, with text and up to three files; the pages say how much of the application's 150 MB of storage is left.
+
+**New for the licensing office (administrators)**
+- The operations overview, the activity feed, any case read as the officer sees it, and user management.
 
 ---
 
