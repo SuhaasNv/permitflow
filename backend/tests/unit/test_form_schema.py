@@ -52,3 +52,51 @@ def test_is_section_complete_and_keys() -> None:
     assert is_section_complete("business", VALID_BUSINESS)
     assert not is_section_complete("business", None)
     assert not is_section_complete("business", {**VALID_BUSINESS, "uen": ""})
+
+
+ODD_VALUES: list[object] = [None, True, False, 0, 1.5, 10**400, ["x"], {"a": 1}, [], {}, "yes", "a\x00b", ""]
+NOT_BOOLEAN: list[object] = [["x"], {"a": 1}, [], {}, 1, 0, 1.5, "yes", "", "a\x00b"]
+
+
+def test_a_select_given_a_list_or_object_is_a_message_not_a_crash() -> None:
+    for bad in (["x"], {"a": 1}, [["x"]], 1, True, 1.5, "a\x00b"):
+        e = validate_section("business", {**VALID_BUSINESS, "entity_type": bad})
+        assert e == {"entity_type": "Choose one of the options."}, bad
+    assert validate_section("premises", {**VALID_PREMISES, "premises_type": ["x"]}) == {
+        "premises_type": "Choose one of the options."
+    }
+
+
+def test_no_field_crashes_on_any_json_shape() -> None:
+    sections = {
+        "business": VALID_BUSINESS,
+        "premises": VALID_PREMISES,
+        "operations": VALID_OPERATIONS,
+        "declarations": VALID_DECLARATIONS,
+    }
+    for key, valid in sections.items():
+        for field_key in valid:
+            for odd in ODD_VALUES:
+                for allow_missing in (False, True):
+                    errors = validate_section(key, {**valid, field_key: odd}, allow_missing=allow_missing)
+                    assert isinstance(errors, dict), (key, field_key, odd)
+
+
+def test_a_non_boolean_declaration_is_never_a_confirm_prompt() -> None:
+    for bad in NOT_BOOLEAN:
+        data = {"information_accurate": bad, "consent_to_inspection": True}
+        assert validate_section("declarations", data) == {"information_accurate": "Must be true or false."}
+        # a draft must not store it either
+        assert validate_section("declarations", data, allow_missing=True) == {
+            "information_accurate": "Must be true or false."
+        }
+
+
+def test_an_unticked_or_missing_declaration_still_asks_to_confirm_and_a_draft_tolerates_it() -> None:
+    confirm = "You must confirm this declaration."
+    for unticked in (False, None):
+        data = {"information_accurate": unticked, "consent_to_inspection": True}
+        assert validate_section("declarations", data) == {"information_accurate": confirm}
+        assert validate_section("declarations", data, allow_missing=True) == {}
+    assert validate_section("declarations", {}, allow_missing=True) == {}
+    assert set(validate_section("declarations", {})) == {"information_accurate", "consent_to_inspection"}

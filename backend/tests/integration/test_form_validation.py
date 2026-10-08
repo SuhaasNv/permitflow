@@ -279,3 +279,31 @@ def test_a_huge_integer_is_422_with_a_field_message(client: TestClient, db: Sess
     assert error["details"]["fields"] == {"seating_capacity": "Must be at most 2000."}
     # past Python's 4300-digit int limit the body itself is refused: still a clean 400, never a 500
     assert patch_with(5000).status_code == 400
+
+
+def test_a_list_or_object_in_a_select_is_422_not_500(client: TestClient, db: Session) -> None:
+    h, app_id = _operator(client, db)
+    for bad in (["x"], {"a": 1}):
+        r = _patch(client, h, app_id, "business", {**VALID_BUSINESS, "entity_type": bad})
+        assert r.status_code == 422, r.text
+        assert r.json()["error"]["details"]["fields"] == {"entity_type": "Choose one of the options."}
+
+
+def test_a_malformed_declaration_is_422_even_in_a_draft_and_never_stored(
+    client: TestClient, db: Session
+) -> None:
+    h, app_id = _operator(client, db)
+    for bad in ({"a": 1}, ["x"], 1.5, "yes", "a\u0000b"):
+        r = _patch(client, h, app_id, "declarations", {"information_accurate": bad})
+        assert r.status_code == 422, (bad, r.text)
+        assert r.json()["error"]["details"]["fields"] == {"information_accurate": "Must be true or false."}
+    # the draft still tolerates an unticked box and saves a ticked one
+    assert _patch(client, h, app_id, "declarations", {"information_accurate": False}).status_code == 200
+    assert _patch(client, h, app_id, "declarations", {"information_accurate": True}).status_code == 200
+
+
+def test_a_visit_number_beyond_the_integer_range_is_422_not_500(client: TestClient, db: Session) -> None:
+    h, app_id = _operator(client, db)
+    url = f"/api/v1/applications/{app_id}/clarifications"
+    assert client.get(f"{url}?visit=2147483648", headers=h).status_code == 422
+    assert client.get(f"{url}?visit=2147483647", headers=h).status_code == 200

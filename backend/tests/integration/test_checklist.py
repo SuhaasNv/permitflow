@@ -473,3 +473,11 @@ def test_extra_findings_free_and_linked(client: TestClient, db: Session) -> None
     # frozen: an extra cannot be added after submit
     r = client.put(URL.format(app_id), headers=off, json={"items": keep, "version": r.json()["version"]})
     assert r.status_code == 409
+
+
+def test_a_visit_number_beyond_the_integer_range_is_422_not_500(client: TestClient, db: Session) -> None:
+    make_user(db, "off-visit@example.sg", Role.OFFICER)
+    off = login(client, "off-visit@example.sg")
+    url = URL.format(uuid.uuid4())
+    assert client.get(f"{url}?visit=2147483648", headers=off).status_code == 422
+    assert client.get(f"{url}?visit=2147483647", headers=off).status_code == 404
