@@ -10,7 +10,7 @@ https://github.com/user-attachments/assets/942739f7-e2bd-4360-b525-ecf960a7e796
 
 A regulatory licensing platform built for a 3-day full-stack assessment. An operator (the business owner, or an agent applying for the business) applies for a Food Establishment Licence through a guided form with checked uploads; a licensing officer reviews the submission, leaves feedback tied to a section or a document, and requests a resubmission in which only the flagged parts reopen. Every status change, feedback round and decision is audited; approval issues a licence certificate. An advisory AI verifier reads each uploaded document against the form before submission. It never decides anything.
 
-**Try it:** production, v0.4.0, at https://permitflow.space (one example application waiting in the officer's queue); development at https://dev.permitflow.space. Demo accounts below. Local setup takes about ten minutes.
+**Try it:** production, v0.4.1, at https://permitflow.space (one example application waiting in the officer's queue); development at https://dev.permitflow.space. Demo accounts below. Local setup takes about ten minutes.
 
 **Ten minutes to review it:** the technical deck's handout PDF in `docs/14-debrief/technical-deck/`, then `SCOPE.md`, then `docs/11-reviews/ASSESSMENT_TRACEABILITY.md` (every line of the brief mapped to code, test and evidence).
 
@@ -116,7 +116,7 @@ The full record, with the prompts grouped by the decision they carry, what was d
 
 ## Release notes
 
-v0.4.0 (8 October 2026) is the version at https://permitflow.space. Next, v0.5.0: virus scanning, a separate worker for the document checks, AI usage per check and limits the administrator can tune. An entry per release, in the users' words: `RELEASE_NOTES.md`; the engineering record: `CHANGELOG.md`.
+v0.4.1 (9 October 2026) is the version at https://permitflow.space. Next, v0.5.0: virus scanning, a separate worker for the document checks, AI usage per check and limits the administrator can tune. An entry per release, in the users' words: `RELEASE_NOTES.md`; the engineering record: `CHANGELOG.md`.
 
 ## What I would do next
 
