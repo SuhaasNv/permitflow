@@ -13,6 +13,7 @@ import { SearchBox } from '@/features/shared/SearchBox'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import { EmptyPanel, ErrorPanel, Skeleton } from '@/features/shared/states'
 import { useToast } from '@/features/shared/Toast'
+import { cleanText } from '@/lib/cleanText'
 import { cn } from '@/lib/cn'
 import { formatDate } from '@/lib/format'
 import { matchesQuery } from '@/lib/search'
@@ -124,12 +125,12 @@ export function AdminUsersPage() {
   const confirmCreate = () => {
     const errors: Partial<Record<keyof UserCreate, string>> = {}
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) errors.email = 'Enter a valid email address.'
-    if (!draft.full_name.trim()) errors.full_name = "Enter the person's name."
+    if (!cleanText(draft.full_name)) errors.full_name = "Enter the person's name."
     if (draft.password.length < 12) errors.password = 'At least 12 characters.'
     setFieldErrors(errors)
     if (Object.keys(errors).length) return
     create.mutate(
-      { ...draft, email: draft.email.trim().toLowerCase(), full_name: draft.full_name.trim() },
+      { ...draft, email: draft.email.trim().toLowerCase(), full_name: cleanText(draft.full_name) },
       {
         onSuccess: (u) => {
           toast.push({

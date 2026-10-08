@@ -19,6 +19,20 @@ def test_form_diff_is_field_level_and_schema_bound() -> None:
     assert "junk" not in out
 
 
+def test_form_diff_compares_the_stored_form_so_legacy_text_is_not_a_change() -> None:
+    legacy = {"contact_phone": "91234567", "contact_email": "Tan@Shop.sg", "business_name": "Kopi House"}
+    clean = {"contact_phone": "+65 9123 4567", "contact_email": "tan@shop.sg", "business_name": "Kopi House"}
+    assert not {s.key: s for s in diff_forms({"business": legacy}, {"business": clean})}["business"].changed
+    edited = {**clean, "business_name": "Kopi Two"}
+    business = {s.key: s for s in diff_forms({"business": legacy}, {"business": edited})}["business"]
+    assert [f.key for f in business.fields] == ["business_name"]
+    # free-text hours compare as written, and a real change to them still shows
+    before = {"operations": {"operating_hours": "Mon-Sun 7am-9pm"}}
+    after = {"operations": {"operating_hours": "Mon-Sat 7am-9pm"}}
+    assert not {s.key: s for s in diff_forms(before, before)}["operations"].changed
+    assert {s.key: s for s in diff_forms(before, after)}["operations"].changed
+
+
 def test_document_diff_compares_by_hash() -> None:
     a = DocumentRef("1", "aaa", "plan.pdf")
     b_same = DocumentRef("2", "aaa", "plan-copy.pdf")

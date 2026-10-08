@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.domain.editability import editable_targets
-from app.domain.form_schema import get_section, validate_section
+from app.domain.form_schema import get_section, normalise_section, validate_section
 from app.models import Application, Document, User, VerificationRun
 from app.models.enums import ApplicationStatus, DocumentType, LicenceType
 from app.repositories.applications import ApplicationRepository
@@ -77,8 +77,9 @@ class ApplicationService:
         if errors:
             raise ValidationFailed("Some fields need attention.", details={"fields": errors})
         draft = dict(app.draft_data)
-        previous = draft.get(key) or {}
-        data = dict(data)
+        # Same form as `data`, or untouched legacy text (a phone saved before normalising) counts as a change.
+        previous = normalise_section(key, draft.get(key) or {})
+        data = normalise_section(key, data)
         if key == "declarations" and app.status == ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION:
             # A fresh confirmation is the change the officer asked for; the values themselves cannot differ.
             data["confirmed_at"] = datetime.now(UTC).isoformat(timespec="seconds")

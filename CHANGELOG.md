@@ -2,6 +2,21 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-108, v0.4.1: every field of the application form checked for its Singapore format (8 Oct 2026)
+
+On `feat/us-108-form-validation`, not merged, not pushed. The owner decided phone numbers are Singapore only and that operating hours become a pick list with the same hours on every open day (artboards S-46, approved first). Version not bumped and `RELEASE_NOTES.md` not touched: the release step does both.
+
+- **One definition, two enforcers.** Each field declares its rule once in `backend/app/domain/form_schema.py` (`min_length`, `max_decimals`, `min_months_ahead`, `max_years_ahead`, `step_minutes` and a named `rule`); the rules are pure functions in `domain/field_rules.py`, `domain/hours.py` and `domain/text_clean.py`, mirrored in `frontend/src/lib/fieldRules.ts`, `hours.ts` and `cleanText.ts`, and both are held to one JSON table of good and bad values.
+- **Rules.** Phone: Singapore only, stored `+65 XXXX XXXX`. UEN: the three ACRA formats, stored upper-case. Email lower-cased. Postal code sectors 01 to 82. Address needs a letter and a digit, a `#05-12` style unit, no postal code inside. Names, business name, description length (10 to 1000), food handlers 1 to 500, floor area at most two decimals, tenancy expiry a real date 3 months to 30 years ahead on the Singapore calendar. Every text value is cleaned of zero-width, bidi, Tag-block and control characters before it is checked and stored. Messages are in `UI_STATES.md`.
+- **Checked as you type.** The form validates on every change; the phone field uses the phone keypad and `autocomplete="tel"`.
+- **Operating hours are picked.** Seven day toggles, quick links, Opens and Closes lists in 30-minute steps, Open 24 hours, an after-midnight hint and "Shown to the officer as ...", built from native controls (`HoursField.tsx`). The summary is formatted in one function on each side and used by the officer's case, the admin's read-only case, the revision compare, the history and the review step. The field moved after the food handlers, as drawn.
+- **Older applications are untouched.** A submitted revision with free-text hours shows it as written and stays complete (`snapshot` mode also skips the rules that look at today, so nothing turns incomplete as time passes); a draft with free text asks for one re-pick.
+- **Other forms audited** (below). Free text on every request body is cleaned the same way; the add-account dialog cleans the name.
+- **Tests.** Backend 1137 (95 % coverage), mock AI gate 12 of 12, vitest 565 in 52 files (86 % statements), Playwright 36 of 36 including the accessibility gate, the 246-check edge script and the 122-check route smoke script against a local stack.
+- **Docs.** `REQUIREMENTS.md` (FR-044, SEC-007), `DOMAIN_MODEL.md` (form definition, hours, legacy strings), `UI_STATES.md`, `design/README.md` (S-46), `TEST_STRATEGY.md`, `THREAT_MODEL.md` (T30), the demo form values.
+
+**Audit of the other forms.** Checked: admin add-account (name, email, password), clarification answers and reopen messages, officer feedback, checklist comments and extra-finding titles, officer notes, withdrawal and site-visit notes, appointment dates, sign-in. Changed: every one of those free-text fields now loses hidden characters before its length limit is applied (a name of only hidden characters is refused, the add-account dialog cleans it before sending). Left as they were because they already hold: appointment dates (working day, notice, 60-day limit and round cap in `domain/site_visit.py`), the 12-character temporary password rule (length is the policy by the owner's choice), sign-in email shape (`EmailStr` on the server, a Zod check on the client), the 2000-character limits on messages and comments on both sides.
+
 ## v0.4.0 released (US-081, 8 Oct 2026)
 
 The assessment is over and the `main` freeze is lifted, so v0.4.0 moves from the development environment to production through the release ritual (`docs/09-operations/BRANCHING.md`, rule 5).

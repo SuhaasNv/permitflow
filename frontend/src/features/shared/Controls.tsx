@@ -24,6 +24,10 @@ function Labelled({ id, label, help, error, required, className, children }: Wra
   )
 }
 
+/** The closed select's look: no native arrow, the product's chevron on the right (shared with the hours picker). */
+export const selectChevron =
+  'appearance-none bg-[url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2716%27 height=%2716%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23465060%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27><path d=%27m6 9 6 6 6-6%27/></svg>")] bg-[length:16px] bg-[right_10px_center] bg-no-repeat pr-9'
+
 export interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement>, Wrap {
   options: { value: string; label: string }[]
   placeholder?: string
@@ -44,7 +48,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
         aria-describedby={error ? `${selectId}-error` : help ? `${selectId}-help` : undefined}
         className={cn(
           inputClasses(Boolean(error)),
-          'appearance-none bg-[url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2716%27 height=%2716%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23465060%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27><path d=%27m6 9 6 6 6-6%27/></svg>")] bg-[length:16px] bg-[right_10px_center] bg-no-repeat pr-9',
+          selectChevron,
         )}
         {...rest}
       >

@@ -70,15 +70,12 @@ Seating capacity
 24
 ```
 
-Operating hours
-```
-Mon-Sun 7am-9pm
-```
-
 Number of food handlers
 ```
 4
 ```
+
+Operating hours: click **Every day**, then choose **Opens 07:00** and **Closes 21:00** (the form shows "Every day, 07:00 to 21:00"; stored as the days, the two times and `open_24h: false`)
 
 ### 4. Declarations
 
@@ -163,15 +160,12 @@ Seating capacity
 24
 ```
 
-Operating hours
-```
-Mon-Sun 7am-9pm
-```
-
 Number of food handlers
 ```
 4
 ```
+
+Operating hours: click **Every day**, then choose **Opens 07:00** and **Closes 21:00** (the form shows "Every day, 07:00 to 21:00"; stored as the days, the two times and `open_24h: false`)
 
 ### 4. Declarations
 

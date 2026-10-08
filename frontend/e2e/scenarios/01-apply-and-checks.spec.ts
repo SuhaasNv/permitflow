@@ -8,6 +8,7 @@ import {
   OPERATOR,
   PREMISES,
   auditSummaries,
+  HOURS_SUMMARY,
   fillSection,
   openCase,
   signIn,
@@ -30,7 +31,7 @@ test('operator applies, every AI check lands, submission is recorded', async ({ 
   await fillSection(page, BUSINESS, { entity_type: 'private_limited' })
   await expect(page).toHaveURL(/\/form\/premises$/)
   await fillSection(page, PREMISES, { premises_type: 'shophouse' })
-  await fillSection(page, OPERATIONS)
+  await fillSection(page, OPERATIONS, {}, { quick: 'Every day', opens: '07:00', closes: '21:00' })
   await page.locator('[name="information_accurate"]').check()
   await page.locator('[name="consent_to_inspection"]').check()
   await page.getByRole('button', { name: /Save and continue/ }).click()
@@ -49,6 +50,8 @@ test('operator applies, every AI check lands, submission is recorded', async ({ 
 
   await page.goto(`${appUrl}/review`)
   await expect(page.getByText('100%')).toBeVisible()
+  // the review step reads the hours as words, not as an object (US-108)
+  await expect(page.getByText(HOURS_SUMMARY)).toBeVisible()
   await page.getByRole('button', { name: 'Submit application' }).click()
   await page.locator('dialog[open]').getByRole('button', { name: 'Submit application' }).click()
   await expect(page).toHaveURL(/\/submitted$/)

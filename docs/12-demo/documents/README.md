@@ -71,7 +71,7 @@ The values the `clean/` documents agree with, and that `backend/evals/cases.json
 | Premises | Floor area, type | 48 sqm, shophouse |
 | Premises | Tenancy expiry | 2027-10-31 |
 | Operations | Cuisine | Kaya toast, soft-boiled eggs, kopi and teh. |
-| Operations | Seating, hours, handlers | 24, Mon-Sun 7am-9pm, 4 |
+| Operations | Seating, handlers, hours | 24, 4, Every day 07:00 to 21:00 |
 | Declarations | Both boxes | ticked |
 
 ## Second business: form values
@@ -85,5 +85,5 @@ The values the `clean/` documents agree with, and that `backend/evals/cases.json
 | Premises | Floor area, type | 48 sqm, shophouse |
 | Premises | Tenancy expiry | 2027-10-31 |
 | Operations | Cuisine | South Indian meals, tandoor dishes and teh tarik |
-| Operations | Seating, hours, handlers | 24, Mon-Sun 7am-9pm, 4 |
+| Operations | Seating, handlers, hours | 24, 4, Every day 07:00 to 21:00 |
 

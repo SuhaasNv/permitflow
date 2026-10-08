@@ -3,10 +3,13 @@ import { Link } from 'react-router-dom'
 import type { SectionView } from '@/api/applications'
 import type { SectionDef } from '@/api/formSchema'
 import { StatusBadge } from '@/features/shared/StatusBadge'
+import { summariseHours } from '@/lib/hours'
 
 export function displayValue(def: SectionDef['fields'][number], value: unknown): string {
   if (value === undefined || value === null || value === '') return 'Not entered'
   if (def.kind === 'checkbox') return value === true ? 'Confirmed' : 'Not confirmed'
+  // The new hours object, or an older free-text entry shown exactly as written (never "[object Object]").
+  if (def.kind === 'hours') return summariseHours(value) || 'Not entered'
   if (def.kind === 'select') return def.options.find((o) => o.value === value)?.label ?? String(value)
   if (def.kind === 'date' && typeof value === 'string') {
     const [y, m, d] = value.split('-')

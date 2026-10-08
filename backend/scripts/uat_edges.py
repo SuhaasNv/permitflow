@@ -17,6 +17,7 @@ The script creates a handful of applications for the seeded operator and leaves 
 from __future__ import annotations
 
 import concurrent.futures as cf
+import datetime as dt
 import json
 import os
 import sys
@@ -102,12 +103,17 @@ PREMISES = {
     "postal_code": "123456",
     "premises_type": "shophouse",
     "floor_area_sqm": 40,
-    "tenancy_expiry": "2027-12-31",
+    "tenancy_expiry": (dt.date.today() + dt.timedelta(days=730)).isoformat(),
 }
 OPERATIONS = {
     "cuisine_description": "Kopi and toast.",
     "seating_capacity": 10,
-    "operating_hours": "7am-7pm",
+    "operating_hours": {
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "opens": "07:00",
+        "closes": "19:00",
+        "open_24h": False,
+    },
     "food_handlers_count": 2,
 }
 DECL = {"information_accurate": True, "consent_to_inspection": True}

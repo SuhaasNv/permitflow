@@ -37,11 +37,15 @@ class Completeness:
     missing: tuple[str, ...]  # human-readable list of what is still needed
 
 
-def compute(draft_data: dict[str, Any], present_document_types: set[DocumentType]) -> Completeness:
+def compute(
+    draft_data: dict[str, Any], present_document_types: set[DocumentType], *, snapshot: bool = False
+) -> Completeness:
+    """`snapshot=True` reads a record that is already submitted: today-relative rules are skipped and a
+    pre-v0.4.1 free-text `operating_hours` is accepted, so an old application does not turn "incomplete"."""
     sections: list[SectionState] = []
     for s in SECTIONS:
         data = draft_data.get(s.key) or {}
-        errors = validate_section(s.key, data) if data else {}
+        errors = validate_section(s.key, data, snapshot=snapshot) if data else {}
         started = bool(data)
         complete = started and not errors
         sections.append(SectionState(s.key, s.title, complete, started, errors))

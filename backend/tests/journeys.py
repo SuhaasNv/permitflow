@@ -2,11 +2,13 @@
 other's private helpers, so a test file can be renamed or deleted without breaking its neighbours."""
 
 import io
+from datetime import timedelta
 from typing import Any
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.domain.field_rules import singapore_today
 from app.models.enums import Role
 from tests.factories import login, make_user
 
@@ -23,12 +25,17 @@ VALID_PREMISES: dict[str, Any] = {
     "postal_code": "208787",
     "premises_type": "shophouse",
     "floor_area_sqm": 48,
-    "tenancy_expiry": "2027-10-31",
+    "tenancy_expiry": (singapore_today() + timedelta(days=730)).isoformat(),
 }
 VALID_OPERATIONS: dict[str, Any] = {
     "cuisine_description": "Kaya toast, soft-boiled eggs, kopi and teh.",
     "seating_capacity": 24,
-    "operating_hours": "Mon-Sun 7am-9pm",
+    "operating_hours": {
+        "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+        "opens": "07:00",
+        "closes": "21:00",
+        "open_24h": False,
+    },
     "food_handlers_count": 4,
 }
 VALID_DECLARATIONS: dict[str, Any] = {"information_accurate": True, "consent_to_inspection": True}

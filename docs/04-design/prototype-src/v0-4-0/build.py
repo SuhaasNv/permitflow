@@ -1167,6 +1167,143 @@ def build_session_board(board: str, w: int, h: int) -> str:
         SESSION["notice"], SESSION["action"] = "", ""
 
 
+# Operating hours picker (US-108, v0.4.1) ----------------------------------------------------------
+# Owner's choice of 8 Oct 2026: the same hours on every open day. Days as toggles, then an opening and a
+# closing time picked from a list in 30-minute steps, and Open 24 hours. Closing before opening means the
+# shop closes after midnight. Stored as operating_days, opens_at, closes_at, open_24h.
+
+DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+CHEVRON_DOWN = "m6 9 6 6 6-6"
+
+
+def day_toggle(day: str, on: bool, error: bool = False, phone: bool = False) -> str:
+    border = TONES["error"][0] if error else (TEXT if on else LINE_STRONG)
+    return div(st(display="inline-flex", align_items="center", justify_content="center", gap="4px", height="44px", min_width="0", padding="0",
+                  border_radius="6px", border=f"1px solid {border}", background=SURFACE3 if on else SURFACE, color=TEXT if on else TEXT2,
+                  font_family=SANS, font_size="14px", font_weight=600 if on else 500, cursor="pointer", box_sizing="border-box", width="100%"),
+               (icon(IC["check"], 12, TEXT) if on and not phone else "") + escape(day), "button", type="button", aria_pressed="true" if on else "false")
+
+
+def time_select(label: str, value: str, disabled: bool = False, error: bool = False, open_list: bool = False, phone: bool = False) -> str:
+    border = TONES["error"][0] if error else (FOCUS if open_list else LINE_STRONG)
+    ring = f"0 0 0 3px {TONES['info'][1]}" if open_list else "none"
+    box = div(st(display="flex", align_items="center", height="44px", padding="0 12px", border=f"1px solid {border}", box_shadow=ring, border_radius="6px",
+                 background=NEUTRAL_SOFT if disabled else SURFACE, color=TEXT3 if disabled else TEXT, font_size="15px", font_variant_numeric="tabular-nums",
+                 box_sizing="border-box", width="100%" if phone else "168px", cursor="not-allowed" if disabled else "pointer"),
+              escape(value) + div(st(margin_left="auto", display="inline-flex", color=TEXT3), icon(CHEVRON_DOWN, 16), "span"), "button", type="button", aria_haspopup="listbox", aria_expanded="true" if open_list else "false")
+    listbox = ""
+    if open_list:
+        times = ["05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30"]
+        opts = "".join(div(st(display="flex", align_items="center", gap="8px", height="36px", padding="0 12px", font_size="15px", font_variant_numeric="tabular-nums",
+                              background=SURFACE3 if t == value else "transparent", color=TEXT, font_weight=600 if t == value else 400),
+                           (icon(IC["check"], 14, TEXT) if t == value else div(st(width="14px"), "", "span")) + escape(t), "li", role="option", aria_selected="true" if t == value else "false") for t in times)
+        listbox = div(st(position="absolute", top="72px", left="0", width="168px", max_height="252px", overflow="hidden", background=SURFACE, border=f"1px solid {LINE}", border_radius="8px",
+                         box_shadow="0 12px 32px rgba(27,36,48,0.14), 0 2px 6px rgba(27,36,48,0.06)", padding="4px 0", margin="0", list_style="none", z_index=5),
+                      opts, "ul", role="listbox", aria_label=f"{label} times")
+    return div(st(display="flex", flex_direction="column", gap="6px", position="relative", flex_grow=1 if phone else 0, min_width="0"),
+               text(label, 13, 18, 600, TEXT3 if disabled else TEXT, "", "label") + box + listbox)
+
+
+def checkbox(label: str, on: bool) -> str:
+    box = div(st(width="20px", height="20px", border_radius="4px", border=f"1px solid {TEXT if on else LINE_STRONG}", background=TEXT if on else SURFACE, display="flex", align_items="center", justify_content="center", flex_shrink=0),
+              icon(IC["check"], 14, "#FFFFFF") if on else "", "span")
+    return div(st(display="flex", align_items="center", gap="10px", min_height="44px", font_size="15px", color=TEXT, cursor="pointer"), box + escape(label), "label")
+
+
+def hours_group(state: str, phone: bool = False) -> str:
+    """The picker. state: default | menu | midnight | allday | error."""
+    days_on = {"default": DAYS[:6], "menu": DAYS[:6], "midnight": DAYS, "allday": DAYS, "error": [], "phone": DAYS}[state]
+    opens, closes = {"midnight": ("18:00", "02:00"), "error": ("09:00", "09:00")}.get(state, ("07:00", "21:00"))
+    allday = state == "allday"
+    err = state == "error"
+    legend = div(st(display="flex", align_items="baseline", gap="6px", padding="0"), text("Operating hours", 14, 20, 600, TEXT, "", "span") + text("*", 14, 20, 600, PRIMARY, "", "span"), "legend")
+    hint = text("Pick the days you open, then the times. The same hours apply to every day you pick.", 13, 18, 400, TEXT3)
+    quick = div(st(display="flex", gap="16px", font_size="13px"), "".join(div(st(color=TEXT2, text_decoration="underline", text_underline_offset="3px"), q, "a", href="#") for q in ("Every day", "Mon to Fri", "Clear")))
+    day_row = div(st(display="grid", grid_template_columns="repeat(7, minmax(0, 1fr))", gap="4px" if phone else "6px", max_width="100%" if phone else "520px"), "".join(day_toggle(d, d in days_on, err, phone) for d in DAYS), role="group", aria_label="Open on")
+    days_block = div(st(display="flex", flex_direction="column", gap="8px"),
+                     div(st(display="flex", align_items="baseline", justify_content="space-between", gap="12px"), text("Open on", 13, 18, 600) + quick)
+                     + day_row + (text("Choose at least one day you open.", 13, 18, 500, TONES["error"][0]) if err else ""))
+    times = div(st(display="flex", gap="12px", align_items="flex-start"),
+                time_select("Opens", opens, allday, err, state == "menu", phone) + time_select("Closes", closes, allday, err, False, phone))
+    time_err = text("Opening and closing time cannot be the same.", 13, 18, 500, TONES["error"][0]) if err else ""
+    midnight = div(st(display="flex", gap="8px", align_items="flex-start", padding="10px 12px", border_radius="6px", background=TONES["info"][1], border=f"1px solid {TONES['info'][2]}", color=TONES["info"][0], font_size="13px", line_height="18px"),
+                   icon(IC["info"], 16) + text("Closes after midnight, at 02:00 the next day.", 13, 18, 500, TONES["info"][0], "", "span")) if state == "midnight" else ""
+    summary_text = {"allday": "Every day, open 24 hours", "midnight": "Every day, 18:00 to 02:00 (next day)", "error": "", "phone": "Every day, 07:00 to 21:00"}.get(state, "Mon to Sat, 07:00 to 21:00")
+    summary = div(st(display="flex", align_items="flex-start", gap="8px"), icon(IC["clock"], 14, TEXT3) + div(st(display="flex", flex_wrap="wrap", column_gap="6px"), text("Shown to the officer as", 13, 18, 400, TEXT3, "", "span") + text(summary_text, 13, 18, 600, TEXT, "", "span"))) if summary_text else ""
+    body = (legend + hint + days_block + ("" if allday else times) + time_err + checkbox("Open 24 hours", allday) + midnight + summary)
+    return div(st(display="flex", flex_direction="column", gap="14px", border="none", padding="0", margin="0", min_width="0"), body, "fieldset")
+
+
+def form_field(label: str, value: str, help_: str = "", wide: bool = False, textarea: bool = False) -> str:
+    box = div(st(display="flex", align_items="flex-start" if textarea else "center", min_height="88px" if textarea else "44px", padding="10px 12px" if textarea else "0 12px", border=f"1px solid {LINE_STRONG}", border_radius="6px",
+                 background=SURFACE, color=TEXT, font_size="15px", line_height="22px", box_sizing="border-box", width="100%"), escape(value))
+    lab = div(st(display="flex", gap="6px"), text(label, 14, 20, 600, TEXT, "", "span") + text("*", 14, 20, 600, PRIMARY, "", "span"), "label")
+    return div(st(display="flex", flex_direction="column", gap="6px", grid_column="1 / -1" if wide else "auto", min_width="0"), lab + box + (text(help_, 13, 18, 400, TEXT3) if help_ else ""))
+
+
+def stepper(current: int) -> str:
+    names = ["Business", "Premises", "Operations", "Declarations", "Documents", "Review"]
+    out = []
+    for i, n in enumerate(names):
+        done, cur = i < current, i == current
+        dot = div(st(width="26px", height="26px", border_radius="999px", display="flex", align_items="center", justify_content="center", font_size="12px", font_weight=600,
+                     background=TONES["success"][0] if done else (INK if cur else SURFACE), color="#FFFFFF" if (done or cur) else TEXT3, border="none" if (done or cur) else f"1px solid {LINE_STRONG}", box_sizing="border-box"),
+                  icon(IC["check"], 13, "#FFFFFF") if done else str(i + 1), "span")
+        out.append(div(st(display="flex", flex_direction="column", align_items="center", gap="6px", flex_grow=1), dot + text(n, 13, 18, 600 if cur else 400, TEXT if cur else TEXT3)))
+    return div(st(display="flex", align_items="flex-start"), "".join(out), "ol", aria_label="Steps")
+
+
+def operations_form(state: str, phone: bool) -> str:
+    head = div(st(padding="20px 28px" if not phone else "18px 20px", border_bottom=f"1px solid {LINE}"),
+               text("SECTION 3 OF 4", 12, 16, 600, TEXT3, "letter-spacing: 0.08em") + text("Operations", 22, 28, 600, TEXT, "letter-spacing: -0.01em; margin-top: 6px", "h2") + text("What you serve and how you operate", 14, 20, 400, TEXT2, "margin-top: 4px"))
+    grid = div(st(display="grid", grid_template_columns="1fr" if phone else "1fr 1fr", gap="20px 24px"),
+               form_field("Description of food and cuisine", "Kopi, kaya toast, soft-boiled eggs and local breakfast sets; noodles at lunch.", "Up to 1000 characters.", True, True)
+               + form_field("Seating capacity", "40") + form_field("Number of food handlers", "4", "Each handler must hold a valid food hygiene certificate.")
+               + div(st(grid_column="1 / -1", min_width="0"), hours_group(state, phone)))
+    body = div(st(padding="24px 28px" if not phone else "20px", display="flex", flex_direction="column", gap="20px"), grid)
+    foot = div(st(display="flex", align_items="center", gap="8px", padding="14px 28px" if not phone else "12px 20px", border_top=f"1px solid {LINE}", background=SURFACE2, flex_wrap="wrap"),
+               div(st(margin_right="auto"), save_indicator("saved")) + button("Save section") + button("Save and continue", "primary"))
+    return div(st(background=SURFACE, border=f"1px solid {LINE}", border_radius="10px", overflow="visible"), head + body + foot, "form")
+
+
+def build_hours_form(width: int, height: int, state: str) -> str:
+    phone = width <= 480
+    header = case_header(["My applications", "PF-2026-001003", "Operations"], "PF-2026-001003", "Food Establishment Licence", "New application", badge("Draft", "neutral"),
+                         "Not yet submitted. You can save and return any time.", "Created 18 Sep 2026 · Step 3 of 6", "" if phone else button("Save and exit"), phone)
+    if phone:
+        content = header + operations_form("phone", True)
+    else:
+        rows = [("01", "Business details", True), ("02", "Premises", True), ("03", "Operations", False), ("04", "Declarations", False)]
+        side = div(st(width="232px", flex_shrink=0, display="flex", flex_direction="column", gap="4px"),
+                   text("SECTIONS", 12, 16, 600, TEXT3, "letter-spacing: 0.08em; padding: 0 11px 8px")
+                   + "".join(div(st(display="flex", align_items="center", gap="12px", height="40px", padding="0 11px", border_radius="6px", background=SURFACE3 if n == "Operations" else "transparent"),
+                                 mono(k, 12, TEXT3) + text(n, 14, 20, 600 if n == "Operations" else 500, TEXT) + div(st(margin_left="auto", width="8px", height="8px", border_radius="999px", background=TONES["success"][0] if done else "transparent", border="none" if done else f"1px solid {LINE_STRONG}"), "", "span")) for k, n, done in rows))
+        content = header + stepper(2) + div(st(display="flex", gap="24px", align_items="flex-start"), side + div(st(flex_grow=1, min_width="0"), operations_form(state, False)))
+    return page("S-46 Operating hours", width, height, shell(width, height, "operator", "My applications", content, "phone" if phone else "full"))
+
+
+def build_hours_states(width: int, height: int) -> str:
+    cards = []
+    for state, title, note in [("midnight", "Closes after midnight", "Closing before opening is allowed: the hint names the next day."),
+                               ("allday", "Open 24 hours", "The two times are removed while it is ticked; unticking brings back the last times."),
+                               ("error", "Errors, shown on Save and continue", "Each message sits under the part it is about, and the summary at the top of the form links here.")]:
+        cards.append(div(st(display="flex", flex_direction="column", gap="8px", flex="1 1 0", min_width="0"),
+                         text(title, 16, 22, 600) + text(note, 13, 18, 400, TEXT3)
+                         + div(st(background=SURFACE, border=f"1px solid {LINE}", border_radius="10px", padding="4px 24px 24px"), hours_group(state))))
+    officer = div(st(display="flex", flex_direction="column", gap="8px", margin_top="8px"),
+                  text("What the officer reads", 16, 22, 600) + text("Case view, Operations section; and the revision compare when an older application had free text.", 13, 18, 400, TEXT3)
+                  + div(st(display="flex", gap="24px"),
+                        div(st(flex="1 1 0", background=SURFACE, border=f"1px solid {LINE}", border_radius="10px", padding="16px 20px"),
+                            text("Operations", 15, 22, 600, TEXT, "margin-bottom: 4px") + def_list([("Seating capacity", "40"), ("Number of food handlers", "4"), ("Operating hours", "Mon to Sat, 07:00 to 21:00")]))
+                        + div(st(flex="1 1 0", background=SURFACE, border=f"1px solid {LINE}", border_radius="10px", padding="16px 20px"),
+                              div(st(display="flex", align_items="center", gap="8px", margin_bottom="8px"), text("Operating hours", 15, 22, 600) + tag("Changed", "changed"))
+                              + def_list([("Revision 1 (free text)", "Mon-Sun 7am-9pm"), ("Revision 2", "Mon to Sat, 07:00 to 21:00")]))))
+    root = div(st(width=f"{width}px", height=f"{height}px", box_sizing="border-box", background=BG, color=TEXT, font_family=SANS, padding="40px", display="flex", flex_direction="column", gap="24px"),
+               text("S-46 Operating hours: states", 24, 32, 600, TEXT, "letter-spacing: -0.015em")
+               + div(st(display="flex", gap="24px", align_items="flex-start"), "".join(cards)) + officer)
+    return page("S-46 Operating hours, states", width, height, root)
+
+
 # Canvas ----------------------------------------------------------------------------------------
 
 BOARDS: list[tuple[str, str, int, int, str, int]] = [
@@ -1194,6 +1331,9 @@ BOARDS: list[tuple[str, str, int, int, str, int]] = [
     ("S45-Session-Idle-Phone.dc.html", "S-45 Idle warning on a phone (390)", 390, 844, "session-idle-390", 5),
     ("S45-Session-8h-A.dc.html", "S-45 8-hour limit, option A: Stay signed in renews the session", 1280, 900, "session-8h-a", 5),
     ("S45-Session-8h-B.dc.html", "S-45 8-hour limit, option B: no renewal, sign in again", 1280, 900, "session-8h-b", 5),
+    ("S46-Hours-Desktop.dc.html", "S-46 Operating hours picker, Opens list open (1280)", 1280, 1500, "hours-1280", 6),
+    ("S46-Hours-Phone.dc.html", "S-46 Operating hours picker on a phone (390)", 390, 1900, "hours-390", 6),
+    ("S46-Hours-States.dc.html", "S-46 States: after midnight, 24 hours, errors; what the officer reads", 1520, 880, "hours-states", 6),
 ]
 
 
@@ -1234,6 +1374,12 @@ def build(board: str, w: int, h: int) -> str:
         return build_whats_new(w, h, "operator")
     if board == "whats-new-admin":
         return build_whats_new(w, h, "admin")
+    if board == "hours-1280":
+        return build_hours_form(w, h, "menu")
+    if board == "hours-390":
+        return build_hours_form(w, h, "phone")
+    if board == "hours-states":
+        return build_hours_states(w, h)
     if board.startswith("session-"):
         return build_session_board(board, w, h)
     raise KeyError(board)
@@ -1259,6 +1405,7 @@ def main(out: Path) -> None:
         "row-admin": {"x": 0, "y": int(boards["S40-Admin-Overview.dc.html"]["y"]) - 300, "text": "Admin: overview, activity, users, read-only case", "kind": "title1", "maxW": 5400},  # type: ignore[call-overload]
         "row-visit": {"x": 0, "y": int(boards["S32-Schedule-Dialog.dc.html"]["y"]) - 300, "text": "Site visit appointment: propose, accept or counter, confirm (US-084)", "kind": "title1", "maxW": 4600},  # type: ignore[call-overload]
         "row-session": {"x": 0, "y": int(boards["S45-Session-Idle.dc.html"]["y"]) - 300, "text": "Session warnings (US-095, WCAG 2.2.1): a warning with Stay signed in before the 60-minute idle limit; the 8-hour limit in two options, pick one", "kind": "title1", "maxW": 5400},  # type: ignore[call-overload]
+        "row-hours": {"x": 0, "y": int(boards["S46-Hours-Desktop.dc.html"]["y"]) - 300, "text": "Operating hours as a pick list (US-108, v0.4.1): days, then opening and closing time in 30-minute steps, or open 24 hours", "kind": "title1", "maxW": 5400},  # type: ignore[call-overload]
         "row-whats-new": {"x": 0, "y": int(boards["S44-Whats-New.dc.html"]["y"]) - 300, "text": "What's new behind the version number: the reader's own changes first, every release below (US-094, v0.4.0-rc.2)", "kind": "title1", "maxW": 4600},  # type: ignore[call-overload]
     }
     canvas = {

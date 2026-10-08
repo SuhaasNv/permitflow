@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.domain.enums import DocumentType, FeedbackTargetType
+from app.domain.form_schema import normalise_section
 
 
 @dataclass(frozen=True)
@@ -46,9 +47,13 @@ def changed_targets(
     current_docs: dict[DocumentType, str],
     flagged: OpenTargets,
 ) -> Changes:
-    """Sections compare by value; documents by sha256. Only flagged targets count (others cannot change)."""
+    """Sections compare by value, both sides in the form the server stores (a revision saved before the
+    normalising rules holds raw text); documents by sha256. Only flagged targets count."""
     sections = frozenset(
-        key for key in flagged.sections if (previous_form.get(key) or {}) != (current_form.get(key) or {})
+        key
+        for key in flagged.sections
+        if normalise_section(key, previous_form.get(key) or {})
+        != normalise_section(key, current_form.get(key) or {})
     )
     documents = frozenset(
         dtype for dtype in flagged.document_types if previous_docs.get(dtype) != current_docs.get(dtype)
