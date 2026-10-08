@@ -261,7 +261,8 @@
   .pf-btn-ghost:hover {
     background: var(--color-neutral-soft);
   }
-  .pf-btn:disabled::before {
+  .pf-btn:disabled::before,
+  .pf-btn[aria-disabled='true']::before {
     display: none;
   }
   /* Landing hero band: deep ink with a faint red light and a cooler one drifting slowly (19 Sep). */
