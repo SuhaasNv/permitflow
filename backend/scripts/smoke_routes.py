@@ -146,6 +146,56 @@ def main() -> None:
     me = client.get("/auth/me", headers=adm).json()
     call(adm, "PATCH", f"/admin/users/{me['id']}", "/admin/users/{user_id}", 409, json={"is_active": False})
 
+    # ---- admin: platform settings (US-101). Change one value with the step-up password, read it back, then
+    # undo it through the history route, so every setting is left as it was found ----
+    cur = call(adm, "GET", "/admin/settings", "/admin/settings", 200).json()["settings"]
+    drafts = next(x for x in cur if x["key"] == "max_drafts_per_user")
+    new_value = drafts["maximum"] - 1 if drafts["maximum"] - 1 >= drafts["minimum"] else None
+    if new_value is None or new_value == drafts["value"]:
+        note(
+            "platform settings: no value to move max_drafts_per_user to here (change and revert skipped)",
+            True,
+        )
+    else:
+        call(
+            adm,
+            "PUT",
+            "/admin/settings/max_drafts_per_user",
+            "/admin/settings/{key}",
+            200,
+            json={"value": new_value, "reason": "Smoke run: route coverage", "password": ADMIN_PW},
+        )
+        hist = call(
+            adm,
+            "GET",
+            "/admin/settings/history?key=max_drafts_per_user&limit=5",
+            "/admin/settings/history",
+            200,
+        ).json()
+        entry = hist["entries"][0]
+        note(
+            "the change is the newest history entry with the reason",
+            entry["new"] == new_value and entry["reason"] == "Smoke run: route coverage",
+        )
+        r = call(
+            adm,
+            "POST",
+            f"/admin/settings/history/{entry['id']}/revert",
+            "/admin/settings/history/{event_id}/revert",
+            200,
+            json={"reason": "Smoke run: put it back", "password": ADMIN_PW},
+        )
+        after = next(
+            x
+            for x in client.get("/admin/settings", headers=adm).json()["settings"]
+            if x["key"] == "max_drafts_per_user"
+        )
+        note(
+            "the revert leaves the setting as it was found",
+            (after["value"], after["overridden"]) == (drafts["value"], drafts["overridden"]),
+            str(after),
+        )
+
     # ---- operator lifecycle ----
     op = login(email, NEW_OP_PW)
     call(op, "GET", "/auth/me", "/auth/me", 200)
@@ -733,6 +783,22 @@ def main() -> None:
     call(op, "GET", "/admin/overview", "/admin/overview", 403)
     call(off, "GET", "/applications", "/applications", 403)
     call(off, "GET", "/admin/users", "/admin/users", 403)
+    probe_event = "00000000-0000-4000-8000-000000000000"
+    settings_body = {"value": 5, "reason": "Smoke run: wrong role", "password": PW}
+    for h, code in ((op, 403), (off, 403), (None, 401)):
+        call(h, "GET", "/admin/settings", "/admin/settings", code)
+        call(h, "GET", "/admin/settings/history", "/admin/settings/history", code)
+        call(
+            h, "PUT", "/admin/settings/max_drafts_per_user", "/admin/settings/{key}", code, json=settings_body
+        )
+        call(
+            h,
+            "POST",
+            f"/admin/settings/history/{probe_event}/revert",
+            "/admin/settings/history/{event_id}/revert",
+            code,
+            json={"reason": "Smoke run: wrong role", "password": PW},
+        )
     call(
         adm,
         "POST",
