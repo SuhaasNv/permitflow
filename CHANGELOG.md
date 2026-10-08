@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## v0.4.1-rc.3: release candidate on the development environment (9 Oct 2026)
+
+New UAT cases for v0.4.1 (`uat_edges.py` groups FV, 69 checks, and RC2, 65 checks; `UAT_PLAN.md` scenarios U20 to U27) found three input-guard bugs on rc.2, each fixed with a regression test: a list or object in a select field raised `TypeError` (500), now 422 "Choose one of the options."; `?visit=` at 2^31 or above reached Postgres as an out-of-range integer (500), now `le=2147483647` on the clarifications and checklist reads (422); a non-boolean declaration value was stored in a draft because the draft tolerated the "confirm" message, now "Must be true or false." for anything but a boolean or nothing. The sign-in page logo now uses the site header's 72 px row and side padding, so it sits where it does on the landing page (checked at 390, 768 and 1280). Data saved before v0.4.1 rules never blocks a case (FV50 to FV69). Production admin password rotated by hand on 9 Oct; the published value is refused. Version `0.4.1-rc.3` in the five files.
+
 ## v0.4.1-rc.2: release candidate on the development environment (8 Oct 2026)
 
 Fixes from security audit run 2 and the rc.1 edge-case sweep (73 cases, 70 correct), each with a regression test: the operator verify re-run route is operator-only (an officer got the operator working copy; officers use the officer route); `update_section` drops client-sent `STAMPED_FIELDS` keys and keeps the held stamp; `_validate_field` calls `math.isfinite` on floats only, so a 401-digit integer is a 422, not an `OverflowError` 500; `seed.py` takes the administrator password from `SEED_ADMIN_PASSWORD` and refuses production without a private value, and the README no longer publishes it (medium finding). The administrator account already seeded keeps its old password until it is rotated by hand (OPERATIONS.md). Version `0.4.1-rc.2` in the five files.

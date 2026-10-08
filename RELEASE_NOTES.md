@@ -14,6 +14,18 @@ Format: the product reads this file at build time for its What's new page (the v
 
 **After that:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
 
+## v0.4.1-rc.3, 9 October 2026: steadier form checks and a tidier sign-in page
+
+**New for operators**
+- A form answer sent in the wrong shape now gets a clear message instead of an error page.
+- The declaration boxes accept only a tick or no tick.
+
+**New for licensing officers**
+- Opening an earlier visit with an impossible visit number now says so instead of showing an error page.
+
+**Also**
+- The PermitFlow name sits in the same place on the sign-in page as on the home page.
+
 ## v0.4.1-rc.2, 8 October 2026: safer sign-ins and sturdier checks
 
 **New for operators**
