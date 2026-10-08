@@ -109,7 +109,7 @@ describe('ReleasesPage (US-094)', () => {
   })
 
   it('opens an earlier release by version and falls back to the newest for an unknown one', () => {
-    const earlier = RELEASE_NOTES.releases[1]
+    const earlier = RELEASE_NOTES.releases.filter((r) => !r.candidate)[1]
     renderAt(`/releases/${earlier.version}`)
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(new RegExp(earlier.title.slice(1), 'i'))
     expect(screen.getByRole('link', { name: new RegExp(earlier.version) })).toHaveAttribute('aria-current', 'page')
@@ -138,5 +138,112 @@ describe('ReleasesPage (US-094)', () => {
     expect(within(policies).getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy')
     expect(within(policies).getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms')
     expect(within(policies).getByRole('link', { name: 'Cookies' })).toHaveAttribute('href', '/cookies')
+  })
+})
+
+describe('ReleasesPage release candidates (US-110)', () => {
+  const candidates = RELEASE_NOTES.releases.filter((r) => r.candidate)
+  const releases = RELEASE_NOTES.releases.filter((r) => !r.candidate)
+  const listHrefs = () =>
+    within(screen.getByRole('navigation', { name: 'Releases' }))
+      .getAllByRole('link')
+      .map((l) => l.getAttribute('href'))
+
+  afterEach(() => {
+    sessionStorage.clear()
+    localStorage.clear()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  function mockHealth(environment: 'development' | 'production' | 'test', version: string = __APP_VERSION__) {
+    vi.spyOn(healthApi, 'getHealth').mockResolvedValue({ status: 'ok', database: 'ok', version, commit: 'abc1234', environment })
+  }
+
+  it('has candidates in the real notes, so the checks below are not vacuous', () => {
+    expect(candidates.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('development: every candidate is listed in file order with a Release candidate badge beside its version', async () => {
+    mockHealth('development')
+    renderAt('/releases')
+    const list = screen.getByRole('navigation', { name: 'Releases' })
+    await vi.waitFor(() => expect(listHrefs()).toEqual(RELEASE_NOTES.releases.map((r) => `/releases/${r.version}`)))
+    for (const c of candidates) {
+      const link = within(list).getByRole('link', { name: new RegExp(`${c.version.replace(/\./g, '\\.')}.*Release candidate`) })
+      const badge = within(link).getByText('Release candidate')
+      expect(badge).toHaveAttribute('data-tone', 'warning')
+      // a dot plus the words, never colour alone
+      expect(badge.querySelector('span[aria-hidden="true"]')).not.toBeNull()
+    }
+    // released versions carry no badge
+    const badged = within(list)
+      .getAllByRole('link')
+      .filter((l) => within(l).queryByText('Release candidate') !== null)
+      .map((l) => l.getAttribute('href'))
+    expect(badged).toEqual(candidates.map((c) => `/releases/${c.version}`))
+    expect(releases.length).toBeGreaterThan(0)
+  })
+
+  it('development: opening a candidate shows its notes with the badge beside the version in the heading', async () => {
+    mockHealth('development')
+    const rc = candidates[0]
+    renderAt(`/releases/${rc.version}`)
+    const heading = await screen.findByRole('heading', { level: 2, name: new RegExp(rc.title.slice(1), 'i') })
+    const article = heading.closest('article')
+    expect(article).not.toBeNull()
+    expect(within(article as HTMLElement).getByText(rc.version)).toBeInTheDocument()
+    expect(within(article as HTMLElement).getByText('Release candidate')).toBeInTheDocument()
+  })
+
+  it('production: candidates are not in the list, and opening one by URL shows its release instead', async () => {
+    mockHealth('production')
+    renderAt(`/releases/${candidates[0].version}`)
+    await vi.waitFor(() => expect(healthApi.getHealth).toHaveBeenCalled())
+    await new Promise((r) => setTimeout(r, 10))
+    expect(listHrefs()).toEqual(releases.map((r) => `/releases/${r.version}`))
+    expect(screen.queryByText('Release candidate')).toBeNull()
+    for (const c of candidates) expect(screen.queryByText(c.version)).toBeNull()
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(new RegExp(releases[0].title.slice(1), 'i'))
+  })
+
+  it('loading: candidates stay hidden until /health answers, then appear on development', async () => {
+    let answer: (h: Awaited<ReturnType<typeof healthApi.getHealth>>) => void = () => undefined
+    vi.spyOn(healthApi, 'getHealth').mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    renderAt('/releases')
+    expect(listHrefs()).toEqual(releases.map((r) => `/releases/${r.version}`))
+    expect(screen.queryByText('Release candidate')).toBeNull()
+    answer({ status: 'ok', database: 'ok', version: __APP_VERSION__, commit: 'abc1234', environment: 'development' })
+    await vi.waitFor(() => expect(listHrefs()).toEqual(RELEASE_NOTES.releases.map((r) => `/releases/${r.version}`)))
+  })
+
+  it('failed: candidates stay hidden when /health cannot be read', async () => {
+    vi.spyOn(healthApi, 'getHealth').mockRejectedValue(new Error('down'))
+    renderAt('/releases')
+    await new Promise((r) => setTimeout(r, 10))
+    expect(listHrefs()).toEqual(releases.map((r) => `/releases/${r.version}`))
+    expect(screen.queryByText('Release candidate')).toBeNull()
+  })
+
+  it('production: Coming next is unchanged and holds no candidate', async () => {
+    mockHealth('production')
+    renderAt('/releases')
+    await new Promise((r) => setTimeout(r, 10))
+    const coming = screen.getAllByRole('complementary', { name: 'Coming next' })[0]
+    expect(coming).toHaveTextContent(/v0\.5\.0/)
+    expect(coming).not.toHaveTextContent(/candidate|-rc\./i)
+  })
+
+  it('This build marks a running release candidate, not the release it belongs to', async () => {
+    vi.stubGlobal('__APP_VERSION__', '0.4.0-rc.2')
+    mockHealth('development', '0.4.0-rc.2')
+    renderAt('/releases')
+    const list = screen.getByRole('navigation', { name: 'Releases' })
+    await vi.waitFor(() => expect(within(list).getByRole('link', { name: /v0\.4\.0-rc\.2/ })).toBeInTheDocument())
+    const rc2 = within(list).getByRole('link', { name: /v0\.4\.0-rc\.2/ })
+    expect(within(rc2).getByText('This build')).toBeInTheDocument()
+    expect(within(rc2).getByText('Release candidate')).toBeInTheDocument()
+    expect(within(list).getAllByText('This build')).toHaveLength(1)
+    expect(screen.getByTestId('build-line')).toHaveTextContent('v0.4.0-rc.2')
   })
 })

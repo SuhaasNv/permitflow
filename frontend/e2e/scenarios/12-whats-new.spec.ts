@@ -20,6 +20,10 @@ test('signed out: the landing footer chip opens the page with every block open a
   await expect(page.getByRole('heading', { level: 3, name: 'New for operators' })).toBeVisible()
   await expect(page.getByText('Also in this release')).toHaveCount(0)
   await expect(page.getByRole('navigation', { name: 'Releases' }).getByText('This build')).toBeVisible()
+  // the local stack reports the development environment, so the release candidates are listed with their badge (US-110)
+  const rc = page.getByRole('navigation', { name: 'Releases' }).getByRole('link', { name: /v0\.4\.0-rc\.2/ })
+  await expect(rc).toBeVisible()
+  await expect(rc.getByText('Release candidate')).toBeVisible()
   // read once: the chip in this page's footer now says What's new, not New
   await expect(chip(page)).toContainText("What's new")
   // an earlier release from the list
