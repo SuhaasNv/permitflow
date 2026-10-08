@@ -105,6 +105,15 @@ describe('HoursField', () => {
     expect(screen.getByText(/Your earlier entry was/)).toHaveTextContent('Mon-Sun 7am-9pm')
   })
 
+  it('on a read-only section shows the older entry as saved, with no instruction to pick', () => {
+    render(
+      <HoursField label="Operating hours" required value={undefined} onChange={() => {}} legacy="Mon-Sun 7am-9pm" disabled />,
+    )
+    expect(screen.getByText(/Saved as/)).toHaveTextContent('Saved as “Mon-Sun 7am-9pm”.')
+    expect(screen.queryByText(/Pick your opening days/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Your earlier entry was/)).not.toBeInTheDocument()
+  })
+
   it('does nothing when disabled', async () => {
     const onChange = vi.fn()
     render(<HoursField label="Operating hours" required value={sixDays} onChange={onChange} disabled />)

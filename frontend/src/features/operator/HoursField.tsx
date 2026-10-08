@@ -102,7 +102,9 @@ export function HoursField({
           {help}
         </div>
       ) : null}
-      {legacy ? (
+      {legacy && disabled ? (
+        <div className="text-[13px] leading-[18px] text-text-3">Saved as &ldquo;{legacy}&rdquo;.</div>
+      ) : legacy ? (
         <Alert tone="warning">
           <span>
             Your earlier entry was &ldquo;{legacy}&rdquo;. Pick your opening days and hours below; this is a one-time change.
