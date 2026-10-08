@@ -63,6 +63,15 @@ Every limit (request rate, sign-in attempts, AI checks per person and per platfo
 - An administrator can still hurt availability (lower a limit, pause the AI). The controls are that it needs the password again, is audited, is announced on Telegram and is one click to undo from the history.
 - `LOGIN_RATE_LIMIT_PER_MINUTE` (failed sign-ins) stays environment-only; the step-up's wrong passwords count against it.
 
+### Review amendments (9 October 2026, `fix/us-101-review`)
+
+- **Reads never block.** See Reads and Consequences above: the reload is a background thread on a private pool with a 3 second connect timeout and a 1 second statement timeout, and a generation counter discards a reload that began before a write. The write path refreshes the cache itself on its worker thread, so the process that took the change still serves it at once. The earlier text (a short blocking query on the event loop every ten seconds) is withdrawn.
+- **Failed step-up is audited.** A wrong password on a change or a revert writes `settings.step_up_failed` (the key and the action, never the password) in its own transaction, besides counting against the sign-in limiter.
+- **Step-up on user management.** `POST /admin/users` and `PATCH /admin/users/{id}` carry the administrator's own password (`admin_password`) and are checked like the settings routes (security audit F2); the failure is audited as `user.step_up_failed`. The create body already had `password` (the new account's), hence the distinct name.
+- **An override equal to the default does not exist.** Setting a value equal to the environment default deletes the override row (audited as a change back to the default), and a revert or a change compares against the stored row as well as the value in force, so a row left holding the default can still be cleared from the panel.
+- **The AI pause is a known gap until US-098.** While paused, each new check ends `unavailable` with the reason `ai_paused` rather than waiting; the application can still be submitted and the document needs a manual re-check once the AI is back. US-098 (the worker) should hold these in the queue instead. To make the cost visible, switching the AI back on records `ended_while_paused` (the number of checks stored `ai_paused` since it was switched on) in the audit row, the feed line and the Telegram message.
+- **Types.** `domain/platform_settings.py` takes `int | None` environment values and `object` for untrusted input; no `Any`.
+
 ### Revisit when
 
 A second administrator's approval is required for a loosening change (the T19 gap), settings need to be shared instantly across many processes (a notification channel instead of a TTL), or a setting needs a per-environment lock that the panel cannot touch.
