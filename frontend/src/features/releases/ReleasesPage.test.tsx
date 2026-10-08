@@ -44,7 +44,8 @@ function signIn(role: Role) {
   vi.spyOn(notificationsApi, 'getNotifications').mockResolvedValue({ items: [], unread_count: 0 })
 }
 
-const latest = RELEASE_NOTES.releases[0]
+// What a reader sees first without /health: the newest release (candidates are hidden until it answers).
+const latest = RELEASE_NOTES.releases.find((r) => !r.candidate)!
 const headingsOf = (audience: 'operator' | 'officer' | 'admin') =>
   latest.blocks.filter((b) => b.audience === audience).map((b) => b.heading)
 
@@ -203,7 +204,8 @@ describe('ReleasesPage release candidates (US-110)', () => {
     await new Promise((r) => setTimeout(r, 10))
     expect(listHrefs()).toEqual(releases.map((r) => `/releases/${r.version}`))
     expect(screen.queryByText('Release candidate')).toBeNull()
-    for (const c of candidates) expect(screen.queryByText(c.version)).toBeNull()
+    // The build line and version chip name the running build; production never runs a candidate, but this suite's build may.
+    for (const c of candidates.filter((x) => x.version !== `v${__APP_VERSION__}`)) expect(screen.queryByText(c.version)).toBeNull()
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(new RegExp(releases[0].title.slice(1), 'i'))
   })
 
