@@ -370,11 +370,12 @@ def download_document(
 def rerun_verification(
     application_id: uuid.UUID,
     document_id: uuid.UUID,
-    user: Annotated[User, Depends(require_role(Role.OPERATOR, Role.OFFICER))],
+    user: OperatorUser,
     db: DbSession,
     background: BackgroundTasks,
 ) -> UploadOut:
-    """Re-run the check on a current document (SCOPE S2). Owner or officer; 409 while one is running."""
+    """Re-run the check on a current document (SCOPE S2). Owner only: an officer uses the officer route
+    (this response is the operator working copy). 409 while one is running."""
     run = VerificationService(db).rerun(user, application_id, document_id)
     background.add_task(run_verification, run.id)
     service = ApplicationService(db)

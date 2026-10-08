@@ -109,8 +109,9 @@ def test_provider_exception_is_failed_never_raised(client: TestClient, db: Sessi
     assert run is not None and run.status == VerificationStatus.FAILED and run.raw_output_valid is False
 
 
-def test_rerun_only_when_terminal_and_by_owner_or_officer(client: TestClient, db: Session) -> None:
+def test_rerun_only_when_terminal_and_by_owner(client: TestClient, db: Session) -> None:
     make_user(db, "op@example.sg", Role.OPERATOR)
+    make_user(db, "off@example.sg", Role.OFFICER)
     make_user(db, "b@example.sg", Role.OPERATOR)
     h, hb = login(client, "op@example.sg"), login(client, "b@example.sg")
     app_id = _draft_with_business(client, h)
@@ -131,6 +132,11 @@ def test_rerun_only_when_terminal_and_by_owner_or_officer(client: TestClient, db
     assert (
         client.post(f"/api/v1/applications/{app_id}/documents/{doc_id}/verify", headers=hb).status_code == 404
     )
+    # an officer must use the officer route: this one would return the operator working copy (403)
+    r = client.post(
+        f"/api/v1/applications/{app_id}/documents/{doc_id}/verify", headers=login(client, "off@example.sg")
+    )
+    assert r.status_code == 403
     # a pending run blocks another re-run
     pending = VerificationRun(
         document_id=uuid.UUID(doc_id), status=VerificationStatus.PENDING, provider="none"
