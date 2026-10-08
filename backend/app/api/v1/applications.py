@@ -218,7 +218,7 @@ def clarifications(
     application_id: uuid.UUID,
     user: OperatorUser,
     db: DbSession,
-    visit: Annotated[int | None, Query(ge=1)] = None,
+    visit: Annotated[int | None, Query(ge=1, le=2147483647)] = None,
 ) -> ClarificationOperatorView:
     """Only the flagged items with a released question, in operator words (US-064): the active visit's,
     or an earlier visit's with `visit`, read-only (F18)."""

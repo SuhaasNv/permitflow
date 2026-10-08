@@ -38,7 +38,7 @@ def read_checklist(
     application_id: uuid.UUID,
     user: OfficerOrAdmin,
     db: DbSession,
-    visit: Annotated[int | None, Query(ge=1)] = None,
+    visit: Annotated[int | None, Query(ge=1, le=2147483647)] = None,
 ) -> ChecklistOut:
     return ChecklistService(db).get(user, application_id, visit_no=visit)
 

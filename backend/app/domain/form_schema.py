@@ -282,9 +282,11 @@ def _validate_field(  # noqa: PLR0911, PLR0912 - one return per rule
     depend on today's date are skipped and a pre-v0.4.1 free-text `operating_hours` is accepted."""
     missing = value is None or (isinstance(value, str) and value.strip() == "") or value == {}
     if f.kind == "checkbox":
-        if f.must_be_true and value is not True:
-            return "You must confirm this declaration."
-        return None if isinstance(value, bool) or value is None else "Must be true or false."
+        # A non-boolean is a malformed value, not an unticked box: only None or False asks to confirm, so
+        # a draft (which tolerates the confirm message) never stores a list, object, number or text here.
+        if value is not None and not isinstance(value, bool):
+            return "Must be true or false."
+        return "You must confirm this declaration." if f.must_be_true and value is not True else None
     if missing:
         return "This field is required." if f.required else None
     if f.kind in TEXT_KINDS:
@@ -292,7 +294,8 @@ def _validate_field(  # noqa: PLR0911, PLR0912 - one return per rule
             return "Must be text."
         return _text_error(f, value, today)
     if f.kind == "select":
-        if value not in {v for v, _ in f.options}:
+        # A list or object is unhashable: test the type before the set lookup.
+        if not isinstance(value, str) or value not in {v for v, _ in f.options}:
             return "Choose one of the options."
         return None
     if f.kind in ("number", "integer"):
