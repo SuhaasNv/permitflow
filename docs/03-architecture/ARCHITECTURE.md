@@ -1,6 +1,6 @@
 # PermitFlow: Architecture
 
-A modular monolith (ADR-001): one FastAPI backend, one React frontend, one PostgreSQL database, local file storage, and an isolated AI verification module.
+A modular monolith (ADR-001): one FastAPI backend, one React frontend, one PostgreSQL database, file storage behind one interface (the local disk by default; an S3-compatible bucket behind `STORAGE_BACKEND=s3`, US-097, ADR-015), and an isolated AI verification module.
 
 ## System diagram
 
@@ -57,7 +57,7 @@ POST /applications/{id}/documents (multipart)
        → validate extension/MIME/size (streamed, 10 MB cap) → magic bytes
   DocumentService.upload (one transaction): Document row (is_current, supersedes) →
      VerificationRun(pending) → audit document.uploaded → commit
-     file bytes are written to FileStorage before commit; on commit failure the file is deleted
+     file bytes are written to FileStorage (disk or bucket, same keys) before commit; on commit failure the file is deleted
   BackgroundTasks.add(run_verification, run_id)   # request session is already closed at this point
   201 { document, verification: { status: "pending" } }
 
