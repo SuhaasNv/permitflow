@@ -46,8 +46,12 @@ function signIn(role: Role) {
 
 // What a reader sees first without /health: the newest release (candidates are hidden until it answers).
 const latest = RELEASE_NOTES.releases.find((r) => !r.candidate)!
-const headingsOf = (audience: 'operator' | 'officer' | 'admin') =>
-  latest.blocks.filter((b) => b.audience === audience).map((b) => b.heading)
+// The folding and ordering checks use a released, historical entry that carries every audience block, so a new
+// entry (or candidate) may hold only the blocks it needs without failing them.
+const STABLE = 'v0.4.0'
+const stable = RELEASE_NOTES.releases.find((r) => r.version === STABLE)!
+const headingsOf = (audience: 'operator' | 'officer' | 'admin' | 'everyone') =>
+  stable.blocks.filter((b) => b.audience === audience).map((b) => b.heading)
 
 describe('ReleasesPage (US-094)', () => {
   afterEach(() => {
@@ -75,12 +79,16 @@ describe('ReleasesPage (US-094)', () => {
     expect(links[0]).toHaveAttribute('aria-current', 'page')
   })
 
+  it('the stable entry used below carries an operator, officer, administrator and shared block', () => {
+    for (const audience of ['operator', 'officer', 'admin', 'everyone'] as const) expect(headingsOf(audience).length).toBeGreaterThan(0)
+  })
+
   it.each([
     ['operator', 'officer', 'admin'],
     ['officer', 'operator', 'admin'],
   ] as const)('signed in as %s: own block first under For you, the %s and %s blocks folded', async (role, otherA, otherB) => {
     signIn(role)
-    renderAt('/releases')
+    renderAt(`/releases/${STABLE}`)
     expect(await screen.findByRole('button', { name: 'Sign out' })).toBeInTheDocument()
     expect(screen.getByText('For you')).toBeInTheDocument()
     const own = headingsOf(role)
@@ -102,9 +110,9 @@ describe('ReleasesPage (US-094)', () => {
 
   it('signed in as admin: everything open, nothing folded, no For you', async () => {
     signIn('admin')
-    renderAt('/releases')
+    renderAt(`/releases/${STABLE}`)
     expect(await screen.findByRole('button', { name: 'Sign out' })).toBeInTheDocument()
-    for (const b of latest.blocks) expect(screen.getByRole('heading', { level: 3, name: b.heading })).toBeInTheDocument()
+    for (const b of stable.blocks) expect(screen.getByRole('heading', { level: 3, name: b.heading })).toBeInTheDocument()
     expect(screen.queryByText('Also in this release')).not.toBeInTheDocument()
     expect(screen.queryByText('For you')).not.toBeInTheDocument()
   })
