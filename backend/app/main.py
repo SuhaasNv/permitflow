@@ -38,6 +38,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.app_env != "test":
         from app.services.verification import mark_stale_runs_failed
 
+        # Load the platform settings once before serving, so the first requests do not run on the
+        # environment values alone (a failure is logged and the reload retries in the background).
+        live().refresh()
+
         try:
             n = mark_stale_runs_failed()
             if n:

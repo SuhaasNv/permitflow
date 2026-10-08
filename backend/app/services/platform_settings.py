@@ -3,14 +3,19 @@
 Two classes, one module:
 
 - `LiveSettings` is what the limiter, the quotas, the upload gate and the AI cap read. It keeps the stored
-  overrides in memory for ten seconds (an injectable clock makes that testable), falls back to the
-  environment when a key has no row, and falls back to the environment for everything when the table
-  cannot be read, so a database hiccup never loosens or tightens a limit by surprise. With an empty table
-  every value is the environment value: behaviour is what it was before the story.
+  overrides in memory for ten seconds (an injectable clock makes that testable) and falls back to the
+  environment when a key has no row. Reading never waits on the database: when the snapshot is due, the
+  caller is handed the current one (the environment values only before the first load) and one background
+  daemon thread reloads it, on a private connection with a 3 second connect timeout and a 1 second
+  statement timeout. A failed reload keeps the last good snapshot (the environment values only before the
+  first load) and is not retried for another ten seconds, so a database hiccup never loosens or tightens a
+  limit by surprise. With an empty table every value is the environment value: behaviour is what it was
+  before the story. A write bumps a generation, so a reload that started before it can never store its
+  older rows as fresh.
 - `PlatformSettingsService` is the administrator's side: list, change, history, revert. Every write takes
   a per-key lock, checks the bounds in `domain.platform_settings`, writes the override and its audit row
-  in one transaction, then (after the commit) drops the local cache and announces the change on Telegram.
-  The caller has already re-verified the administrator's password (step-up).
+  in one transaction, then (after the commit) refreshes the local cache and announces the change on
+  Telegram. The caller has already re-verified the administrator's password (step-up).
 """
 
 import logging
@@ -18,6 +23,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -37,7 +43,7 @@ from app.domain.platform_settings import (
     validate,
 )
 from app.infra import notifier
-from app.infra.db import session_factory
+from app.infra.db import background_session
 from app.models import PlatformSetting, User
 from app.repositories.audit import AuditRepository
 from app.repositories.platform_settings import PlatformSettingsRepository
@@ -62,13 +68,34 @@ Clock = Callable[[], float]
 Value = int | bool | str
 
 
+LOAD_STATEMENT_TIMEOUT = "1s"
+
+
 def _load_rows() -> dict[str, Any]:
-    with session_factory()() as db:
-        return {row.key: row.value for row in PlatformSettingsRepository(db).all()}
+    with background_session() as db:
+        repo = PlatformSettingsRepository(db)
+        repo.limit_statement_time(LOAD_STATEMENT_TIMEOUT)
+        return {row.key: row.value for row in repo.all()}
+
+
+def _start_thread(job: Callable[[], None]) -> None:
+    threading.Thread(target=job, name="platform-settings-reload", daemon=True).start()
+
+
+def run_inline(job: Callable[[], None]) -> None:
+    """Tests: run the reload on the calling thread, so a read sees the rows it just wrote."""
+    job()
+
+
+@dataclass(frozen=True)
+class _Snapshot:
+    rows: dict[str, Any]
+    loaded_at: float
+    generation: int
 
 
 class LiveSettings:
-    """The cached read side. Thread-safe; one reload at a time, and only the very first read waits for it."""
+    """The cached read side. Thread-safe and non-blocking: a read never waits for the database."""
 
     def __init__(
         self,
@@ -76,44 +103,84 @@ class LiveSettings:
         clock: Clock = time.monotonic,
         ttl: float = TTL_SECONDS,
         loader: Callable[[], dict[str, Any]] = _load_rows,
+        spawn: Callable[[Callable[[], None]], None] = _start_thread,
     ) -> None:
         self._clock = clock
         self._ttl = ttl
         self._loader = loader
-        self._snapshot: dict[str, Any] = {}
-        self._loaded_at: float | None = None
-        self._lock = threading.Lock()
+        self._spawn = spawn
+        self._snapshot: _Snapshot | None = None
+        self._generation = 0
+        self._state_lock = threading.Lock()  # guards `_snapshot` and `_generation`; never held over I/O
+        self._reload_lock = threading.Lock()  # held by the one reload in flight
 
     def invalidate(self) -> None:
-        """Forget the snapshot: the next read reloads. Called after a write in this process; the other
+        """Mark the snapshot stale: the next read starts a reload, and a reload already running (it began
+        before this change) is discarded when it finishes. Called after a write in this process; the other
         processes pick the change up within the ttl."""
-        self._loaded_at = None
+        with self._state_lock:
+            self._generation += 1
+
+    def refresh(self) -> None:
+        """Reload now, on the calling thread. For the write path (a worker thread, never the event loop),
+        right after `invalidate()`, so this process serves the new value at once. A failure is logged and
+        leaves the previous snapshot in place."""
+        with self._state_lock:
+            generation = self._generation
+        self._load(generation)
+
+    def _is_fresh(self, snap: _Snapshot | None) -> bool:
+        return (
+            snap is not None
+            and snap.generation == self._generation
+            and self._clock() - snap.loaded_at < self._ttl
+        )
 
     def _rows(self) -> dict[str, Any]:
-        loaded = self._loaded_at
-        if loaded is not None and self._clock() - loaded < self._ttl:
-            return self._snapshot
-        # Only the first read (nothing to serve yet) waits; afterwards one thread reloads and the rest
-        # keep serving the previous snapshot, so a slow database never stalls the request path.
-        if not self._lock.acquire(blocking=loaded is None):
-            return self._snapshot
-        try:
-            now = self._clock()
-            if self._loaded_at is not None and now - self._loaded_at < self._ttl:
-                return self._snapshot
+        snap = self._snapshot
+        if self._is_fresh(snap):
+            assert snap is not None
+            return snap.rows
+        # Due. Serve what there is and let one background thread reload; whoever loses the race for the
+        # lock just serves it too. Nothing here waits on the database.
+        if self._reload_lock.acquire(blocking=False):
             try:
-                self._snapshot = self._loader()
-            except Exception:  # noqa: BLE001 - settings must never take the request path down
-                logger.warning("platform_settings_unreadable", exc_info=True)
-            self._loaded_at = now
-            return self._snapshot
+                self._spawn(self._reload_in_background)
+            except Exception:  # noqa: BLE001 - e.g. no thread could be started; try again on a later read
+                self._reload_lock.release()
+                logger.warning("platform_settings_reload_not_started", exc_info=True)
+        snap = self._snapshot
+        return snap.rows if snap is not None else {}
+
+    def _reload_in_background(self) -> None:
+        try:
+            with self._state_lock:
+                generation = self._generation
+                snap = self._snapshot
+            if self._is_fresh(snap):
+                return
+            self._load(generation)
         finally:
-            self._lock.release()
+            self._reload_lock.release()
+
+    def _load(self, generation: int) -> None:
+        try:
+            rows: dict[str, Any] | None = self._loader()
+        except Exception:  # noqa: BLE001 - settings must never take the request path down
+            logger.warning("platform_settings_unreadable", exc_info=True)
+            rows = None
+        now = self._clock()
+        with self._state_lock:
+            if generation != self._generation:
+                return  # a change landed while this loaded: these rows may be older than it
+            previous = self._snapshot
+            kept = rows if rows is not None else (previous.rows if previous is not None else {})
+            self._snapshot = _Snapshot(rows=kept, loaded_at=now, generation=generation)
 
     def value(self, key: str) -> Value:
         spec = spec_for(key)
         settings = get_settings()
-        env = getattr(settings, spec.env_field) if spec.env_field else None
+        env = _env_value(spec)
         rows = self._rows()
         return effective(spec, rows.get(key), env, settings.app_env, present=key in rows)
 
@@ -143,6 +210,16 @@ def reset_live(replacement: LiveSettings | None = None) -> LiveSettings:
     global _live
     _live = replacement if replacement is not None else LiveSettings()
     return _live
+
+
+def _env_value(spec: SettingSpec) -> int | None:
+    """The environment value a setting defaults to and is capped by (None for a setting with no variable)."""
+    if spec.env_field is None:
+        return None
+    value: object = getattr(get_settings(), spec.env_field)
+    if isinstance(value, bool) or not isinstance(value, int):  # pragma: no cover - the spec names an int
+        raise TypeError(f"{spec.env_field} is not a number")
+    return value
 
 
 def _show(value: Value) -> str:
@@ -243,13 +320,18 @@ class PlatformSettingsService:
         env = self._env(spec)
         row = self.repo.lock(spec.key)
         old = effective(spec, row.value if row else None, env, settings.app_env, present=row is not None)
-        if new == old and type(new) is type(old):
+        # A value equal to the environment default is stored as no row, so the panel can always clear an
+        # override: "follow the environment" and "set to the same number" are one state.
+        default = default_for(spec, env)
+        to_default = restore_default or (new == default and type(new) is type(default))
+        # Nothing to do when the value is unchanged and there is no stored row to clear.
+        if new == old and type(new) is type(old) and (row is None or not to_default):
             self.db.rollback()
             raise ValidationFailed(
                 f"{spec.label} is already {_show(old)}.",
                 details={"key": spec.key, "reason": "no_change"},
             )
-        if restore_default:
+        if to_default:
             if row is not None:
                 self.repo.remove(row)
         else:
@@ -266,9 +348,10 @@ class PlatformSettingsService:
             payload["reverted_event_id"] = str(reverted_event_id)
         self.audit.record(application_id=None, actor_id=admin.id, event_type=event_type, payload=payload)
         self.db.commit()
-        # After the commit: a rolled-back change is never announced, and the local cache is dropped so this
-        # process serves the new value at once (the others within the ttl).
+        # After the commit: a rolled-back change is never announced, and the local cache is reloaded here (a
+        # worker thread) so this process serves the new value at once (the others within the ttl).
         live().invalidate()
+        live().refresh()
         notifier.notify(
             f"PermitFlow [{settings.app_env}] setting {'reverted' if reverted_event_id else 'changed'}\n"
             f"{spec.label}: {_show(old)} -> {_show(new)}\n"
@@ -278,8 +361,8 @@ class PlatformSettingsService:
         names = self.users.names([admin.id])
         return self._out(spec, fresh, names)
 
-    def _env(self, spec: SettingSpec) -> Any:
-        return getattr(get_settings(), spec.env_field) if spec.env_field else None
+    def _env(self, spec: SettingSpec) -> int | None:
+        return _env_value(spec)
 
     def _spec(self, key: str) -> SettingSpec:
         try:

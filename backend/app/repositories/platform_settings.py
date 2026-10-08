@@ -15,6 +15,11 @@ class PlatformSettingsRepository:
     def all(self) -> list[PlatformSetting]:
         return list(self.db.scalars(select(PlatformSetting).order_by(PlatformSetting.key)))
 
+    def limit_statement_time(self, timeout: str) -> None:
+        """Cap every statement of the current transaction (`SET LOCAL`): the transaction's end lifts it, and
+        no other connection or session is touched."""
+        self.db.execute(text("SELECT set_config('statement_timeout', :t, true)"), {"t": timeout})
+
     def get(self, key: str) -> PlatformSetting | None:
         return self.db.get(PlatformSetting, key)
 

@@ -6,7 +6,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.api.v1 import auth as auth_module
@@ -183,6 +183,54 @@ def test_no_change_is_refused_and_leaves_no_audit_row(client: TestClient, db: Se
     r = _put(client, h, "max_drafts_per_user", get_settings().max_drafts_per_user)
     assert r.status_code == 422 and r.json()["error"]["details"]["reason"] == "no_change"
     assert _events(db, "settings.changed") == [] and db.scalar(select(PlatformSetting)) is None
+
+
+def test_setting_the_environment_default_clears_the_override_instead_of_storing_it(
+    client: TestClient, db: Session
+) -> None:
+    h = _admin(client, db)
+    assert _put(client, h, "max_drafts_per_user", 5).status_code == 200
+    r = _put(client, h, "max_drafts_per_user", 20, reason="Back to the default")  # 20: the env value
+    assert r.status_code == 200, r.text
+    assert r.json()["value"] == 20 and r.json()["overridden"] is False
+    db.expire_all()
+    assert db.get(PlatformSetting, "max_drafts_per_user") is None
+    last = _events(db, "settings.changed")[-1].payload
+    assert (last["old"], last["new"], last["old_was_default"]) == (5, 20, False)
+    assert live().int_value("max_drafts_per_user") == 20
+    # With no row, setting the default again is still a no-op.
+    again = _put(client, h, "max_drafts_per_user", 20)
+    assert again.status_code == 422 and again.json()["error"]["details"]["reason"] == "no_change"
+
+
+def test_an_override_equal_to_the_default_can_be_cleared_by_a_put_and_by_a_revert(
+    client: TestClient, db: Session
+) -> None:
+    """A row left holding the default value (written before this rule, or by hand) used to be stuck: the
+    effective value already equalled the default, so both routes answered no_change."""
+    h = _admin(client, db)
+    admin = make_user(db, "other@example.sg", Role.ADMIN)
+    assert _put(client, h, "max_drafts_per_user", 5).status_code == 200
+    first = client.get(f"{SETTINGS}/history", headers=h).json()["entries"][0]
+    row = db.get(PlatformSetting, "max_drafts_per_user")
+    assert row is not None
+    row.value = 20
+    row.updated_by = admin.id
+    db.commit()
+    stuck = client.get(SETTINGS, headers=h).json()["settings"]
+    assert next(s for s in stuck if s["key"] == "max_drafts_per_user")["overridden"] is True
+    r = _revert(client, h, first["id"])  # the first entry: back to "following the environment"
+    assert r.status_code == 200, r.text
+    assert r.json()["overridden"] is False
+    db.expire_all()
+    assert db.get(PlatformSetting, "max_drafts_per_user") is None
+    # The same through a PUT of the default.
+    db.add(PlatformSetting(key="max_drafts_per_user", value=20, updated_by=admin.id, reason="stuck"))
+    db.commit()
+    r = _put(client, h, "max_drafts_per_user", 20)
+    assert r.status_code == 200 and r.json()["overridden"] is False
+    db.expire_all()
+    assert db.get(PlatformSetting, "max_drafts_per_user") is None
 
 
 def test_an_unknown_key_is_404(client: TestClient, db: Session) -> None:
@@ -660,10 +708,10 @@ def test_paused_checks_do_not_count_toward_the_quotas_and_unpausing_resumes(
 
 def test_a_change_made_elsewhere_is_picked_up_within_ten_seconds(db: Session) -> None:
     """Another process writes the row; this one sees it once the ten seconds are up (clock injected)."""
-    from app.services.platform_settings import LiveSettings, reset_live
+    from app.services.platform_settings import LiveSettings, reset_live, run_inline
 
     now = {"t": 5000.0}
-    reader = reset_live(LiveSettings(clock=lambda: now["t"]))
+    reader = reset_live(LiveSettings(clock=lambda: now["t"], spawn=run_inline))
     admin = make_user(db, "adm@example.sg", Role.ADMIN)
     assert reader.int_value("max_drafts_per_user") == 20
     db.add(PlatformSetting(key="max_drafts_per_user", value=4, updated_by=admin.id, reason="from afar"))
@@ -672,3 +720,45 @@ def test_a_change_made_elsewhere_is_picked_up_within_ten_seconds(db: Session) ->
     assert reader.int_value("max_drafts_per_user") == 20
     now["t"] += 0.2
     assert reader.int_value("max_drafts_per_user") == 4
+
+
+def test_the_reload_runs_on_its_own_connection_with_short_timeouts(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The background reload is bounded (1 s statement, 3 s connect) without touching the application
+    engine's defaults, and it reads the same rows the API wrote."""
+    from app.repositories.platform_settings import PlatformSettingsRepository
+    from app.services import platform_settings as service
+
+    seen: dict[str, str] = {}
+    original = PlatformSettingsRepository.all
+
+    def spy(self: PlatformSettingsRepository) -> list[PlatformSetting]:
+        seen["statement_timeout"] = str(self.db.execute(text("SHOW statement_timeout")).scalar_one())
+        return original(self)
+
+    monkeypatch.setattr(PlatformSettingsRepository, "all", spy)
+    admin = make_user(db, "adm@example.sg", Role.ADMIN)
+    db.add(PlatformSetting(key="max_drafts_per_user", value=4, updated_by=admin.id, reason="r"))
+    db.commit()
+    assert service._load_rows() == {"max_drafts_per_user": 4}
+    assert seen["statement_timeout"] == "1s"
+    # The application's own sessions keep the server default.
+    assert db.execute(text("SHOW statement_timeout")).scalar_one() == "0"
+
+
+def test_the_background_pool_is_separate_and_connects_with_a_timeout() -> None:
+    from sqlalchemy.engine import Engine
+    from sqlalchemy.pool import QueuePool
+
+    from app.infra import db as dbmod
+
+    session = dbmod.background_session()
+    try:
+        bind = session.get_bind()
+        assert isinstance(bind, Engine) and bind is not dbmod.get_engine()
+        assert isinstance(bind.pool, QueuePool) and bind.pool.timeout() == 3
+        raw = session.connection().connection.driver_connection
+        assert raw is not None and "connect_timeout=3" in raw.info.dsn
+    finally:
+        session.close()
