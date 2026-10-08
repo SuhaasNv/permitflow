@@ -93,18 +93,23 @@ How the seed behaves with `APP_ENV=production`:
 
 The seed never deletes or re-passwords an account that already exists, so the production demo accounts seeded on 19 Sep 2026 keep working and keep the published password until they are rotated or deactivated. To turn a production demo account off, deactivate it on the Users page (the operator, officer and administrator accounts are protected and cannot be deactivated there; the spare officer and any hand-made account can). To change its password, rotate it as below.
 
-**Rotating an account's password (one environment at a time; owner-approved, not part of any deploy).** The app has no password reset by design, so rotation is a one-off command on the backend service, run interactively so the new value never lands in shell history, a ticket or the repository:
+**Rotating an account's password (one environment at a time; owner-approved, not part of any deploy).** The app has no password reset by design, so rotation is a one-off command on the backend service, run in an interactive session so the new value never lands in shell history, a ticket or the repository. `getpass` needs a terminal, so the snippet is not piped in over stdin: open a shell on the service, start Python there, and paste the block.
 
 ```bash
-railway ssh --environment <development|production> --service backend -- .venv/bin/python - <<'PY'
+railway ssh --environment <development|production> --service backend
+# in the shell that opens on the service:
+cd /app && .venv/bin/python
+```
+
+At the Python prompt, paste the block below up to and including its final blank line, then type each new password at the hidden prompt (12 or more characters; the input is not echoed). The block has no blank lines inside it, so the prompt accepts it as pasted.
+
+```python
 import getpass
 from datetime import UTC, datetime
-
 from app.core.security import hash_password
 from app.infra.db import session_factory
 from app.repositories.sessions import SessionRepository
 from app.repositories.users import UserRepository
-
 emails = ["<account email>", "<another account email>"]  # the accounts to rotate, from the private notes
 with session_factory()() as db:
     users, sessions = UserRepository(db), SessionRepository(db)
@@ -116,12 +121,16 @@ with session_factory()() as db:
         user.password_hash = hash_password(password)
         sessions.revoke_live(user.id, datetime.now(UTC), "rotated")
     db.commit()
-PY
+
 ```
+
+Leave the prompt with `exit()` and then `exit`. Do not add the passwords to the command line, to `-c`, or to a heredoc.
 
 Then, for each account: confirm the old password is refused at sign-in (401, "Email or password is incorrect.") and the new one works, and record the date in the private notes (never the value).
 
 **The four hand-made backup accounts (created on 6 Oct 2026: two operators, two officers; they share the published password in both environments).** Their addresses are in the owner's private notes (`notes/demo/`, outside the repository). Rotate them in development and in production with the command above, one environment at a time, each time after the owner's yes. If a backup account is no longer wanted, deactivate it on the Users page instead; a deactivated account cannot sign in and its sessions end at once. The published-password accounts that are protected by the seed (`operator@`, `officer@`, `admin@permitflow.example.sg`) are rotated with the same command; production's administrator was rotated on 9 Oct 2026.
+
+**Release step: the production demonstration accounts that still hold the published password.** `operator@permitflow.example.sg`, `officer@permitflow.example.sg` (both protected, so they cannot be deactivated on the Users page) and `officer2@permitflow.example.sg` were seeded in production on 19 Sep 2026 with the published password, and, as of 9 Oct 2026, still have it: anyone who has read the README of an earlier version can sign in as them. Rotating them is a release step for the version that carries US-103, run after that version is live and before it is announced. It needs the owner's yes in that turn (production is touched). Rotate all three with the command above (`emails = [...]` lists the three addresses; the new values go in the private notes, never in the repository), confirm for each that the published password is refused at sign-in and the new one works, then record the date here and in `CHANGELOG.md`. Until it is recorded, the README says production's demonstration sign-ins are being rotated and are not for public use; once it is recorded, change that README sentence to say they are private. The four hand-made backup accounts of 6 Oct 2026 and the other environments follow the same rule.
 
 **Opting production in to the public demonstration.** Set `SEED_PUBLIC_DEMO=true` on the production backend service, run `scripts/seed.py` once, then remove the variable if the demonstration is over. Do this only for a deliberate public demonstration; the sign-in page and the privacy policy already say the demonstration accounts are shared.
 

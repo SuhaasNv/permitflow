@@ -54,7 +54,7 @@ A candidate is **stable** when the full local run is green, CI on its commit is 
    - metrics answer 401 without the token
    - the site and `/releases` answer with the new bundle
    - one request that uses something new in this version
-6. Run the seed once if the version adds seeded accounts. Record the image row in `OPERATIONS.md`. Mark the release story Done in Notion.
+6. Run the seed once if the version adds seeded accounts. For the version that carries US-103, also rotate production's `operator@`, `officer@` and `officer2@` demonstration accounts, which still hold the published password (owner's yes in that turn; `OPERATIONS.md`, "Release step: the production demonstration accounts"). Record the image row in `OPERATIONS.md`. Mark the release story Done in Notion.
 
 **Rollback:** set both production services back to the previous release's `sha-` tag and redeploy (`OPERATIONS.md`, Rollback).
 
