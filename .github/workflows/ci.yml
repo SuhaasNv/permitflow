@@ -39,11 +39,11 @@ jobs:
         working-directory: backend
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Release guard unit test
         working-directory: .
         run: python3 -m unittest scripts/test_release_guard.py
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -65,8 +65,8 @@ jobs:
         working-directory: frontend
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -96,9 +96,9 @@ jobs:
     name: Dependency and code audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
       - name: pip-audit (production dependencies, blocking)
@@ -140,7 +140,9 @@ jobs:
     # US-103: the OWASP Top Ten, Python and TypeScript rule packs over our own source. Blocking at ERROR
     # severity; WARNING and INFO findings are listed in the log and do not fail the build. Runs on every pull
     # request and every push (so on dev and main). Semgrep is pinned and run through uvx, so there is no
-    # third-party action in the path. The rules are fetched from the public registry with metrics off.
+    # third-party action in the path. The rules are fetched from the public registry with metrics off; the
+    # scan is retried once if the run could not complete (a rules outage must not block a release for a
+    # transient error, and must not pass it either).
     name: Semgrep
     runs-on: ubuntu-latest
     steps:
@@ -148,10 +150,18 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
       - name: Semgrep (owasp-top-ten, python, typescript; blocking at ERROR)
         run: |
-          uvx --from semgrep==1.172.0 semgrep scan \
-            --config p/owasp-top-ten --config p/python --config p/typescript \
-            --severity ERROR --error --metrics=off \
-            backend/app backend/scripts frontend/src 2>&1 | tee /tmp/semgrep.txt
+          # One retry when the run fails for any reason other than findings (exit 1 with `--error`), for
+          # example the rules registry being unreachable. Findings fail at once; a second failure fails the job.
+          for attempt in 1 2; do
+            rc=0
+            uvx --from semgrep==1.172.0 semgrep scan \
+              --config p/owasp-top-ten --config p/python --config p/typescript \
+              --severity ERROR --error --metrics=off \
+              backend/app backend/scripts frontend/src 2>&1 | tee /tmp/semgrep.txt || rc=$?
+            if [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ]; then exit "$rc"; fi
+            echo "Semgrep did not complete (exit $rc, attempt $attempt of 2)"; sleep 30
+          done
+          echo "Semgrep did not complete after two attempts; failing the check rather than skipping it"; exit 1
       - name: Summary
         if: always()
         run: |
@@ -166,10 +176,10 @@ jobs:
     name: Secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -207,11 +217,11 @@ jobs:
       E2E_API_URL: http://localhost:8000/api/v1
       VITE_API_URL: http://localhost:8000/api/v1
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           enable-cache: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -240,7 +250,7 @@ jobs:
       - name: Server logs on failure
         if: failure()
         run: tail -n 200 /tmp/backend.log /tmp/frontend.log
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: playwright-report
@@ -259,22 +269,25 @@ jobs:
     env:
       REGISTRY: ghcr.io
       OWNER: ${{ github.repository_owner }}
+      # Trivy: a pinned release and the SHA-256 of its linux x64 tarball (from the release's checksums file).
+      # Bump both together, in a pull request, with a re-run of the scan.
+      TRIVY_VERSION: 0.75.0
+      TRIVY_SHA256: c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f
+      # The vulnerability databases come from the public ECR mirror, not ghcr.io, so a ghcr.io outage or
+      # rate limit cannot block a release.
+      TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
+      TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db:1
     steps:
       # Full history and tags: the release guard compares a release tag with its release candidate.
-      - uses: actions/checkout@v4
+      # The token is not kept in .git/config: nothing after this step needs git to authenticate.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Release guard (v* tags only)
         if: github.ref_type == 'tag'
         run: python3 scripts/release_guard.py "$GITHUB_REF_NAME"
-      - uses: docker/setup-buildx-action@v3
-      - name: Log in to GHCR
-        if: github.event_name == 'push'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - name: Tags
         id: tags
         run: |
@@ -298,12 +311,32 @@ jobs:
           fi
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
-      # US-103: each image is built once into the runner, scanned, and only then built again for the push (the
-      # second build is a cache hit). Trivy blocks on a HIGH or CRITICAL vulnerability that has a fix; one with
-      # no fix yet (`ignore-unfixed`) does not block, because nothing can be done about it today. An accepted
-      # finding goes in `.trivyignore` with its reason and a review date, never as a bare id.
-      - name: Backend image (build for the scan)
-        uses: docker/build-push-action@v6
+      # US-103: each image is built once, loaded into the runner and scanned there; the image that is pushed is
+      # that same image (tagged and pushed with `docker push`), not a second build. The GHCR login comes after
+      # both scans, so the `packages: write` token is not on disk while the scanner runs. Trivy is the pinned
+      # release binary with a SHA-256 check (as gitleaks is in secret-history.yml), not a third-party action. It
+      # blocks on a HIGH or CRITICAL vulnerability that has a fix; one with no fix yet (`--ignore-unfixed`) does
+      # not block, because nothing can be done about it today. An accepted finding goes in `.trivyignore` with
+      # its reason and a review date, never as a bare id.
+      - name: Install Trivy (pinned, checksum verified)
+        run: |
+          curl -fsSL --retry 3 -o /tmp/trivy.tar.gz \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  /tmp/trivy.tar.gz" | sha256sum --check -
+          tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
+          /tmp/trivy --version
+      # The vulnerability database comes from the public ECR mirror (TRIVY_DB_REPOSITORY above), which is not
+      # rate limited like ghcr.io. It is fetched here with retries and the scans run with `--skip-db-update`; if
+      # all three attempts fail the job fails: a release is never cleared by a scan that did not run.
+      - name: Trivy database (retried)
+        run: |
+          for attempt in 1 2 3; do
+            if /tmp/trivy image --download-db-only --no-progress; then exit 0; fi
+            echo "Trivy database download failed (attempt $attempt of 3), retrying in 20 s"; sleep 20
+          done
+          echo "Trivy database could not be downloaded; failing the check rather than skipping it"; exit 1
+      - name: Backend image (build once, loaded into the runner)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./backend
           load: true
@@ -313,29 +346,15 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
       - name: Trivy, backend image (blocking at HIGH and CRITICAL)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: permitflow-backend:scan
-          scanners: vuln
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
-          trivyignores: .trivyignore
-      - name: Backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.tags.outputs.backend }}
-          build-args: GIT_SHA=${{ github.sha }}
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
+        run: |
+          /tmp/trivy image --skip-db-update --no-progress --scanners vuln --severity HIGH,CRITICAL \
+            --ignore-unfixed --exit-code 1 --ignorefile .trivyignore permitflow-backend:scan
       # The What's new page reads RELEASE_NOTES.md at build time (US-094); the image build's context is the
       # frontend folder alone, so the file is copied in first (ignored by git, see .gitignore).
       - name: Release notes into the frontend build context
         run: cp RELEASE_NOTES.md frontend/RELEASE_NOTES.md
-      - name: Frontend image (build for the scan)
-        uses: docker/build-push-action@v6
+      - name: Frontend image (build once, loaded into the runner)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./frontend
           load: true
@@ -344,22 +363,32 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
       - name: Trivy, frontend image (blocking at HIGH and CRITICAL)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        run: |
+          /tmp/trivy image --skip-db-update --no-progress --scanners vuln --severity HIGH,CRITICAL \
+            --ignore-unfixed --exit-code 1 --ignorefile .trivyignore permitflow-frontend:scan
+      - name: Log in to GHCR (after the scans)
+        if: github.event_name == 'push'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
-          image-ref: permitflow-frontend:scan
-          scanners: vuln
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
-          trivyignores: .trivyignore
-      - name: Frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.tags.outputs.frontend }}
-          cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push the scanned images (the same image ids Trivy read)
+        if: github.event_name == 'push'
+        env:
+          BACKEND_TAGS: ${{ steps.tags.outputs.backend }}
+          FRONTEND_TAGS: ${{ steps.tags.outputs.frontend }}
+        run: |
+          push_all() {
+            local image="$1" tags="$2" t
+            echo "$image is $(docker image inspect --format '{{.Id}}' "$image")"
+            for t in ${tags//,/ }; do
+              docker tag "$image" "$t"
+              docker push "$t"
+            done
+          }
+          push_all permitflow-backend:scan "$BACKEND_TAGS"
+          push_all permitflow-frontend:scan "$FRONTEND_TAGS"
       - name: Summary
         run: |
           {

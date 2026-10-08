@@ -53,8 +53,10 @@ jobs:
           test -n "$RAILWAY_PROJECT_ID" || { echo "RAILWAY_PROJECT_ID variable is missing"; exit 1; }
           test -n "$BACKEND_URL" -a -n "$FRONTEND_URL" || { echo "BACKEND_URL / FRONTEND_URL environment variables are missing"; exit 1; }
           echo "deploying ${{ github.event.workflow_run.head_sha || 'current images (manual run)' }} to $RAILWAY_ENV"
+      # Pinned to the version the subcommands and flags below were checked against (deployment list --json,
+      # redeploy --from-source --yes). Bump it in a pull request after running them with the new version.
       - name: Install Railway CLI
-        run: npm install -g @railway/cli
+        run: npm install -g @railway/cli@5.59.0
       - name: Record the deployments that are live before the redeploy
         id: before
         run: |
