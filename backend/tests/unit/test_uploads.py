@@ -24,3 +24,11 @@ def test_magic_bytes() -> None:
         check_magic_bytes(".pdf", b"PK\x03\x04")
     with pytest.raises(UploadRejected):
         check_magic_bytes(".txt", b"\x00\x01binary")
+
+
+def test_the_too_large_message_names_whole_and_fractional_megabytes() -> None:
+    from app.domain.uploads import too_large_message
+
+    assert too_large_message(10 * 1024 * 1024) == "The file is larger than 10 MB."
+    assert too_large_message(1024 * 1024) == "The file is larger than 1 MB."
+    assert too_large_message(int(1.5 * 1024 * 1024)) == "The file is larger than 1.5 MB."

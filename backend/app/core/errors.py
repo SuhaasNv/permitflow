@@ -46,6 +46,12 @@ class Forbidden(AppError):
     code = "forbidden"
 
 
+class StepUpFailed(Forbidden):
+    """The signed-in administrator's password did not match on a change that asks for it again (US-101)."""
+
+    code = "step_up_failed"
+
+
 class NotFound(AppError):
     status_code = 404
     code = "not_found"

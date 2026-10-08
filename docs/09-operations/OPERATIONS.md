@@ -52,7 +52,21 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `METRICS_TOKEN` | empty | backend | Turns on `GET /api/v1/metrics` for Prometheus (US-077); the scraper presents it as a bearer token. Empty: the route answers 404. Generate with `openssl rand -hex 24`; one value per environment, the same value in that environment's Prometheus scrape config. |
 | `METRICS_TARGET`, `METRICS_SCHEME`, `ENVIRONMENT_LABEL` | `host.docker.internal:8000`, `http`, `local` | Prometheus (Compose) | Where the local Prometheus scrapes and how it labels the environment; `backend:8000` with the `full` profile. Not read by the app. |
 | `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ROOT_URL` | `admin`, `permitflow`, `http://localhost:3001` | Grafana (Compose) | The local Grafana sign-in and its public URL. Not read by the app. |
+| `WORKER_CONCURRENCY` | `2` | backend | US-101: the ceiling for the "worker concurrency" platform setting (1 to this value). Stored and audited now; the worker reads it from US-098. |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | empty | backend (also Grafana and the bot) | US-101: the API posts one Telegram message for each platform settings change to this chat. Both empty: no message, no network call. The same bot and chat the monitoring layer uses (`OBSERVABILITY.md`, 5a); set them on the backend service as well. |
 | `VITE_API_URL` | `http://localhost:8000/api/v1` | frontend | Build-time, read from `frontend/.env` (not the repo root). In the container the runtime `API_URL` wins. |
+
+### Platform settings: the limits above are now ceilings (v0.5.0, US-101)
+
+Eight of the variables above are the **default and the hard ceiling** of a setting an administrator can change from `GET/PUT /admin/settings` (no screen yet; the screens follow): `RATE_LIMIT_PER_MINUTE`, `LOGIN_ATTEMPTS_PER_MINUTE`, `AI_RUNS_PER_USER_PER_DAY`, `AI_RUNS_PER_DAY`, `MAX_DRAFTS_PER_USER`, `UPLOAD_MAX_BYTES` (never above 10 MB), `AI_MAX_TEXT_CHARS` and `WORKER_CONCURRENCY`. Three more settings have no variable: the AI pause switch (default off), the Telegram per-check message switch (default off) and the scanner fail mode (default closed; open is refused when `APP_ENV=production`).
+
+- **With no override the environment value applies**, exactly as before. Removing an override (a revert to the first change) returns to it.
+- **The panel can lower a value, never raise it above the variable, and never below a small minimum** (10 requests, 3 sign-in attempts, 1 for the quotas, 1 MB for uploads); it cannot switch a limit off. To raise a ceiling, change the variable and redeploy. An override above a ceiling that was lowered later is clamped to the new ceiling when it is read.
+- **A variable set to 0 ("no limit") stays no limit** until an administrator sets a real value; the panel then lets them choose any value up to a fixed cap, never 0.
+- **Overrides live in the database** (`platform_settings`, migration 0015; the history is in the audit trail), so a redeploy keeps them. Each API process caches them for 10 seconds, so a change reaches every process within 10 seconds.
+- **To see what is overridden:** `GET /admin/settings` as an administrator (overridden, who, why), or `SELECT key, value, reason FROM platform_settings`. To undo one without the panel, delete the row; the next read (within 10 seconds) is the environment value again.
+- **`LOGIN_RATE_LIMIT_PER_MINUTE`** (failed sign-ins) is not a platform setting and stays environment-only; the administrator's password confirmation on a settings change counts against it.
+- Migration order: apply migration 0015 before the new API serves traffic (the image does on start). If the table is missing the API logs `platform_settings_unreadable` and serves the environment values, so a late migration never takes a limit away.
 
 ## Seeding
 

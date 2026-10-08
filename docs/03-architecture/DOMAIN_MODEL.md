@@ -171,6 +171,18 @@ Lifecycle: `open` → `addressed` (system, on resubmission when the target chang
 
 Email delivery is mocked: an `EmailNotifier` logs the message.
 
+### PlatformSetting (v0.5.0, US-101)
+One administrator override of an environment default. A missing row means "follow the environment", so an empty table changes nothing. The definition of each editable setting (key, type, bounds, default source) lives in `app/domain/platform_settings.py`, not in the table.
+| Field | Type | Notes |
+|-------|------|-------|
+| key | str(64), PK | one of the eleven keys in the domain module |
+| value | JSON scalar | a whole number, a boolean or a choice string, typed by the setting; read back inside today's bounds (a number above the environment ceiling is clamped, one below the minimum or of the wrong type is ignored) |
+| updated_by | FK User | the administrator who set it |
+| updated_at | datetime | |
+| reason | text | required on every change |
+
+There is no history table: the history is the audit trail (`settings.changed`, `settings.reverted`, below), which already records the old and new value, the actor and the reason, and is append-only. Migration 0015.
+
 ### AuditEvent
 Append-only.
 | Field | Type | Notes |
@@ -178,7 +190,7 @@ Append-only.
 | id | UUID | |
 | application_id | FK Application, nullable | null for user-management events |
 | actor_id | FK User, nullable | null for system events |
-| event_type | str | `application.created`, `section.updated`, `document.uploaded`, `document.replaced`, `document.deleted`, `verification.requested`, `verification.completed`, `revision.submitted`, `status.changed`, `feedback.created`, `feedback.released`, `feedback.addressed`, `feedback.resolved`, `feedback.withdrawn`, `feedback.reopened`, `feedback.restored`, `licence.issued`, the site visit, checklist and clarification events (`site_visit.*`, `checklist.*`, `clarification.*`, v0.4.0), and the user events with no application (`user.created`, `user.role_changed`, `user.deactivated`, `user.reactivated`, `user.session_taken_over`, `user.signed_out`) |
+| event_type | str | `application.created`, `section.updated`, `document.uploaded`, `document.replaced`, `document.deleted`, `verification.requested`, `verification.completed`, `revision.submitted`, `status.changed`, `feedback.created`, `feedback.released`, `feedback.addressed`, `feedback.resolved`, `feedback.withdrawn`, `feedback.reopened`, `feedback.restored`, `licence.issued`, the site visit, checklist and clarification events (`site_visit.*`, `checklist.*`, `clarification.*`, v0.4.0), and the user events with no application (`user.created`, `user.role_changed`, `user.deactivated`, `user.reactivated`, `user.session_taken_over`, `user.signed_out`) and the settings events with no application (`settings.changed`, `settings.reverted`: payload `key`, `label`, `old`, `new`, `old_was_default`, `reason`, and `reverted_event_id` on a revert; US-101) |
 | payload | JSON | event-specific data (from/to status, revision number, feedback id, document type, verification status) |
 | created_at | datetime | |
 
@@ -341,3 +353,4 @@ Required document types: `business_profile`, `floor_plan`, `tenancy_agreement`, 
 10. One checklist per (application, visit number); every template key is present from creation; `result`, `comment` and `needs_clarification` never change after `submitted_at`.
 11. Indexes for the admin reads at volume (migration 0013, US-086): `audit_events (application_id, created_at)`, `(created_at, id)`, `(event_type, created_at)`; `verification_runs (created_at)` and `(started_at)`.
 12. At most one live session per user; a token whose session is revoked, idle or missing never authenticates, whatever its `exp`.
+13. A platform setting changes only inside `[minimum, ceiling]`, where the ceiling is the environment value (further limited by the setting's absolute cap, 10 MB for uploads) and the minimum is at least 1; the override row and its `settings.changed` or `settings.reverted` audit row are written in one transaction; the scanner never fails open when `APP_ENV=production`. The same bounds are applied again when a value is read, so a row edited by hand cannot loosen a limit.

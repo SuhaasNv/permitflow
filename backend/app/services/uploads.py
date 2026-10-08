@@ -19,6 +19,7 @@ from app.repositories.checklists import ChecklistRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.licences import LicenceRepository
 from app.schemas.storage import StorageView
+from app.services.platform_settings import live
 
 CHUNK = 64 * 1024
 
@@ -85,7 +86,7 @@ def receive(storage: FileStorage, key: str, ext: str, stream: BinaryIO, usage: S
     left on disk. Returns the digest and size of the stored bytes."""
     if usage.remaining_bytes <= 0:
         raise budget_error(usage)
-    limit = get_settings().upload_max_bytes
+    limit = live().int_value("upload_max_bytes")
     digest = hashlib.sha256()
     size = 0
 

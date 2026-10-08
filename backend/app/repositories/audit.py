@@ -54,6 +54,27 @@ class AuditRepository:
         stmt = stmt.order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc()).limit(limit)
         return list(self.db.scalars(stmt))
 
+    def get(self, event_id: uuid.UUID) -> AuditEvent | None:
+        return self.db.get(AuditEvent, event_id)
+
+    def by_type(
+        self,
+        event_types: Iterable[str],
+        *,
+        limit: int,
+        before: tuple[datetime, uuid.UUID] | None = None,
+        payload_key: str | None = None,
+    ) -> list[AuditEvent]:
+        """Events of the given types, newest first, keyset-paged like `feed` (US-101: the settings
+        history). `payload_key` keeps only the events whose payload names that setting."""
+        stmt = select(AuditEvent).where(AuditEvent.event_type.in_(list(event_types)))
+        if payload_key is not None:
+            stmt = stmt.where(AuditEvent.payload["key"].as_string() == payload_key)
+        if before is not None:
+            stmt = stmt.where(tuple_(AuditEvent.created_at, AuditEvent.id) < before)
+        stmt = stmt.order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc()).limit(limit)
+        return list(self.db.scalars(stmt))
+
     def idle_applications(
         self, cutoff: datetime, statuses: Iterable[ApplicationStatus]
     ) -> list[tuple[Application, datetime]]:

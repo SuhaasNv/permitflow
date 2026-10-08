@@ -13,6 +13,12 @@ def _status(value: Any) -> str:
         return str(value)
 
 
+def _setting_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    return str(value)
+
+
 def summarize(event_type: str, payload: dict[str, Any]) -> str:
     p = payload
     match event_type:
@@ -71,6 +77,10 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
             return f"Account reactivated: {p.get('email', '')}"
         case "user.created":
             return f"Account created: {p.get('email', '')} ({p.get('role', '')})"
+        case "settings.changed" | "settings.reverted":
+            verb = "reverted" if event_type == "settings.reverted" else "changed"
+            name = p.get("label", p.get("key", ""))
+            return f"Setting {verb}: {name}, {_setting_value(p.get('old'))} to {_setting_value(p.get('new'))}"
         case "user.session_taken_over":
             return f"Signed in on {p.get('to_device', '')}; the session on {p.get('from_device', '')} ended"
         case "user.signed_out":

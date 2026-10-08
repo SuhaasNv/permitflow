@@ -171,7 +171,7 @@ def test_quota_refusals_do_not_count_toward_the_quota(
     since = datetime.now(UTC) - timedelta(days=1)
     repo = DocumentRepository(db)
     assert repo.count_runs_since(since, operator_id=user.id) == 3
-    assert repo.count_runs_since(since, operator_id=user.id, exclude_reason=DAILY_LIMIT_REASON) == 1
+    assert repo.count_runs_since(since, operator_id=user.id, exclude_reasons=(DAILY_LIMIT_REASON,)) == 1
     next(gen, None)
 
 

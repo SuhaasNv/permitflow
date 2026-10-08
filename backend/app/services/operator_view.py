@@ -117,10 +117,11 @@ def summary(
     )
 
 
-# Reasons an operator may see: the daily quota (so the slot can say why) and why their own file could not
-# be read. Provider and infrastructure codes (`provider_not_configured`, `storage_error`, ...) describe our
-# configuration, not their document, and are collapsed to `unavailable` (the officer sees the real code).
-_OPERATOR_REASONS = frozenset({"daily_limit_reached", "interrupted"})
+# Reasons an operator may see: the daily quota and the administrator's pause (so the slot can say why),
+# and why their own file could not be read. Provider and infrastructure codes (`provider_not_configured`,
+# `storage_error`, ...) describe our configuration, not their document, and are collapsed to
+# `unavailable` (the officer sees the real code).
+_OPERATOR_REASONS = frozenset({"daily_limit_reached", "interrupted", "ai_paused"})
 
 
 def _operator_reason(run: VerificationRun) -> str | None:

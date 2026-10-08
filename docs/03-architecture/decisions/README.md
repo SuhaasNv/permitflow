@@ -58,6 +58,8 @@ Each line below is the decision in one breath: chose X over Y because Z.
 
 - 011, 20 Sep: the observability layer (US-077) adds three Railway services (Prometheus, Grafana, the Telegram bot) from public images with their configuration in variables, so the "Railway never builds" rule holds without a new image; `docs/13-observability/OBSERVABILITY.md`.
 
+- 014, 9 Oct (v0.5.0, US-101): the administrator also writes platform settings, a third write beside the users, but only inside the environment's bounds: the variables become ceilings, every change needs a reason and a password step-up and is audited and announced on Telegram, and the history is the audit trail.
+
 ## In a debrief
 
 Name three: 003 (the workflow is a table you can test exhaustively), 006 (the AI is boxed in: schema, rules, no authority) and 011 (build once, promote by tag, a person approves production). Point at this page for the rest.

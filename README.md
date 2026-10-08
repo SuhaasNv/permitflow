@@ -35,7 +35,7 @@ npm install
 npm run dev                            # http://localhost:3000
 ```
 
-Local quotas: an operator may hold 20 open drafts and run 60 AI checks a day (the mock provider counts too). For local work set `MAX_DRAFTS_PER_USER=0` and `AI_RUNS_PER_USER_PER_DAY=0` in `.env`.
+Local quotas: an operator may hold 20 open drafts and run 60 AI checks a day (the mock provider counts too). For local work set `MAX_DRAFTS_PER_USER=0` and `AI_RUNS_PER_USER_PER_DAY=0` in `.env`. From v0.5.0 these limits are also the ceilings of the administrator's platform settings (US-101): the API can lower them within bounds, never raise them (`docs/09-operations/OPERATIONS.md`).
 
 A site visit is recorded on or after its day (`SITE_VISIT_DAY_GUARD=true`, the default): Mark site visit done and the checklist submit wait for the confirmed date. To run a whole appointment in one sitting (the browser suite, `backend/scripts/uat_edges.py`, a demonstration) set `SITE_VISIT_DAY_GUARD=false`.
 

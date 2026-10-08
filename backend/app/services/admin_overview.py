@@ -31,6 +31,7 @@ from app.schemas.admin import (
     TodayOut,
     TotalsOut,
 )
+from app.services.platform_settings import live
 
 SUBMITTED = {ApplicationStatus.APPLICATION_RECEIVED.value}
 RESUBMITTED = {
@@ -49,7 +50,6 @@ class AdminOverviewService:
 
     def overview(self, now: datetime | None = None) -> AdminOverviewOut:
         now = now or datetime.now(UTC)
-        settings = get_settings()
         by_status = self.applications.count_by_status()
         counts = [
             StatusCountOut(
@@ -80,7 +80,7 @@ class AdminOverviewService:
             checklists_submitted=self.audit.count_since("checklist.submitted", start, end),
             clarification_rounds=self.audit.count_since("clarification.answered", start, end),
             runs_today=self.documents.count_runs_since(start),
-            runs_per_day_quota=settings.ai_runs_per_day,
+            runs_per_day_quota=live().int_value("ai_runs_per_day"),
         )
         return AdminOverviewOut(
             as_of=now, totals=totals, counts=counts, idle=idle[0], today=today, checks=self._checks(now)

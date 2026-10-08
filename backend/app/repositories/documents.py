@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Iterable
 from datetime import datetime
 
 from sqlalchemy import and_, delete, func, or_, select, update
@@ -122,16 +123,22 @@ class DocumentRepository:
         return list(self.db.scalars(stmt))
 
     def count_runs_since(
-        self, since: datetime, operator_id: uuid.UUID | None = None, *, exclude_reason: str | None = None
+        self,
+        since: datetime,
+        operator_id: uuid.UUID | None = None,
+        *,
+        exclude_reasons: Iterable[str] = (),
     ) -> int:
         """Verification runs requested since `since`, for one applicant's documents or for everyone
         (US-058 quotas: the cost ceiling is counted in the database, so it holds across restarts).
-        Runs stored with `exclude_reason` (the quota refusals themselves) are not counted, otherwise a
-        refused attempt would extend the applicant's lock-out by another day."""
+        Runs stored with one of `exclude_reasons` (the quota refusals themselves, and checks held back by
+        the pause switch) are not counted, otherwise a refused attempt would extend the applicant's
+        lock-out by another day."""
         stmt = select(func.count()).select_from(VerificationRun).where(VerificationRun.created_at >= since)
-        if exclude_reason is not None:
+        excluded = list(exclude_reasons)
+        if excluded:
             stmt = stmt.where(
-                or_(VerificationRun.error_reason.is_(None), VerificationRun.error_reason != exclude_reason)
+                or_(VerificationRun.error_reason.is_(None), VerificationRun.error_reason.not_in(excluded))
             )
         if operator_id is not None:
             stmt = (

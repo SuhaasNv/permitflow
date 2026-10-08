@@ -15,19 +15,24 @@ from sqlalchemy.orm import Session
 
 from app.core import metrics
 from app.core.errors import Conflict
-from app.core.settings import get_settings
 from app.domain.enums import VerificationStatus
 from app.models import VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.users import UserRepository
+from app.services.platform_settings import live
 
 DAILY_LIMIT_REASON = "daily_limit_reached"
+# US-101: the administrator paused the AI checks. The run is stored `unavailable`, nothing reaches the
+# provider, and it does not count toward the quotas (it never could have cost anything).
+AI_PAUSED_REASON = "ai_paused"
+NOT_COUNTED_REASONS = (DAILY_LIMIT_REASON, AI_PAUSED_REASON)
 
 
 def ensure_draft_capacity(db: Session, operator_id: uuid.UUID) -> None:
-    """Refuse a new draft once the operator holds `MAX_DRAFTS_PER_USER` open ones (0 disables)."""
-    limit = get_settings().max_drafts_per_user
+    """Refuse a new draft once the operator holds the open-draft limit (`MAX_DRAFTS_PER_USER`, or the
+    administrator's lower value; 0 disables)."""
+    limit = live().int_value("max_drafts_per_user")
     if limit <= 0:
         return
     # Lock the operator's user row for the rest of the transaction, so the count and the insert that
@@ -42,17 +47,22 @@ def ensure_draft_capacity(db: Session, operator_id: uuid.UUID) -> None:
 
 
 def verification_over_quota(db: Session, operator_id: uuid.UUID) -> str | None:
-    """The reason to skip the model call, or None when the run may proceed."""
-    settings = get_settings()
+    """The reason to skip the model call, or None when the run may proceed. The pause switch (US-101) wins
+    over the quotas; the quota limits are the live platform settings."""
+    settings = live()
+    if settings.bool_value("ai_paused"):
+        return AI_PAUSED_REASON
+    per_user = settings.int_value("ai_runs_per_user_per_day")
+    per_day = settings.int_value("ai_runs_per_day")
     since = datetime.now(UTC) - timedelta(days=1)
     repo = DocumentRepository(db)
-    if settings.ai_runs_per_user_per_day > 0:
-        used = repo.count_runs_since(since, operator_id=operator_id, exclude_reason=DAILY_LIMIT_REASON)
-        if used >= settings.ai_runs_per_user_per_day:
+    if per_user > 0:
+        used = repo.count_runs_since(since, operator_id=operator_id, exclude_reasons=NOT_COUNTED_REASONS)
+        if used >= per_user:
             metrics.QUOTA_REFUSALS.labels("ai_runs_per_user").inc()
             return DAILY_LIMIT_REASON
-    if settings.ai_runs_per_day > 0:
-        if repo.count_runs_since(since, exclude_reason=DAILY_LIMIT_REASON) >= settings.ai_runs_per_day:
+    if per_day > 0:
+        if repo.count_runs_since(since, exclude_reasons=NOT_COUNTED_REASONS) >= per_day:
             metrics.QUOTA_REFUSALS.labels("ai_runs_per_day").inc()
             return DAILY_LIMIT_REASON
     return None

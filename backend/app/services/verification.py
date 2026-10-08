@@ -35,7 +35,8 @@ from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.services.applications import ApplicationService
-from app.services.quotas import new_run
+from app.services.platform_settings import live
+from app.services.quotas import AI_PAUSED_REASON, new_run
 
 logger = logging.getLogger("permitflow.verification")
 
@@ -70,7 +71,7 @@ def run_verification(run_id: uuid.UUID) -> None:
 
         try:
             data = b"".join(get_storage().open(doc.stored_key))
-            extracted = extract_text(doc.content_type, data, max_chars=settings.ai_max_text_chars)
+            extracted = extract_text(doc.content_type, data, max_chars=live().int_value("ai_max_text_chars"))
             doc.extracted_text = extracted.text or None
             if extracted.reason:
                 _finish(
@@ -80,6 +81,20 @@ def run_verification(run_id: uuid.UUID) -> None:
                     VerificationStatus.UNREADABLE,
                     provider="none",
                     error_reason=extracted.reason,
+                    started=started,
+                )
+                return
+
+            # US-101: a check created before the administrator paused the AI is stopped here, before
+            # any provider is chosen or called.
+            if live().bool_value("ai_paused"):
+                _finish(
+                    db,
+                    run,
+                    app,
+                    VerificationStatus.UNAVAILABLE,
+                    provider="none",
+                    error_reason=AI_PAUSED_REASON,
                     started=started,
                 )
                 return
