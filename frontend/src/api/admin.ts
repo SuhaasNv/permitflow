@@ -115,13 +115,18 @@ export interface AdminUsers {
 export interface UserPatch {
   role?: Role
   is_active?: boolean
+  /** The signed-in administrator's own password (step-up). */
+  admin_password: string
 }
 
 export interface UserCreate {
   email: string
   full_name: string
   role: Role
+  /** The new account's password. */
   password: string
+  /** The signed-in administrator's own password (step-up). */
+  admin_password: string
 }
 
 export function getAdminUsers(): Promise<AdminUsers> {

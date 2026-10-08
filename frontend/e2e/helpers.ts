@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 
 export const PASSWORD = process.env.SEED_PASSWORD ?? 'PermitFlow!2026'
 /** The administrator's password is private on a real deployment (SEED_ADMIN_PASSWORD); it falls back to the shared one. */
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || PASSWORD
+export const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || PASSWORD
 const passwordFor = (email: string) => (email === ADMIN ? ADMIN_PASSWORD : PASSWORD)
 export const OPERATOR = 'operator@permitflow.example.sg'
 export const OFFICER = 'officer@permitflow.example.sg'
@@ -163,8 +163,8 @@ export async function restoreSpareAccount(): Promise<void> {
   const { users } = await call<{ users: { id: string; email: string; role: string; is_active: boolean }[] }>(admin, '/admin/users')
   const spare = users.find((u) => u.email === SPARE)
   if (!spare) return
-  if (!spare.is_active) await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ is_active: true }) })
-  if (spare.role !== 'officer') await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ role: 'officer' }) })
+  if (!spare.is_active) await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ is_active: true, admin_password: ADMIN_PASSWORD }) })
+  if (spare.role !== 'officer') await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ role: 'officer', admin_password: ADMIN_PASSWORD }) })
   await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: admin })
 }
 

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { ADMIN, SPARE, restoreSpareAccount, seedUnderReview, signIn, signOut } from '../helpers.js'
+import { ADMIN, ADMIN_PASSWORD, SPARE, restoreSpareAccount, seedUnderReview, signIn, signOut } from '../helpers.js'
 
 /** The administrator (US-070, US-072, US-073): the overview with live numbers, a case read without a
  * single control, the activity feed with a user row, and the spare account changed and restored. */
@@ -49,13 +49,17 @@ test('admin: overview, read-only case, activity feed, user management restored a
   await spare.getByRole('button', { name: 'Change role' }).click()
   const dialog = page.getByRole('dialog', { name: /Change .* role\?/ })
   await dialog.getByRole('radio', { name: 'Operator' }).check()
+  // A wrong password changes nothing; the step-up asks for the administrator's own.
+  await dialog.getByLabel(/Your password/).fill('not-the-password')
+  await dialog.getByRole('button', { name: 'Change role' }).click()
+  await expect(dialog.getByText(/Your password is incorrect/)).toBeVisible()
+  await dialog.getByLabel(/Your password/).fill(ADMIN_PASSWORD)
   await dialog.getByRole('button', { name: 'Change role' }).click()
   await expect(spare).toContainText('Operator')
   await spare.getByRole('button', { name: 'Deactivate' }).click()
-  await page
-    .getByRole('dialog', { name: /Deactivate .*\?/ })
-    .getByRole('button', { name: 'Deactivate' })
-    .click()
+  const deactivate = page.getByRole('dialog', { name: /Deactivate .*\?/ })
+  await deactivate.getByLabel(/Your password/).fill(ADMIN_PASSWORD)
+  await deactivate.getByRole('button', { name: 'Deactivate' }).click()
   await expect(spare).toContainText('Deactivated')
 
   // The change is on the feed as a user row without a case.
@@ -67,14 +71,14 @@ test('admin: overview, read-only case, activity feed, user management restored a
   await page.goto('/admin/users')
   const spareAgain = page.locator('li', { hasText: SPARE })
   await spareAgain.getByRole('button', { name: 'Reactivate' }).click()
-  await page
-    .getByRole('dialog', { name: /Reactivate .*\?/ })
-    .getByRole('button', { name: 'Reactivate' })
-    .click()
+  const reactivate = page.getByRole('dialog', { name: /Reactivate .*\?/ })
+  await reactivate.getByLabel(/Your password/).fill(ADMIN_PASSWORD)
+  await reactivate.getByRole('button', { name: 'Reactivate' }).click()
   await expect(spareAgain).toContainText('Active')
   await spareAgain.getByRole('button', { name: 'Change role' }).click()
   const back = page.getByRole('dialog', { name: /Change .* role\?/ })
   await back.getByRole('radio', { name: 'Licensing officer' }).check()
+  await back.getByLabel(/Your password/).fill(ADMIN_PASSWORD)
   await back.getByRole('button', { name: 'Change role' }).click()
   await expect(spareAgain).toContainText('Licensing officer')
   await signOut(page)

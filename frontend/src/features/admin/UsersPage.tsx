@@ -48,6 +48,26 @@ export function conflictMessage(error: unknown): string {
   return 'Something went wrong. Try again.'
 }
 
+type UserDraft = Omit<UserCreate, 'admin_password'>
+const EMPTY_DRAFT: UserDraft = { email: '', full_name: '', role: 'officer', password: '' }
+const PASSWORD_NEEDED = 'Enter your password to confirm.'
+
+/** The administrator's own password, asked again before any change to an account (step-up). */
+function StepUpField({ value, error, onChange }: { value: string; error?: string; onChange: (v: string) => void }) {
+  return (
+    <Field
+      label="Your password"
+      type="password"
+      required
+      value={value}
+      error={error}
+      help="Confirms it is you making this change."
+      autoComplete="current-password"
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
+}
+
 type Pending = { kind: 'role'; user: AdminUser } | { kind: 'active'; user: AdminUser } | { kind: 'create' } | null
 
 /** Users (S-41, US-073): change a role, deactivate or reactivate, add an account; every change is audited. */
@@ -60,9 +80,11 @@ export function AdminUsersPage() {
   const [query, setQuery] = useState('')
   const [pending, setPending] = useState<Pending>(null)
   const [role, setRole] = useState<Role>('operator')
-  const [draft, setDraft] = useState<UserCreate>({ email: '', full_name: '', role: 'officer', password: '' })
+  const [draft, setDraft] = useState<UserDraft>(EMPTY_DRAFT)
+  const [adminPassword, setAdminPassword] = useState('')
+  const [stepUpError, setStepUpError] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof UserCreate, string>>>({})
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof UserDraft, string>>>({})
 
   const rows = useMemo(() => users.data?.users ?? [], [users.data])
   const selfId = users.data?.self_id ?? ''
@@ -83,6 +105,8 @@ export function AdminUsersPage() {
     setPending(null)
     setError(null)
     setFieldErrors({})
+    setAdminPassword('')
+    setStepUpError(undefined)
   }
 
   const confirmRole = () => {
@@ -91,8 +115,12 @@ export function AdminUsersPage() {
       close()
       return
     }
+    if (!adminPassword) {
+      setStepUpError(PASSWORD_NEEDED)
+      return
+    }
     patch.mutate(
-      { id: pending.user.id, body: { role } },
+      { id: pending.user.id, body: { role, admin_password: adminPassword } },
       {
         onSuccess: (u) => {
           toast.push({ title: 'Role changed', body: `${u.full_name} is now ${ROLE_LABEL[u.role].toLowerCase()}.`, tone: 'success' })
@@ -106,8 +134,12 @@ export function AdminUsersPage() {
   const confirmActive = () => {
     if (pending?.kind !== 'active') return
     const next = !pending.user.is_active
+    if (!adminPassword) {
+      setStepUpError(PASSWORD_NEEDED)
+      return
+    }
     patch.mutate(
-      { id: pending.user.id, body: { is_active: next } },
+      { id: pending.user.id, body: { is_active: next, admin_password: adminPassword } },
       {
         onSuccess: (u) => {
           toast.push({
@@ -123,14 +155,20 @@ export function AdminUsersPage() {
   }
 
   const confirmCreate = () => {
-    const errors: Partial<Record<keyof UserCreate, string>> = {}
+    const errors: Partial<Record<keyof UserDraft, string>> = {}
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) errors.email = 'Enter a valid email address.'
     if (!cleanText(draft.full_name)) errors.full_name = "Enter the person's name."
     if (draft.password.length < 12) errors.password = 'At least 12 characters.'
     setFieldErrors(errors)
-    if (Object.keys(errors).length) return
+    setStepUpError(adminPassword ? undefined : PASSWORD_NEEDED)
+    if (Object.keys(errors).length || !adminPassword) return
     create.mutate(
-      { ...draft, email: draft.email.trim().toLowerCase(), full_name: cleanText(draft.full_name) },
+      {
+        ...draft,
+        email: draft.email.trim().toLowerCase(),
+        full_name: cleanText(draft.full_name),
+        admin_password: adminPassword,
+      },
       {
         onSuccess: (u) => {
           toast.push({
@@ -138,7 +176,7 @@ export function AdminUsersPage() {
             body: `${u.full_name} can sign in as ${ROLE_LABEL[u.role].toLowerCase()}.`,
             tone: 'success',
           })
-          setDraft({ email: '', full_name: '', role: 'officer', password: '' })
+          setDraft(EMPTY_DRAFT)
           close()
         },
         onError: (e) =>
@@ -312,6 +350,7 @@ export function AdminUsersPage() {
               ))}
             </fieldset>
             <p>They get {ROLE_LABEL[role].toLowerCase()} permissions on their next request. This does not sign them out.</p>
+            <StepUpField value={adminPassword} error={stepUpError} onChange={setAdminPassword} />
             {error ? (
               <Alert tone="error">
                 <span>{error}</span>
@@ -337,6 +376,7 @@ export function AdminUsersPage() {
                 ? 'They are signed out on their next request and cannot sign in again until reactivated. Their applications and history stay as they are.'
                 : 'They can sign in again at once, with the role they had.'}
             </p>
+            <StepUpField value={adminPassword} error={stepUpError} onChange={setAdminPassword} />
             {error ? (
               <Alert tone="error">
                 <span>{error}</span>
@@ -397,6 +437,7 @@ export function AdminUsersPage() {
             autoComplete="new-password"
             onChange={(e) => setDraft({ ...draft, password: e.target.value })}
           />
+          <StepUpField value={adminPassword} error={stepUpError} onChange={setAdminPassword} />
           {error ? (
             <Alert tone="error">
               <span>{error}</span>
