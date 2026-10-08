@@ -23,7 +23,7 @@ import {
   TEXT_RULES,
 } from '@/lib/fieldRules'
 import type { HoursValue } from '@/lib/hours'
-import { hoursFromData, hoursStarted, normaliseHours, validateHours } from '@/lib/hours'
+import { HOURS_REQUIRED_MESSAGE, hoursFromData, hoursStarted, normaliseHours, validateHours } from '@/lib/hours'
 
 export type FormMode = 'draft' | 'complete'
 export type SectionValues = Record<string, string | number | boolean | HoursValue | undefined>
@@ -108,7 +108,7 @@ function fieldSchema(f: FieldDef, mode: FormMode): z.ZodTypeAny {
       return z.unknown().superRefine((v, ctx) => {
         const started = typeof v === 'object' && v !== null && !Array.isArray(v) ? hoursStarted(v as HoursValue) : v !== undefined && v !== ''
         if (!started) {
-          if (!optional) ctx.addIssue({ code: 'custom', message: REQUIRED })
+          if (!optional) ctx.addIssue({ code: 'custom', message: HOURS_REQUIRED_MESSAGE })
           return
         }
         const message = validateHours(v)
