@@ -1,4 +1,5 @@
-"""File storage behind a small interface (SCOPE: local disk now, object storage later)."""
+"""File storage behind a small interface: local disk by default, an S3-compatible bucket behind
+STORAGE_BACKEND=s3 (US-097, ADR-015)."""
 
 import os
 import shutil
@@ -17,6 +18,11 @@ class FileStorage(Protocol):
     def exists(self, key: str) -> bool: ...
     def size(self, key: str) -> int: ...
     def disk_usage(self) -> tuple[int, int]: ...
+
+
+class StorageError(OSError):
+    """The storage backend failed (network, credentials, bucket). An OSError so every caller that already
+    treats a disk failure as a storage failure treats this the same way."""
 
 
 class LocalDiskStorage:
@@ -76,4 +82,8 @@ def new_storage_key(application_id: uuid.UUID, extension: str) -> str:
 
 
 def get_storage() -> FileStorage:
+    if get_settings().storage_backend == "s3":
+        from app.infra.s3_storage import s3_storage_from_settings
+
+        return s3_storage_from_settings()
     return LocalDiskStorage()

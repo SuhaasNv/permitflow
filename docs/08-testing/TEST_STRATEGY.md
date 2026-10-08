@@ -79,6 +79,10 @@ The first run missed the overview budget at 2.8 s: the idle list loaded every op
 
 `npm run size` (`scripts/check-bundle-size.mjs`) runs in the frontend CI job after the build and fails above 250 KB gzipped for the JavaScript the respond page loads; the app ships one bundle, so the figure is the whole app: 215 KB gzipped (763 KB raw) on 21 Sep 2026.
 
+## Object storage (US-097)
+
+One contract suite, `backend/tests/unit/test_storage_contract.py`, runs the same cases against `LocalDiskStorage` (a temporary directory) and `S3Storage` (moto's in-process S3, no network and no credentials): round trip, empty file, a 9 MB file that crosses the multipart threshold and is read back in chunks of at most 64 KB, missing keys, idempotent delete, overwrite, a rejected upload leaving nothing (and keeping the previous file), traversal keys refused, `StorageError` on an unreachable bucket, the switch defaulting to `local` and selecting the bucket, and start-up refused without the bucket settings. `tests/unit/test_copy_uploads_script.py` covers the copy script on moto: dry run changes nothing, execute verifies sha256 on read-back, a second run skips identical objects, an interrupted copy resumes, a conflict is reported and never overwritten, a corrupted copy is removed and reported, and the exit codes. `tests/integration/test_storage_s3.py` drives upload, authorised download (404 for another operator, no redirect) and draft purge through the API with `STORAGE_BACKEND=s3`. 40 tests; the rest of the suite runs on the default `local` backend. The copy script was also run by hand against the Compose MinIO (dry run, execute, re-run).
+
 ## Release guard
 
 `scripts/release_guard.py` (run in CI on every `v*` tag, see `RELEASING.md`) is covered by `scripts/test_release_guard.py` (standard-library `unittest`, no git needed): `python3 -m unittest scripts/test_release_guard.py`, run in the backend CI job on every push.

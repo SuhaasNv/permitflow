@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     # evidence, the licence). A 5 GB volume holds about 34 applications at the ceiling; most use a tenth.
     storage_budget_bytes: int = 150 * 1024 * 1024
 
+    # US-097: where uploaded files live. `local` is the disk under UPLOAD_DIR (the default, today's
+    # behaviour); `s3` is an S3-compatible bucket (a Railway bucket, MinIO locally). No credential has a
+    # default: with `s3` the four below that are marked required must be set or the app refuses to start.
+    storage_backend: Literal["local", "s3"] = "local"
+    s3_endpoint_url: str = ""  # empty = AWS; MinIO or a Railway bucket name theirs
+    s3_bucket: str = ""  # required with `s3`
+    s3_region: str = "us-east-1"
+    s3_access_key_id: str = ""  # required with `s3`
+    s3_secret_access_key: str = ""  # required with `s3`
+    s3_addressing_style: Literal["auto", "path", "virtual"] = "auto"  # MinIO needs `path`
+
     # Mark site visit done and the checklist submit wait for the visit day (Singapore date; UAT run 5, F12).
     # Off only where a whole appointment must run in one sitting: the automated suites and a demonstration.
     site_visit_day_guard: bool = True
@@ -91,6 +102,17 @@ class Settings(BaseSettings):
         placeholder from `.env.example` counts as unset."""
         if len(self.jwt_secret) < 16 or self.jwt_secret == "change-me-to-a-long-random-string":
             raise RuntimeError("JWT_SECRET must be set to at least 16 random characters")
+        if self.storage_backend == "s3" and self.s3_missing():
+            raise RuntimeError(f"STORAGE_BACKEND=s3 needs {', '.join(self.s3_missing())} to be set")
+
+    def s3_missing(self) -> list[str]:
+        """The required bucket settings that are empty (US-097)."""
+        required = {
+            "S3_BUCKET": self.s3_bucket,
+            "S3_ACCESS_KEY_ID": self.s3_access_key_id,
+            "S3_SECRET_ACCESS_KEY": self.s3_secret_access_key,
+        }
+        return [name for name, value in required.items() if not value]
 
 
 @lru_cache
