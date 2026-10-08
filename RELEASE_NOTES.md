@@ -14,6 +14,18 @@ Format: the product reads this file at build time for its What's new page (the v
 
 **After that:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
 
+## v0.4.1-rc.2, 8 October 2026: safer sign-ins and sturdier checks
+
+**New for operators**
+- A very large number typed into a number field now gets a clear message instead of an error page.
+- The date your declaration was confirmed is always set by the service when you confirm it.
+
+**New for licensing officers**
+- Re-checking a document is done from the case page; the applicant's own re-check stays on the application.
+
+**Also**
+- The administrator's sign-in is no longer published with the demonstration accounts.
+
 ## v0.4.1-rc.1, 8 October 2026: Singapore formats on the form, hours you pick, and a clear test environment
 
 **New for operators**

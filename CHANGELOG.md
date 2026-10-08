@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## v0.4.1-rc.2: release candidate on the development environment (8 Oct 2026)
+
+Fixes from security audit run 2 and the rc.1 edge-case sweep (73 cases, 70 correct), each with a regression test: the operator verify re-run route is operator-only (an officer got the operator working copy; officers use the officer route); `update_section` drops client-sent `STAMPED_FIELDS` keys and keeps the held stamp; `_validate_field` calls `math.isfinite` on floats only, so a 401-digit integer is a 422, not an `OverflowError` 500; `seed.py` takes the administrator password from `SEED_ADMIN_PASSWORD` and refuses production without a private value, and the README no longer publishes it (medium finding). The administrator account already seeded keeps its old password until it is rotated by hand (OPERATIONS.md). Version `0.4.1-rc.2` in the five files.
+
 ## v0.4.1-rc.1: release candidate on the development environment (8 Oct 2026)
 
 The first version cut under `docs/09-operations/RELEASING.md`: a release candidate on `dev`, tested on dev.permitflow.space, released to `main` only when stable. Contents: US-108 (form validation and the operating hours pick list), US-109 (the development environment strip on every page outside production), US-110 (release candidates listed on the development What's new page, hidden in production; retro entries for v0.4.0-rc.1 and rc.2), the release guard (`scripts/release_guard.py`, run in CI on every `v*` tag) and the production image record of v0.4.0 in `OPERATIONS.md`. Version `0.4.1-rc.1` in the five files. Security audit run 2 reviews this source before the release.
