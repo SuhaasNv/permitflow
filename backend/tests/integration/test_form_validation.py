@@ -2,6 +2,7 @@
 legacy free-text hours)."""
 
 import copy
+import json
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -259,3 +260,22 @@ def test_resaving_an_untouched_legacy_section_is_not_a_change(client: TestClient
     compare = client.get(f"/api/v1/applications/{app_id}/compare?from=1&to=2", headers=op).json()
     business = next(s for s in compare["sections"] if s["key"] == "business")
     assert [f["key"] for f in business["fields"]] == ["business_name"]
+
+
+def test_a_huge_integer_is_422_with_a_field_message(client: TestClient, db: Session) -> None:
+    h, app_id = _operator(client, db)
+    url = f"/api/v1/applications/{app_id}/sections/operations"
+    valid = json.dumps({**VALID_OPERATIONS, "seating_capacity": 1})
+
+    def patch_with(digits: int) -> Any:
+        number = "1" + "0" * (digits - 1)
+        body = valid.replace('"seating_capacity": 1', f'"seating_capacity": {number}')
+        return client.patch(url, headers={**h, "content-type": "application/json"}, content=body)
+
+    r = patch_with(401)
+    assert r.status_code == 422, r.text
+    error = r.json()["error"]
+    assert error["code"] == "validation_failed"
+    assert error["details"]["fields"] == {"seating_capacity": "Must be at most 2000."}
+    # past Python's 4300-digit int limit the body itself is refused: still a clean 400, never a 500
+    assert patch_with(5000).status_code == 400
