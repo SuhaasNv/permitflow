@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import raw from 'virtual:release-notes'
@@ -11,9 +11,9 @@ import { PageHeader } from '@/features/shared/PageHeader'
 import { PolicyLinks } from '@/features/shared/PolicyLinks'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import { cn } from '@/lib/cn'
-import { orderBlocks, parseReleaseNotes, releaseFor, tokenizeInline } from './notes'
-import type { Audience, NoteBlock, Release } from './notes'
-import { useBuildInfo } from './queries'
+import { orderBlocks, parseReleaseNotes, releaseFor, tokenizeInline, visibleNotes } from './notes'
+import type { Audience, NoteBlock, Release, ReleaseNotes } from './notes'
+import { useBuildInfo, useShowCandidates } from './queries'
 import { markReleaseSeen } from './seen'
 import { VersionChip } from './VersionChip'
 
@@ -118,6 +118,11 @@ function FoldedBlock({ block }: { block: NoteBlock }) {
   )
 }
 
+/** Marks a release candidate: dot plus words, so colour is never the only signal. */
+function CandidateBadge({ className }: { className?: string }) {
+  return <StatusBadge label="Release candidate" tone="warning" className={className} />
+}
+
 function ReleaseArticle({ release, reader }: { release: Release; reader: Audience | null }) {
   const { own, others, shared } = orderBlocks(release.blocks, reader)
   const ownKicker = reader && reader !== 'admin' ? 'For you' : undefined
@@ -126,6 +131,7 @@ function ReleaseArticle({ release, reader }: { release: Release; reader: Audienc
       <div className="flex flex-wrap items-baseline gap-x-2.5">
         <span className="font-mono text-[15px] text-text-2">{release.version}</span>
         <span className="text-[13px] text-text-3">{release.date}</span>
+        {release.candidate ? <CandidateBadge /> : null}
       </div>
       <h2 className="mt-1.5 text-[24px] font-semibold leading-[30px] tracking-[-0.015em] sm:text-[28px] sm:leading-9">
         {capitalize(release.title)}
@@ -159,9 +165,9 @@ function capitalize(s: string): string {
 }
 
 /** The page body: the build line, the releases list (the running one marked), Coming next, the selected release. */
-function ReleasesBody({ selected, reader }: { selected: Release; reader: Audience | null }) {
+function ReleasesBody({ notes, selected, reader }: { notes: ReleaseNotes; selected: Release; reader: Audience | null }) {
   const build = useBuildInfo()
-  const current = releaseFor(RELEASE_NOTES, __APP_VERSION__)
+  const current = releaseFor(notes, __APP_VERSION__)
   const commit = build.data?.commit && build.data.commit !== 'local' ? build.data.commit : null
   const environment = build.data ? (ENVIRONMENT_LABEL[build.data.environment] ?? build.data.environment) : null
   return (
@@ -184,7 +190,7 @@ function ReleasesBody({ selected, reader }: { selected: Release; reader: Audienc
         <div className="lg:sticky lg:top-6 lg:flex lg:flex-col lg:gap-5">
           <nav aria-label="Releases" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 lg:flex-col lg:gap-0.5 lg:overflow-visible">
             <p className="pf-eyebrow hidden px-2.5 pb-1.5 lg:block">Releases</p>
-            {RELEASE_NOTES.releases.map((r) => {
+            {notes.releases.map((r) => {
               const isCurrent = r.version === current?.version
               const isSelected = r.version === selected.version
               return (
@@ -202,6 +208,7 @@ function ReleasesBody({ selected, reader }: { selected: Release; reader: Audienc
                     <span className={cn('font-mono text-[13px]', isSelected ? 'font-semibold' : '')}>{r.version}</span>
                     <span className="hidden text-xs text-text-3 lg:inline">{r.date}</span>
                   </span>
+                  {r.candidate ? <CandidateBadge className="ml-2 shrink-0 lg:ml-0 lg:mt-1 lg:self-start" /> : null}
                   <span className={cn('hidden truncate text-[13px] lg:block', isSelected ? 'font-medium' : '')}>{capitalize(r.title)}</span>
                   {isCurrent ? (
                     <span className="mt-1 hidden lg:block">
@@ -247,7 +254,9 @@ function ReleasesBody({ selected, reader }: { selected: Release; reader: Audienc
 export function ReleasesPage() {
   const { version } = useParams()
   const { user, ready } = useAuth()
-  const selected = (version ? releaseFor(RELEASE_NOTES, version) : undefined) ?? RELEASE_NOTES.releases[0]
+  const showCandidates = useShowCandidates()
+  const notes = useMemo(() => visibleNotes(RELEASE_NOTES, showCandidates), [showCandidates])
+  const selected = (version ? releaseFor(notes, version) : undefined) ?? notes.releases[0]
   useEffect(() => {
     markReleaseSeen(__APP_VERSION__)
   }, [])
@@ -257,7 +266,7 @@ export function ReleasesPage() {
   if (user && ready) {
     return (
       <AppShell>
-        <ReleasesBody selected={selected} reader={user.role} />
+        <ReleasesBody notes={notes} selected={selected} reader={user.role} />
       </AppShell>
     )
   }
@@ -278,7 +287,7 @@ export function ReleasesPage() {
         </div>
       </header>
       <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1200px] px-5 py-12 outline-none sm:px-10 sm:py-16">
-        <ReleasesBody selected={selected} reader={null} />
+        <ReleasesBody notes={notes} selected={selected} reader={null} />
       </main>
       <footer className="mt-auto border-t border-line">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-5 py-8 text-[13px] text-text-3 sm:flex-row sm:items-center sm:gap-4 sm:px-10">

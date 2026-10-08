@@ -6,6 +6,8 @@
  *
  *   ## Coming next                                  the paragraphs until the next release heading
  *   ## vX.Y.Z, D Month YYYY[ (note)]: title         one release, newest first
+ *   ## vX.Y.Z-rc.N, D Month YYYY[ (note)]: title    one release candidate, among the releases; shown on
+ *                                                   the development environment only (US-110)
  *   **Heading** [trailing note]                     an audience block inside a release
  *   - item                                          a bullet in the current block
  *   any other line                                  a paragraph (of the release before its first block)
@@ -25,6 +27,8 @@ export interface NoteBlock {
 
 export interface Release {
   version: string
+  /** A release candidate (`v0.4.1-rc.1`): listed on the development environment, never on production. */
+  candidate: boolean
   date: string
   /** The parenthesised note in the heading, if any ("release candidate v0.4.0-rc.2 on the development environment"). */
   note: string | null
@@ -38,7 +42,7 @@ export interface ReleaseNotes {
   releases: Release[]
 }
 
-const RELEASE_HEADING = /^## (v\d+\.\d+\.\d+), (\d{1,2} [A-Z][a-z]+ \d{4})(?: \(([^)]*)\))?: (.+)$/
+const RELEASE_HEADING = /^## (v\d+\.\d+\.\d+(-rc\.\d+)?), (\d{1,2} [A-Z][a-z]+ \d{4})(?: \(([^)]*)\))?: (.+)$/
 const COMING_NEXT_HEADING = /^## Coming next\s*$/
 const BLOCK_HEADING = /^\*\*([^*]+)\*\*\s*(.*)$/
 const BULLET = /^- (.+)$/
@@ -78,8 +82,8 @@ export function parseReleaseNotes(raw: string): ReleaseNotes {
         return
       }
       const m = RELEASE_HEADING.exec(line)
-      if (!m) throw new ReleaseNotesFormatError(at, `a release heading must read "## vX.Y.Z, D Month YYYY[ (note)]: title", got "${line}"`)
-      release = { version: m[1], date: m[2], note: m[3] ?? null, title: m[4].trim(), intro: [], blocks: [] }
+      if (!m) throw new ReleaseNotesFormatError(at, `a release heading must read "## vX.Y.Z[-rc.N], D Month YYYY[ (note)]: title", got "${line}"`)
+      release = { version: m[1], candidate: m[2] !== undefined, date: m[3], note: m[4] ?? null, title: m[5].trim(), intro: [], blocks: [] }
       releases.push(release)
       section = 'release'
       return
@@ -111,6 +115,13 @@ export function parseReleaseNotes(raw: string): ReleaseNotes {
     if (r.blocks.length === 0 && r.intro.length === 0) throw new ReleaseNotesFormatError(0, `${r.version} has no content`)
   })
   return { comingNext, releases }
+}
+
+/** What a reader may see: every release, plus the candidates only where `showCandidates` is true (the development
+ * environment). Order is the file's. Coming next is never touched: candidates are not part of the plan. */
+export function visibleNotes(notes: ReleaseNotes, showCandidates: boolean): ReleaseNotes {
+  if (showCandidates) return notes
+  return { comingNext: notes.comingNext, releases: notes.releases.filter((r) => !r.candidate) }
 }
 
 /** The notes for one version: the exact version, or the release an rc belongs to (`v0.4.0-rc.2` reads `v0.4.0`). */

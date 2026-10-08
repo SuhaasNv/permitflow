@@ -1,6 +1,6 @@
 import raw from 'virtual:release-notes'
 
-import { ReleaseNotesFormatError, audienceOf, orderBlocks, parseReleaseNotes, releaseFor, tokenizeInline } from './notes'
+import { ReleaseNotesFormatError, audienceOf, orderBlocks, parseReleaseNotes, releaseFor, tokenizeInline, visibleNotes } from './notes'
 
 const SAMPLE = `# Release notes
 
@@ -72,7 +72,8 @@ describe('parseReleaseNotes', () => {
     expect(notes.releases.length).toBeGreaterThanOrEqual(4)
     expect(notes.comingNext.length).toBeGreaterThan(0)
     for (const r of notes.releases) {
-      expect(r.version).toMatch(/^v\d+\.\d+\.\d+$/)
+      expect(r.version).toMatch(/^v\d+\.\d+\.\d+(-rc\.\d+)?$/)
+      expect(r.candidate).toBe(r.version.includes('-rc.'))
       expect(r.date).toMatch(/^\d{1,2} [A-Z][a-z]+ \d{4}$/)
       expect(r.title.length).toBeGreaterThan(0)
       expect(r.blocks.length).toBeGreaterThan(0)
@@ -135,5 +136,97 @@ describe('audienceOf, releaseFor, orderBlocks, tokenizeInline', () => {
       { kind: 'text', text: ' text.' },
     ])
     expect(tokenizeInline('plain')).toEqual([{ kind: 'text', text: 'plain' }])
+  })
+})
+
+const WITH_CANDIDATES = `# Release notes
+
+## Coming next
+
+**v0.6.0** is planned.
+
+## v0.5.0, 20 October 2026: safe intake
+
+**New**
+- Files are checked.
+
+---
+
+## v0.5.0-rc.2, 18 October 2026 (the second look): safe intake, again
+
+**New**
+- The check also covers photos.
+
+## v0.5.0-rc.1, 15 October 2026: safe intake
+
+An introduction line.
+
+**New**
+- Files are checked.
+
+## v0.4.0, 8 October 2026: the site visit
+
+**New**
+- The site visit.
+`
+
+describe('release candidates (US-110)', () => {
+  it('reads -rc.N headings, with or without a note, keeping the file order', () => {
+    const notes = parseReleaseNotes(WITH_CANDIDATES)
+    expect(notes.releases.map((r) => [r.version, r.candidate])).toEqual([
+      ['v0.5.0', false],
+      ['v0.5.0-rc.2', true],
+      ['v0.5.0-rc.1', true],
+      ['v0.4.0', false],
+    ])
+    expect(notes.releases[1].note).toBe('the second look')
+    expect(notes.releases[1].title).toBe('safe intake, again')
+    expect(notes.releases[2].note).toBeNull()
+    expect(notes.releases[2].intro).toEqual(['An introduction line.'])
+    expect(notes.releases[2].blocks[0].items).toEqual(['Files are checked.'])
+  })
+
+  it.each([
+    '## v0.5.0-rc, 15 October 2026: title',
+    '## v0.5.0-rc.x, 15 October 2026: title',
+    '## v0.5.0-beta.1, 15 October 2026: title',
+    '## v0.5.0-rc.1.2, 15 October 2026: title',
+    '## v0.5-rc.1, 15 October 2026: title',
+    '## v0.5.0 rc.1, 15 October 2026: title',
+    '## v0.5.0-rc.1 (15 October 2026): title',
+    '## v0.5.0-rc.1, 15 October 2026 title',
+  ])('still refuses %s, naming the line', (heading) => {
+    expect(() => parseReleaseNotes(`${heading}\n**New**\n- x`)).toThrow(ReleaseNotesFormatError)
+    expect(() => parseReleaseNotes(`${heading}\n**New**\n- x`)).toThrow(/line 1/)
+  })
+
+  it('shows candidates only when asked; production keeps releases and Coming next, in order', () => {
+    const notes = parseReleaseNotes(WITH_CANDIDATES)
+    expect(visibleNotes(notes, true)).toBe(notes)
+    const production = visibleNotes(notes, false)
+    expect(production.releases.map((r) => r.version)).toEqual(['v0.5.0', 'v0.4.0'])
+    expect(production.releases.some((r) => r.candidate)).toBe(false)
+    expect(production.comingNext).toEqual(notes.comingNext)
+    expect(notes.releases).toHaveLength(4)
+  })
+
+  it('finds a candidate by its exact version and falls back to its release when it is hidden', () => {
+    const notes = parseReleaseNotes(WITH_CANDIDATES)
+    expect(releaseFor(notes, '0.5.0-rc.2')?.version).toBe('v0.5.0-rc.2')
+    expect(releaseFor(notes, 'v0.5.0-rc.1')?.candidate).toBe(true)
+    expect(releaseFor(visibleNotes(notes, false), '0.5.0-rc.2')?.version).toBe('v0.5.0')
+  })
+
+  it('the real file: candidates are listed, the newest entry is a release, and no release mentions a candidate', () => {
+    const notes = parseReleaseNotes(raw)
+    const candidates = notes.releases.filter((r) => r.candidate)
+    expect(candidates.map((r) => r.version)).toEqual(expect.arrayContaining(['v0.4.0-rc.2', 'v0.4.0-rc.1']))
+    expect(notes.releases[0].candidate).toBe(false)
+    for (const r of notes.releases.filter((x) => !x.candidate)) {
+      const text = [r.title, r.note ?? '', ...r.intro, ...r.blocks.flatMap((b) => [b.heading, b.note ?? '', ...b.paragraphs, ...b.items])].join('\n')
+      expect(text, r.version).not.toMatch(/candidate|-rc\.|\brc\d/i)
+    }
+    // What production would show: no candidate anywhere.
+    expect(visibleNotes(notes, false).releases.every((r) => !r.candidate)).toBe(true)
   })
 })
