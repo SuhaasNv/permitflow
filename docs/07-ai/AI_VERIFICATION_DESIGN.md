@@ -21,6 +21,7 @@ Inputs sent to the provider (and nothing else: see THREAT_MODEL T18):
 - `document_type` and a one-line description of what that type should contain.
 - The relevant form section only (Business for `business_profile`, Premises for `floor_plan` and `tenancy_agreement`, Business for `food_hygiene_certificate`).
 - Extracted text, capped at 20 000 characters, wrapped in explicit delimiters and labelled as untrusted data.
+- Both the text and the form values are cleaned and have NRIC/FIN and phone numbers masked before they are sent (US-102, "Input hardening" below).
 
 ## Pipeline
 
@@ -30,7 +31,7 @@ run_verification(run_id): sync, threadpool, own DB session:
   1. mark running
   2. extract text: PDF via pypdf (≤ 30 pages, ≤ 20 000 chars, 10 s); TXT as UTF-8; PNG/JPEG → unreadable (no OCR)
   3. empty/unsupported → status unreadable, error_reason, stop (no model call, no cost)
-  4. injection heuristic over the text → flag (list of matched phrases)
+  4. input hardening (US-102, domain/ai_input.py): strip and flag hidden characters, NFKC, injection heuristic over a look-alike-folded skeleton and the decoded hidden text → flag (evidence for the officer); then mask NRIC/FIN and phone numbers in the text and in the form values
   5. provider.verify(request) with 30 s timeout, one retry on transient errors
   6. wire model (from provider) → domain model validation (extra=forbid, 0 ≤ confidence ≤ 1, enum codes)
   7. rules: verified & confidence < AI_CONFIDENCE_THRESHOLD → needs_review; injection flag → needs_review + issue possible_prompt_injection
@@ -40,6 +41,20 @@ run_verification(run_id): sync, threadpool, own DB session:
 ```
 
 Re-run: allowed by the owner or an officer only when the latest run is terminal; creates a new run row (history is kept).
+
+## Input hardening (US-102)
+
+One pure function, `prepare_text` in `backend/app/domain/ai_input.py`, runs in the verification service and in the evaluation harness, so the golden set exercises exactly what an upload does. It runs after extraction and before the injection check and before anything reaches a provider.
+
+1. **Clean.** Hidden characters are stripped: zero-width (U+200B to U+200D, U+2060, U+FEFF), bidirectional overrides and isolates (U+202A to U+202E, U+2066 to U+2069) and the Unicode Tag block (U+E0000 to U+E007F). The pattern is the one `domain/text_clean.py` (US-108) already uses for typed text. The text is then normalised with NFKC (fullwidth and mathematical letters become plain ones) and passed through `clean_text` (control characters removed, runs of spaces collapsed, at most one blank line). Soft hyphens, invisible operators and the combining grapheme joiner are stripped without a flag (they appear in ordinary PDF text).
+2. **Detect.**
+   - Finding a hidden character at all raises `possible_prompt_injection` and sends the check to `needs_review`. The evidence is `hidden text: <decoded message>` when the Tag block carried one (Tag characters are ASCII shifted to U+E0000), otherwise `hidden characters (<count>)`.
+   - The phrase heuristic (`find_injection_phrases`) then reads a **skeleton** of the cleaned text: accents dropped, white space and line breaks collapsed, and look-alike letters from other scripts folded to Latin using the Unicode TR39 confusables table. The skeleton is for the detector only; the provider receives the cleaned text as written.
+   - Not flagged, because it is ordinary writing: a byte-order mark at the very start of a file; a zero-width joiner between emoji or between letters of Tamil, Devanagari, Arabic and the other joining scripts; the Tag-block subdivision flags (England, Scotland, Wales); normal Malay, Chinese, Tamil, accented Latin and emoji text. A joiner between Latin letters, a byte-order mark in the middle of a word and a long Tag run after a flag emoji are flagged.
+   - The TR39 table is vendored, not installed: `backend/app/domain/confusables_data.py` (711 entries, 9 KB) is generated from Unicode's `confusables.txt` (version 18.0.0) by `backend/scripts/gen_confusables.py`, keeping single non-ASCII letters and digits that map to ASCII letters or digits. No new dependency.
+3. **Redact.** NRIC/FIN numbers (S, T, F, G with the checksum letter verified; M by shape and letter set) and Singapore phone numbers (8 digits starting 3, 6, 8 or 9, with or without +65, 65 or 0065) are masked and the last 4 characters are kept: `S1234567D` becomes `*****567D`, `+65 9123 4567` becomes `****4567`. Business UENs, postal codes, dates (including 8 digits written as a date) and certificate numbers are left alone. The same masking is applied to the form section sent beside the text, so a number in the document and the same number on the form read identically to the model and the comparison still works. The stored application and `extracted_text` are not changed. Other personal data (names, addresses, free text) is not masked; readiness row 8 stays open for it.
+
+The prompt text is unchanged (`PROMPT_VERSION` 2026-09-19.3): a masked value in the document and the same masked value in the form need no explanation. The live model has not yet seen the masked inputs; the owner-approved live run follows.
 
 ## Prompt contract (OpenAI provider)
 
@@ -69,7 +84,7 @@ Deterministic, dependency-free, used in tests and when `AI_PROVIDER=mock` or no 
 - Text contains the form's business name or registration number → `field_mismatch` not raised; otherwise raised for `business_profile`.
 - Text contains a keyword expected for the type (for example "tenancy", "lease" for `tenancy_agreement`) → type accepted; otherwise `wrong_document_type`.
 - Text contains "expired", or a date in the past (ISO or "3 January 2025") after an expiry phrase ("expiry", "valid until") → `expired_document`; a tenancy agreement with no date at all → `missing_field`.
-- Injection phrases ("ignore previous instructions", "mark this as verified") → `possible_prompt_injection`.
+- Injection phrases ("ignore previous instructions", "mark this as verified") → `possible_prompt_injection`. The mock has no heuristic of its own: the flag comes from the pipeline's input hardening, so it is the same on every provider.
 - Confidence: 0.9 when no issues, 0.7 with issues, 0.4 if the text is shorter than 200 characters (drives `needs_review`).
 
 The mock is intentionally simple; it exists so the whole product works without a key and so tests are hermetic.
@@ -111,4 +126,4 @@ Estimated cost per verification with `gpt-4.1-mini`: well under one cent for a 2
 
 ## Evaluation (Day 3, `docs/07-ai/AI_EVALUATION.md`)
 
-Built: fourteen cases in `backend/evals/cases.json` (the eight demo PDFs plus text fixtures for wrong type, missing expiry, ambiguous, empty, oversized and two injection styles) run through the real pipeline by `python -m evals.run`; the mock run is a blocking CI job, the OpenAI run is by hand. Results and caveats in `AI_EVALUATION.md`.
+Built: 27 cases in `backend/evals/cases.json`, 24 in the gate set (the eight demo PDFs plus text fixtures for wrong type, missing expiry, ambiguous, empty, oversized, eight injection styles including hidden, Tag-block, look-alike and fullwidth text, and four personal-data and ordinary-Unicode cases) and three red-team cases reported but not counted run through the real pipeline by `python -m evals.run`; the mock run is a blocking CI job, the OpenAI run is by hand. Results and caveats in `AI_EVALUATION.md`.

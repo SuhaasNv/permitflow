@@ -22,12 +22,12 @@ from pathlib import Path
 from typing import Any
 
 from app.core.settings import get_settings
+from app.domain.ai_input import prepare_text, redact_form_section
 from app.domain.verification_rules import (
     DOCUMENT_TYPE_DESCRIPTIONS,
     SECTION_FOR_DOCUMENT,
     VerificationRequest,
     apply_rules,
-    find_injection_phrases,
 )
 from app.infra.ai.base import VerificationProvider
 from app.infra.ai.mock import MockProvider
@@ -80,17 +80,19 @@ def run_case(case: dict[str, Any], form: dict[str, Any], provider: VerificationP
         actual = "unreadable"
         note = f"extraction: {extracted.reason}"
     else:
-        injection = find_injection_phrases(extracted.text)
+        prepared = prepare_text(extracted.text)
         doc_type = case["document_type"]
         request = VerificationRequest(
             document_type=doc_type,
             document_type_description=DOCUMENT_TYPE_DESCRIPTIONS[doc_type],
-            form_section=dict(form.get(SECTION_FOR_DOCUMENT[doc_type]) or {}),
-            text=extracted.text,
+            form_section=redact_form_section(dict(form.get(SECTION_FOR_DOCUMENT[doc_type]) or {})),
+            text=prepared.text,
         )
         result = provider.verify(request)
         outcome = apply_rules(
-            result, confidence_threshold=settings.ai_confidence_threshold, injection_phrases=injection
+            result,
+            confidence_threshold=settings.ai_confidence_threshold,
+            injection_phrases=prepared.injection,
         )
         actual = outcome.status.value
         codes = sorted({str(i["code"]) for i in outcome.issues})

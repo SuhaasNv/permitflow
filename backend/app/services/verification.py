@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core import metrics
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.settings import get_settings
+from app.domain.ai_input import prepare_text, redact_form_section
 from app.domain.enums import Role, VerificationStatus
 from app.domain.verification_rules import (
     DOCUMENT_TYPE_DESCRIPTIONS,
@@ -22,7 +23,6 @@ from app.domain.verification_rules import (
     VerificationRequest,
     VerificationResult,
     apply_rules,
-    find_injection_phrases,
 )
 from app.infra.ai import ProviderError, ProviderUnavailable
 from app.infra.ai.factory import get_provider
@@ -97,13 +97,14 @@ def run_verification(run_id: uuid.UUID) -> None:
                 )
                 return
 
-            injection = find_injection_phrases(extracted.text)
+            # Clean, check and redact before anything reaches the provider (US-102).
+            prepared = prepare_text(extracted.text)
             section_key = SECTION_FOR_DOCUMENT[doc.document_type.value]
             request = VerificationRequest(
                 document_type=doc.document_type.value,
                 document_type_description=DOCUMENT_TYPE_DESCRIPTIONS[doc.document_type.value],
-                form_section=dict(app.draft_data.get(section_key) or {}),
-                text=extracted.text,
+                form_section=redact_form_section(dict(app.draft_data.get(section_key) or {})),
+                text=prepared.text,
                 extra={"verification_run_id": run.id, "application_id": app.id, "document_id": doc.id},
             )
             try:
@@ -135,7 +136,9 @@ def run_verification(run_id: uuid.UUID) -> None:
                 return
 
             outcome = apply_rules(
-                result, confidence_threshold=settings.ai_confidence_threshold, injection_phrases=injection
+                result,
+                confidence_threshold=settings.ai_confidence_threshold,
+                injection_phrases=prepared.injection,
             )
             run.confidence = result.confidence
             run.summary = result.summary
