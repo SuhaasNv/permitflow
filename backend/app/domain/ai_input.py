@@ -62,6 +62,8 @@ _SELECTOR_BASES = frozenset(
 )
 # Thai, Lao and Khmer are written without spaces: a zero-width space between two letters marks a word break.
 _WORD_BREAK_SCRIPTS = frozenset({"THAI", "LAO", "KHMER"})
+# Unicode names that start the characters of the right-to-left scripts, Arabic-Indic digits included.
+_RTL_NAMES = ("ARABIC", "HEBREW", "SYRIAC", "THAANA", "EXTENDED ARABIC-INDIC")
 # A `<document>` tag in any case, with white space inside or attributes: the provider's data delimiter.
 _DOCUMENT_TAG = re.compile(r"<\s*(/?)\s*document\b[^>]*>", re.IGNORECASE)
 _JOINING_SCRIPTS = frozenset(
@@ -174,6 +176,8 @@ def _suspicious_hidden(text: str) -> list[str]:
             continue
         if char in "\u200b\u200c\u200d" and _is_joiner_in_writing(text, index):
             continue
+        if char in "\u200e\u200f" and _is_direction_mark_in_rtl(text, index):
+            continue
         found.append(char)
     return found
 
@@ -188,6 +192,14 @@ def _is_emoji_selector(text: str, index: int) -> bool:
     return before in _SELECTOR_BASES or (before != "\ufe0f" and _is_emoji(before))
 
 
+def _is_direction_mark_in_rtl(text: str, index: int) -> bool:
+    """LRM and RLM are normal in Arabic, Hebrew, Syriac and Thaana text (and beside Arabic-Indic digits):
+    one directly beside a letter of those scripts is ordinary writing. Between Latin letters, or inside a run
+    of marks (a bit pattern), it is not."""
+    neighbours = text[max(index - 1, 0) : index] + text[index + 1 : index + 2]
+    return any(_script_name(c).startswith(_RTL_NAMES) for c in neighbours)
+
+
 def _is_joiner_in_writing(text: str, index: int) -> bool:
     if index == 0 or index + 1 >= len(text):
         return False
@@ -200,7 +212,11 @@ def _is_joiner_in_writing(text: str, index: int) -> bool:
 
 
 def _script(char: str) -> str:
-    return unicodedata.name(char, "").split(" ", 1)[0]
+    return _script_name(char).split(" ", 1)[0]
+
+
+def _script_name(char: str) -> str:
+    return unicodedata.name(char, "")
 
 
 def _is_emoji(char: str) -> bool:

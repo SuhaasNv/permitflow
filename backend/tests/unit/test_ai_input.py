@@ -490,3 +490,51 @@ def test_golden_document_breakout_is_neutralised_and_flagged() -> None:
     assert "</document>" not in prepared.text and "<document>" not in prepared.text
     assert "[/document]" in prepared.text
     assert prepared.injection[0].startswith("document delimiter tag in the text")
+
+
+LRM, RLM = chr(0x200E), chr(0x200F)
+ARABIC_NAME = u(0x0645, 0x062D, 0x0645, 0x062F) + " " + u(0x0639, 0x0644, 0x064A)  # Muhammad Ali
+HEBREW_NAME = u(0x05D3, 0x05D5, 0x05D3) + " " + u(0x05DB, 0x05D4, 0x05DF)  # David Cohen
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        ARABIC_NAME + RLM + " (Muhammad Ali)",
+        RLM + ARABIC_NAME,
+        ARABIC_NAME + RLM,
+        "Name: " + RLM + ARABIC_NAME + LRM + ", UEN 202355555E",
+        HEBREW_NAME + RLM + ": Tan Wei Ling",
+        "Tan Wei Ling " + LRM + HEBREW_NAME,
+        u(0x0661, 0x0662, 0x0663) + LRM + " units",  # Arabic-Indic digits
+        "Syriac " + RLM + u(0x0710, 0x0712),
+        "Thaana " + RLM + u(0x0780, 0x0781),
+    ],
+)
+def test_a_direction_mark_beside_right_to_left_text_is_stripped_not_flagged(text: str) -> None:
+    prepared = prepare_text(text)
+    assert prepared.injection == [] and prepared.hidden_count == 0, text.encode("unicode_escape")
+    assert LRM not in prepared.text and RLM not in prepared.text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Kopi" + LRM + "Kaya",
+        "Kopi " + RLM + " Kaya",
+        "Kopi Kaya" + LRM,
+        LRM + "Kopi Kaya",
+        "Tan " + LRM + RLM + LRM + RLM + " Wei Ling",  # a bit pattern between Latin letters
+        ARABIC_NAME + (LRM + RLM) * 4 + " Kopi",  # a run: only the mark beside the Arabic letter is quiet
+        ARABIC_NAME + " " + LRM + " 123 Kopi",  # a space is not a letter
+    ],
+)
+def test_a_direction_mark_elsewhere_is_still_flagged(text: str) -> None:
+    prepared = prepare_text(text)
+    assert flagged(prepared) and prepared.hidden_count >= 1, text.encode("unicode_escape")
+    assert LRM not in prepared.text and RLM not in prepared.text
+
+
+def test_an_arabic_sentence_with_marks_reaches_the_provider_unchanged_apart_from_the_marks() -> None:
+    sentence = f"{ARABIC_NAME}{RLM} {HEBREW_NAME}{RLM}"
+    assert prepare_text(sentence).text == f"{ARABIC_NAME} {HEBREW_NAME}"
