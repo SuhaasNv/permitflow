@@ -1,5 +1,6 @@
 """Authentication use cases: sign in, the per-request session check, sign out (US-001, US-093)."""
 
+import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ from app.models import User, UserSession
 from app.repositories.audit import AuditRepository
 from app.repositories.sessions import SessionRepository
 from app.repositories.users import UserRepository
+
+logger = logging.getLogger("permitflow.auth")
 
 
 @dataclass(frozen=True)
@@ -115,11 +118,23 @@ class AuthService:
             self.db.commit()
         return user
 
-    def confirm_password(self, user: User, password: str) -> None:
-        """Step-up (US-101): re-verify the signed-in user's own password before a sensitive change. The
-        caller counts a failure against the sign-in limiter."""
-        if not verify_password(password, user.password_hash):
-            raise StepUpFailed("Your password is incorrect. The change was not made.")
+    def confirm_password(
+        self, user: User, password: str, *, failure_event: str, failure_payload: dict[str, str | None]
+    ) -> None:
+        """Step-up (US-101): re-verify the signed-in user's own password before a sensitive change. A wrong
+        password is audited as `failure_event` (never with the password) in its own transaction, committed
+        before the error is raised; the caller counts it against the sign-in limiter."""
+        if verify_password(password, user.password_hash):
+            return
+        try:
+            self.audit.record(
+                application_id=None, actor_id=user.id, event_type=failure_event, payload=failure_payload
+            )
+            self.db.commit()
+        except Exception:  # noqa: BLE001 - the refusal must reach the caller even if it cannot be recorded
+            self.db.rollback()
+            logger.exception("step_up_failure_not_audited")
+        raise StepUpFailed("Your password is incorrect. The change was not made.")
 
     def sign_out(self, user: User, session_id: uuid.UUID) -> None:
         session = self.sessions.get(session_id)

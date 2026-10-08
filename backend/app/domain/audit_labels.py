@@ -80,7 +80,15 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
         case "settings.changed" | "settings.reverted":
             verb = "reverted" if event_type == "settings.reverted" else "changed"
             name = p.get("label", p.get("key", ""))
-            return f"Setting {verb}: {name}, {_setting_value(p.get('old'))} to {_setting_value(p.get('new'))}"
+            text = f"Setting {verb}: {name}, {_setting_value(p.get('old'))} to {_setting_value(p.get('new'))}"
+            stopped = p.get("ended_while_paused")
+            if stopped is not None:
+                text += f" ({stopped} checks ended as ai_paused while paused)"
+            return text
+        case "settings.step_up_failed":
+            return f"Wrong password on a setting change: {p.get('key') or p.get('history_entry', '')}"
+        case "user.step_up_failed":
+            return f"Wrong password on an account change: {p.get('action', '')}"
         case "user.session_taken_over":
             return f"Signed in on {p.get('to_device', '')}; the session on {p.get('from_device', '')} ended"
         case "user.signed_out":

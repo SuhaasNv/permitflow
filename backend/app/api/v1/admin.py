@@ -67,31 +67,64 @@ def users(user: AdminUser, db: DbSession) -> AdminUsersOut:
 
 
 @router.post("/users", response_model=AdminUserOut, status_code=status.HTTP_201_CREATED)
-def create_user(payload: UserCreateIn, user: AdminUser, db: DbSession) -> AdminUserOut:
-    """A new account (US-073, added at the owner's request): audit `user.created`."""
+def create_user(payload: UserCreateIn, request: Request, user: AdminUser, db: DbSession) -> AdminUserOut:
+    """A new account (US-073, added at the owner's request). Needs the administrator's own password
+    (`admin_password`, step-up): 403 `step_up_failed`, audited as `user.step_up_failed`, 429 after
+    repeated failures. Audit `user.created`."""
+    _step_up(
+        request,
+        user,
+        db,
+        payload.admin_password,
+        failure_event="user.step_up_failed",
+        failure_payload={"action": "create", "email": payload.email.strip().lower()},
+    )
     return AdminUserService(db).create(
         user, email=payload.email, full_name=payload.full_name, role=payload.role, password=payload.password
     )
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserOut)
-def patch_user(user_id: uuid.UUID, payload: UserPatchIn, user: AdminUser, db: DbSession) -> AdminUserOut:
-    """Change the role and/or the active flag (US-073): 409 `self_change`, `protected_account`,
-    `last_admin`, `try_again`; audit `user.role_changed`, `user.deactivated`, `user.reactivated`."""
+def patch_user(
+    user_id: uuid.UUID, payload: UserPatchIn, request: Request, user: AdminUser, db: DbSession
+) -> AdminUserOut:
+    """Change the role and/or the active flag (US-073). Needs the administrator's own password
+    (`admin_password`, step-up): 403 `step_up_failed`, audited as `user.step_up_failed`, 429 after
+    repeated failures. 409 `self_change`, `protected_account`, `last_admin`, `try_again`; audit
+    `user.role_changed`, `user.deactivated`, `user.reactivated`."""
+    _step_up(
+        request,
+        user,
+        db,
+        payload.admin_password,
+        failure_event="user.step_up_failed",
+        failure_payload={"action": "change", "user_id": str(user_id)},
+    )
     return AdminUserService(db).change(user, user_id, Change(role=payload.role, is_active=payload.is_active))
 
 
-def _step_up(request: Request, user: User, db: DbSession, password: str) -> None:
-    """Re-verify the administrator's own password before a settings change (US-101). A wrong password is
-    403 `step_up_failed` and counts against the sign-in limiter of the client address, which answers 429
-    once it is full, so the confirmation cannot be used to guess the password."""
+def _step_up(
+    request: Request,
+    user: User,
+    db: DbSession,
+    password: str,
+    *,
+    failure_event: str,
+    failure_payload: dict[str, str | None],
+) -> None:
+    """Re-verify the administrator's own password before a sensitive change (US-101, security audit F2). A
+    wrong password is 403 `step_up_failed`, is audited as `failure_event` in its own transaction and counts
+    against the sign-in limiter of the client address, which answers 429 once it is full, so the
+    confirmation cannot be used to guess the password."""
     settings = get_settings()
     key = client_key(request, settings.trusted_proxies, settings.client_ip_header)
     limiter = auth_api.login_limiter
     if limiter.is_blocked(key):
         raise RateLimited("Too many failed attempts. Try again in a minute.")
     try:
-        AuthService(db).confirm_password(user, password)
+        AuthService(db).confirm_password(
+            user, password, failure_event=failure_event, failure_payload=failure_payload
+        )
     except StepUpFailed:
         limiter.record_failure(key)
         raise
@@ -122,7 +155,14 @@ def change_platform_setting(
     """Move one setting inside its bounds (US-101). Needs a reason and the administrator's password:
     403 `step_up_failed`, 429 after repeated failures, 404 unknown key, 422 `validation_failed` naming the
     bound (or `no_change`); audit `settings.changed`."""
-    _step_up(request, user, db, payload.password)
+    _step_up(
+        request,
+        user,
+        db,
+        payload.password,
+        failure_event="settings.step_up_failed",
+        failure_payload={"key": key, "action": "change"},
+    )
     return PlatformSettingsService(db).change(user, key, payload.value, payload.reason)
 
 
@@ -132,5 +172,17 @@ def revert_platform_setting(
 ) -> SettingOut:
     """Undo one history entry: the setting returns to the value it had before it (US-101). Same step-up,
     reason and bounds as a change; audit `settings.reverted`."""
-    _step_up(request, user, db, payload.password)
-    return PlatformSettingsService(db).revert(user, event_id, payload.reason)
+    service = PlatformSettingsService(db)
+    _step_up(
+        request,
+        user,
+        db,
+        payload.password,
+        failure_event="settings.step_up_failed",
+        failure_payload={
+            "key": service.key_of_entry(event_id),
+            "action": "revert",
+            "history_entry": str(event_id),
+        },
+    )
+    return service.revert(user, event_id, payload.reason)

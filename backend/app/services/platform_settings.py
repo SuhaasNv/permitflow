@@ -46,6 +46,7 @@ from app.infra import notifier
 from app.infra.db import background_session
 from app.models import PlatformSetting, User
 from app.repositories.audit import AuditRepository
+from app.repositories.documents import DocumentRepository
 from app.repositories.platform_settings import PlatformSettingsRepository
 from app.repositories.users import UserRepository
 from app.schemas.platform_settings import (
@@ -234,6 +235,7 @@ class PlatformSettingsService:
         self.repo = PlatformSettingsRepository(db)
         self.audit = AuditRepository(db)
         self.users = UserRepository(db)
+        self.documents = DocumentRepository(db)
 
     # ---- reads ----
 
@@ -262,6 +264,13 @@ class PlatformSettingsService:
             entries=entries,
             next_cursor=encode_cursor(last.created_at, last.id) if more and last is not None else None,
         )
+
+    def key_of_entry(self, event_id: uuid.UUID) -> str | None:
+        """The setting a history entry is about, or None if the id is not a settings entry."""
+        event = self.audit.get(event_id)
+        if event is None or event.event_type not in HISTORY_TYPES:
+            return None
+        return str(event.payload.get("key", "")) or None
 
     # ---- writes ----
 
@@ -331,6 +340,11 @@ class PlatformSettingsService:
                 f"{spec.label} is already {_show(old)}.",
                 details={"key": spec.key, "reason": "no_change"},
             )
+        # Switching the AI back on: say how many checks the pause stopped (known gap until the worker, US-098,
+        # holds them in a queue instead). The reason code on a run is the setting's key.
+        ended_while_paused: int | None = None
+        if spec.key == "ai_paused" and old is True and new is False and row is not None:
+            ended_while_paused = self.documents.count_runs_ended_with(spec.key, since=row.updated_at)
         if to_default:
             if row is not None:
                 self.repo.remove(row)
@@ -344,6 +358,8 @@ class PlatformSettingsService:
             "old_was_default": row is None,
             "reason": reason,
         }
+        if ended_while_paused is not None:
+            payload["ended_while_paused"] = ended_while_paused
         if reverted_event_id is not None:
             payload["reverted_event_id"] = str(reverted_event_id)
         self.audit.record(application_id=None, actor_id=admin.id, event_type=event_type, payload=payload)
@@ -356,6 +372,11 @@ class PlatformSettingsService:
             f"PermitFlow [{settings.app_env}] setting {'reverted' if reverted_event_id else 'changed'}\n"
             f"{spec.label}: {_show(old)} -> {_show(new)}\n"
             f"By {admin.full_name}\nReason: {reason}"
+            + (
+                f"\n{ended_while_paused} checks ended as ai_paused while the AI was paused"
+                if ended_while_paused is not None
+                else ""
+            )
         )
         fresh = self.repo.get(spec.key)
         names = self.users.names([admin.id])

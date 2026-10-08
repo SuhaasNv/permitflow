@@ -48,6 +48,13 @@ class DocumentRepository:
             return []
         return list(self.db.scalars(select(Document).where(Document.id.in_(ids))))
 
+    def count_runs_ended_with(self, error_reason: str, *, since: datetime) -> int:
+        """Checks stored with this reason since a moment (the AI pause switch: how many were stopped)."""
+        stmt = select(func.count()).where(
+            VerificationRun.error_reason == error_reason, VerificationRun.created_at >= since
+        )
+        return int(self.db.scalar(stmt) or 0)
+
     def latest_run(self, document_id: uuid.UUID) -> VerificationRun | None:
         stmt = (
             select(VerificationRun)

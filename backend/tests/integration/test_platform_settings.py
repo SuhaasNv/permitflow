@@ -3,18 +3,21 @@ history and revert, and every consumer reading the live value."""
 
 import uuid
 from collections.abc import Iterator
+from typing import NoReturn
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from httpx2 import Response  # what Starlette's TestClient returns
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.api.v1 import auth as auth_module
-from app.core.rate_limit import FailedLoginLimiter
+from app.core.rate_limit import FailedLoginLimiter, RequestLimiter
 from app.core.settings import get_settings
 from app.infra import notifier
 from app.main import build_request_limiter
-from app.models import AuditEvent, PlatformSetting, VerificationRun
+from app.models import AuditEvent, PlatformSetting, User, VerificationRun
 from app.models.enums import Role, VerificationStatus
 from app.repositories.documents import DocumentRepository
 from app.services.platform_settings import live
@@ -38,13 +41,27 @@ def _put(
     *,
     reason: str = "Load from the open day",
     password: str = DEFAULT_PASSWORD,
-):  # type: ignore[no-untyped-def]
+) -> Response:
     return client.put(
         f"{SETTINGS}/{key}", headers=h, json={"value": value, "reason": reason, "password": password}
     )
 
 
-def _by_key(client: TestClient, h: dict[str, str]) -> dict[str, dict]:  # type: ignore[type-arg]
+def _install_limiter(client: TestClient, limiter: RequestLimiter) -> None:
+    app = client.app
+    assert isinstance(app, FastAPI)
+    app.state.limiter = limiter
+
+
+def _installed_limiter(client: TestClient) -> RequestLimiter:
+    app = client.app
+    assert isinstance(app, FastAPI)
+    limiter = app.state.limiter
+    assert isinstance(limiter, RequestLimiter)
+    return limiter
+
+
+def _by_key(client: TestClient, h: dict[str, str]) -> dict[str, dict[str, object]]:
     body = client.get(SETTINGS, headers=h).json()
     return {s["key"]: s for s in body["settings"]}
 
@@ -77,7 +94,9 @@ ROUTES = [
 
 
 @pytest.mark.parametrize(("method", "url", "body"), ROUTES)
-def test_unauthenticated_is_401(client: TestClient, method: str, url: str, body: dict | None) -> None:  # type: ignore[type-arg]
+def test_unauthenticated_is_401(
+    client: TestClient, method: str, url: str, body: dict[str, object] | None
+) -> None:
     assert client.request(method, url, json=body).status_code == 401
 
 
@@ -89,7 +108,7 @@ def test_operators_and_officers_are_403(
     role: Role,
     method: str,
     url: str,
-    body: dict | None,  # type: ignore[type-arg]
+    body: dict[str, object] | None,
 ) -> None:
     make_user(db, "someone@example.sg", role)
     h = login(client, "someone@example.sg")
@@ -372,6 +391,39 @@ def test_a_wrong_password_is_403_and_changes_nothing(
     assert _events(db, "settings.changed") == [] and announcements == []
 
 
+def test_a_wrong_password_on_a_change_is_audited_with_the_key_and_never_the_password(
+    client: TestClient, db: Session
+) -> None:
+    h = _admin(client, db)
+    r = _put(client, h, "max_drafts_per_user", 5, password="Not-The-Password-1")
+    assert r.status_code == 403
+    (event,) = _events(db, "settings.step_up_failed")
+    adm = db.scalar(select(User).where(User.email == "adm@example.sg"))
+    assert adm is not None and event.actor_id == adm.id and event.application_id is None
+    assert event.payload == {"key": "max_drafts_per_user", "action": "change"}
+    assert "Not-The-Password-1" not in str(event.payload)
+    # It is not a change: the history and the setting are untouched, and the feed says it in words.
+    assert client.get(f"{SETTINGS}/history", headers=h).json()["entries"] == []
+    feed = client.get(f"{API}/admin/audit-feed", headers=h).json()["events"]
+    assert any(e["summary"] == "Wrong password on a setting change: max_drafts_per_user" for e in feed)
+
+
+def test_a_wrong_password_on_a_revert_is_audited_with_the_key(client: TestClient, db: Session) -> None:
+    h = _admin(client, db)
+    assert _put(client, h, "max_drafts_per_user", 5).status_code == 200
+    entry = client.get(f"{SETTINGS}/history", headers=h).json()["entries"][0]
+    assert _revert(client, h, entry["id"], password="wrong-wrong-1").status_code == 403
+    (event,) = _events(db, "settings.step_up_failed")
+    assert event.payload == {
+        "key": "max_drafts_per_user",
+        "action": "revert",
+        "history_entry": entry["id"],
+    }
+    # An id that is not a settings entry is still recorded, without a key.
+    assert _revert(client, h, str(uuid.uuid4()), password="wrong-wrong-1").status_code == 403
+    assert _events(db, "settings.step_up_failed")[-1].payload["key"] is None
+
+
 def test_the_step_up_checks_the_signed_in_admins_own_password_not_another_admins(
     client: TestClient, db: Session
 ) -> None:
@@ -428,7 +480,7 @@ def test_history_lists_changes_newest_first_with_paging_and_a_key_filter(
     assert client.get(f"{SETTINGS}/history", headers=h, params={"limit": 0}).status_code == 422
 
 
-def _revert(client: TestClient, h: dict[str, str], event_id: str, **kw: str):  # type: ignore[no-untyped-def]
+def _revert(client: TestClient, h: dict[str, str], event_id: str, **kw: str) -> Response:
     body = {"reason": kw.get("reason", "Putting it back"), "password": kw.get("password", DEFAULT_PASSWORD)}
     return client.post(f"{SETTINGS}/history/{event_id}/revert", headers=h, json=body)
 
@@ -473,7 +525,8 @@ def test_a_revert_cannot_restore_a_value_the_ceiling_now_forbids(
     monkeypatch.setattr(get_settings(), "max_drafts_per_user", 10)  # the ceiling came down since
     r = _revert(client, h, latest["id"])
     assert r.status_code == 422 and r.json()["error"]["details"]["bound"] == "maximum"
-    assert db.get(PlatformSetting, "max_drafts_per_user").value == 3  # type: ignore[union-attr]
+    kept = db.get(PlatformSetting, "max_drafts_per_user")
+    assert kept is not None and kept.value == 3
 
 
 def test_revert_needs_the_password_and_a_real_settings_entry(client: TestClient, db: Session) -> None:
@@ -520,13 +573,13 @@ def test_the_request_limiter_reads_the_live_value(
 ) -> None:
     h = _admin(client, db)
     # Empty table: the environment value (12) is the limit, exactly as before the story.
-    client.app.state.limiter = build_request_limiter(enabled=True)  # type: ignore[attr-defined]
+    _install_limiter(client, build_request_limiter(enabled=True))
     codes = [client.get(f"{API}/form-schema").status_code for _ in range(13)]
     assert codes[:12] == [401] * 12 and codes[12] == 429
-    client.app.state.limiter.clear()  # type: ignore[attr-defined]
-    client.app.state.limiter = build_request_limiter(enabled=False)  # type: ignore[attr-defined]
+    _installed_limiter(client).clear()
+    _install_limiter(client, build_request_limiter(enabled=False))
     assert _put(client, h, "rate_limit_per_minute", 10).status_code == 200
-    client.app.state.limiter = build_request_limiter(enabled=True)  # type: ignore[attr-defined]
+    _install_limiter(client, build_request_limiter(enabled=True))
     codes = [client.get(f"{API}/form-schema").status_code for _ in range(11)]
     assert codes[:10] == [401] * 10 and codes[10] == 429
 
@@ -535,7 +588,7 @@ def test_one_limiter_instance_follows_a_change_without_being_rebuilt(
     client: TestClient, db: Session, small_ceilings: None
 ) -> None:
     h = _admin(client, db)
-    client.app.state.limiter = build_request_limiter(enabled=False)  # type: ignore[attr-defined]
+    _install_limiter(client, build_request_limiter(enabled=False))
     limiter = build_request_limiter(enabled=True)
     assert limiter.general.limit == 12 and limiter.login.limit == 6
     assert _put(client, h, "rate_limit_per_minute", 11).status_code == 200
@@ -548,7 +601,7 @@ def test_the_sign_in_limiter_reads_the_live_value(
 ) -> None:
     h = _admin(client, db)
     assert _put(client, h, "login_attempts_per_minute", 3).status_code == 200
-    client.app.state.limiter = build_request_limiter(enabled=True)  # type: ignore[attr-defined]
+    _install_limiter(client, build_request_limiter(enabled=True))
     bad = {"email": "nobody@example.sg", "password": "wrong-wrong-1"}
     codes = [client.post(f"{API}/auth/login", json=bad).status_code for _ in range(4)]
     assert codes == [401, 401, 401, 429]
@@ -635,7 +688,7 @@ def _no_provider(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
     calls: list[str] = []
 
-    def spy():  # type: ignore[no-untyped-def]
+    def spy() -> NoReturn:
         calls.append("provider")
         raise AssertionError("the provider must not be reached while the AI is paused")
 
@@ -701,6 +754,28 @@ def test_paused_checks_do_not_count_toward_the_quotas_and_unpausing_resumes(
     assert _put(client, h, "ai_paused", False).status_code == 200
     v = upload(client, op, app_id, "tenancy_agreement", "t.pdf", PDF).json()["document"]["verification"]
     assert v["status"] != "unavailable"  # the paused ones used none of the one run allowed
+
+
+def test_unpausing_reports_how_many_checks_the_pause_stopped(
+    client: TestClient, db: Session, announcements: list[str]
+) -> None:
+    h = _admin(client, db)
+    make_user(db, "op@example.sg", Role.OPERATOR)
+    op = login(client, "op@example.sg")
+    app_id = draft(client, op)
+    assert _put(client, h, "ai_paused", True).status_code == 200
+    for dtype in ("business_profile", "floor_plan"):
+        upload(client, op, app_id, dtype, f"{dtype}.pdf", PDF)
+    assert _put(client, h, "ai_paused", False).status_code == 200
+    on, off = _events(db, "settings.changed")
+    assert "ended_while_paused" not in on.payload and off.payload["ended_while_paused"] == 2
+    assert "2 checks ended as ai_paused" in announcements[-1]
+    feed = client.get(f"{API}/admin/audit-feed", headers=h).json()["events"]
+    assert any("(2 checks ended as ai_paused while paused)" in e["summary"] for e in feed)
+    # A pause with nothing stopped reports zero; checks before the pause are not counted.
+    assert _put(client, h, "ai_paused", True).status_code == 200
+    assert _put(client, h, "ai_paused", False).status_code == 200
+    assert _events(db, "settings.changed")[-1].payload["ended_while_paused"] == 0
 
 
 # ---- the cache ----
