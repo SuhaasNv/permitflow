@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.domain.editability import editable_targets
-from app.domain.form_schema import get_section, normalise_section, validate_section
+from app.domain.form_schema import STAMPED_FIELDS, get_section, normalise_section, validate_section
 from app.models import Application, Document, User, VerificationRun
 from app.models.enums import ApplicationStatus, DocumentType, LicenceType
 from app.repositories.applications import ApplicationRepository
@@ -73,6 +73,9 @@ class ApplicationService:
             if app.status == ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION:
                 raise Forbidden("The licensing officer did not ask for changes to this section.")
             raise Forbidden("This section is not open for changes.")
+        # Server stamps (e.g. "Confirmed on") are never taken from the client: drop them, keep the held value.
+        stamped = {k for k, _ in STAMPED_FIELDS.get(key, ())}
+        data = {k: v for k, v in data.items() if k not in stamped}
         errors = validate_section(key, data, allow_missing=app.status == ApplicationStatus.DRAFT)
         if errors:
             raise ValidationFailed("Some fields need attention.", details={"fields": errors})
@@ -80,6 +83,7 @@ class ApplicationService:
         # Same form as `data`, or untouched legacy text (a phone saved before normalising) counts as a change.
         previous = normalise_section(key, draft.get(key) or {})
         data = normalise_section(key, data)
+        data.update({k: v for k, v in (draft.get(key) or {}).items() if k in stamped})
         if key == "declarations" and app.status == ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION:
             # A fresh confirmation is the change the officer asked for; the values themselves cannot differ.
             data["confirmed_at"] = datetime.now(UTC).isoformat(timespec="seconds")

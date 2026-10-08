@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -82,3 +84,26 @@ def test_section_not_editable_outside_draft(client: TestClient, db: Session) -> 
     r = client.patch(f"/api/v1/applications/{app_id}/sections/business", headers=h, json=VALID_BUSINESS)
     assert r.status_code == 403
     assert r.json()["error"]["message"] == "This section is not open for changes."
+
+
+def test_client_cannot_write_the_confirmed_on_stamp(client: TestClient, db: Session) -> None:
+    """`declarations.confirmed_at` is a server stamp: a client value is dropped, a held one is kept."""
+    make_user(db, "op@example.sg", Role.OPERATOR)
+    h = login(client, "op@example.sg")
+    app_id = _draft(client, h)
+    url = f"/api/v1/applications/{app_id}/sections/declarations"
+    body = {"information_accurate": True, "consent_to_inspection": True}
+    r = client.patch(url, headers=h, json={**body, "confirmed_at": "2000-01-01T00:00:00+00:00"})
+    assert r.status_code == 200, r.text
+    row = db.get(Application, uuid.UUID(app_id))
+    assert row is not None
+    assert "confirmed_at" not in row.draft_data["declarations"]
+    # a real stamp held by the server is kept on a normal save and cannot be replaced by the client
+    row.draft_data = {**row.draft_data, "declarations": {**body, "confirmed_at": "2026-10-01T09:00:00+00:00"}}
+    db.commit()
+    for payload in (body, {**body, "confirmed_at": "2000-01-01T00:00:00+00:00"}):
+        assert client.patch(url, headers=h, json=payload).status_code == 200
+        db.expire_all()
+        row = db.get(Application, uuid.UUID(app_id))
+        assert row is not None
+        assert row.draft_data["declarations"]["confirmed_at"] == "2026-10-01T09:00:00+00:00"
