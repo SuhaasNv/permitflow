@@ -14,6 +14,20 @@ Format: the product reads this file at build time for its What's new page (the v
 
 **After that:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
 
+## v0.4.1-rc.1, 8 October 2026: Singapore formats on the form, hours you pick, and a clear test environment
+
+**New for operators**
+- Every field on the application form is checked as you type, with the same rules the service applies: a Singapore phone number (+65 and eight digits starting with 3, 6, 8 or 9), any of the three UEN formats, a postal code from a real sector, an address with a unit number written like #01-12, and a tenancy that ends at least three months from today.
+- Operating hours are picked instead of typed: choose the days you open, then the opening and closing time from a list, or tick Open 24 hours; closing after midnight is fine and the form says so.
+- What you type is tidied before it is saved: the phone number in one format, the UEN in capitals, the email in lower case, and invisible characters removed.
+
+**New for licensing officers**
+- The hours read the same way everywhere, for example "Mon to Sat, 07:00 to 21:00"; older applications keep the hours exactly as they were written.
+
+**Also**
+- On the development environment a strip across the top of every page says it is not the live service.
+- This page lists each release candidate on the development environment; the live service shows released versions only.
+
 ## v0.4.0, 8 October 2026: the site visit, the clarification and the office's own view
 
 **New for licensing officers**
