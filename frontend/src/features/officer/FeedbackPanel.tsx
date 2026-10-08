@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { AppError } from '@/api/client'
 import type { FeedbackItem, FeedbackTemplate, OfficerApplication } from '@/api/officer'
@@ -59,6 +59,22 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
   // The case can stop being editable under the officer (status moved, operator withdrew): the composer is derived closed.
   const composing = composingRequested && editable
 
+  // Focus follows the composer (WCAG 2.4.3): into the message when it opens, back to "Add feedback" when it closes.
+  const addRef = useRef<HTMLButtonElement>(null)
+  const messageRef = useRef<HTMLTextAreaElement>(null)
+  const returnFocus = useRef(false)
+  useEffect(() => {
+    if (composing) messageRef.current?.focus()
+    else if (returnFocus.current) {
+      returnFocus.current = false
+      addRef.current?.focus()
+    }
+  }, [composing])
+  const closeComposer = () => {
+    returnFocus.current = true
+    setComposing(false)
+  }
+
   /** Undo for 10 s (the server accepts a little longer). */
   const offerUndo = (title: string, body: string, feedbackId: string) => {
     toast.push({
@@ -108,7 +124,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
       },
       {
         onSuccess: () => {
-          setComposing(false)
+          closeComposer()
           setTarget('')
           setTemplateKey('')
           setMessage('')
@@ -257,7 +273,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
         ) : !view.feedback_editable ? (
           <p className="text-[13px] leading-[19px] text-text-3">{view.feedback_locked_reason}</p>
         ) : !composing ? (
-          <Button variant="secondary" onClick={() => setComposing(true)} className="w-full">
+          <Button ref={addRef} variant="secondary" onClick={() => setComposing(true)} className="w-full">
             Add feedback
           </Button>
         ) : (
@@ -291,6 +307,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
               options={targets.map((t) => ({ value: t.value, label: t.label }))}
             />
             <TextAreaField
+              ref={messageRef}
               label="Feedback for the operator"
               required
               value={message}
@@ -304,7 +321,7 @@ export function FeedbackPanel({ view, targets }: { view: OfficerApplication; tar
                 type="button"
                 variant="ghost"
                 onClick={() => {
-                  setComposing(false)
+                  closeComposer()
                   setErrors({})
                 }}
               >

@@ -26,13 +26,15 @@ export interface AlertProps {
   children: ReactNode
   className?: string
   action?: ReactNode
+  /** False when a live region around the alert announces it, so it is not read twice. */
+  announce?: boolean
 }
 
 /** Inline message with a tone icon. Errors are announced immediately, everything else politely. */
-export function Alert({ tone = 'info', title, children, className, action }: AlertProps) {
+export function Alert({ tone = 'info', title, children, className, action, announce = true }: AlertProps) {
   return (
     <div
-      role={tone === 'error' ? 'alert' : 'status'}
+      role={announce ? (tone === 'error' ? 'alert' : 'status') : undefined}
       className={cn('pf-enter-fast flex flex-wrap gap-3 rounded-md border px-4 py-3 text-sm leading-5', tones[tone], className)}
     >
       <svg

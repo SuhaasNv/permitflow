@@ -95,6 +95,12 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
   // True while our own save is in flight: the server data that comes back is ours, not another tab's.
   const savingRef = useRef(false)
 
+  // Focus moves to the summary once it is on the page: setSummary only schedules the render, so the
+  // element does not exist yet in the tick that sets it.
+  useEffect(() => {
+    if (summary.length > 0) summaryRef.current?.focus()
+  }, [summary])
+
   const dirty = form.formState.isDirty
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange])
 
@@ -127,7 +133,6 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
             messages.push(field ? field.label : key)
           }
           setSummary(messages)
-          summaryRef.current?.focus()
           return
         }
       }
@@ -229,7 +234,7 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
             key={f.key}
             control={form.control}
             name={f.key}
-            render={({ field }) => (
+            render={({ field, fieldState }) => (
               <div className={className}>
                 <HoursField
                   label={f.label}
@@ -238,7 +243,8 @@ export const SectionForm = forwardRef<SectionFormHandle, SectionFormProps>(funct
                   value={hoursOf(field.value)}
                   onChange={field.onChange}
                   onBlur={field.onBlur}
-                  error={common.error}
+                  // Said once the operator has left the field or tried to continue, not on the first day clicked.
+                  error={fieldState.isTouched || form.formState.isSubmitted ? common.error : undefined}
                   disabled={!editable}
                   stepMinutes={f.step_minutes}
                   legacy={typeof saved === 'string' && saved.trim() !== '' && field.value === undefined ? saved : undefined}

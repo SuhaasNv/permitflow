@@ -102,8 +102,35 @@ describe('SectionForm with the Singapore rules', () => {
     })
     expect(screen.getByText(/Your earlier entry was/)).toHaveTextContent('Mon-Sun 7am-9pm')
     await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }))
-    expect(await screen.findByText('This field is required.')).toBeInTheDocument()
+    expect(await screen.findByText('Choose the days you open and the opening and closing time.')).toBeInTheDocument()
+    expect(screen.queryByText('This field is required.')).not.toBeInTheDocument()
     expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('does not show an hours error on the first day clicked, only once the field is left', async () => {
+    renderForm('operations', {
+      cuisine_description: 'Kaya toast, soft-boiled eggs, kopi and teh.',
+      seating_capacity: 24,
+      food_handlers_count: 4,
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Mon' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Tue' }))
+    expect(screen.queryByText('Choose an opening and a closing time.')).not.toBeInTheDocument()
+    // Moving on to another field of the form leaves the hours picker.
+    await userEvent.click(screen.getByLabelText(/Seating capacity/))
+    expect(await screen.findByText('Choose an opening and a closing time.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Opens')).toHaveAttribute('aria-describedby')
+  })
+
+  it('moves focus to the error summary once it is on the page', async () => {
+    renderForm('operations', {
+      cuisine_description: 'Kaya toast, soft-boiled eggs, kopi and teh.',
+      seating_capacity: 24,
+      food_handlers_count: 4,
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }))
+    const summary = await screen.findByText(/needs attention before this section is complete/)
+    await waitFor(() => expect(summary.closest('[tabindex="-1"]')).toHaveFocus())
   })
 
   it('puts the server message on the hours picker when the server refuses it', async () => {

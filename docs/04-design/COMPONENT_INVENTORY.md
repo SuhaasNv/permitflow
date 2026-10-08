@@ -25,7 +25,7 @@ Components are extracted only where the prototype uses them in two or more place
 
 | Component | Variants | Notes |
 |-----------|----------|-------|
-| `Button` | primary, secondary, ghost, danger, link; sm; disabled with `title` reason; `asChild` for links | one primary per screen |
+| `Button` | primary, secondary, ghost, danger, link; sm; disabled with `title` reason; `asChild` for links; `loading` sets `aria-disabled` and `aria-busy` (not `disabled`), so the button keeps keyboard focus, and swallows clicks and the implicit form submit until it finishes | one primary per screen |
 | `IconButton` | with badge count | bell |
 | `Input`, `Select`, `Textarea`, `Checkbox` | invalid, read-only, focus ring | RHF + Zod |
 | `Field` | label (required mark), control, help, error (`role="alert"`) | all forms |

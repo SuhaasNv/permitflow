@@ -35,8 +35,6 @@ function Check({ size = 12 }: { size?: number }) {
   )
 }
 
-const focusRing = 'focus-visible:outline-hidden focus-visible:shadow-[0_0_0_3px_rgba(23,92,211,0.2)]'
-
 /**
  * Operating hours as a picker (S-46, US-108): the days a shop opens as toggles, then one opening and one
  * closing time (30-minute steps) for all of them, or Open 24 hours. A closing time earlier than the opening
@@ -72,10 +70,7 @@ export function HoursField({
       type="button"
       onClick={() => set({ days })}
       disabled={disabled}
-      className={cn(
-        'rounded-sm py-2 text-[13px] text-text-2 underline underline-offset-[3px] hover:text-text disabled:cursor-not-allowed disabled:no-underline sm:py-0.5',
-        focusRing,
-      )}
+      className="rounded-sm py-2 text-[13px] text-text-2 underline underline-offset-[3px] hover:text-text disabled:cursor-not-allowed disabled:no-underline sm:py-0.5"
     >
       {text}
     </button>
@@ -85,7 +80,10 @@ export function HoursField({
     <fieldset
       className="m-0 flex min-w-0 flex-col gap-3.5 border-0 p-0"
       aria-describedby={error ? `${id}-error` : help ? `${id}-help` : undefined}
-      onBlur={onBlur}
+      onBlur={(e) => {
+        // The field is left only when focus goes somewhere outside it, not from one day to the next.
+        if (!e.currentTarget.contains(e.relatedTarget)) onBlur?.()
+      }}
     >
       <legend className="flex items-baseline gap-1.5 p-0 text-[13px] font-semibold leading-[18px] text-text">
         {label}
@@ -123,7 +121,12 @@ export function HoursField({
             {quick('Clear', [])}
           </span>
         </div>
-        <div role="group" aria-labelledby={`${id}-days`} className="grid max-w-full grid-cols-7 gap-1 sm:max-w-[520px] sm:gap-1.5">
+        <div
+          role="group"
+          aria-labelledby={`${id}-days`}
+          aria-describedby={daysError ? `${id}-error` : undefined}
+          className="grid max-w-full grid-cols-7 gap-1 sm:max-w-[520px] sm:gap-1.5"
+        >
           {DAYS.map((d) => {
             const on = current.days.includes(d.value)
             return (
@@ -134,10 +137,10 @@ export function HoursField({
                 disabled={disabled}
                 onClick={() => toggle(d.value)}
                 className={cn(
-                  'inline-flex h-11 min-w-0 items-center justify-center gap-1 rounded-md border px-0 text-sm',
+                  // The check sits above the day on a phone, where seven days share one row and "Wed" fills its box.
+                  'inline-flex h-11 min-w-0 flex-col items-center justify-center rounded-md border px-0 text-sm sm:flex-row sm:gap-1',
                   'transition-[border-color,background-color] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
                   'disabled:cursor-not-allowed disabled:opacity-60',
-                  focusRing,
                   on
                     ? 'border-text bg-surface-3 font-semibold text-text'
                     : daysError
@@ -145,11 +148,7 @@ export function HoursField({
                       : 'border-line-strong bg-surface font-medium text-text-2 hover:border-text-3',
                 )}
               >
-                {on ? (
-                  <span className="hidden sm:inline-flex">
-                    <Check />
-                  </span>
-                ) : null}
+                {on ? <Check /> : null}
                 {d.label}
               </button>
             )
@@ -172,6 +171,7 @@ export function HoursField({
                   value={current[field] ?? ''}
                   disabled={disabled}
                   aria-invalid={timesError ? true : undefined}
+                  aria-describedby={timesError ? `${id}-error` : undefined}
                   onChange={(e) => time(field, e.target.value)}
                   className={cn(inputClasses(Boolean(timesError)), selectChevron, 'tabular-nums')}
                 >
@@ -195,29 +195,35 @@ export function HoursField({
           checked={current.open_24h}
           disabled={disabled}
           onChange={(e) => set({ open_24h: e.target.checked })}
-          className={cn('h-5 w-5 cursor-pointer accent-text', focusRing)}
+          className="h-5 w-5 cursor-pointer accent-text"
         />
         Open 24 hours
       </label>
 
-      {afterMidnight ? (
-        <Alert tone="info">
-          <span>Closes after midnight, at {current.closes} the next day.</span>
-        </Alert>
-      ) : null}
+      {/* Both live regions are always in the page and only their contents change, so a screen reader announces
+          the hint and the summary when they appear (WCAG 4.1.3). Empty, each takes back the gap it adds. */}
+      <div role="status" className="empty:-mt-3.5">
+        {afterMidnight ? (
+          <Alert tone="info" announce={false}>
+            <span>Closes after midnight, at {current.closes} the next day.</span>
+          </Alert>
+        ) : null}
+      </div>
 
-      {summary ? (
-        <div className="flex items-start gap-2 text-[13px] leading-[18px]" aria-live="polite">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0 text-text-3">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 7v5l3 2" />
-          </svg>
-          <span className="flex flex-wrap gap-x-1.5">
-            <span className="text-text-3">Shown to the officer as</span>
-            <span className="font-semibold text-text">{summary}</span>
-          </span>
-        </div>
-      ) : null}
+      <div aria-live="polite" className="empty:-mt-3.5">
+        {summary ? (
+          <div className="flex items-start gap-2 text-[13px] leading-[18px]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0 text-text-3">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            <span className="flex flex-wrap gap-x-1.5">
+              <span className="text-text-3">Shown to the officer as</span>
+              <span className="font-semibold text-text">{summary}</span>
+            </span>
+          </div>
+        ) : null}
+      </div>
     </fieldset>
   )
 }

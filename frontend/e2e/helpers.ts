@@ -233,6 +233,25 @@ export async function seedPendingResubmission(message = 'Please confirm the prem
   return seeded
 }
 
+/** A new draft with nothing filled in: every section is editable, no document check is spent. */
+export async function seedDraft(): Promise<Seeded> {
+  const op = await login(OPERATOR)
+  const app = await call<{ id: string; reference_no: string }>(op, '/applications', { method: 'POST' })
+  return { id: app.id, reference: app.reference_no, url: `/app/applications/${app.id}` }
+}
+
+/** The operator fixed the premises and resubmitted (Revision 2): the officer's compare view has a change to show. */
+export async function seedResubmitted(): Promise<Seeded> {
+  const seeded = await seedPendingResubmission()
+  const op = await login(OPERATOR)
+  await call(op, `/applications/${seeded.id}/sections/premises`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ...PREMISES, address_line_1: '10 Jalan Besar #01-21', floor_area_sqm: 48, premises_type: 'shophouse' }),
+  })
+  await call(op, `/applications/${seeded.id}/resubmit`, { method: 'POST' })
+  return seeded
+}
+
 // ---- Site visit appointment (US-084) ----
 
 /** An ISO date `n` working days ahead of today in Singapore (Monday to Friday, no holiday calendar). */
