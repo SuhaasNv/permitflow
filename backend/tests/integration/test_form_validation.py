@@ -11,12 +11,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.field_rules import singapore_today
-from app.models import Application, ApplicationRevision
+from app.models import Application, ApplicationRevision, AuditEvent
 from app.models.enums import Role
 from tests.factories import login, make_user
 from tests.journeys import VALID_BUSINESS, VALID_OPERATIONS, VALID_PREMISES
+from tests.journeys import add_feedback as _add_feedback
 from tests.journeys import draft as _draft
 from tests.journeys import submitted as _submitted
+from tests.journeys import transition as _transition
+from tests.journeys import under_review as _under_review
 
 PHONE_MESSAGE = "Enter a Singapore number: 8 digits starting with 3, 6, 8 or 9, for example +65 9123 4567."
 
@@ -209,3 +212,50 @@ def test_the_form_schema_declares_the_rules(client: TestClient, db: Session) -> 
     assert fields["operating_hours"]["kind"] == "hours"
     assert fields["contact_phone"]["rule"] == "sg_phone"
     assert fields["tenancy_expiry"]["min_months_ahead"] == 3
+
+
+def _last_section_event(db: Session) -> AuditEvent:
+    db.expire_all()
+    events = db.scalars(
+        select(AuditEvent).where(AuditEvent.event_type == "section.updated").order_by(AuditEvent.created_at)
+    ).all()
+    return events[-1]
+
+
+def test_resaving_an_untouched_legacy_section_is_not_a_change(client: TestClient, db: Session) -> None:
+    """A revision saved before the normalising rules holds "91234567" and "Tan@Shop.sg". Saving the section
+    again stores the clean form; that must not look like an edit to the resubmit guard, the compare view or
+    the audit trail."""
+    app_id, op, off, _ = _under_review(client, db)
+    legacy = {**VALID_BUSINESS, "contact_phone": "91234567", "contact_email": "Tan@Shop.sg"}
+    rev = db.scalar(select(ApplicationRevision))
+    app = db.get(Application, uuid.UUID(app_id))
+    assert rev is not None and app is not None
+    form, draft = copy.deepcopy(rev.form_data), copy.deepcopy(app.draft_data)
+    form["business"] = legacy
+    draft["business"] = legacy
+    rev.form_data, app.draft_data = form, draft
+    db.commit()
+    _add_feedback(client, off, app_id, target_type="section", section_key="business", message="Check it.")
+    _transition(client, off, app_id, "pending_pre_site_resubmission")
+
+    r = _patch(client, op, app_id, "business", legacy)
+    assert r.status_code == 200, r.text
+    ready = r.json()["resubmit"]
+    assert ready["can_resubmit"] is False and ready["changed_sections"] == []
+    saved = next(s for s in r.json()["sections"] if s["key"] == "business")["data"]
+    assert saved["contact_phone"] == "+65 9123 4567" and saved["contact_email"] == "tan@shop.sg"
+    refused = client.post(f"/api/v1/applications/{app_id}/resubmit", headers=op)
+    assert refused.status_code == 422
+    assert refused.json()["error"]["details"]["reason"] == "no_change"
+    assert _last_section_event(db).payload == {"section": "business", "fields": []}
+
+    # Editing one field is the only change that shows: in readiness, the audit trail and compare.
+    r = _patch(client, op, app_id, "business", {**legacy, "business_name": "Kopi & Kaya Two Pte. Ltd."})
+    assert r.status_code == 200, r.text
+    assert r.json()["resubmit"]["changed_sections"] == ["business"]
+    assert _last_section_event(db).payload == {"section": "business", "fields": ["business_name"]}
+    assert client.post(f"/api/v1/applications/{app_id}/resubmit", headers=op).status_code == 200
+    compare = client.get(f"/api/v1/applications/{app_id}/compare?from=1&to=2", headers=op).json()
+    business = next(s for s in compare["sections"] if s["key"] == "business")
+    assert [f["key"] for f in business["fields"]] == ["business_name"]

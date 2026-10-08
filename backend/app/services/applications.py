@@ -77,7 +77,8 @@ class ApplicationService:
         if errors:
             raise ValidationFailed("Some fields need attention.", details={"fields": errors})
         draft = dict(app.draft_data)
-        previous = draft.get(key) or {}
+        # Same form as `data`, or untouched legacy text (a phone saved before normalising) counts as a change.
+        previous = normalise_section(key, draft.get(key) or {})
         data = normalise_section(key, data)
         if key == "declarations" and app.status == ApplicationStatus.PENDING_PRE_SITE_RESUBMISSION:
             # A fresh confirmation is the change the officer asked for; the values themselves cannot differ.
