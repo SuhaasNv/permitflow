@@ -129,7 +129,13 @@ def main() -> None:
         "/admin/users",
         "/admin/users",
         (201, 200),
-        json={"email": email, "full_name": "Smoke Operator", "role": "operator", "password": NEW_OP_PW},
+        json={
+            "email": email,
+            "full_name": "Smoke Operator",
+            "role": "operator",
+            "password": NEW_OP_PW,
+            "admin_password": ADMIN_PW,
+        },
     )
     new_user_id = r.json()["id"]
     users = call(adm, "GET", "/admin/users", "/admin/users", 200).json()
@@ -144,7 +150,14 @@ def main() -> None:
         call(adm, "GET", f"/admin/audit-feed?limit=5&before={cursor}", "/admin/audit-feed", 200)
     # admin guards
     me = client.get("/auth/me", headers=adm).json()
-    call(adm, "PATCH", f"/admin/users/{me['id']}", "/admin/users/{user_id}", 409, json={"is_active": False})
+    call(
+        adm,
+        "PATCH",
+        f"/admin/users/{me['id']}",
+        "/admin/users/{user_id}",
+        409,
+        json={"is_active": False, "admin_password": ADMIN_PW},
+    )
 
     # ---- operator lifecycle ----
     op = login(email, NEW_OP_PW)
@@ -762,13 +775,30 @@ def main() -> None:
     call(op, "POST", "/auth/logout", "/auth/logout", (200, 204))
     # deactivate the smoke operator, then reactivate to prove both halves, then deactivate for good
     call(
-        adm, "PATCH", f"/admin/users/{new_user_id}", "/admin/users/{user_id}", 200, json={"is_active": False}
+        adm,
+        "PATCH",
+        f"/admin/users/{new_user_id}",
+        "/admin/users/{user_id}",
+        200,
+        json={"is_active": False, "admin_password": ADMIN_PW},
     )
     r = client.post("/auth/login", json={"email": email, "password": NEW_OP_PW, "take_over": True})
     note("deactivated operator cannot sign in (401)", r.status_code == 401, str(r.status_code))
-    call(adm, "PATCH", f"/admin/users/{new_user_id}", "/admin/users/{user_id}", 200, json={"is_active": True})
     call(
-        adm, "PATCH", f"/admin/users/{new_user_id}", "/admin/users/{user_id}", 200, json={"is_active": False}
+        adm,
+        "PATCH",
+        f"/admin/users/{new_user_id}",
+        "/admin/users/{user_id}",
+        200,
+        json={"is_active": True, "admin_password": ADMIN_PW},
+    )
+    call(
+        adm,
+        "PATCH",
+        f"/admin/users/{new_user_id}",
+        "/admin/users/{user_id}",
+        200,
+        json={"is_active": False, "admin_password": ADMIN_PW},
     )
     call(adm, "POST", "/auth/logout", "/auth/logout", (200, 204))
 

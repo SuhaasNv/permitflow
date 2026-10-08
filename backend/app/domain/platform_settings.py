@@ -13,7 +13,7 @@ database alone can never loosen a limit past the environment.
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
 
 SettingKind = Literal["int", "bool", "choice"]
 SettingGroup = Literal["traffic", "ai", "uploads", "system"]
@@ -178,11 +178,11 @@ class UnknownSetting(KeyError):  # noqa: N818 - a lookup miss, translated to a 4
 
 
 class SettingRejected(Exception):  # noqa: N818 - a value object the service turns into a 422
-    def __init__(self, message: str, *, reason: str, details: Mapping[str, Any] | None = None) -> None:
+    def __init__(self, message: str, *, reason: str, details: Mapping[str, object] | None = None) -> None:
         super().__init__(message)
         self.message = message
         self.reason = reason
-        self.details: dict[str, Any] = dict(details or {})
+        self.details: dict[str, object] = dict(details or {})
 
 
 def spec_for(key: str) -> SettingSpec:
@@ -199,19 +199,21 @@ class Bounds:
     max_source: Literal["env", "cap", "none"]
 
 
-def default_for(spec: SettingSpec, env_value: Any) -> int | bool | str:
+def default_for(spec: SettingSpec, env_value: int | None) -> int | bool | str:
     """What applies with no row: the environment value, or the built-in default for a switch."""
     if spec.env_field is None:
         return spec.fallback
-    return int(env_value)
+    assert env_value is not None, spec.key  # the caller reads the field the spec names
+    return env_value
 
 
-def bounds_for(spec: SettingSpec, env_value: Any) -> Bounds:
+def bounds_for(spec: SettingSpec, env_value: int | None) -> Bounds:
     """`[minimum, ceiling]` for a number. The ceiling is the environment value, further limited by the
     setting's absolute cap; an environment value of 0 (no limit) leaves the cap as the ceiling."""
     if spec.kind != "int":
         return Bounds(None, None, "none")
-    env = int(env_value)
+    assert env_value is not None, spec.key
+    env = env_value
     if env > 0:
         ceiling = min(env, spec.absolute_max) if spec.absolute_max else env
         source: Literal["env", "cap", "none"] = "env" if ceiling == env else "cap"
@@ -221,7 +223,7 @@ def bounds_for(spec: SettingSpec, env_value: Any) -> Bounds:
     return Bounds(min(spec.minimum, ceiling), ceiling, source)
 
 
-def validate(spec: SettingSpec, value: Any, env_value: Any, app_env: str) -> int | bool | str:
+def validate(spec: SettingSpec, value: object, env_value: int | None, app_env: str) -> int | bool | str:
     """The value, if the panel may store it; `SettingRejected` naming the bound otherwise."""
     if spec.kind == "bool":
         if not isinstance(value, bool):
@@ -262,7 +264,7 @@ def validate(spec: SettingSpec, value: Any, env_value: Any, app_env: str) -> int
 
 
 def effective(
-    spec: SettingSpec, stored: Any, env_value: Any, app_env: str, *, present: bool
+    spec: SettingSpec, stored: object, env_value: int | None, app_env: str, *, present: bool
 ) -> int | bool | str:
     """The value in force: the stored one when it is valid inside today's bounds, else the default.
 

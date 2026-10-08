@@ -127,5 +127,5 @@ Kinds from the domain model only: `submitted` and `resubmitted` (to officers), `
 | 1 | S-40 | Stat strip, applications by status, idle cases, check health, today's counts against the platform quota | `GET /admin/overview` |
 | 2 | S-42 | Every audit event across applications, family filter, older pages by cursor, user rows without a case link | `GET /admin/audit-feed` |
 | 3 | S-43 | Any case as the officer sees it, with the read-only banner and no actions | officer GETs with `OfficerOrAdmin`; `actions[]` empty |
-| 4 | S-41 | Directory; Change role or Deactivate with a consequence dialog; own and protected rows disabled with the reason; Add an account (name, email, role, temporary password) | `GET /admin/users`, `PATCH /admin/users/{id}`, `POST /admin/users` |
+| 4 | S-41 | Directory; Change role or Deactivate with a consequence dialog; own and protected rows disabled with the reason; Add an account (name, email, role, temporary password); all three dialogs ask for "Your password" | `GET /admin/users`, `PATCH /admin/users/{id}`, `POST /admin/users` |
 

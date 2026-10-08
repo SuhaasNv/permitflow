@@ -33,7 +33,7 @@ from app.core.settings import get_settings  # noqa: E402
 from app.infra import db as dbmod  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Base  # noqa: E402
-from app.services.platform_settings import reset_live  # noqa: E402
+from app.services.platform_settings import LiveSettings, reset_live, run_inline  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
@@ -73,8 +73,10 @@ def clean_tables() -> Iterator[None]:
 
 @pytest.fixture(autouse=True)
 def fresh_platform_settings() -> Iterator[None]:
-    """The live settings cache (US-101) is per process; a test must not see another test's override."""
-    reset_live()
+    """The live settings cache (US-101) is per process; a test must not see another test's override. It
+    reloads on the reading thread here so a test sees the rows it just wrote; the tests of the background
+    reload build their own reader."""
+    reset_live(LiveSettings(spawn=run_inline))
     yield
     reset_live()
 

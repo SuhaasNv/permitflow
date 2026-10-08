@@ -10,6 +10,11 @@ from app.core.settings import get_settings
 
 _engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None
+_background_engine: Engine | None = None
+
+# The background reader of the platform settings (US-101) must never wait long on a dead or saturated
+# database, and must not compete with requests for the application pool: it has a pool of its own.
+BACKGROUND_CONNECT_TIMEOUT_SECONDS = 3
 
 
 def get_engine() -> Engine:
@@ -35,6 +40,24 @@ def session_factory() -> sessionmaker[Session]:
     return _session_factory
 
 
+def background_session() -> Session:
+    """A session on a small private pool with a short connect timeout, for background readers that run off
+    the request path (the live settings reload). The application engine and its defaults are untouched."""
+    global _background_engine
+    if _background_engine is None:
+        settings = get_settings()
+        _background_engine = create_engine(
+            settings.effective_database_url,
+            pool_pre_ping=True,
+            future=True,
+            pool_size=2,
+            max_overflow=0,
+            pool_timeout=BACKGROUND_CONNECT_TIMEOUT_SECONDS,
+            connect_args={"connect_timeout": BACKGROUND_CONNECT_TIMEOUT_SECONDS},
+        )
+    return Session(bind=_background_engine, expire_on_commit=False)
+
+
 def get_db() -> Generator[Session, None, None]:
     db = session_factory()()
     try:
@@ -54,8 +77,11 @@ def database_is_reachable() -> bool:
 
 def reset_engine() -> None:
     """Dispose the cached engine (used by tests when settings change)."""
-    global _engine, _session_factory
+    global _engine, _session_factory, _background_engine
     if _engine is not None:
         _engine.dispose()
+    if _background_engine is not None:
+        _background_engine.dispose()
     _engine = None
     _session_factory = None
+    _background_engine = None
