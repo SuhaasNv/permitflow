@@ -106,3 +106,26 @@ jobs:
         run: |
           curl -fsS "$FRONTEND_URL/config.js" | tee /tmp/config.js
           grep -q "$BACKEND_URL" /tmp/config.js
+
+  zap-baseline:
+    # US-103. An OWASP ZAP baseline (passive) scan of the development site once the new deployment is healthy.
+    # Report only: the step cannot fail the workflow (`continue-on-error`, `fail_action: false`) and no GitHub
+    # issue is opened. The HTML, Markdown and JSON reports are uploaded as the `zap-baseline-report` artifact
+    # (kept 90 days by default); read it on the run page. It scans development only, never production. It runs
+    # for the automatic deploy after CI on `dev` and for a manual redeploy of development.
+    name: ZAP baseline (development, report only)
+    needs: deploy
+    if: needs.deploy.result == 'success' && (github.event_name == 'workflow_run' || inputs.environment == 'development')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: ZAP baseline scan of https://dev.permitflow.space
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        continue-on-error: true
+        with:
+          target: https://dev.permitflow.space
+          allow_issue_writing: false
+          fail_action: false
+          artifact_name: zap-baseline-report
