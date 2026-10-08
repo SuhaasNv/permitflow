@@ -19,6 +19,7 @@ from app.core.settings import get_settings
 from app.infra.storage import StorageError
 
 if TYPE_CHECKING:
+    from _typeshed import WriteableBuffer
     from mypy_boto3_s3.client import S3Client
 
 CHUNK = 64 * 1024
@@ -40,14 +41,15 @@ class _ChunkReader(io.RawIOBase):
     def readable(self) -> bool:
         return True
 
-    def readinto(self, buffer: bytearray | memoryview) -> int:  # type: ignore[override]
+    def readinto(self, buffer: "WriteableBuffer") -> int:
+        view = memoryview(buffer).cast("B")
         while not self._pending:
             try:
                 self._pending = next(self._chunks)
             except StopIteration:
                 return 0
-        n = min(len(buffer), len(self._pending))
-        buffer[:n] = self._pending[:n]
+        n = min(len(view), len(self._pending))
+        view[:n] = self._pending[:n]
         self._pending = self._pending[n:]
         return n
 
