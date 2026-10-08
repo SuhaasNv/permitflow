@@ -2,21 +2,28 @@
 
 Three steps run before the injection check and before any text reaches a provider:
 
-1. Clean. Hidden characters (zero-width, bidirectional overrides and isolates, the Unicode Tag block) are
-   stripped, the text is normalised with NFKC (fullwidth and mathematical letters become plain ones), and
-   the shared cleaner from US-108 (`text_clean`) tidies spaces and control characters.
+1. Clean. Hidden characters (zero-width, bidirectional overrides and isolates, the Unicode Tag block,
+   variation selectors, Hangul fillers, left-to-right and right-to-left marks) are stripped, the text is
+   normalised with NFKC (fullwidth and mathematical letters become plain ones), and the shared cleaner
+   from US-108 (`text_clean`) tidies spaces and control characters. A `<document>` or `</document>` tag
+   inside the text is replaced by `[document]` / `[/document]`, so the text cannot close the data block
+   the provider wraps it in.
 2. Detect. Finding hidden characters at all raises `possible_prompt_injection`, with the hidden text
-   decoded for the evidence (Tag-block characters are ASCII in disguise). The phrase heuristic then runs
-   on a "skeleton" of the text, where look-alike letters from other scripts are folded to Latin (Unicode
-   TR39 confusables) and accents are dropped, and on the decoded hidden text too. The skeleton is for the
+   decoded for the evidence (Tag-block characters are ASCII in disguise; variation selectors carry one
+   byte each). A delimiter tag in the text raises it too. The phrase heuristic then runs on a "skeleton"
+   of the text, where look-alike letters from other scripts are folded to Latin (Unicode TR39
+   confusables) and accents are dropped, and on the decoded hidden text too. The skeleton is for the
    detector only: the provider receives the cleaned text, not the folded one.
 3. Redact. NRIC/FIN numbers (with a valid checksum letter) and Singapore phone numbers are masked, keeping
-   the last 4 characters. The same masking is applied to the form values sent beside the text, so a number
-   in the document and the same number on the form still read identically to the model.
+   the last 4 characters. The same masking is applied to the form values sent beside the text (NFKC first,
+   like the text), so a number in the document and the same number on the form still read identically to
+   the model.
 
 A few hidden characters are ordinary writing and are not flagged: a byte-order mark at the very start, a
 joiner inside an emoji sequence or between letters of a joining script (Tamil, Devanagari, Arabic and the
-like), and the Tag-block subdivision flags (England, Scotland, Wales). They are still stripped.
+like), a single zero-width space between letters of Thai, Lao or Khmer (word breaking), a variation
+selector directly after an emoji, and the three Tag-block subdivision flags (England, Scotland, Wales).
+They are still stripped, except the emoji selector.
 """
 
 import re
@@ -32,9 +39,31 @@ _TAG_BASE = 0xE0000
 # Invisible in print but not an instruction channel: stripped without raising a flag (soft hyphen from PDF
 # line breaks, combining grapheme joiner, Arabic letter mark, Mongolian vowel separator, invisible operators).
 _QUIET_CHARS = re.compile("[\u00ad\u034f\u061c\u180e\u2062-\u2064]")
-# U+1F3F4 (black flag) + tag letters + cancel tag: how the flags of England, Scotland and Wales are written.
-_FLAG_SEQUENCE = re.compile("\U0001f3f4([\U000e0020-\U000e007e]+)\U000e007f")
-_FLAG_CODE = re.compile(r"[a-z0-9]{2,7}")
+# Other hidden or invisible characters that carry a message or break a word for a reader but not for a
+# model: variation selectors (U+FE00 to U+FE0F, U+E0100 to U+E01EF: 256 values, one byte each), Hangul
+# fillers (U+115F, U+1160, U+3164, U+FFA0) and the left-to-right / right-to-left marks (U+200E, U+200F).
+# Not in `text_clean.HIDDEN_CHARS`, which the typed-text cleaner shares with the frontend.
+_SMUGGLING = "[\ufe00-\ufe0f\U000e0100-\U000e01ef\u115f\u1160\u3164\uffa0\u200e\u200f]"
+_ALL_HIDDEN = re.compile(f"{HIDDEN_CHARS.pattern}|{_SMUGGLING}")
+_SELECTOR_RUN = re.compile("[\ufe00-\ufe0f\U000e0100-\U000e01ef]{2,}")
+# U+1F3F4 (black flag) + tag letters + cancel tag: the only three flags that are written this way (England,
+# Scotland, Wales). Any other tag run after a black flag is hidden text.
+_BLACK_FLAG = "\U0001f3f4"
+_FLAG_SEQUENCE = re.compile(
+    _BLACK_FLAG
+    + "(?:"
+    + "|".join("".join(chr(_TAG_BASE + ord(c)) for c in code) for code in ("gbeng", "gbsct", "gbwls"))
+    + ")\U000e007f"
+)
+# Characters an emoji presentation selector (U+FE0F) can follow besides the pictographs in `_is_emoji`:
+# copyright and trade mark signs and a few symbols. Keycap bases (# * 0 to 9) count only before U+20E3.
+_SELECTOR_BASES = frozenset(
+    "\u00a9\u00ae\u203c\u2049\u2122\u2139\u24c2\u25aa\u25ab\u25b6\u25c0\u25fb\u25fc\u3030\u303d\u3297\u3299"
+)
+# Thai, Lao and Khmer are written without spaces: a zero-width space between two letters marks a word break.
+_WORD_BREAK_SCRIPTS = frozenset({"THAI", "LAO", "KHMER"})
+# A `<document>` tag in any case, with white space inside or attributes: the provider's data delimiter.
+_DOCUMENT_TAG = re.compile(r"<\s*(/?)\s*document\b[^>]*>", re.IGNORECASE)
 _JOINING_SCRIPTS = frozenset(
     {
         "TAMIL",
@@ -68,20 +97,34 @@ def prepare_text(raw: str) -> PreparedText:
     """Clean, check and redact one document's extracted text."""
     unflagged = _without_ordinary_flags(raw)
     suspicious = _suspicious_hidden(unflagged)
-    decoded = _decode_tags(unflagged).strip()
+    decoded = " ".join(
+        part for part in (_decode_tags(unflagged), _decode_selectors(unflagged)) if part
+    ).strip()
 
-    stripped = _QUIET_CHARS.sub("", HIDDEN_CHARS.sub("", raw))
+    stripped = _QUIET_CHARS.sub("", _strip_hidden(unflagged))
     cleaned = clean_text(unicodedata.normalize("NFKC", stripped), multiline=True)
+    delimiters = len(_DOCUMENT_TAG.findall(cleaned)) or len(_DOCUMENT_TAG.findall(skeleton(cleaned)))
+    cleaned = _DOCUMENT_TAG.sub(_neutralise_document_tag, cleaned)
 
     signals: list[str] = []
     if decoded:
         signals.append(f"hidden text: {decoded[:_EVIDENCE_MAX]}")
     elif suspicious:
         signals.append(f"hidden characters ({len(suspicious)})")
-    signals += find_injection_phrases(skeleton(cleaned))
+    if delimiters:
+        signals.append(f"document delimiter tag in the text ({delimiters})")
+    for phrase in find_injection_phrases(skeleton(cleaned)) + (
+        find_injection_phrases(skeleton(decoded)) if decoded else []
+    ):
+        if phrase not in signals:
+            signals.append(phrase)
 
     text, redactions = redact(cleaned)
     return PreparedText(text=text, injection=signals, hidden_count=len(suspicious), redactions=redactions)
+
+
+def _neutralise_document_tag(match: re.Match[str]) -> str:
+    return "[/document]" if match.group(1) else "[document]"
 
 
 def skeleton(text: str) -> str:
@@ -100,29 +143,57 @@ def _decode_tags(text: str) -> str:
     return "".join(chr(ord(c) - _TAG_BASE) for c in text if 0xE0020 <= ord(c) <= 0xE007E)
 
 
-def _without_ordinary_flags(text: str) -> str:
-    def keep_if_not_a_flag(match: re.Match[str]) -> str:
-        return "" if _FLAG_CODE.fullmatch(_decode_tags(match.group(1))) else match.group(0)
+def _decode_selectors(text: str) -> str:
+    """A run of variation selectors is a known way to carry bytes after a visible character: U+FE00 to
+    U+FE0F are the values 0 to 15 and U+E0100 to U+E01EF the values 16 to 255. A lone selector is not a
+    message, so only runs of two or more are decoded."""
+    decoded = ""
+    for run in _SELECTOR_RUN.findall(text):
+        data = bytes(ord(c) - 0xFE00 if ord(c) <= 0xFE0F else ord(c) - 0xE0100 + 16 for c in run)
+        decoded += "".join(c for c in data.decode("utf-8", errors="ignore") if c.isprintable())
+    return decoded
 
-    return _FLAG_SEQUENCE.sub(keep_if_not_a_flag, text)
+
+def _without_ordinary_flags(text: str) -> str:
+    """Drop the tag run of the England, Scotland and Wales flags (keeping the flag itself). Every other tag
+    run, a longer one after a black flag included, stays in the text and is flagged as hidden."""
+    return _FLAG_SEQUENCE.sub(_BLACK_FLAG, text)
+
+
+def _strip_hidden(text: str) -> str:
+    return _ALL_HIDDEN.sub(lambda m: m.group() if _is_emoji_selector(m.string, m.start()) else "", text)
 
 
 def _suspicious_hidden(text: str) -> list[str]:
     found: list[str] = []
-    for match in HIDDEN_CHARS.finditer(text):
+    for match in _ALL_HIDDEN.finditer(text):
         char, index = match.group(), match.start()
         if char == "\ufeff" and index == 0:
             continue
-        if char in "\u200c\u200d" and _is_joiner_in_writing(text, index):
+        if _is_emoji_selector(text, index):
+            continue
+        if char in "\u200b\u200c\u200d" and _is_joiner_in_writing(text, index):
             continue
         found.append(char)
     return found
+
+
+def _is_emoji_selector(text: str, index: int) -> bool:
+    """U+FE0F directly after an emoji is how an emoji is asked for in colour: ordinary writing."""
+    if text[index] != "\ufe0f" or index == 0:
+        return False
+    before = text[index - 1]
+    if before in "#*0123456789":
+        return text[index + 1 : index + 2] == "\u20e3"
+    return before in _SELECTOR_BASES or (before != "\ufe0f" and _is_emoji(before))
 
 
 def _is_joiner_in_writing(text: str, index: int) -> bool:
     if index == 0 or index + 1 >= len(text):
         return False
     before, after = text[index - 1], text[index + 1]
+    if text[index] == "\u200b":
+        return _script(before) in _WORD_BREAK_SCRIPTS and _script(after) in _WORD_BREAK_SCRIPTS
     if text[index] == "\u200d" and _is_emoji(before) and _is_emoji(after):
         return True
     return _script(before) in _JOINING_SCRIPTS and _script(after) in _JOINING_SCRIPTS
@@ -152,14 +223,25 @@ _NRIC_ST = "JZIHGFEDCBA"
 _NRIC_FG = "XWUTRQPNMLK"
 _NRIC_M = "KLJNPQRTUWX"
 # Singapore numbers: 8 digits starting 3, 6, 8 or 9, with or without +65 / 65 / 0065 and a space or hyphen.
-_PHONE = re.compile(r"(?<![A-Za-z0-9])(?:(?:\+|00)?65[ -]?)?([3689]\d{3})[ -]?(\d{4})(?![A-Za-z0-9])")
+# Two 4-digit groups split by a space are only a phone number with a prefix or a phone word nearby: "area
+# 3000 2500 sqft" is not one. The unbroken and the hyphenated forms are always masked.
+_PHONE = re.compile(
+    r"(?<![A-Za-z0-9])(?P<prefix>(?:\+|00)?65[ -]?)?"
+    r"[3689]\d{3}(?P<sep>[ -]?)(?P<tail>\d{4})(?![A-Za-z0-9])"
+)
+_PHONE_WORD = re.compile(
+    r"\b(?:tel|telephone|phones?|mobile|handphone|hp|contacts?|call|calls|calling)\b", re.IGNORECASE
+)
+_PHONE_WORDS_BEFORE = 4
+_PHONE_WORDS_AFTER = 1
 _DDMMYYYY = re.compile(r"3[01](?:0[1-9]|1[0-2])(?:19|20)\d{2}")
 _KEPT = 4
 
 
-def redact(text: str) -> tuple[str, int]:
+def redact(text: str, *, phone_context: bool = False) -> tuple[str, int]:
     """Mask NRIC/FIN and Singapore phone numbers, keeping the last 4 characters. Returns the text and how
-    many numbers were masked."""
+    many numbers were masked. `phone_context` says the text is known to hold a phone number (a form field
+    named phone), so the space-separated form needs no prefix or phone word."""
     count = 0
 
     def mask_nric(match: re.Match[str]) -> str:
@@ -176,25 +258,39 @@ def redact(text: str) -> tuple[str, int]:
         # Eight bare digits starting with 3 can be a date written without separators (31102027).
         if whole.isdigit() and _DDMMYYYY.fullmatch(whole):
             return whole
+        if match.group("sep") == " " and not match.group("prefix") and not phone_context:
+            if not _phone_word_near(match.string, match.start(), match.end()):
+                return whole
         count += 1
-        return "****" + match.group(2)
+        return "****" + match.group("tail")
 
     return _PHONE.sub(mask_phone, _NRIC.sub(mask_nric, text)), count
 
 
+def _phone_word_near(text: str, start: int, end: int) -> bool:
+    """A phone word (tel, phone, mobile, hp, contact, call) within a few words of the number."""
+    before = " ".join(text[:start].split()[-_PHONE_WORDS_BEFORE:])
+    after = " ".join(text[end:].split()[:_PHONE_WORDS_AFTER])
+    return bool(_PHONE_WORD.search(before) or _PHONE_WORD.search(after))
+
+
 def redact_form_section(section: dict[str, Any]) -> dict[str, Any]:
-    """The form values sent beside the document, masked the same way, so a masked number in the text and
-    the same number in the form compare equal."""
-    return {key: _redact_value(value) for key, value in section.items()}
+    """The form values sent beside the document, normalised with NFKC and masked the same way as the text,
+    so a masked number or a name in the text and the same one in the form compare equal."""
+    return {key: _redact_value(value, _is_phone_key(key)) for key, value in section.items()}
 
 
-def _redact_value(value: Any) -> Any:
+def _is_phone_key(key: str) -> bool:
+    return any(_PHONE_WORD.fullmatch(part) for part in re.split(r"[^A-Za-z0-9]+", key))
+
+
+def _redact_value(value: Any, phone_context: bool) -> Any:
     if isinstance(value, str):
-        return redact(value)[0]
+        return redact(unicodedata.normalize("NFKC", value), phone_context=phone_context)[0]
     if isinstance(value, dict):
-        return {k: _redact_value(v) for k, v in value.items()}
+        return {k: _redact_value(v, _is_phone_key(k)) for k, v in value.items()}
     if isinstance(value, list):
-        return [_redact_value(v) for v in value]
+        return [_redact_value(v, phone_context) for v in value]
     return value
 
 
