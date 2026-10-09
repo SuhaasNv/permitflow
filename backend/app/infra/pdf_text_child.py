@@ -40,7 +40,8 @@ def main() -> None:
         parts.append(page.extract_text() or "")
         if sum(len(p) for p in parts) >= max_chars:
             break
-    print(json.dumps({"encrypted": False, "text": "\n".join(parts)}))
+    # Never more than the cap, so the parent does not buffer a page's worth beyond it.
+    print(json.dumps({"encrypted": False, "text": "\n".join(parts)[: int(max_chars)]}))
 
 
 if __name__ == "__main__":

@@ -112,9 +112,11 @@ class Settings(BaseSettings):
     worker_lock_timeout_seconds: int = 5
     # Both modes: the PDF text extraction runs in a child process killed at the wall-clock deadline, with
     # address-space and CPU-time caps (a hostile or broken PDF cannot take the API or the worker with it).
-    pdf_extract_timeout_seconds: float = 15.0
-    pdf_extract_memory_mb: int = 512
-    pdf_extract_cpu_seconds: int = 10
+    # The CPU cap sits above the page budget (10 s) so a slow but legitimate PDF is cut by the budget and
+    # keeps the text read so far, rather than killed by the cap with nothing; the wall clock sits above both.
+    pdf_extract_timeout_seconds: float = Field(25.0, ge=2.0)
+    pdf_extract_memory_mb: int = Field(512, ge=64)
+    pdf_extract_cpu_seconds: int = Field(20, ge=2)
 
     @property
     def cors_origin_list(self) -> list[str]:

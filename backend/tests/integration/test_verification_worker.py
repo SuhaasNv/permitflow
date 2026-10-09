@@ -476,6 +476,20 @@ def test_a_normal_pdf_is_read_by_the_child() -> None:
     assert extract_text("application/pdf", _pdf(), max_chars=100) == Extracted("hi", None)
 
 
+def test_pdf_child_never_prints_more_than_the_cap() -> None:
+    import json
+
+    from app.infra.extraction import _CHILD
+
+    done = subprocess.run(
+        [sys.executable, "-I", str(_CHILD), "1", "30", "10", "512", "20"],
+        input=_pdf(),
+        capture_output=True,
+        check=True,
+    )
+    assert json.loads(done.stdout) == {"encrypted": False, "text": "h"}
+
+
 def test_pdf_child_survives_when_the_child_cannot_start(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.infra import extraction
 

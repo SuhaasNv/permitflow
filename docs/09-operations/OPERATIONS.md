@@ -60,8 +60,8 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `WORKER_LEASE_SECONDS` | `180` | worker | How long a claimed check may go without finishing before the reaper takes it back. Keep it above `PDF_EXTRACT_TIMEOUT_SECONDS` plus `AI_TIMEOUT_SECONDS` (twice, one retry). |
 | `WORKER_METRICS_PORT` | `9100` | worker | The worker's own `/metrics` port. Private: no token, never published or given a domain. `0` picks a free port (tests). |
 | `WORKER_LOCK_TIMEOUT_SECONDS` | `5` | worker | Postgres `lock_timeout` on the worker's connections: a lock wait longer than this fails the attempt instead of hanging. |
-| `PDF_EXTRACT_TIMEOUT_SECONDS` | `15` | backend, worker | Both modes. The PDF text is extracted in a child process killed at this wall-clock deadline; a kill is stored as `unreadable: pdf_parse_error`. |
-| `PDF_EXTRACT_MEMORY_MB`, `PDF_EXTRACT_CPU_SECONDS` | `512`, `10` | backend, worker | Both modes. `RLIMIT_AS` and `RLIMIT_CPU` of that child. `RLIMIT_AS` is enforced on Linux (the containers), not on macOS. |
+| `PDF_EXTRACT_TIMEOUT_SECONDS` | `25` | backend, worker | Both modes. The PDF text is extracted in a child process killed at this wall-clock deadline; a kill is stored as `unreadable: pdf_parse_error`. |
+| `PDF_EXTRACT_MEMORY_MB`, `PDF_EXTRACT_CPU_SECONDS` | `512`, `20` | backend, worker | Both modes. `RLIMIT_AS` and `RLIMIT_CPU` of that child. `RLIMIT_AS` is enforced on Linux (the containers), not on macOS. |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | empty | backend (also Grafana and the bot) | US-101: the API posts one Telegram message for each platform settings change to this chat. Both empty: no message, no network call. The same bot and chat the monitoring layer uses (`OBSERVABILITY.md`, 5a); set them on the backend service as well. |
 | `VITE_API_URL` | `http://localhost:8000/api/v1` | frontend | Build-time, read from `frontend/.env` (not the repo root). In the container the runtime `API_URL` wins. |
 
@@ -186,7 +186,7 @@ Document checks run in one of two places, chosen by `VERIFICATION_MODE`. The cod
 
 **Watch it.** Dashboard row "Is the verification worker keeping up?" (checks waiting, oldest waiting check, checks being worked, dead checks, worker up, leases taken back). Admin overview, "Document checks": a "Gave up after 3 tries" line appears when a check died in the last 24 hours. A dead check is served as `failed` to applicants and officers, who can re-run it.
 
-**Dead checks.** `SELECT id, document_id, attempts, created_at FROM verification_runs WHERE status = 'dead' ORDER BY created_at DESC;` They died because a worker vanished or hung three times for the same document: look at the worker's logs (`worker_reaped`, `worker_run_crashed`) and at the file (a very large PDF is killed at 15 s and is `unreadable`, not dead). Re-running from the UI creates a new run.
+**Dead checks.** `SELECT id, document_id, attempts, created_at FROM verification_runs WHERE status = 'dead' ORDER BY created_at DESC;` They died because a worker vanished or hung three times for the same document: look at the worker's logs (`worker_reaped`, `worker_run_crashed`) and at the file (a very large PDF is killed at 25 s and is `unreadable`, not dead). Re-running from the UI creates a new run.
 
 **Switching an environment to `worker`.** Development first, with the UAT pass before production, which is switched at a release.
 
