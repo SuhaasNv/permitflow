@@ -1,8 +1,9 @@
-"""AI verification runs (ADR-004, ADR-006). The only module that talks to `infra.ai`.
+"""AI verification runs (ADR-004, ADR-006, ADR-016). The only module that talks to `infra.ai`.
 
-`run_verification(run_id)` is a plain synchronous function that opens its own database session, so it
-can run in FastAPI's threadpool via BackgroundTasks after the request session is gone. It never raises:
-every failure is recorded on the run as data (REL-003).
+`execute_run(run_id)` is a plain synchronous function that opens its own database session, so it can run
+in FastAPI's threadpool via BackgroundTasks after the request session is gone (`VERIFICATION_MODE=inline`),
+or in a worker thread of `python -m app.worker` (`worker`). It never raises: every failure is recorded on
+the run as data (REL-003). A queued run is `pending`; a claimed one is `running` and held by a lease.
 """
 
 import logging
@@ -47,21 +48,47 @@ TERMINAL = {
     VerificationStatus.UNREADABLE,
     VerificationStatus.FAILED,
     VerificationStatus.UNAVAILABLE,
+    VerificationStatus.DEAD,
 }
+MAX_ATTEMPTS = 3
+REPLACED_REASON = "document_replaced"
+
+
+def start_run(run_id: uuid.UUID) -> None:
+    """The request's background task. Inline: run the check here. Worker: the run is already queued, so
+    only wake the workers (a missed wake-up costs at most the polling interval)."""
+    if get_settings().verification_mode == "inline":
+        run_verification(run_id)
+        return
+    try:
+        with session_factory()() as db:
+            DocumentRepository(db).notify_queue()
+            db.commit()
+    except Exception:  # noqa: BLE001 - the workers poll anyway; the request has already been answered
+        logger.exception("verification_notify_failed")
 
 
 def run_verification(run_id: uuid.UUID) -> None:
-    settings = get_settings()
+    """Inline mode: claim the pending run (the atomic pending-to-running move: true for one caller only)
+    and execute it."""
     with session_factory()() as db:
-        # Atomic claim: only one worker can move a run from pending to running.
         claimed = DocumentRepository(db).claim_run(run_id, datetime.now(UTC))
         db.commit()
-        if not claimed:
-            return
+    if claimed:
+        execute_run(run_id)
+
+
+def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
+    """Run a claimed check. `worker_id` is the claimant (None inline); the result is written only while the
+    run is still `running` and still held by it, so a duplicate execution is harmless (at-least-once)."""
+    settings = get_settings()
+    with session_factory()() as db:
         run = db.get(VerificationRun, run_id)
-        doc = db.get(Document, run.document_id) if run else None
+        if run is None or run.status != VerificationStatus.RUNNING or run.worker_id != worker_id:
+            return
+        doc = db.get(Document, run.document_id)
         app = db.get(Application, doc.application_id) if doc else None
-        if run is None or doc is None or app is None:
+        if doc is None or app is None:
             return
         # End the read transaction here: the session keeps the loaded rows (expire_on_commit=False) but
         # returns its pooled connection while the file is read and the model is called, so a burst of slow
@@ -99,6 +126,26 @@ def run_verification(run_id: uuid.UUID) -> None:
                     started=started,
                 )
                 return
+
+            # The draft may have been deleted, or the file replaced, while the text was read: look again
+            # before anything leaves the system. A deleted draft's text never reaches the provider.
+            with db.no_autoflush:
+                state = DocumentRepository(db).lifecycle(run.id)
+            if state == "removed":
+                db.rollback()
+                return
+            if state == "replaced":
+                _finish(
+                    db,
+                    run,
+                    app,
+                    VerificationStatus.UNAVAILABLE,
+                    provider="none",
+                    error_reason=REPLACED_REASON,
+                    started=started,
+                )
+                return
+            db.commit()  # keep the extracted text, and give the connection back during the model call
 
             provider = get_provider()
             if provider is None:
@@ -175,7 +222,7 @@ def run_verification(run_id: uuid.UUID) -> None:
             logger.exception("verification_crashed", extra={"extra_fields": {"run_id": str(run_id)}})
             db.rollback()
             run = db.get(VerificationRun, run_id)
-            if run is not None:
+            if run is not None and run.status == VerificationStatus.RUNNING and run.worker_id == worker_id:
                 _finish(
                     db,
                     run,
@@ -213,6 +260,15 @@ def _finish(
     raw_output_valid: bool | None = None,
     started: float,
 ) -> None:
+    # Only the holder of the run writes its result, under a row lock: if the draft was deleted (the run
+    # is gone) or the lease was taken over by another worker, this result is dropped.
+    with db.no_autoflush:  # the lock comes first; the result is flushed under it
+        held = DocumentRepository(db).lock_state(run.id) == (VerificationStatus.RUNNING, run.worker_id)
+    if not held:
+        db.rollback()
+        logger.warning("verification_result_dropped", extra={"extra_fields": {"run_id": str(run.id)}})
+        return
+    run.lease_until = None
     run.status = status
     run.provider = provider
     run.model = model
@@ -250,6 +306,55 @@ def _finish(
             }
         },
     )
+
+
+def claim_next_run(worker_id: str) -> uuid.UUID | None:
+    """Worker mode: take the oldest queued run and commit the claim at once. From here the lease, not a
+    transaction, says the run is being worked."""
+    now = datetime.now(UTC)
+    lease_until = now + timedelta(seconds=get_settings().worker_lease_seconds)
+    with session_factory()() as db:
+        run_id = DocumentRepository(db).claim_next(worker_id, now, lease_until)
+        db.commit()
+        return run_id
+
+
+def release_run(run_id: uuid.UUID, worker_id: str) -> bool:
+    """Worker shutdown: hand an unfinished run back to the queue."""
+    with session_factory()() as db:
+        released = DocumentRepository(db).release_lease(run_id, worker_id)
+        db.commit()
+        return released
+
+
+def reap_expired_runs() -> tuple[int, int]:
+    """Worker mode: runs whose lease ran out (the worker died or hung) go back to the queue, or die after
+    `MAX_ATTEMPTS` claims. Returns (requeued, dead). A dead run is audited like any finished check."""
+    with session_factory()() as db:
+        requeued, dead_ids = DocumentRepository(db).reap_expired(datetime.now(UTC), MAX_ATTEMPTS)
+        for run_id in dead_ids:
+            run = db.get(VerificationRun, run_id)
+            doc = db.get(Document, run.document_id) if run else None
+            if run is None:
+                continue
+            AuditRepository(db).record(
+                application_id=doc.application_id if doc else None,
+                actor_id=None,
+                event_type="verification.completed",
+                payload={
+                    "run_id": str(run.id),
+                    "document_id": str(run.document_id),
+                    "status": VerificationStatus.DEAD.value,
+                    "provider": run.provider,
+                    "error_reason": run.error_reason,
+                    "attempts": run.attempts,
+                },
+            )
+            metrics.VERIFICATION_RUNS.labels(VerificationStatus.DEAD.value, run.provider).inc()
+        db.commit()
+    metrics.REAPED.labels("requeued").inc(requeued)
+    metrics.REAPED.labels("dead").inc(len(dead_ids))
+    return requeued, len(dead_ids)
 
 
 def mark_stale_runs_failed(grace_seconds: int = 60) -> int:

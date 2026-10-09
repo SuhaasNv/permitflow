@@ -139,7 +139,7 @@ def document_view(
     if run is not None:
         # Operators see the outcome and a plain explanation; confidence is officer-only (design decision).
         verification = VerificationView(
-            status=run.status.value,
+            status=run.status.served.value,
             summary=run.summary,
             issues=[{k: v for k, v in i.items() if k != "evidence"} for i in run.issues],
             missing_information=list(run.missing_information),

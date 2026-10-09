@@ -301,7 +301,7 @@ def _verification(run: VerificationRun | None) -> OfficerVerificationOut | None:
     if run is None:
         return None
     return OfficerVerificationOut(
-        status=run.status.value,
+        status=run.status.served.value,
         summary=run.summary,
         confidence=run.confidence,
         issues=list(run.issues),

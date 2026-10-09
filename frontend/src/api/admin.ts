@@ -52,6 +52,7 @@ export interface Checks {
   unreadable: number
   failed_or_unavailable: number
   still_running: number
+  dead: number
   average_seconds: number | null
   p95_seconds: number | null
   provider: string

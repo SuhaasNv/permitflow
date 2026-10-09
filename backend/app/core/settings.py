@@ -86,12 +86,27 @@ class Settings(BaseSettings):
     langsmith_hide_inputs: bool = True
 
     # US-101: the limits above are the defaults and the hard ceilings of the admin settings panel. The
-    # worker's concurrency has no consumer yet (US-098) but is a panel setting, so its ceiling lives here.
+    # worker's concurrency (US-098) is a panel setting too, so its ceiling lives here.
     worker_concurrency: int = 2
     # US-101: the API announces every settings change in the Telegram chat the monitoring bot already
     # uses. Both empty: no message and no network call.
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+
+    # US-098 (ADR-016): where document checks run. `inline` is the API process (FastAPI background tasks,
+    # the default); `worker` queues the run in `verification_runs` and `python -m app.worker` executes it.
+    verification_mode: Literal["inline", "worker"] = "inline"
+    # Worker only. The lease is how long a claimed run may go without finishing before the reaper takes it
+    # back; it must exceed the PDF deadline plus the model timeout. The metrics port is private (no
+    # published port, not routed by the edge). Postgres drops a lock wait after the lock timeout.
+    worker_lease_seconds: int = 180
+    worker_metrics_port: int = 9100
+    worker_lock_timeout_seconds: int = 5
+    # Both modes: the PDF text extraction runs in a child process killed at the wall-clock deadline, with
+    # address-space and CPU-time caps (a hostile or broken PDF cannot take the API or the worker with it).
+    pdf_extract_timeout_seconds: float = 15.0
+    pdf_extract_memory_mb: int = 512
+    pdf_extract_cpu_seconds: int = 10
 
     @property
     def cors_origin_list(self) -> list[str]:
