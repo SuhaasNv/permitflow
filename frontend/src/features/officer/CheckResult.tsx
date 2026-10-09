@@ -35,6 +35,7 @@ const REASON: Record<string, string> = {
   interrupted: 'The check was interrupted by a restart.',
   document_replaced: 'The document was replaced while it was being checked; the new file has its own check.',
   worker_gave_up: 'The check could not be completed after three tries; re-run it.',
+  ai_paused: 'Automatic checks are paused by the administrator; re-run once they resume.',
   daily_limit_reached: 'The daily limit on automatic checks was reached; review this document by hand or re-run it tomorrow.',
 }
 
