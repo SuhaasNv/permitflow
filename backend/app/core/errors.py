@@ -85,3 +85,17 @@ class ValidationFailed(AppError):
 class RateLimited(AppError):
     status_code = 429
     code = "rate_limited"
+
+
+class Unavailable(AppError):
+    """Busy, not broken: the caller may try again in a moment (US-098)."""
+
+    status_code = 503
+    code = "unavailable"
+
+
+class InsufficientStorage(AppError):
+    """The platform has no room left for another file (US-098)."""
+
+    status_code = 507
+    code = "storage_full"

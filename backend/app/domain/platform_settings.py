@@ -123,14 +123,13 @@ SPECS: tuple[SettingSpec, ...] = (
     SettingSpec(
         key="worker_concurrency",
         label="Worker concurrency",
-        description="Checks the worker runs at the same time. Stored now; read by the worker (US-098).",
+        description="Checks the worker runs at the same time. Read live by the worker (US-098).",
         group="ai",
         kind="int",
         env_field="worker_concurrency",
         unit="checks",
         minimum=1,
         absolute_max=32,
-        in_use=False,
     ),
     SettingSpec(
         key="ai_paused",

@@ -21,10 +21,11 @@ export function retryDelay(attempt: number): number {
   return Math.min(1000 * 2 ** Math.max(0, attempt - 1), 30_000)
 }
 
-/** Whether a failed request is worth retrying by itself: the network, or the server, not the request. */
+/** Whether a failed request is worth retrying by itself: the network, or the server, not the request.
+ *  507 (`storage_full`) is the platform out of space: waiting does not fix it, so it is not retried. */
 export function isTransient(error: unknown): boolean {
   const status = (error as { status?: number } | null)?.status
-  return status === 0 || status === undefined || status >= 500 || status === 408 || status === 429
+  return status === 0 || status === undefined || (status >= 500 && status !== 507) || status === 408 || status === 429
 }
 
 /** No retry while the tab is hidden: the browser throttles timers there and a save with keepalive already went. */

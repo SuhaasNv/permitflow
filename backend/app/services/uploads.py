@@ -10,10 +10,10 @@ from typing import BinaryIO
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import BadRequest, ValidationFailed
+from app.core.errors import AppError, BadRequest, InsufficientStorage, Unavailable, ValidationFailed
 from app.core.settings import get_settings
 from app.domain.uploads import UploadRejected, check_magic_bytes, too_large_message
-from app.infra.images import ImageUnreadableError, is_image, strip_metadata
+from app.infra.images import ImageBusyError, ImageUnreadableError, is_image, strip_metadata
 from app.infra.storage import FileStorage, get_storage
 from app.repositories.checklists import ChecklistRepository
 from app.repositories.documents import DocumentRepository
@@ -80,12 +80,39 @@ def budget_error(usage: StorageUsage) -> ValidationFailed:
     )
 
 
-def receive(storage: FileStorage, key: str, ext: str, stream: BinaryIO, usage: StorageUsage) -> Received:
+def platform_remaining(db: Session) -> int | None:
+    """Room left under the platform-wide ceiling (US-098), from the same two sums as the storage gauge,
+    so it holds on either backend; None when there is no ceiling (0, never in production). Parallel
+    uploads can overshoot it by a few files: it is a brake on growth, not an accounting lock."""
+    cap = get_settings().storage_total_max_bytes
+    if cap <= 0:
+        return None
+    return max(cap - DocumentRepository(db).total_bytes() - ChecklistRepository(db).attachment_bytes(), 0)
+
+
+def platform_full() -> InsufficientStorage:
+    return InsufficientStorage(
+        "The platform has no storage room left for this file. Try again later.",
+        details={"reason": "platform_storage_full"},
+    )
+
+
+def receive(
+    storage: FileStorage,
+    key: str,
+    ext: str,
+    stream: BinaryIO,
+    usage: StorageUsage,
+    platform_room: int | None = None,
+) -> Received:
     """Read the upload under the size cap, check its signature, strip an image's metadata, refuse it
     when it would pass the application's budget, and store it under `key`. On any refusal nothing is
-    left on disk. Returns the digest and size of the stored bytes."""
+    left on disk. `platform_room` is what `platform_remaining` returned (None: no ceiling). Returns the
+    digest and size of the stored bytes."""
     if usage.remaining_bytes <= 0:
         raise budget_error(usage)
+    if platform_room is not None and platform_room <= 0:
+        raise platform_full()
     limit = live().int_value("upload_max_bytes")
     digest = hashlib.sha256()
     size = 0
@@ -105,6 +132,8 @@ def receive(storage: FileStorage, key: str, ext: str, stream: BinaryIO, usage: S
                 raise BadRequest(too_large_message(limit), details={"reason": "too_large"})
             if size > usage.remaining_bytes:
                 raise budget_error(usage)
+            if platform_room is not None and size > platform_room:
+                raise platform_full()
             digest.update(chunk)
             yield chunk
         if first:
@@ -116,6 +145,8 @@ def receive(storage: FileStorage, key: str, ext: str, stream: BinaryIO, usage: S
         data = b"".join(chunks())
         try:
             data = strip_metadata(data, ext)
+        except ImageBusyError as exc:
+            raise Unavailable("The server is busy. Try again in a moment.") from exc
         except ImageUnreadableError as exc:
             raise BadRequest(
                 "The image could not be read. Send it again, or save it as a PDF.",
@@ -126,6 +157,8 @@ def receive(storage: FileStorage, key: str, ext: str, stream: BinaryIO, usage: S
             raise BadRequest(too_large_message(limit), details={"reason": "too_large"})
         if len(data) > usage.remaining_bytes:
             raise budget_error(usage)
+        if platform_room is not None and len(data) > platform_room:
+            raise platform_full()
         try:
             storage.put(key, iter([data]))
         except BadRequest:
@@ -135,7 +168,7 @@ def receive(storage: FileStorage, key: str, ext: str, stream: BinaryIO, usage: S
 
     try:
         storage.put(key, chunks())
-    except (BadRequest, ValidationFailed):
+    except AppError:
         storage.delete(key)
         raise
     return Received(sha256=digest.hexdigest(), size_bytes=size)
@@ -146,6 +179,7 @@ __all__ = [
     "StorageUsage",
     "budget_error",
     "format_bytes",
+    "platform_remaining",
     "receive",
     "storage_usage",
     "storage_view",

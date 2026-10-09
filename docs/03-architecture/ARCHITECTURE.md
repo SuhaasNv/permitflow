@@ -1,10 +1,31 @@
 # PermitFlow: Architecture
 
-A modular monolith (ADR-001): one FastAPI backend, one React frontend, one PostgreSQL database, file storage behind one interface (the local disk by default; an S3-compatible bucket behind `STORAGE_BACKEND=s3`, US-097, ADR-015), and an isolated AI verification module.
+A modular monolith (ADR-001): one FastAPI backend, one React frontend, one PostgreSQL database, file storage behind one interface (the local disk by default; an S3-compatible bucket behind `STORAGE_BACKEND=s3`, US-097, ADR-015), and an isolated AI verification module that runs inside the API (`VERIFICATION_MODE=inline`, the default) or in a separate worker process (`worker`, US-098, ADR-016).
 
 ## System diagram
 
 ![Solution architecture: users, the web application and the API with its modules, PostgreSQL and file storage, OpenAI and LangSmith](diagrams/views/solution-architecture.png)
+
+**Worker mode (US-098, ADR-016).** The picture above is the `inline` shape. With `VERIFICATION_MODE=worker` the verification module moves out of the API into a second process of the same image, and `verification_runs` is the queue between them. The PNG views (this one and `deployment.png`) were drawn outside the repository and have not been redrawn; this diagram is the current truth for the worker until they are.
+
+```
+ Browser ──HTTPS──> Frontend ──> API (FastAPI)                          Worker (python -m app.worker)
+                                  │  upload / re-run                     │  no public address, no published port
+                                  │  1. quota check (as today)           │
+                                  │  2. INSERT verification_runs         │  loop: LISTEN verification_runs, poll 2 s
+                                  │     status 'pending' (= queued)      │  claim: UPDATE ... FOR UPDATE SKIP LOCKED
+                                  │  3. after the response:              │         status 'running', lease_until, attempts+1
+                                  │     NOTIFY verification_runs ───────>│  per run (WORKER_CONCURRENCY threads):
+                                  ▼                                      │    read file (FileStorage: bucket on Railway)
+                            PostgreSQL <─────────────────────────────────┤    extract text in a child process (kill + caps)
+                          verification_runs (the queue)                  │    re-check draft/document, then provider.verify
+                          documents, applications, audit_events          │    write result under a row lock (fenced on worker_id)
+                                  ▲                                      │  reaper every 60 s: expired lease -> pending,
+                                  │  GET /applications/{id} polls        │    or 'dead' after the 3rd claim
+                                  │  every 2 s (status served as          │  /metrics on :9100 (private)
+                                  │  pending, running, ..., failed)       ▼
+                                  └──────────────────────────────────  OpenAI / mock provider
+```
 
 ## Backend layering and dependency direction
 
@@ -58,7 +79,9 @@ POST /applications/{id}/documents (multipart)
   DocumentService.upload (one transaction): Document row (is_current, supersedes) →
      VerificationRun(pending) → audit document.uploaded → commit
      file bytes are written to FileStorage (disk or bucket, same keys) before commit; on commit failure the file is deleted
-  BackgroundTasks.add(run_verification, run_id)   # request session is already closed at this point
+  BackgroundTasks.add(start_run, run_id)   # request session is already closed at this point
+  #   inline: start_run runs the check below in this process.
+  #   worker (US-098): start_run only sends NOTIFY; the run stays pending until a worker claims it.
   201 { document, verification: { status: "pending" } }
 
 run_verification(run_id):   # plain sync function; FastAPI runs it in the threadpool
@@ -74,6 +97,18 @@ run_verification(run_id):   # plain sync function; FastAPI runs it in the thread
   → on any exception: failed/unavailable with reason (never raises out of the task)
   Multi-worker note: startup stale-run cleanup only marks runs whose started_at is older than the
   timeout + grace, so a peer worker's in-flight run is not killed.
+
+execute_run(run_id, worker_id) as changed by US-098 (both modes; `worker_id` is None inline):
+  runs only while the row is `running` and held by worker_id
+  → PDF text is extracted in a child process (kill at 25 s, address-space and CPU caps); a timeout or a
+    cap is `pdf_parse_error`, the same reason a corrupt PDF gets
+  → pause check (US-101) → look again: run, document and application still exist and the document is
+    still current (gone: stop, write nothing; replaced: finish `unavailable: document_replaced`)
+  → commit (keeps the extracted text, returns the connection) → provider.verify → rules
+  → _finish: lock the run row, proceed only if still `running` for this worker_id (else drop the
+    result), then write the status, audit row and metrics in one commit
+Worker mode only: claim_next_run (one atomic UPDATE, committed at once), reap_expired_runs every 60 s
+(requeue, or `dead` after 3 claims, with an audit row), release_run on SIGTERM.
 
 Client: GET /applications/{id} polls every 2 s while any document is pending/running.
 ```
@@ -131,7 +166,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /applications/{id}/licence | owner, officer or admin | the issued certificate as PDF; 404 before approval (built, US-051) |
 | GET | /officer/applications/{id}/licence/preview | officer | watermarked certificate while pending approval; nothing stored (built, US-051) |
 | POST | /applications/{id}/withdraw | operator (own) | any post-submission non-terminal → withdrawn, optional reason, officers notified (built, US-038) |
-| POST | /applications/{id}/documents | operator (own) | upload / replace by type; JPG and PNG are stored without metadata (US-085); 422 `storage_budget` past the application's 150 MB |
+| POST | /applications/{id}/documents | operator (own) | upload / replace by type; JPG and PNG are stored without metadata (US-085); 422 `storage_budget` past the application's 150 MB, 507 `storage_full` past the platform ceiling (US-098), 503 `unavailable` when no image slot frees up |
 | DELETE | /applications/{id}/documents/{doc_id} | operator (own) | remove a document while in `draft` only |
 | GET | /applications/{id}/documents/{doc_id}/download | owner or officer (admin included since US-072) | file; the document must belong to `{id}` |
 | POST | /applications/{id}/documents/{doc_id}/verify | operator (own) | re-run verification (only when the latest run is terminal); 202 |
@@ -153,7 +188,7 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /applications/{id}/site-visit/reschedule | operator (own) | `{ date, slot, reason }` on a confirmed visit before its date: becomes a counter-proposal the officer decides; the confirmed date stays until then; audit `site_visit.rescheduled`; officers notified (built, US-084) |
 | GET | /applications/{id}/clarifications | operator (own) | `?visit=N` reads an earlier visit's thread, read-only (UAT run 5, F18); without it the active visit's (none while the case is back in review, empty for a second visit until its checklist is submitted). `ClarificationOperatorView`: only the flagged items with a released, non-withdrawn question, each with title, guidance, the requests, the operator's own responses (US-065) and a status in operator words (Waiting for your response, Sent, Clarified, No longer needed); no field exists for a result, an unflagged item or an unreleased question; the application view carries `clarification { can_respond, open_count, answered_count, round }` (built, US-064) |
 | POST | /applications/{id}/clarifications/{item_id}/responses | operator (own) | `{ message }` (1 to 2000 characters): draft or rewrite the answer to the current open question on one item; 409 unless the office is waiting for answers, the item is open, and the answer is not yet sent; audit `clarification.response_drafted` once per item (built, US-065) |
-| POST | /applications/{id}/clarifications/responses/{rid}/attachments | operator (own) | multipart `file`: the document rules (allowlist, magic bytes, 10 MB), three per answer (422 `attachment_cap`), 422 `storage_budget` past the application's 150 MB, images stored without metadata (US-085), an identical file is kept once and reported `unchanged`; 409 once sent; audit `clarification.attachment_added` (built, US-065) |
+| POST | /applications/{id}/clarifications/responses/{rid}/attachments | operator (own) | multipart `file`: the document rules (allowlist, magic bytes, 10 MB), three per answer (422 `attachment_cap`), 422 `storage_budget` past the application's 150 MB, 507 `storage_full` past the platform ceiling (US-098), 503 `unavailable` when no image slot frees up, images stored without metadata (US-085), an identical file is kept once and reported `unchanged`; 409 once sent; audit `clarification.attachment_added` (built, US-065) |
 | DELETE | /applications/{id}/clarifications/responses/{rid}/attachments/{aid} | operator (own) | remove until sent (409 after); audit `clarification.attachment_removed` (built, US-065) |
 | POST | /applications/{id}/clarifications/send | operator (own) | every open item must carry an answer (422 `details.items` with the unanswered keys); items withdrawn before the send are left out; responses get `sent_at`, items become `answered`, audit `clarification.answered` per item then `status.changed` (operator actor) to `post_site_clarification_resubmitted`; every active officer notified (built, US-065) |
 | GET | /applications/{id}/clarifications/attachments/{aid}/download | owner, officer, admin | the file with `content_disposition()`; the chain attachment, response, request, item, checklist, application is checked at every hop; an id from elsewhere is 404 (built, US-065) |
@@ -219,12 +254,13 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 - Request logging middleware: request id, method, path, status, duration, user id; request id echoed in `X-Request-ID`.
 - Verification logs: run id, provider, model, latency, outcome, `raw_output_valid`.
 - `/health`: database ping (503 on failure) plus `version`, `commit` and `environment` (US-094). AI provider configuration is never reported publicly; the planned admin AI-health endpoint (US-071) would carry it.
-- Metrics (US-077): `core/metrics.py` holds the Prometheus counters and histograms, the outermost middleware counts every answer, the services increment their own events, `api/v1/metrics.py` renders them behind a bearer token. Prometheus scrapes them every 15 s; Grafana draws one dashboard (API health, document checks, cost, queue); seven alert rules and an hourly digest reach Telegram, where a small bot also answers `/status` and friends. The layer in full, with the Railway services: `../13-observability/OBSERVABILITY.md`.
+- Metrics (US-077): `core/metrics.py` holds the Prometheus counters and histograms, the outermost middleware counts every answer, the services increment their own events, `api/v1/metrics.py` renders them behind a bearer token. In worker mode the check counters live in the worker process, which serves its own `/metrics` on a private port (`WORKER_METRICS_PORT`, 9100); the queue gauges (depth, oldest wait, active leases, dead runs) are read from the database by both processes. Prometheus scrapes them every 15 s; Grafana draws one dashboard (API health, document checks, cost, queue); seven alert rules and an hourly digest reach Telegram, where a small bot also answers `/status` and friends. The layer in full, with the Railway services: `../13-observability/OBSERVABILITY.md`.
 
 ## Deployment
 
 - Local: `docker compose up db` (PostgreSQL only; the API and the frontend run natively with `uvicorn` and `vite`) or `docker compose --profile full up` to also run the API container. A local database is kept because the test suite truncates tables between tests and because a reviewer must be able to run the system from a clean clone without any hosted credentials (NFR-001).
 - Railway, two environments (`development` from `dev`, `production` from `main`), each with its own Postgres, uploads volume, secrets and domains; both tiers run as GHCR images built once in CI (frontend: nginx with the API URL injected at start), deployed by `deploy.yml` behind health gates and, for production, a reviewer approval. Shape, secrets, seeding and rollback: `docs/09-operations/OPERATIONS.md`.
+- Worker (US-098): with `VERIFICATION_MODE=worker` a new Railway service, `worker`, runs `python -m app.worker` from the same backend image (a custom start command), with no public domain, the same `DATABASE_URL` and bucket variables as the API, and `STORAGE_BACKEND=s3` on both (a volume cannot be shared between services). Locally: `docker compose --profile full --profile worker up -d` with `VERIFICATION_MODE=worker`; the default Compose path is unchanged and runs inline. Not yet created on Railway; see OPERATIONS.md.
 
 ### Visits on the case views (UAT run 5, 24 Sep 2026)
 

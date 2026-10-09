@@ -42,12 +42,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # environment values alone (a failure is logged and the reload retries in the background).
         live().refresh()
 
-        try:
-            n = mark_stale_runs_failed()
-            if n:
-                logger.warning("stale_runs_marked_failed", extra={"extra_fields": {"count": n}})
-        except Exception:  # noqa: BLE001 - startup must not depend on this housekeeping
-            logger.exception("stale_run_cleanup_failed")
+        # Worker mode (US-098): the queue outlives an API restart, and the workers' reaper handles expiry.
+        if settings.verification_mode == "inline":
+            try:
+                n = mark_stale_runs_failed()
+                if n:
+                    logger.warning("stale_runs_marked_failed", extra={"extra_fields": {"count": n}})
+            except Exception:  # noqa: BLE001 - startup must not depend on this housekeeping
+                logger.exception("stale_run_cleanup_failed")
     yield
 
 

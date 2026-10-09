@@ -134,6 +134,20 @@ panels = [
     panel(55, "What the applications hold, by kind", [(f'{m("permitflow_storage_bytes", chr(107)+"ind=~\"documents|attachments\"")}', "{{kind}}")], 8, 86, w=8, h=7, unit="bytes", stack=True),
     panel(56, "Evidence bytes uploaded per day", [(f'sum(increase({m("permitflow_attachment_bytes_total")}[1d]))', "bytes")], 16, 86, w=8, h=7, unit="bytes"),
     stat(57, "Signed in right now", f'sum({m("permitflow_sessions_active")})', 0, 93, 8, unit="short", decimals=0, color="blue"),
+
+    row(105, "Is the verification worker keeping up? (US-098)", 97),
+    stat(61, "Checks waiting", f'max({m("permitflow_verification_queue_depth")})', 0, 98, 4, unit="short", decimals=0, color="blue"),
+    stat(62, "Oldest waiting check", f'max({m("permitflow_verification_queue_oldest_seconds")})', 4, 98, 4, unit="s", decimals=0,
+         thresholds={"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "orange", "value": 120}, {"color": "red", "value": 600}]}),
+    stat(63, "Checks being worked", f'max({m("permitflow_verification_active_leases")})', 8, 98, 4, unit="short", decimals=0, color="purple"),
+    stat(64, "Dead checks (gave up after 3 tries)", f'max({m("permitflow_verification_dead_runs")})', 12, 98, 4, unit="short", decimals=0,
+         thresholds={"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "red", "value": 1}]}),
+    stat(65, "Worker", f'min({m("up", "job=\"permitflow-worker\"")})', 16, 98, 4, mappings=up_map, thresholds=up_thr),
+    stat(66, "Leases taken back, last hour", f'sum(increase({m("permitflow_verification_reaped_total")}[1h]))', 20, 98, 4, unit="short", decimals=0, color="orange"),
+    panel(67, "Checks waiting and oldest wait", [(f'max({m("permitflow_verification_queue_depth")})', "waiting"), (f'max({m("permitflow_verification_queue_oldest_seconds")})', "oldest wait (s)")], 0, 102, w=12, h=7, unit="short",
+          desc="Read from the database on every scrape of the API and every ten seconds by the worker, so it is true in both modes. With VERIFICATION_MODE=inline the queue is empty except for a moment."),
+    panel(68, "Leases taken back, by outcome, per hour", [(f'sum by (outcome) (increase({m("permitflow_verification_reaped_total")}[1h]))', "{{outcome}}")], 12, 102, w=12, h=7, unit="short", stack=True,
+          desc="requeued: a worker died or hung and the check went back to the queue. dead: it had been claimed three times and was given up on."),
 ]
 
 dashboard = {

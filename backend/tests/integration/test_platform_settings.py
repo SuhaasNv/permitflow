@@ -152,7 +152,6 @@ def test_an_empty_table_lists_every_setting_at_its_environment_default(
     ]
     # Stored for later stories, and honest about it.
     assert {k for k, v in s.items() if not v["in_use"]} == {
-        "worker_concurrency",
         "telegram_per_check_messages",
         "scanner_fail_mode",
     }

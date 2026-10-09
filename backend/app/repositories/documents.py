@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 
-from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy import String, and_, delete, func, literal_column, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from app.models import Application, Document, VerificationRun
@@ -117,6 +117,150 @@ class DocumentRepository:
             .values(status=VerificationStatus.FAILED, error_reason="interrupted", finished_at=finished_at)
         )
         return int(getattr(result, "rowcount", 0) or 0)
+
+    # ---- the work queue (US-098, ADR-016): `pending` is queued, `running` is leased ----
+
+    def claim_next(self, worker_id: str, now: datetime, lease_until: datetime) -> uuid.UUID | None:
+        """Atomically take the oldest queued run: one statement, so two workers never get the same one.
+        `SKIP LOCKED` lets a second worker pass over a row the first is claiming; LIMIT stays inside the
+        subquery. The caller commits at once: the claim is held by the lease, not by a transaction."""
+        # The status is inlined, not bound, so Postgres can match the partial index
+        # `ix_verification_runs_queued` (a generic plan with a bound parameter cannot).
+        pending = literal_column(f"'{VerificationStatus.PENDING.value}'", String)
+        oldest = (
+            select(VerificationRun.id)
+            .where(VerificationRun.status == pending)
+            .order_by(VerificationRun.created_at)
+            .limit(1)
+            .with_for_update(skip_locked=True)
+            .scalar_subquery()
+        )
+        stmt = (
+            update(VerificationRun)
+            .where(VerificationRun.id == oldest)
+            .values(
+                status=VerificationStatus.RUNNING,
+                started_at=now,
+                lease_until=lease_until,
+                worker_id=worker_id,
+                attempts=VerificationRun.attempts + 1,
+            )
+            .returning(VerificationRun.id)
+            .execution_options(synchronize_session=False)
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
+
+    def release_lease(self, run_id: uuid.UUID, worker_id: str) -> bool:
+        """A worker shutting down hands its unfinished run back to the queue; the interrupted attempt does
+        not count."""
+        result = self.db.execute(
+            update(VerificationRun)
+            .where(
+                VerificationRun.id == run_id,
+                VerificationRun.status == VerificationStatus.RUNNING,
+                VerificationRun.worker_id == worker_id,
+            )
+            .values(
+                status=VerificationStatus.PENDING,
+                lease_until=None,
+                worker_id=None,
+                attempts=VerificationRun.attempts - 1,
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0) == 1
+
+    def reap_expired(self, now: datetime, max_attempts: int) -> tuple[int, list[uuid.UUID]]:
+        """Runs whose lease has expired: back to the queue, or `dead` once they have been claimed
+        `max_attempts` times. Returns how many were requeued and the ids that died."""
+        expired = and_(
+            VerificationRun.status == VerificationStatus.RUNNING, VerificationRun.lease_until < now
+        )
+        dead = self.db.execute(
+            update(VerificationRun)
+            .where(expired, VerificationRun.attempts >= max_attempts)
+            .values(
+                status=VerificationStatus.DEAD,
+                error_reason="worker_gave_up",
+                finished_at=now,
+                lease_until=None,
+                worker_id=None,
+            )
+            .returning(VerificationRun.id)
+            .execution_options(synchronize_session=False)
+        )
+        dead_ids = list(dead.scalars())
+        requeued = self.db.execute(
+            update(VerificationRun)
+            .where(expired)
+            .values(status=VerificationStatus.PENDING, lease_until=None, worker_id=None)
+        )
+        return int(getattr(requeued, "rowcount", 0) or 0), dead_ids
+
+    def fail_stranded_inline(self, started_before: datetime, finished_at: datetime) -> int:
+        """`running` runs with no lease, started before the cutoff: they began inline, before the switch to
+        worker mode, and no process is left to finish them. Same outcome as the startup sweep."""
+        result = self.db.execute(
+            update(VerificationRun)
+            .where(
+                VerificationRun.status == VerificationStatus.RUNNING,
+                VerificationRun.lease_until.is_(None),
+                VerificationRun.started_at < started_before,
+            )
+            .values(status=VerificationStatus.FAILED, error_reason="interrupted", finished_at=finished_at)
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
+
+    def lock_state(
+        self, run_id: uuid.UUID, application_id: uuid.UUID | None = None
+    ) -> tuple[VerificationStatus, str | None] | None:
+        """Lock the run row and read who holds it, without touching the loaded object: the guard before a
+        worker writes its result. None when the run no longer exists (the draft was deleted). The
+        application row is locked first (FOR KEY SHARE, which the audit insert needs anyway), the same
+        order as draft deletion (application, then runs), so the two cannot deadlock."""
+        if application_id is not None:
+            self.db.execute(
+                select(Application.id).where(Application.id == application_id).with_for_update(key_share=True)
+            )
+        row = self.db.execute(
+            select(VerificationRun.status, VerificationRun.worker_id)
+            .where(VerificationRun.id == run_id)
+            .with_for_update()
+        ).first()
+        return None if row is None else (row[0], row[1])
+
+    def lifecycle(self, run_id: uuid.UUID) -> str:
+        """`ok` while the run's application and document exist and the document is the current revision,
+        `replaced` when a newer revision superseded it, `removed` when the draft or document is gone."""
+        current = self.db.execute(
+            select(Document.is_current)
+            .select_from(VerificationRun)
+            .join(Document, Document.id == VerificationRun.document_id)
+            .join(Application, Application.id == Document.application_id)
+            .where(VerificationRun.id == run_id)
+        ).scalar_one_or_none()
+        if current is None:
+            return "removed"
+        return "ok" if current else "replaced"
+
+    def notify_queue(self) -> None:
+        """Wake the workers (`LISTEN verification_runs`). Polling covers a missed notification."""
+        self.db.execute(text("SELECT pg_notify('verification_runs', '')"))
+
+    def queue_stats(self, now: datetime) -> tuple[int, float, int, int]:
+        """Queue depth, age in seconds of the oldest queued run (0 when none), active leases, dead runs."""
+        depth, oldest = self.db.execute(
+            select(func.count(), func.min(VerificationRun.created_at)).where(
+                VerificationRun.status == VerificationStatus.PENDING
+            )
+        ).one()
+        leases = self.db.scalar(
+            select(func.count()).where(
+                VerificationRun.status == VerificationStatus.RUNNING, VerificationRun.lease_until > now
+            )
+        )
+        dead = self.db.scalar(select(func.count()).where(VerificationRun.status == VerificationStatus.DEAD))
+        age = (now - oldest).total_seconds() if oldest is not None else 0.0
+        return int(depth), age, int(leases or 0), int(dead or 0)
 
     def add(self, doc: Document) -> Document:
         self.db.add(doc)

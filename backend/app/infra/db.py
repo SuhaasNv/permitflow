@@ -2,6 +2,7 @@
 
 from collections.abc import Generator
 
+import psycopg
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -11,6 +12,8 @@ from app.core.settings import get_settings
 _engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None
 _background_engine: Engine | None = None
+# Extra libpq options for the application engine; the worker sets a lock timeout before first use.
+_connect_args: dict[str, str] = {}
 
 # The background reader of the platform settings (US-101) must never wait long on a dead or saturated
 # database, and must not compete with requests for the application pool: it has a pool of its own.
@@ -28,9 +31,23 @@ def get_engine() -> Engine:
             pool_size=settings.db_pool_size,
             max_overflow=settings.db_max_overflow,
             pool_timeout=settings.db_pool_timeout_seconds,
+            connect_args=_connect_args,
         )
         _session_factory = sessionmaker(bind=_engine, expire_on_commit=False, class_=Session)
     return _engine
+
+
+def set_lock_timeout(seconds: int) -> None:
+    """Make every connection of the application engine give up a lock wait after `seconds` (the worker's,
+    so a stuck row lock fails the attempt instead of hanging it). Call before the first connection."""
+    _connect_args["options"] = f"-c lock_timeout={seconds * 1000}"
+    reset_engine()
+
+
+def listen_connection() -> psycopg.Connection[tuple[object, ...]]:
+    """A dedicated autocommit connection for LISTEN (the worker's wake-up channel)."""
+    url = get_settings().effective_database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+    return psycopg.connect(url, autocommit=True)
 
 
 def session_factory() -> sessionmaker[Session]:

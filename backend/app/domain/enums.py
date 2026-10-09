@@ -46,6 +46,13 @@ class VerificationStatus(enum.StrEnum):
     UNREADABLE = "unreadable"
     FAILED = "failed"
     UNAVAILABLE = "unavailable"
+    # US-098: the worker gave up after the last attempt. Never served: clients see it as `failed`.
+    DEAD = "dead"
+
+    @property
+    def served(self) -> "VerificationStatus":
+        """What clients are shown: `dead` is a queue detail, and a failed check to them."""
+        return VerificationStatus.FAILED if self is VerificationStatus.DEAD else self
 
 
 class IssueCode(enum.StrEnum):
