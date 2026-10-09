@@ -42,3 +42,7 @@ The user-facing requirement is satisfied fully by B. C's benefits are operationa
 - Integration test: upload → `pending` → task runs with mock provider → `verified`; a provider that raises → `failed`, upload still 201, submission still allowed.
 - Startup cleanup test: a seeded stale `running` row becomes `failed`.
 - E2E: document card changes state without page reload.
+
+## Amendment, 9 October 2026 (US-098)
+
+`inline` mode is still exactly this decision and is the default. `VERIFICATION_MODE=worker` replaces the in-process task with a separate worker fed by `verification_runs` (ADR-016), which removes the restart loss named under Negative / Tradeoffs. In both modes PDF extraction now runs in a killed, capped child process, and the check looks again at the draft before calling the provider.

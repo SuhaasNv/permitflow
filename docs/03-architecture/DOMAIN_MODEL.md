@@ -106,7 +106,7 @@ One AI verification attempt for a document. The latest run is the document's dis
 |-------|------|-------|
 | id | UUID | |
 | document_id | FK Document | |
-| status | enum `VerificationStatus` | `pending`, `running`, `verified`, `issues_found`, `needs_review`, `unreadable`, `failed`, `unavailable` |
+| status | enum `VerificationStatus` | `pending` (queued), `running`, `verified`, `issues_found`, `needs_review`, `unreadable`, `failed`, `unavailable`, `dead` (US-098; served to clients as `failed`) |
 | provider | str | `openai`, `mock`, `none` |
 | model | str, nullable | |
 | confidence | float, nullable | 0–1 as reported by the model |
@@ -117,6 +117,11 @@ One AI verification attempt for a document. The latest run is the document's dis
 | raw_output_valid | bool, nullable | whether provider output passed schema validation |
 | started_at, finished_at | datetime | |
 | latency_ms | int, nullable | |
+| attempts | int, default 0 | US-098 (migration 0016): how many times a worker has claimed the run; `dead` after the third claim whose lease expires. Stays 0 in `inline` mode |
+| lease_until | datetime, nullable | US-098: until when the claim of a `running` run is good; cleared when the run finishes or is requeued. Null in `inline` mode |
+| worker_id | str(64), nullable | US-098: the worker holding the run; the result is written only while it matches |
+
+Indexes (migration 0016): `ix_verification_runs_queued (created_at) WHERE status = 'pending'` serves the worker's claim; `ix_verification_runs_lease (lease_until) WHERE status = 'running'` serves the reaper.
 
 Rules: results are advisory. No service reads verification status to decide workflow state (ADR-006).
 
@@ -124,8 +129,9 @@ Verification status vocabulary (who sets it, when):
 
 | Status | Set by | When |
 |--------|--------|------|
-| `pending` | upload service | run row created; task not started |
-| `running` | task | task picked up the run |
+| `pending` | upload service | run row created; task not started. In `worker` mode this is "queued": it waits until a worker claims it, or stays while the AI is paused |
+| `running` | task, or a worker's claim | the run was picked up (inline: `claim_run`; worker: `claim_next`, with a lease) |
+| `dead` | worker's reaper | a `running` run whose lease expired after its third claim (`error_reason = worker_gave_up`). Terminal; the applicant may re-run. Served as `failed` to operators and officers; counted separately on the admin overview |
 | `unreadable` | rule (no model call) | no extractable text (image, empty or encrypted PDF, unsupported type) |
 | `verified` | model + rules | model reports `verified`, confidence ≥ threshold, no injection flag |
 | `issues_found` | model | model reports one or more issues (see codes) |
