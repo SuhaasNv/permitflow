@@ -38,7 +38,16 @@ deletion, N, Q, Z, H notifications, queue, quota, health, SE one live session pe
          delete, and a server key that never echoes the client's file name. The S3 backend is covered by the
          unit and integration suites, not here.
 
-The script holds 471 checks (380 for v0.4.1, 5 US103, 58 PS, 11 AI, 17 ST) and takes about four minutes.
+    US098  the verification worker and storage caps (v0.5.0, US-098) in the default inline mode: an image and a PDF
+           verify end to end; a `dead` check is served as failed to the operator, officer and administrator
+           (one is written to the database and removed again); the admin overview's dead count; a draft
+           deleted straight after an upload leaves no run; the stored and limit storage gauges on /metrics
+           (needs METRICS_TOKEN in the script's environment, else marked skipped); the 507 storage_full
+           body, only with UAT_STORAGE_FULL=1 against an API started with STORAGE_TOTAL_MAX_BYTES=1 (that
+           run does only the 507 check; otherwise it is marked skipped). Worker mode itself is covered by the
+           integration suite and the written scenarios U35 to U40.
+
+The script holds 502 checks (380 for v0.4.1, 5 US103, 58 PS, 11 AI, 17 ST, 31 US098) and takes about four minutes.
 Set UPLOAD_DIR to the API's upload directory when the script runs on the same machine, so ST also reads the
 storage backend; without it the file-removal check is marked skipped.
 
@@ -2949,7 +2958,263 @@ def st_checks(op: dict[str, str], op2: dict[str, str], off: dict[str, str]) -> N
     st("and its files with it: the earlier document's download is 404", r.status_code == 404, r.text[:100])
 
 
+def text_pdf(text: str) -> bytes:
+    """A one-page PDF with real text, so the PDF reader has something to read (reportlab is a runtime dependency)."""
+    from io import BytesIO
+
+    from reportlab.pdfgen import canvas
+
+    out = BytesIO()
+    page = canvas.Canvas(out)
+    for i, line in enumerate(text.split(". ")):
+        page.drawString(50, 780 - 16 * i, line)
+    page.save()
+    return out.getvalue()
+
+
+def holds_value(node: object, wanted: str) -> bool:
+    """True when `wanted` is a value anywhere in the JSON (a key called `dead` does not count)."""
+    if isinstance(node, dict):
+        return any(holds_value(v, wanted) for v in node.values())
+    if isinstance(node, list):
+        return any(holds_value(v, wanted) for v in node)
+    return node == wanted
+
+
+def us098_storage_full(op: dict[str, str]) -> None:
+    """The 507 body, for a run against an API started with STORAGE_TOTAL_MAX_BYTES below what is stored."""
+    u = Numbered("US098F-")
+    aid = req(op, "POST", "/applications").json()["id"]
+    r = upload(op, aid, "floor_plan", "full.txt", TXT)
+    err = r.json().get("error", {}) if r.status_code == 507 else {}
+    u(
+        "an upload when the platform is full is 507 storage_full in the envelope, with the reason",
+        r.status_code == 507
+        and envelope_ok(r)
+        and err.get("code") == "storage_full"
+        and err.get("details", {}).get("reason") == "platform_storage_full"
+        and "no storage room left" in err.get("message", ""),
+        r.text[:300],
+    )
+    view = req(op, "GET", f"/applications/{aid}").json()
+    u(
+        "and nothing was stored: the slot is empty",
+        not any(x["present"] for x in view["document_slots"] if x["type"] == "floor_plan"),
+        "",
+    )
+    req(op, "DELETE", f"/applications/{aid}")
+
+
+def us098_checks(op: dict[str, str], off: dict[str, str]) -> None:
+    """US098: the verification worker and the storage caps (v0.5.0, US-098) as far as they show over HTTP in
+    the default VERIFICATION_MODE=inline. Worker mode itself (queue, leases, kill and recover, pause hold) is
+    covered by the integration suite and the written scenarios U35 to U40."""
+    from sqlalchemy import func, select
+
+    from app.infra.db import session_factory
+    from app.models import Document, VerificationRun
+    from app.models.enums import VerificationStatus
+
+    u = Numbered("US098-")
+    terminal = {"verified", "issues_found", "unavailable", "unreadable", "failed", "needs_review"}
+
+    def slot_status(h: dict[str, str], aid: str, dtype: str) -> str | None:
+        view = req(h, "GET", f"/applications/{aid}").json()
+        slot = next(x for x in view["document_slots"] if x["type"] == dtype)
+        return ((slot.get("document") or {}).get("verification") or {}).get("status")
+
+    def settle(h: dict[str, str], aid: str, dtypes: list[str], timeout: float = 40) -> dict[str, str | None]:
+        end = time.time() + timeout
+        seen: dict[str, str | None] = {}
+        while time.time() < end:
+            seen = {t: slot_status(h, aid, t) for t in dtypes}
+            if all(v in terminal for v in seen.values()):
+                break
+            time.sleep(0.5)
+        return seen
+
+    # ---- an image and a PDF still verify end to end ----
+    aid = req(op, "POST", "/applications").json()["id"]
+    r1 = upload(op, aid, "floor_plan", "plan.png", tiny_png(), "image/png")
+    r2 = upload(op, aid, "business_profile", "profile.pdf", text_pdf(TXT.decode()), "application/pdf")
+    u("an image upload is accepted in inline mode", r1.status_code in (200, 201), r1.text[:200])
+    u("a PDF upload is accepted in inline mode", r2.status_code in (200, 201), r2.text[:200])
+    seen = settle(op, aid, ["floor_plan", "business_profile"])
+    u("the image check reaches a terminal state, never dead", seen.get("floor_plan") in terminal, str(seen))
+    u(
+        "the PDF check reaches a terminal state, never dead",
+        seen.get("business_profile") in terminal,
+        str(seen),
+    )
+    u(
+        "a readable PDF is read: the check ends verified or with findings, not unreadable",
+        seen.get("business_profile") in ("verified", "issues_found", "needs_review"),
+        str(seen),
+    )
+    req(op, "DELETE", f"/applications/{aid}")
+
+    # ---- dead is never served: put one in the database and read every view ----
+    case = submitted_case(op)
+    slots = req(op, "GET", f"/applications/{case}").json()["document_slots"]
+    doc_id = next(x["document"]["id"] for x in slots if x["type"] == "tenancy_agreement")
+    login_admin = client.post(
+        "/auth/login", json={"email": "admin@permitflow.example.sg", "password": PW, "take_over": True}
+    )
+    admin = (
+        {"Authorization": "Bearer " + login_admin.json()["access_token"]}
+        if login_admin.status_code == 200
+        else None
+    )
+    no_admin = "(skipped: admin sign-in unavailable on this stack)"
+
+    def dead_count() -> int | None:
+        if admin is None:
+            return None
+        r = req(admin, "GET", "/admin/overview")
+        return r.json().get("checks", {}).get("dead") if r.status_code == 200 else None
+
+    before = dead_count()
+    u(
+        "the admin overview exposes the dead count as a number" + ("" if admin else " " + no_admin),
+        admin is None or isinstance(before, int),
+        str(before),
+    )
+    with session_factory()() as db:
+        dead = VerificationRun(
+            document_id=uuid.UUID(doc_id), status=VerificationStatus.DEAD, error_reason="worker_gave_up"
+        )
+        db.add(dead)
+        db.commit()
+        dead_id = dead.id
+    try:
+        mine = req(op, "GET", f"/applications/{case}")
+        slot = next(x for x in mine.json()["document_slots"] if x["type"] == "tenancy_agreement")
+        u(
+            "the operator sees a dead check as failed",
+            slot["document"]["verification"]["status"] == "failed",
+            json.dumps(slot)[:200],
+        )
+        u(
+            "and no dead value is anywhere in the operator's application",
+            not holds_value(mine.json(), "dead"),
+            "",
+        )
+        listing = req(op, "GET", "/applications")
+        u("nor in the operator's list", not holds_value(listing.json(), "dead"), "")
+        ov = req(off, "GET", f"/officer/applications/{case}")
+        doc = next(d for d in ov.json()["documents"] if d["id"] == doc_id) if ov.status_code == 200 else {}
+        u(
+            "the officer sees a dead check as failed",
+            (doc.get("verification") or {}).get("status") == "failed",
+            json.dumps(doc.get("verification"))[:200],
+        )
+        u("and no dead value is anywhere in the officer's case view", not holds_value(ov.json(), "dead"), "")
+        q = req(off, "GET", "/officer/applications")
+        u(
+            "nor in the officer's queue",
+            q.status_code == 200 and not holds_value(q.json(), "dead"),
+            q.text[:200],
+        )
+        if admin is None:
+            u("the administrator's views hold no dead value " + no_admin, True)
+        else:
+            ao = req(admin, "GET", "/admin/overview")
+            u(
+                "nor in the administrator's overview, which counts it under checks.dead instead",
+                ao.status_code == 200 and not holds_value(ao.json(), "dead"),
+                ao.text[:200],
+            )
+            u(
+                "and the dead count rose by one",
+                isinstance(before, int) and dead_count() == before + 1,
+                f"{before}",
+            )
+            for path in (f"/admin/applications/{case}", "/admin/audit-feed"):
+                r = req(admin, "GET", path)
+                u(
+                    f"nor in the administrator's {path.split('/')[2]}",
+                    r.status_code == 200 and not holds_value(r.json(), "dead"),
+                    r.text[:200],
+                )
+    finally:
+        with session_factory()() as db:
+            row = db.get(VerificationRun, dead_id)
+            if row is not None:
+                db.delete(row)
+                db.commit()
+    if admin is not None:
+        u("and removing the run puts the count back", dead_count() == before, f"{before} -> {dead_count()}")
+
+    # ---- a draft deleted straight after an upload ----
+    ids: list[uuid.UUID] = []
+    for _ in range(3):
+        did = req(op, "POST", "/applications").json()["id"]
+        a = upload(op, did, "floor_plan", "quick.png", tiny_png(), "image/png")
+        b = upload(op, did, "business_profile", "quick.pdf", text_pdf(TXT.decode()), "application/pdf")
+        ids += [uuid.UUID(x.json()["document"]["id"]) for x in (a, b) if x.status_code in (200, 201)]
+        d = req(op, "DELETE", f"/applications/{did}")
+        u(
+            "a draft deleted straight after its uploads is deleted without an error",
+            d.status_code in (200, 204),
+            d.text[:200],
+        )
+        u("and is gone", req(op, "GET", f"/applications/{did}").status_code == 404, "")
+    time.sleep(4)  # let any check that was already running finish or give up
+    with session_factory()() as db:
+        runs = db.scalar(
+            select(func.count()).select_from(VerificationRun).where(VerificationRun.document_id.in_(ids))
+        )
+        left = db.scalar(select(func.count()).select_from(Document).where(Document.id.in_(ids)))
+    u(
+        "no check run is left behind for the deleted drafts",
+        bool(ids) and runs == 0,
+        f"{len(ids)} documents, {runs} runs",
+    )
+    u("and no document row", left == 0, str(left))
+    u("and the API is still healthy", client.get("/health").json().get("database") == "ok", "")
+
+    # ---- the storage gauges ----
+    token = os.environ.get("METRICS_TOKEN", "")
+    if not token:
+        u(
+            "the stored and limit storage gauges appear on /metrics (skipped: METRICS_TOKEN is not set for this run)",
+            True,
+        )
+    else:
+        m = client.get("/metrics", headers={"Authorization": "Bearer " + token})
+        u("/metrics answers 200 with the token", m.status_code == 200, str(m.status_code))
+        u(
+            'permitflow_storage_bytes{kind="stored"} is there',
+            'permitflow_storage_bytes{kind="stored"}' in m.text,
+            "",
+        )
+        has_limit = 'permitflow_storage_bytes{kind="limit"}' in m.text
+        if os.environ.get("STORAGE_TOTAL_MAX_BYTES") == "0":
+            u('no kind="limit" series without a ceiling', not has_limit, "")
+        else:
+            u('permitflow_storage_bytes{kind="limit"} is there', has_limit, "")
+        u(
+            "the queue gauges are there too",
+            "permitflow_verification_queue_depth" in m.text and "permitflow_verification_dead_runs" in m.text,
+            "",
+        )
+
+    # ---- storage full (507) ----
+    if os.environ.get("UAT_STORAGE_FULL") == "1":
+        us098_storage_full(op)
+    else:
+        u(
+            "507 storage_full body (skipped: set UAT_STORAGE_FULL=1 against an API started with STORAGE_TOTAL_MAX_BYTES=1; "
+            "the integration suite covers it and the run is U40 in the UAT plan)",
+            True,
+        )
+
+
 def main() -> None:
+    if os.environ.get("UAT_STORAGE_FULL") == "1":
+        # A platform that is full refuses every upload, so the full run cannot go on against it: only the 507 check.
+        us098_storage_full(login(OPERATOR))
+        summary()
     ensure_second_operator()
     try:
         run_checks()
@@ -4457,8 +4722,12 @@ def run_checks() -> None:
     ps_checks(op, op2, off)
     ai_checks(op, off)
     st_checks(op, op2, off)
+    us098_checks(op, off)
 
-    # ---------- Summary ----------
+    summary()
+
+
+def summary() -> None:
     failed = [x for x in RESULTS if not x[2]]
     print(f"\n{len(RESULTS) - len(failed)} passed, {len(failed)} failed of {len(RESULTS)}")
     for f in failed:
