@@ -263,10 +263,14 @@ def _finish(
     # Only the holder of the run writes its result, under a row lock: if the draft was deleted (the run
     # is gone) or the lease was taken over by another worker, this result is dropped.
     with db.no_autoflush:  # the lock comes first; the result is flushed under it
-        held = DocumentRepository(db).lock_state(run.id) == (VerificationStatus.RUNNING, run.worker_id)
+        held = DocumentRepository(db).lock_state(run.id, app.id if app else None) == (
+            VerificationStatus.RUNNING,
+            run.worker_id,
+        )
     if not held:
-        db.rollback()
+        # Log first: after the rollback `run.id` would reload a row that is gone if the draft was deleted.
         logger.warning("verification_result_dropped", extra={"extra_fields": {"run_id": str(run.id)}})
+        db.rollback()
         return
     run.lease_until = None
     run.status = status

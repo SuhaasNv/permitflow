@@ -31,8 +31,9 @@ from app.domain.verification_rules import VerificationRequest, VerificationResul
 from app.infra import db as dbmod
 from app.infra.ai.mock import MockProvider
 from app.infra.extraction import Extracted, extract_text
-from app.models import AuditEvent, Document, PlatformSetting, User, VerificationRun
+from app.models import Application, AuditEvent, Document, PlatformSetting, User, VerificationRun
 from app.models.enums import Role, VerificationStatus
+from app.repositories.documents import DocumentRepository
 from app.services import verification as module
 from app.services.metrics import refresh_queue_gauges
 from app.services.platform_settings import live
@@ -447,6 +448,57 @@ def test_result_is_not_written_for_a_draft_deleted_after_the_provider(
     assert claim_next_run("w") == run_id
     execute_run(run_id, "w")
     assert provider.calls == 1 and db.get(VerificationRun, run_id) is None
+    assert db.scalars(select(AuditEvent).where(AuditEvent.event_type == "verification.completed")).all() == []
+
+
+def test_finish_and_draft_deletion_take_locks_in_the_same_order(
+    client: TestClient, db: Session, worker_mode: None
+) -> None:
+    """Deletion locks the application, then the run. `_finish` used to lock the run, then the application
+    (the audit insert): with the deletion holding the application and `_finish` the run, each waited for the
+    other. Now `_finish` waits on the application first, holding nothing, so the deletion goes through."""
+    run_id, app_id, _ = _queued(client, db)
+    assert claim_next_run("w") == run_id
+    deleter, finisher = dbmod.session_factory()(), dbmod.session_factory()()
+    failure: list[BaseException] = []
+    try:
+        deleter.execute(text("SET LOCAL lock_timeout = '5s'"))
+        deleter.execute(
+            text("SELECT id FROM applications WHERE id = :a FOR UPDATE"), {"a": uuid.UUID(app_id)}
+        )  # deletion step 1
+        run = finisher.get(VerificationRun, run_id)
+        app = finisher.get(Application, uuid.UUID(app_id))
+        assert run is not None and app is not None
+
+        def finish() -> None:
+            try:
+                module._finish(
+                    finisher,
+                    run,
+                    app,
+                    VerificationStatus.VERIFIED,
+                    provider="none",
+                    started=time.perf_counter(),
+                )
+            except BaseException as exc:  # noqa: BLE001 - reported below
+                failure.append(exc)
+
+        thread = threading.Thread(target=finish, daemon=True)
+        thread.start()
+        thread.join(1.0)
+        assert thread.is_alive()  # waiting for the application row, holding no lock on the run
+        # deletion step 2: the run row. With the old order this waited for `_finish` and deadlocked.
+        deleter.execute(text("SELECT id FROM verification_runs WHERE id = :r FOR UPDATE"), {"r": run_id})
+        DocumentRepository(deleter).purge_for_application(uuid.UUID(app_id))
+        deleter.execute(text("DELETE FROM audit_events WHERE application_id = :a"), {"a": uuid.UUID(app_id)})
+        deleter.execute(text("DELETE FROM applications WHERE id = :a"), {"a": uuid.UUID(app_id)})
+        deleter.commit()
+        thread.join(10)
+        assert not thread.is_alive() and failure == []
+    finally:
+        deleter.close()
+        finisher.close()
+    assert db.get(VerificationRun, run_id) is None
     assert db.scalars(select(AuditEvent).where(AuditEvent.event_type == "verification.completed")).all() == []
 
 
