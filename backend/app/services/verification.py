@@ -327,11 +327,20 @@ def release_run(run_id: uuid.UUID, worker_id: str) -> bool:
         return released
 
 
+def _interrupted_after(grace_seconds: int = 60) -> timedelta:
+    """How long a lease-less `running` run may last before it counts as interrupted."""
+    return timedelta(seconds=get_settings().ai_timeout_seconds * 2 + grace_seconds)
+
+
 def reap_expired_runs() -> tuple[int, int]:
     """Worker mode: runs whose lease ran out (the worker died or hung) go back to the queue, or die after
-    `MAX_ATTEMPTS` claims. Returns (requeued, dead). A dead run is audited like any finished check."""
+    `MAX_ATTEMPTS` claims. Returns (requeued, dead). A dead run is audited like any finished check. A
+    `running` run with no lease began inline before the switch to worker mode (the startup sweep is skipped
+    there): once older than the sweep's cutoff it becomes `failed: interrupted`."""
+    now = datetime.now(UTC)
     with session_factory()() as db:
-        requeued, dead_ids = DocumentRepository(db).reap_expired(datetime.now(UTC), MAX_ATTEMPTS)
+        requeued, dead_ids = DocumentRepository(db).reap_expired(now, MAX_ATTEMPTS)
+        stranded = DocumentRepository(db).fail_stranded_inline(now - _interrupted_after(), now)
         for run_id in dead_ids:
             run = db.get(VerificationRun, run_id)
             doc = db.get(Document, run.document_id) if run else None
@@ -354,6 +363,7 @@ def reap_expired_runs() -> tuple[int, int]:
         db.commit()
     metrics.REAPED.labels("requeued").inc(requeued)
     metrics.REAPED.labels("dead").inc(len(dead_ids))
+    metrics.REAPED.labels("interrupted").inc(stranded)
     return requeued, len(dead_ids)
 
 
@@ -362,8 +372,7 @@ def mark_stale_runs_failed(grace_seconds: int = 60) -> int:
     `pending` run was too: background tasks live in the process that died, so nothing will ever claim it.
     Both become `failed: interrupted` so re-run is possible and the queue does not show them as checking
     forever."""
-    settings = get_settings()
-    cutoff = datetime.now(UTC) - timedelta(seconds=settings.ai_timeout_seconds * 2 + grace_seconds)
+    cutoff = datetime.now(UTC) - _interrupted_after(grace_seconds)
     with session_factory()() as db:
         count = DocumentRepository(db).fail_interrupted_runs(cutoff, datetime.now(UTC))
         db.commit()

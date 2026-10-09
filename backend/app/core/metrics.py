@@ -46,7 +46,7 @@ ACTIVE_LEASES = Gauge("permitflow_verification_active_leases", "Checks a worker 
 DEAD_RUNS = Gauge("permitflow_verification_dead_runs", "Checks the workers gave up on (status dead).")
 REAPED = Counter(
     "permitflow_verification_reaped_total",
-    "Checks taken back from a worker whose lease expired, by outcome (requeued, dead).",
+    "Checks taken back from a worker whose lease expired, by outcome (requeued, dead, interrupted).",
     ["outcome"],
 )
 QUOTA_REFUSALS = Counter(

@@ -255,6 +255,32 @@ def test_reaper_leaves_inline_runs_and_live_leases_alone(
     assert _run(db, inline.id).status == VerificationStatus.RUNNING
 
 
+def test_reaper_fails_an_inline_run_stranded_by_the_switch(
+    client: TestClient, db: Session, worker_mode: None
+) -> None:
+    """A run started inline before the switch has no lease and the startup sweep is skipped in worker mode:
+    once older than the sweep's cutoff the reaper fails it as `interrupted`, like the sweep would."""
+    run_id, _, _ = _queued(client, db)
+    doc_id = _run(db, run_id).document_id
+    old = VerificationRun(
+        document_id=doc_id,
+        status=VerificationStatus.RUNNING,
+        started_at=datetime.now(UTC) - timedelta(seconds=get_settings().ai_timeout_seconds * 2 + 120),
+    )
+    fresh = VerificationRun(
+        document_id=doc_id, status=VerificationStatus.RUNNING, started_at=datetime.now(UTC)
+    )
+    db.add_all([old, fresh])
+    db.commit()
+    assert claim_next_run("w") == run_id  # a leased run is never mistaken for a stranded one
+    assert reap_expired_runs() == (0, 0)
+    stranded = _run(db, old.id)
+    assert stranded.status == VerificationStatus.FAILED and stranded.error_reason == "interrupted"
+    assert stranded.finished_at is not None
+    assert _run(db, fresh.id).status == VerificationStatus.RUNNING
+    assert _run(db, run_id).status == VerificationStatus.RUNNING
+
+
 def test_stale_result_from_a_taken_over_run_is_dropped(
     client: TestClient, db: Session, worker_mode: None
 ) -> None:
