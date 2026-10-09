@@ -20,8 +20,10 @@ MAX_PIXELS = 40_000_000
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 
 # US-098: a decoded image is hundreds of MB at the cap, so only a few are open at once in this process.
-# A caller waits up to WAIT_SECONDS for a slot and then gets ImageBusyError (a 503), never a 500.
-WAIT_SECONDS = 10.0
+# A caller waits up to WAIT_SECONDS for a slot and then gets ImageBusyError (a 503), never a 500. The wait
+# happens inside the upload request, holding its database connection and the application's row lock, so it
+# is kept short.
+WAIT_SECONDS = 2.0
 _SLOTS = threading.BoundedSemaphore(get_settings().image_decode_concurrency)
 
 _FORMATS = {".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG"}
