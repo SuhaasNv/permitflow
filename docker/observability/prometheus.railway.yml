@@ -32,6 +32,12 @@ scrape_configs:
     relabel_configs:
       - target_label: job
         replacement: permitflow-api
+  - job_name: permitflow-worker
+    # US-098: the development worker's registry, private network only (no token; counts only).
+    static_configs:
+      - targets: ["worker.railway.internal:9100"]
+        labels:
+          environment: development
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
