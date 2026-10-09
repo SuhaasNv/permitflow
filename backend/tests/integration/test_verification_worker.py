@@ -26,12 +26,14 @@ from sqlalchemy.orm import Session
 
 from app import worker as worker_module
 from app.core.settings import get_settings
+from app.domain.audit_labels import summarize
 from app.domain.verification_rules import VerificationRequest, VerificationResult
 from app.infra import db as dbmod
 from app.infra.ai.mock import MockProvider
 from app.infra.extraction import Extracted, extract_text
-from app.models import AuditEvent, Document, PlatformSetting, User, VerificationRun
+from app.models import Application, AuditEvent, Document, PlatformSetting, User, VerificationRun
 from app.models.enums import Role, VerificationStatus
+from app.repositories.documents import DocumentRepository
 from app.services import verification as module
 from app.services.metrics import refresh_queue_gauges
 from app.services.platform_settings import live
@@ -226,6 +228,8 @@ def test_killed_worker_is_recovered_and_the_third_expiry_is_dead(
 
     events = [e for e in db.scalars(select(AuditEvent)) if e.event_type == "verification.completed"]
     assert events[-1].payload["status"] == "dead"
+    # The officer's audit trail reads as a sentence; the raw word is not shown.
+    assert summarize(events[-1].event_type, events[-1].payload) == "Check gave up after 3 tries"
     # Clients never see `dead`: it is a failed check, and the applicant may re-run it.
     slot = next(
         s
@@ -253,6 +257,32 @@ def test_reaper_leaves_inline_runs_and_live_leases_alone(
     assert claim_next_run("w") == run_id
     assert reap_expired_runs() == (0, 0)
     assert _run(db, inline.id).status == VerificationStatus.RUNNING
+
+
+def test_reaper_fails_an_inline_run_stranded_by_the_switch(
+    client: TestClient, db: Session, worker_mode: None
+) -> None:
+    """A run started inline before the switch has no lease and the startup sweep is skipped in worker mode:
+    once older than the sweep's cutoff the reaper fails it as `interrupted`, like the sweep would."""
+    run_id, _, _ = _queued(client, db)
+    doc_id = _run(db, run_id).document_id
+    old = VerificationRun(
+        document_id=doc_id,
+        status=VerificationStatus.RUNNING,
+        started_at=datetime.now(UTC) - timedelta(seconds=get_settings().ai_timeout_seconds * 2 + 120),
+    )
+    fresh = VerificationRun(
+        document_id=doc_id, status=VerificationStatus.RUNNING, started_at=datetime.now(UTC)
+    )
+    db.add_all([old, fresh])
+    db.commit()
+    assert claim_next_run("w") == run_id  # a leased run is never mistaken for a stranded one
+    assert reap_expired_runs() == (0, 0)
+    stranded = _run(db, old.id)
+    assert stranded.status == VerificationStatus.FAILED and stranded.error_reason == "interrupted"
+    assert stranded.finished_at is not None
+    assert _run(db, fresh.id).status == VerificationStatus.RUNNING
+    assert _run(db, run_id).status == VerificationStatus.RUNNING
 
 
 def test_stale_result_from_a_taken_over_run_is_dropped(
@@ -288,6 +318,46 @@ def test_result_is_dropped_when_the_lease_changes_hands_mid_run(
     execute_run(run_id, "slow")
     run = _run(db, run_id)
     assert run.status == VerificationStatus.RUNNING and run.worker_id == "fast" and run.summary is None
+
+
+def test_same_worker_reclaiming_a_run_fences_the_stale_thread(
+    client: TestClient, db: Session, worker_mode: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A thread hangs past its lease, the reaper requeues the run and the SAME worker claims it again: each
+    claim has its own id, so the old thread is no longer the holder and its write is dropped. Both threads
+    stay tracked."""
+    run_id, _, _ = _queued(client, db)
+    claims: list[str] = []
+    release = threading.Event()
+
+    def hold(_: uuid.UUID, claim: str | None = None) -> None:
+        assert claim is not None
+        claims.append(claim)
+        release.wait(20)
+
+    monkeypatch.setattr(worker_module, "execute_run", hold)
+    monkeypatch.setattr(get_settings(), "worker_concurrency", 3)
+    w = Worker()
+    assert w.fill_slots() == 1
+    _expire(db, run_id)
+    reap_expired_runs()
+    assert w.fill_slots() == 1
+    deadline = time.monotonic() + 5
+    while len(claims) < 2 and time.monotonic() < deadline:
+        time.sleep(0.05)
+    first, second = claims
+    assert first != second and first.startswith(w.id) and second.startswith(w.id)
+    assert all(len(c) <= 64 for c in claims)  # the worker_id column is varchar(64)
+    assert len(w._active) == 2  # the hung thread is not lost when the run id is claimed again
+    assert _run(db, run_id).worker_id == second
+
+    execute_run(run_id, first)  # the stale holder: nothing written
+    run = _run(db, run_id)
+    assert run.status == VerificationStatus.RUNNING and run.worker_id == second and run.summary is None
+    release.set()
+    _finish_threads(w)
+    execute_run(run_id, second)
+    assert _run(db, run_id).status == VerificationStatus.VERIFIED
 
 
 # ---- the lifecycle: nothing of a deleted draft reaches the provider ----
@@ -381,6 +451,57 @@ def test_result_is_not_written_for_a_draft_deleted_after_the_provider(
     assert db.scalars(select(AuditEvent).where(AuditEvent.event_type == "verification.completed")).all() == []
 
 
+def test_finish_and_draft_deletion_take_locks_in_the_same_order(
+    client: TestClient, db: Session, worker_mode: None
+) -> None:
+    """Deletion locks the application, then the run. `_finish` used to lock the run, then the application
+    (the audit insert): with the deletion holding the application and `_finish` the run, each waited for the
+    other. Now `_finish` waits on the application first, holding nothing, so the deletion goes through."""
+    run_id, app_id, _ = _queued(client, db)
+    assert claim_next_run("w") == run_id
+    deleter, finisher = dbmod.session_factory()(), dbmod.session_factory()()
+    failure: list[BaseException] = []
+    try:
+        deleter.execute(text("SET LOCAL lock_timeout = '5s'"))
+        deleter.execute(
+            text("SELECT id FROM applications WHERE id = :a FOR UPDATE"), {"a": uuid.UUID(app_id)}
+        )  # deletion step 1
+        run = finisher.get(VerificationRun, run_id)
+        app = finisher.get(Application, uuid.UUID(app_id))
+        assert run is not None and app is not None
+
+        def finish() -> None:
+            try:
+                module._finish(
+                    finisher,
+                    run,
+                    app,
+                    VerificationStatus.VERIFIED,
+                    provider="none",
+                    started=time.perf_counter(),
+                )
+            except BaseException as exc:  # noqa: BLE001 - reported below
+                failure.append(exc)
+
+        thread = threading.Thread(target=finish, daemon=True)
+        thread.start()
+        thread.join(1.0)
+        assert thread.is_alive()  # waiting for the application row, holding no lock on the run
+        # deletion step 2: the run row. With the old order this waited for `_finish` and deadlocked.
+        deleter.execute(text("SELECT id FROM verification_runs WHERE id = :r FOR UPDATE"), {"r": run_id})
+        DocumentRepository(deleter).purge_for_application(uuid.UUID(app_id))
+        deleter.execute(text("DELETE FROM audit_events WHERE application_id = :a"), {"a": uuid.UUID(app_id)})
+        deleter.execute(text("DELETE FROM applications WHERE id = :a"), {"a": uuid.UUID(app_id)})
+        deleter.commit()
+        thread.join(10)
+        assert not thread.is_alive() and failure == []
+    finally:
+        deleter.close()
+        finisher.close()
+    assert db.get(VerificationRun, run_id) is None
+    assert db.scalars(select(AuditEvent).where(AuditEvent.event_type == "verification.completed")).all() == []
+
+
 # ---- the PDF child process ----
 
 
@@ -408,6 +529,20 @@ def test_pdf_over_the_cpu_cap_is_unreadable(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_a_normal_pdf_is_read_by_the_child() -> None:
     assert extract_text("application/pdf", _pdf(), max_chars=100) == Extracted("hi", None)
+
+
+def test_pdf_child_never_prints_more_than_the_cap() -> None:
+    import json
+
+    from app.infra.extraction import _CHILD
+
+    done = subprocess.run(
+        [sys.executable, "-I", str(_CHILD), "1", "30", "10", "512", "20"],
+        input=_pdf(),
+        capture_output=True,
+        check=True,
+    )
+    assert json.loads(done.stdout) == {"encrypted": False, "text": "h"}
 
 
 def test_pdf_child_survives_when_the_child_cannot_start(monkeypatch: pytest.MonkeyPatch) -> None:

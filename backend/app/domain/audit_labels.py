@@ -39,6 +39,9 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
         case "verification.requested":
             return f"Check re-run requested for {p.get('document_type', '')}"
         case "verification.completed":
+            if p.get("status") == "dead":  # the reaper's status; clients are never shown the word
+                tries = p.get("attempts")
+                return f"Check gave up after {tries} tries" if tries else "Check gave up"
             return f"Check finished: {p.get('status', '')}" + (
                 f" ({p['provider']})" if p.get("provider") else ""
             )

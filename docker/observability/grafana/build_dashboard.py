@@ -145,7 +145,7 @@ panels = [
     stat(65, "Worker", f'min({m("up", "job=\"permitflow-worker\"")})', 16, 98, 4, mappings=up_map, thresholds=up_thr),
     stat(66, "Leases taken back, last hour", f'sum(increase({m("permitflow_verification_reaped_total")}[1h]))', 20, 98, 4, unit="short", decimals=0, color="orange"),
     panel(67, "Checks waiting and oldest wait", [(f'max({m("permitflow_verification_queue_depth")})', "waiting"), (f'max({m("permitflow_verification_queue_oldest_seconds")})', "oldest wait (s)")], 0, 102, w=12, h=7, unit="short",
-          desc="Read from the database on every scrape of the API and every ten seconds by the worker, so it is true in both modes. With VERIFICATION_MODE=inline the queue is always empty."),
+          desc="Read from the database on every scrape of the API and every ten seconds by the worker, so it is true in both modes. With VERIFICATION_MODE=inline the queue is empty except for a moment."),
     panel(68, "Leases taken back, by outcome, per hour", [(f'sum by (outcome) (increase({m("permitflow_verification_reaped_total")}[1h]))', "{{outcome}}")], 12, 102, w=12, h=7, unit="short", stack=True,
           desc="requeued: a worker died or hung and the check went back to the queue. dead: it had been claimed three times and was given up on."),
 ]

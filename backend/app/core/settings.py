@@ -112,9 +112,11 @@ class Settings(BaseSettings):
     worker_lock_timeout_seconds: int = 5
     # Both modes: the PDF text extraction runs in a child process killed at the wall-clock deadline, with
     # address-space and CPU-time caps (a hostile or broken PDF cannot take the API or the worker with it).
-    pdf_extract_timeout_seconds: float = 15.0
-    pdf_extract_memory_mb: int = 512
-    pdf_extract_cpu_seconds: int = 10
+    # The CPU cap sits above the page budget (10 s) so a slow but legitimate PDF is cut by the budget and
+    # keeps the text read so far, rather than killed by the cap with nothing; the wall clock sits above both.
+    pdf_extract_timeout_seconds: float = Field(default=25.0, ge=2.0)
+    pdf_extract_memory_mb: int = Field(default=512, ge=64)
+    pdf_extract_cpu_seconds: int = Field(default=20, ge=2)
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -135,6 +137,18 @@ class Settings(BaseSettings):
             raise RuntimeError("JWT_SECRET must be set to at least 16 random characters")
         if self.app_env == "production" and self.storage_total_max_bytes <= 0:
             raise RuntimeError("STORAGE_TOTAL_MAX_BYTES must be above 0 in production")
+        if (
+            self.app_env == "production"
+            and self.verification_mode == "worker"
+            and self.storage_backend == "local"
+        ):
+            # A separate worker service cannot read the API's volume (ADR-015): every check would fail.
+            raise RuntimeError("VERIFICATION_MODE=worker needs STORAGE_BACKEND=s3 in production")
+        if self.worker_lease_seconds <= self.pdf_extract_timeout_seconds + 2 * self.ai_timeout_seconds:
+            # A lease shorter than the longest check lets the reaper take back a run that is still working.
+            raise RuntimeError(
+                "WORKER_LEASE_SECONDS must exceed PDF_EXTRACT_TIMEOUT_SECONDS + 2 * AI_TIMEOUT_SECONDS"
+            )
         if self.storage_backend == "s3" and self.s3_missing():
             raise RuntimeError(f"STORAGE_BACKEND=s3 needs {', '.join(self.s3_missing())} to be set")
 

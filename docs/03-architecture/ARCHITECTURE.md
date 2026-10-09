@@ -100,7 +100,7 @@ run_verification(run_id):   # plain sync function; FastAPI runs it in the thread
 
 execute_run(run_id, worker_id) as changed by US-098 (both modes; `worker_id` is None inline):
   runs only while the row is `running` and held by worker_id
-  → PDF text is extracted in a child process (kill at 15 s, address-space and CPU caps); a timeout or a
+  → PDF text is extracted in a child process (kill at 25 s, address-space and CPU caps); a timeout or a
     cap is `pdf_parse_error`, the same reason a corrupt PDF gets
   → pause check (US-101) → look again: run, document and application still exist and the document is
     still current (gone: stop, write nothing; replaced: finish `unavailable: document_replaced`)

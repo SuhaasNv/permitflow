@@ -196,9 +196,31 @@ class DocumentRepository:
         )
         return int(getattr(requeued, "rowcount", 0) or 0), dead_ids
 
-    def lock_state(self, run_id: uuid.UUID) -> tuple[VerificationStatus, str | None] | None:
+    def fail_stranded_inline(self, started_before: datetime, finished_at: datetime) -> int:
+        """`running` runs with no lease, started before the cutoff: they began inline, before the switch to
+        worker mode, and no process is left to finish them. Same outcome as the startup sweep."""
+        result = self.db.execute(
+            update(VerificationRun)
+            .where(
+                VerificationRun.status == VerificationStatus.RUNNING,
+                VerificationRun.lease_until.is_(None),
+                VerificationRun.started_at < started_before,
+            )
+            .values(status=VerificationStatus.FAILED, error_reason="interrupted", finished_at=finished_at)
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
+
+    def lock_state(
+        self, run_id: uuid.UUID, application_id: uuid.UUID | None = None
+    ) -> tuple[VerificationStatus, str | None] | None:
         """Lock the run row and read who holds it, without touching the loaded object: the guard before a
-        worker writes its result. None when the run no longer exists (the draft was deleted)."""
+        worker writes its result. None when the run no longer exists (the draft was deleted). The
+        application row is locked first (FOR KEY SHARE, which the audit insert needs anyway), the same
+        order as draft deletion (application, then runs), so the two cannot deadlock."""
+        if application_id is not None:
+            self.db.execute(
+                select(Application.id).where(Application.id == application_id).with_for_update(key_share=True)
+            )
         row = self.db.execute(
             select(VerificationRun.status, VerificationRun.worker_id)
             .where(VerificationRun.id == run_id)

@@ -2177,7 +2177,7 @@
      "mode": "multi"
     }
    },
-   "description": "Read from the database on every scrape of the API and every ten seconds by the worker, so it is true in both modes. With VERIFICATION_MODE=inline the queue is always empty."
+   "description": "Read from the database on every scrape of the API and every ten seconds by the worker, so it is true in both modes. With VERIFICATION_MODE=inline the queue is empty except for a moment."
   },
   {
    "id": 68,

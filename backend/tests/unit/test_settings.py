@@ -40,6 +40,33 @@ def test_production_refuses_to_start_without_a_total_storage_ceiling() -> None:
         check("production", 0)
 
 
+def test_worker_mode_startup_rules() -> None:
+    base = Settings.model_construct(jwt_secret="x" * 32, verification_mode="worker")
+
+    def check(**update: object) -> None:
+        base.model_copy(update=update).validate_for_startup()
+
+    bucket = {"s3_bucket": "b", "s3_access_key_id": "k", "s3_secret_access_key": "s"}
+    check(app_env="production", storage_backend="s3", **bucket)
+    check(app_env="development", storage_backend="local")
+    with pytest.raises(RuntimeError, match="STORAGE_BACKEND=s3"):
+        check(app_env="production", storage_backend="local")
+    # The lease must exceed the PDF deadline plus two model timeouts (25 + 2 * 30 = 85 by default).
+    check(worker_lease_seconds=86)
+    with pytest.raises(RuntimeError, match="WORKER_LEASE_SECONDS"):
+        check(worker_lease_seconds=85)
+
+
+def test_pdf_extract_limits_have_lower_bounds() -> None:
+    for field, value in (
+        ("pdf_extract_timeout_seconds", 0.5),
+        ("pdf_extract_memory_mb", 1),
+        ("pdf_extract_cpu_seconds", 0),
+    ):
+        with pytest.raises(ValueError):
+            Settings(_env_file=None, **{field: value})  # type: ignore[call-arg, arg-type]
+
+
 def test_cors_origins_parsed() -> None:
     s = Settings(cors_origins="http://a, http://b ,", _env_file=None)  # type: ignore[call-arg]
     assert s.cors_origin_list == ["http://a", "http://b"]

@@ -5,6 +5,18 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 ## Unreleased / v0.5.0 wave 2: UAT run (10 Oct 2026)
 
 Branch `test/uat-wave-2`. `uat_edges.py` gains the US098 group (31 checks, 502 in all): an image and a PDF verify in inline mode, a `dead` check is served as failed to the operator, the officer and the administrator, the admin overview's dead count, a draft deleted straight after an upload leaves no run, and the stored and limit gauges on `/metrics`; the 507 `storage_full` body runs with `UAT_STORAGE_FULL=1` against an API started with `STORAGE_TOTAL_MAX_BYTES=1`. `smoke_routes.py` still calls all 66 routes (wave 2 added none). `UAT_PLAN.md` scenarios U35 to U40 (worker end to end, worker killed and recovered, pause holds the queue, deleted draft, busy image slot, storage full). Fix: the settings API reported `worker_concurrency` as `in_use: false` although the worker reads it.
+## US-098 review fixes (10 Oct 2026, `fix/us-098-review`, on top of `integrate/wave-2`)
+
+An independent review of the worker and the storage caps found these; each has a regression test where it is a behaviour.
+
+- **Stranded runs at the switch.** The reaper also fails a `running` run with no lease that started more than twice the model timeout plus 60 s ago, as `failed: interrupted` (the startup sweep is skipped in `worker` mode, so a check started inline before the switch stayed running for ever).
+- **Fence on the claim.** The `worker_id` of a run is now unique per claim (`<worker id>:<8 hex>`), so a thread that hangs past its lease cannot write after the same worker reclaims the run; the worker keeps both threads in `_active`.
+- **No endless retry of 507.** `storage_full` on a clarification attachment is no longer treated as a transient failure by the front end.
+- **Image decode wait** 10 s to 2 s (it held a connection and the application row lock). **PDF child:** CPU cap 20 s and wall clock 25 s (page budget stays 10 s), prints at most `max_chars`.
+- **Lock order.** `_finish` takes the application row (FOR KEY SHARE) before the run row, as draft deletion does; the dropped-result log no longer reloads a deleted row.
+- **Startup refuses** `VERIFICATION_MODE=worker` with local storage in production, a lease at or below the PDF deadline plus twice the model timeout, and out-of-range `PDF_EXTRACT_*` values.
+- **Wording.** A check the reaper gave up on reads "Check gave up after 3 tries" in the audit trail; the officer's check result has plain labels for `document_replaced` and `worker_gave_up`. **Intended change in inline mode:** a document replaced while its check is running now ends `unavailable: document_replaced` with no provider call (before, the check ran to the end on the replaced file's text).
+- **Local Prometheus** scrapes the worker at `worker:9100` over the Compose network. Docs: rollback marks queued checks `failed: interrupted`, T4 and the dashboard text say what is true, Railway worker needs `RAILWAY_DEPLOYMENT_DRAINING_SECONDS`.
 
 ## Unreleased / v0.5.0-rc.2: US-098, the verification worker (10 Oct 2026)
 

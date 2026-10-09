@@ -20,7 +20,8 @@ scrape_configs:
         labels:
           environment: __ENVIRONMENT__
   # US-098: the verification worker (docker compose --profile worker). Its port is private and carries no
-  # token. Down when VERIFICATION_MODE=inline, which is expected: the panel only reads "Worker" in worker mode.
+  # token. Reached by service name (`worker:9100`) over the Compose network; the port is not published.
+  # Down when no worker container runs, which is expected in inline mode.
   - job_name: permitflow-worker
     static_configs:
       - targets: ["__WORKER_TARGET__"]
