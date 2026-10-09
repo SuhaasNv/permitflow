@@ -50,7 +50,8 @@ class Worker:
         self.id = f"{socket.gethostname()[:30]}-{os.getpid()}-{uuid.uuid4().hex[:6]}"
         self.stop = threading.Event()
         self.wake = threading.Event()
-        self._active: dict[uuid.UUID, threading.Thread] = {}
+        # Keyed by (run, claim): the same run can be claimed again while a hung thread of its old claim lives.
+        self._active: dict[tuple[uuid.UUID, str], threading.Thread] = {}
         self._lock = threading.Lock()
 
     # ---- the loop ----
@@ -106,8 +107,8 @@ class Worker:
 
     def free_slots(self) -> int:
         with self._lock:
-            for run_id in [r for r, t in self._active.items() if not t.is_alive()]:
-                del self._active[run_id]
+            for key in [k for k, t in self._active.items() if not t.is_alive()]:
+                del self._active[key]
             return max(1, live().int_value("worker_concurrency")) - len(self._active)
 
     def fill_slots(self) -> int:
@@ -118,23 +119,26 @@ class Worker:
             if live().bool_value("ai_paused"):
                 return 0
             for _ in range(self.free_slots()):
-                run_id = claim_next_run(self.id)
+                # One id per claim, not per worker: if a hung thread outlives its lease and this worker
+                # reclaims the run, the old thread is no longer the holder and its write is dropped.
+                claim = f"{self.id}:{uuid.uuid4().hex[:8]}"
+                run_id = claim_next_run(claim)
                 if run_id is None:
                     break
                 thread = threading.Thread(
-                    target=self._work, args=(run_id,), name=f"run-{run_id}", daemon=True
+                    target=self._work, args=(run_id, claim), name=f"run-{run_id}", daemon=True
                 )
                 with self._lock:
-                    self._active[run_id] = thread
+                    self._active[(run_id, claim)] = thread
                 thread.start()
                 started += 1
         except Exception:  # noqa: BLE001 - a database blip must not stop the worker
             logger.exception("worker_claim_failed")
         return started
 
-    def _work(self, run_id: uuid.UUID) -> None:
+    def _work(self, run_id: uuid.UUID, claim: str) -> None:
         try:
-            execute_run(run_id, self.id)
+            execute_run(run_id, claim)
         except Exception:  # noqa: BLE001 - execute_run records failures itself; an expired lease covers the rest
             logger.exception("worker_run_crashed", extra={"extra_fields": {"run_id": str(run_id)}})
         finally:
@@ -162,11 +166,11 @@ class Worker:
             running = dict(self._active)
         for thread in running.values():
             thread.join(max(0.0, deadline - time.monotonic()))
-        for run_id, thread in running.items():
+        for (run_id, claim), thread in running.items():
             if thread.is_alive():
                 logger.warning("worker_released_run", extra={"extra_fields": {"run_id": str(run_id)}})
                 try:
-                    release_run(run_id, self.id)
+                    release_run(run_id, claim)
                 except Exception:  # noqa: BLE001 - the lease expires and the reaper takes it back
                     logger.exception("worker_release_failed")
         logger.info("worker_stopped", extra={"extra_fields": {"worker": self.id}})

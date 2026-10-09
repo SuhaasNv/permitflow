@@ -290,6 +290,46 @@ def test_result_is_dropped_when_the_lease_changes_hands_mid_run(
     assert run.status == VerificationStatus.RUNNING and run.worker_id == "fast" and run.summary is None
 
 
+def test_same_worker_reclaiming_a_run_fences_the_stale_thread(
+    client: TestClient, db: Session, worker_mode: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A thread hangs past its lease, the reaper requeues the run and the SAME worker claims it again: each
+    claim has its own id, so the old thread is no longer the holder and its write is dropped. Both threads
+    stay tracked."""
+    run_id, _, _ = _queued(client, db)
+    claims: list[str] = []
+    release = threading.Event()
+
+    def hold(_: uuid.UUID, claim: str | None = None) -> None:
+        assert claim is not None
+        claims.append(claim)
+        release.wait(20)
+
+    monkeypatch.setattr(worker_module, "execute_run", hold)
+    monkeypatch.setattr(get_settings(), "worker_concurrency", 3)
+    w = Worker()
+    assert w.fill_slots() == 1
+    _expire(db, run_id)
+    reap_expired_runs()
+    assert w.fill_slots() == 1
+    deadline = time.monotonic() + 5
+    while len(claims) < 2 and time.monotonic() < deadline:
+        time.sleep(0.05)
+    first, second = claims
+    assert first != second and first.startswith(w.id) and second.startswith(w.id)
+    assert all(len(c) <= 64 for c in claims)  # the worker_id column is varchar(64)
+    assert len(w._active) == 2  # the hung thread is not lost when the run id is claimed again
+    assert _run(db, run_id).worker_id == second
+
+    execute_run(run_id, first)  # the stale holder: nothing written
+    run = _run(db, run_id)
+    assert run.status == VerificationStatus.RUNNING and run.worker_id == second and run.summary is None
+    release.set()
+    _finish_threads(w)
+    execute_run(run_id, second)
+    assert _run(db, run_id).status == VerificationStatus.VERIFIED
+
+
 # ---- the lifecycle: nothing of a deleted draft reaches the provider ----
 
 
