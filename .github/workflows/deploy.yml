@@ -66,10 +66,15 @@ jobs:
           }
           echo "backend=$(latest_id backend)" >> "$GITHUB_OUTPUT"
           echo "frontend=$(latest_id frontend)" >> "$GITHUB_OUTPUT"
-      - name: Redeploy backend and frontend from the new images
+          # The worker service exists in development only (production still verifies inline).
+          if [ "$RAILWAY_ENV" = development ]; then echo "worker=$(latest_id worker)" >> "$GITHUB_OUTPUT"; fi
+      - name: Redeploy backend, frontend and (development) worker from the new images
         run: |
           railway redeploy --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service backend --from-source --yes
           railway redeploy --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service frontend --from-source --yes
+          if [ "$RAILWAY_ENV" = development ]; then
+            railway redeploy --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service worker --from-source --yes
+          fi
       - name: Wait for the NEW deployments to succeed (redeploy returns before the rollout)
         run: |
           # The health URLs keep answering from the old containers during the rollout, so the gate waits
@@ -95,6 +100,7 @@ jobs:
           }
           wait_for backend "${{ steps.before.outputs.backend }}"
           wait_for frontend "${{ steps.before.outputs.frontend }}"
+          if [ "$RAILWAY_ENV" = development ]; then wait_for worker "${{ steps.before.outputs.worker }}"; fi
       - name: Post-deploy gate (health of both tiers)
         run: |
           for i in $(seq 1 30); do
