@@ -14,6 +14,23 @@ Format: the product reads this file at build time for its What's new page (the v
 
 **After that:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
 
+## v0.5.0-rc.2, 10 October 2026: checks that survive slow files, and storage that cannot run out
+
+**New for operators**
+- A document whose text takes too long to read is stopped after a short time and marked as unreadable, instead of holding up the check; a photo upload during a busy moment asks you to try again in a moment instead of failing.
+- If a draft is deleted while its documents are being checked, nothing from it is sent for the automatic check.
+- When the service has no storage room left, an upload says so plainly and is not retried over and over.
+
+**New for licensing officers**
+- A check that could not finish now says why in plain words: the document was replaced while it was being checked, or the check gave up after three tries.
+
+**New for administrators**
+- The overview shows how many automatic checks gave up after three tries in the last day.
+- The automatic checks can run on a separate worker, switched on per environment; while the checks are paused, waiting checks stay in line and run after the pause.
+
+**Also**
+- The service has an overall storage ceiling with an alert at 80 %, and only two photos are processed at a time so a large image cannot exhaust memory.
+
 ## v0.5.0-rc.1, 9 October 2026: safer documents, tunable limits and clearer focus
 
 **New for operators**
@@ -28,7 +45,7 @@ Format: the product reads this file at build time for its What's new page (the v
 - Creating an account or changing a role now asks for your password again.
 
 **Also**
-- Production's demonstration accounts are no longer published, and new ones there are opt-in.
+- Demonstration accounts are now switched on per environment; production keeps them, so anyone can still try the service.
 - The build now scans the code and the container images for known weaknesses before anything is released.
 
 ## v0.4.1, 9 October 2026: Singapore formats on the form, hours you pick, and steadier checks
