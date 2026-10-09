@@ -99,7 +99,7 @@ The second look is the write itself: the row lock above blocks the draft purge u
 - **Pause while queued.** Runs queued before a pause show "Queued for checking" until it ends. The front end already treats a run older than the stale limit as no longer live.
 - **Attempts.** `attempts` counts claims. A run that raised an exception inside the check is recorded `failed` by the existing handler and is not retried; only a worker that vanished or hung leaves a run to the reaper. A run is therefore retried only for infrastructure faults, which is the safe default for a paid, non-deterministic call.
 - **The admin panel counts dead runs in the 24-hour window** like the other numbers; the gauge counts all of them.
-- **`worker_concurrency` is still reported `in_use: false`** by the settings API (the existing test pins it); it is read only by the worker.
+- **`worker_concurrency` is reported `in_use: true`** by the settings API: the worker reads it live. (The API process never does; it is meaningful only with `VERIFICATION_MODE=worker`.)
 - The worker adds a thread per check on top of the engine's pool (10 + 20 overflow); the ceiling of 32 for the setting is above what one pool serves, so keep the setting low (2 to 4) or raise `DB_POOL_SIZE` with it.
 - No alert rule is added in this change (the plan names panels only). Candidates: oldest queued above 10 min, any dead run, worker target down.
 

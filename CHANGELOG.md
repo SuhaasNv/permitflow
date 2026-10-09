@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Unreleased / v0.5.0 wave 2: UAT run (10 Oct 2026)
+
+Branch `test/uat-wave-2`. `uat_edges.py` gains the US098 group (31 checks, 502 in all): an image and a PDF verify in inline mode, a `dead` check is served as failed to the operator, the officer and the administrator, the admin overview's dead count, a draft deleted straight after an upload leaves no run, and the stored and limit gauges on `/metrics`; the 507 `storage_full` body runs with `UAT_STORAGE_FULL=1` against an API started with `STORAGE_TOTAL_MAX_BYTES=1`. `smoke_routes.py` still calls all 66 routes (wave 2 added none). `UAT_PLAN.md` scenarios U35 to U40 (worker end to end, worker killed and recovered, pause holds the queue, deleted draft, busy image slot, storage full). Fix: the settings API reported `worker_concurrency` as `in_use: false` although the worker reads it.
+
 ## Unreleased / v0.5.0-rc.2: US-098, the verification worker (10 Oct 2026)
 
 Built on `feat/us-098-verification-worker`, not merged. The document checks can now run in a separate worker process instead of inside the API, behind `VERIFICATION_MODE=inline|worker`. The default is `inline`, which behaves exactly as v0.5.0-rc.1 does; nothing changes until the switch is set to `worker`.
