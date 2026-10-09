@@ -26,6 +26,20 @@ def test_tokens_are_never_signed_with_a_fallback_secret(monkeypatch: pytest.Monk
         get_settings.cache_clear()
 
 
+def test_production_refuses_to_start_without_a_total_storage_ceiling() -> None:
+    base = Settings.model_construct(jwt_secret="x" * 32)
+
+    def check(app_env: str, ceiling: int) -> None:
+        base.model_copy(
+            update={"app_env": app_env, "storage_total_max_bytes": ceiling}
+        ).validate_for_startup()
+
+    check("production", 1)
+    check("development", 0)
+    with pytest.raises(RuntimeError, match="STORAGE_TOTAL_MAX_BYTES"):
+        check("production", 0)
+
+
 def test_cors_origins_parsed() -> None:
     s = Settings(cors_origins="http://a, http://b ,", _env_file=None)  # type: ignore[call-arg]
     assert s.cors_origin_list == ["http://a", "http://b"]

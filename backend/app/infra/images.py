@@ -3,11 +3,14 @@ photo was taken into the file; the licensing record needs the picture, not the l
 kitchen. EXIF, XMP, IPTC and text chunks are dropped; the ICC profile is kept so colours stay right; the
 EXIF orientation is applied to the pixels first so the picture does not turn on its side."""
 
+import threading
 import warnings
 from io import BytesIO
 from typing import Any
 
 from PIL import Image, ImageOps, JpegImagePlugin, UnidentifiedImageError
+
+from app.core.settings import get_settings
 
 # 40 megapixels is generous for a phone photo (a 12 MP camera is a third of it). Pillow's own setting
 # only warns at this figure and refuses at twice it, and the warning let an 80-megapixel PNG of a few
@@ -16,11 +19,20 @@ from PIL import Image, ImageOps, JpegImagePlugin, UnidentifiedImageError
 MAX_PIXELS = 40_000_000
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 
+# US-098: a decoded image is hundreds of MB at the cap, so only a few are open at once in this process.
+# A caller waits up to WAIT_SECONDS for a slot and then gets ImageBusyError (a 503), never a 500.
+WAIT_SECONDS = 10.0
+_SLOTS = threading.BoundedSemaphore(get_settings().image_decode_concurrency)
+
 _FORMATS = {".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG"}
 
 
 class ImageUnreadableError(Exception):
     """The bytes carry an image signature but Pillow cannot decode them (truncated, bomb, corrupt)."""
+
+
+class ImageBusyError(Exception):
+    """Every decode slot stayed taken for WAIT_SECONDS: the caller should try again in a moment."""
 
 
 def is_image(ext: str) -> bool:
@@ -29,7 +41,15 @@ def is_image(ext: str) -> bool:
 
 def strip_metadata(data: bytes, ext: str) -> bytes:
     """Return the image re-encoded with only its pixels and colour profile."""
-    fmt = _FORMATS[ext]
+    if not _SLOTS.acquire(timeout=WAIT_SECONDS):
+        raise ImageBusyError
+    try:
+        return _strip(data, _FORMATS[ext])
+    finally:
+        _SLOTS.release()
+
+
+def _strip(data: bytes, fmt: str) -> bytes:
     try:
         # The filter is scoped here, not module-wide: a test runner or a library resets global filters.
         with warnings.catch_warnings():
@@ -41,7 +61,9 @@ def strip_metadata(data: bytes, ext: str) -> bytes:
                 raise ImageUnreadableError(f"{width}x{height} is more than {MAX_PIXELS} pixels")
             source.load()
             icc = source.info.get("icc_profile")
-            image = ImageOps.exif_transpose(source) or source
+            # In place: the turned pixels replace the decoded ones, so there is no second full copy.
+            ImageOps.exif_transpose(source, in_place=True)
+            image: Image.Image = source
             # Pillow writes what it finds in `info` (comment, XMP, EXIF) unless told otherwise.
             image.info = {}
             out = BytesIO()
@@ -71,4 +93,4 @@ def strip_metadata(data: bytes, ext: str) -> bytes:
         raise ImageUnreadableError(str(exc)) from exc
 
 
-__all__ = ["MAX_PIXELS", "ImageUnreadableError", "is_image", "strip_metadata"]
+__all__ = ["MAX_PIXELS", "ImageBusyError", "ImageUnreadableError", "is_image", "strip_metadata"]

@@ -47,7 +47,7 @@ from app.schemas.clarification import (
 )
 from app.services.documents import _display_name
 from app.services.notifications import NotificationService
-from app.services.uploads import receive, storage_usage, storage_view
+from app.services.uploads import platform_remaining, receive, storage_usage, storage_view
 
 MAX_MESSAGE = 2000
 ATTACHMENT_CAP = 3
@@ -282,7 +282,14 @@ class ClarificationService:
                 f"Up to {ATTACHMENT_CAP} files per answer.", details={"reason": "attachment_cap"}
             )
         key = new_storage_key(app.id, ext)
-        received = receive(self.storage, key, ext, stream, storage_usage(self.db, app.id, self.storage))
+        received = receive(
+            self.storage,
+            key,
+            ext,
+            stream,
+            storage_usage(self.db, app.id, self.storage),
+            platform_remaining(self.db),
+        )
         sha, size = received.sha256, received.size_bytes
         if any(a.sha256 == sha for a in existing):
             self.storage.delete(key)
