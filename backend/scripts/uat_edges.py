@@ -2036,10 +2036,8 @@ def us103_checks() -> None:
     readme = (repo / "README.md").read_text(encoding="utf-8")
     demo = readme[readme.index("## Demo accounts") : readme.index("The first three are protected")]
     check_seed(
-        "the README prints the shared password only under the development and local table, and says production does not",
-        "Development and local sign-ins" in demo
-        and demo.count("PermitFlow!2026") == 3
-        and "does not print a password" in demo,
+        "the README prints the shared password for the three demo accounts only, and keeps the administrator's private",
+        demo.count("PermitFlow!2026") == 3 and "shared privately with reviewers" in demo,
         f"{demo.count('PermitFlow!2026')} occurrences",
     )
 
