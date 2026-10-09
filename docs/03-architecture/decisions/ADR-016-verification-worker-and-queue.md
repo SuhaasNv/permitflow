@@ -93,7 +93,7 @@ The second look is the write itself: the row lock above blocks the draft purge u
 ## Consequences
 
 - **A second process to run.** In `worker` mode a worker that is down means checks stay `pending` (the queue-age panel shows it; there is no alert rule yet). The checks are advisory, so submissions are not blocked.
-- **Files.** On Railway the worker cannot read the API's volume. `worker` mode there requires `STORAGE_BACKEND=s3` (ADR-015) on both services; the worker logs a warning at start when it runs in production with local storage. In Compose both share the `uploads` volume.
+- **Files.** On Railway the worker cannot read the API's volume. `worker` mode there requires `STORAGE_BACKEND=s3` (ADR-015) on both services; the API and the worker both refuse to start with `VERIFICATION_MODE=worker` and `STORAGE_BACKEND=local` in production, and with a `WORKER_LEASE_SECONDS` at or below `PDF_EXTRACT_TIMEOUT_SECONDS` plus twice `AI_TIMEOUT_SECONDS` (`validate_for_startup`). In Compose both share the `uploads` volume.
 - **Prometheus must scrape the worker** (the local config does; the Railway Prometheus, which scrapes the public API domains only, needs a private-network target when the worker service exists). Until then the check counters and the cost panels read zero in `worker` mode.
 - **Switching back.** Setting `inline` and restarting the API: its startup sweep marks every `pending` and long-`running` run `failed: interrupted`, so queued checks are lost to the applicants, who re-run them. Drain the queue first (watch "Checks waiting") when that matters.
 - **Pause while queued.** Runs queued before a pause show "Queued for checking" until it ends. The front end already treats a run older than the stale limit as no longer live.

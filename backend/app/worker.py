@@ -65,9 +65,6 @@ class Worker:
         start_http_server(settings.worker_metrics_port)
         if settings.verification_mode != "worker":
             logger.warning("worker_started_in_inline_mode", extra={"extra_fields": {"worker": self.id}})
-        if settings.app_env == "production" and settings.storage_backend == "local":
-            # A separate service cannot read the API's volume (ADR-015): every check would fail storage_error.
-            logger.warning("worker_needs_shared_storage", extra={"extra_fields": {"worker": self.id}})
         signal.signal(signal.SIGTERM, self._on_signal)
         signal.signal(signal.SIGINT, self._on_signal)
         threading.Thread(target=self._listen, name="worker-listen", daemon=True).start()

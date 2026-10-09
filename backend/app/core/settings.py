@@ -137,6 +137,18 @@ class Settings(BaseSettings):
             raise RuntimeError("JWT_SECRET must be set to at least 16 random characters")
         if self.app_env == "production" and self.storage_total_max_bytes <= 0:
             raise RuntimeError("STORAGE_TOTAL_MAX_BYTES must be above 0 in production")
+        if (
+            self.app_env == "production"
+            and self.verification_mode == "worker"
+            and self.storage_backend == "local"
+        ):
+            # A separate worker service cannot read the API's volume (ADR-015): every check would fail.
+            raise RuntimeError("VERIFICATION_MODE=worker needs STORAGE_BACKEND=s3 in production")
+        if self.worker_lease_seconds <= self.pdf_extract_timeout_seconds + 2 * self.ai_timeout_seconds:
+            # A lease shorter than the longest check lets the reaper take back a run that is still working.
+            raise RuntimeError(
+                "WORKER_LEASE_SECONDS must exceed PDF_EXTRACT_TIMEOUT_SECONDS + 2 * AI_TIMEOUT_SECONDS"
+            )
         if self.storage_backend == "s3" and self.s3_missing():
             raise RuntimeError(f"STORAGE_BACKEND=s3 needs {', '.join(self.s3_missing())} to be set")
 
