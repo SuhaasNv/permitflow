@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from app import worker as worker_module
 from app.core.settings import get_settings
+from app.domain.audit_labels import summarize
 from app.domain.verification_rules import VerificationRequest, VerificationResult
 from app.infra import db as dbmod
 from app.infra.ai.mock import MockProvider
@@ -226,6 +227,8 @@ def test_killed_worker_is_recovered_and_the_third_expiry_is_dead(
 
     events = [e for e in db.scalars(select(AuditEvent)) if e.event_type == "verification.completed"]
     assert events[-1].payload["status"] == "dead"
+    # The officer's audit trail reads as a sentence; the raw word is not shown.
+    assert summarize(events[-1].event_type, events[-1].payload) == "Check gave up after 3 tries"
     # Clients never see `dead`: it is a failed check, and the applicant may re-run it.
     slot = next(
         s
