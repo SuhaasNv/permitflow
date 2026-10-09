@@ -1,3 +1,16 @@
+# Settings the API and the verification worker share (same image, same database, same upload volume).
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://permitflow:permitflow@db:5432/permitflow
+  UPLOAD_DIR: /data/uploads
+  # US-097: STORAGE_BACKEND=s3 (shell or .env) sends uploads to the MinIO below instead of the volume.
+  # The default stays local. These are the local MinIO's development values, not real credentials.
+  STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_BUCKET: permitflow-uploads
+  S3_ACCESS_KEY_ID: permitflow
+  S3_SECRET_ACCESS_KEY: permitflow-local
+  S3_ADDRESSING_STYLE: path
+
 services:
   db:
     image: postgres:16-alpine
@@ -23,16 +36,10 @@ services:
     profiles: ["full"]
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://permitflow:permitflow@db:5432/permitflow
-      UPLOAD_DIR: /data/uploads
-      # US-097: STORAGE_BACKEND=s3 (shell or .env) sends uploads to the MinIO below instead of the volume.
-      # The default stays local. These are the local MinIO's development values, not real credentials.
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
-      S3_ENDPOINT_URL: http://minio:9000
-      S3_BUCKET: permitflow-uploads
-      S3_ACCESS_KEY_ID: permitflow
-      S3_SECRET_ACCESS_KEY: permitflow-local
-      S3_ADDRESSING_STYLE: path
+      <<: *backend-env
+      # US-098: `inline` (the default) runs the document checks in this process. VERIFICATION_MODE=worker
+      # (shell or .env) only queues them; start the worker with `--profile worker` to run them.
+      VERIFICATION_MODE: ${VERIFICATION_MODE:-inline}
     ports:
       - "8000:8000"
     volumes:
@@ -40,6 +47,27 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  # The verification worker (US-098, ADR-016): `docker compose --profile full --profile worker up -d` with
+  # VERIFICATION_MODE=worker for the API. Same image as the backend, no published port: its metrics are on
+  # :9100 inside the Compose network only. Without VERIFICATION_MODE=worker on the API there is nothing for
+  # it to do (checks run inline), so it sits idle.
+  worker:
+    build: ./backend
+    container_name: permitflow-worker
+    profiles: ["worker"]
+    env_file: .env
+    environment:
+      <<: *backend-env
+      VERIFICATION_MODE: worker
+    command: [".venv/bin/python", "-m", "app.worker"]
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 15s
 
   # Object storage for uploads (US-097): `docker compose --profile storage up -d`. S3 API on :9000, console
   # on :9001 (sign in permitflow / permitflow-local). Used only when STORAGE_BACKEND=s3; nothing else

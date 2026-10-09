@@ -102,6 +102,7 @@ function ChecksPanel({ checks }: { checks: Checks }) {
           <Row label="Could not read" value={checks.unreadable} />
           <Row label="Failed or unavailable" value={checks.failed_or_unavailable} />
           {checks.still_running > 0 ? <Row label="Still running" value={checks.still_running} muted /> : null}
+          {checks.dead > 0 ? <Row label="Gave up after 3 tries" value={checks.dead} /> : null}
           <Row label="Average time" value={seconds(checks.average_seconds)} />
           <Row label="Slowest 5 % of checks" value={seconds(checks.p95_seconds)} />
         </dl>

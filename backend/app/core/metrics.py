@@ -36,6 +36,19 @@ VERIFICATION_SECONDS = Histogram(
     ["provider"],
     buckets=(0.1, 0.5, 1, 2, 5, 10, 20, 30, 60),
 )
+# The queue behind the document checks (US-098, ADR-016). Refreshed from the database on every API scrape
+# and every few seconds by the worker, which serves them on its own private port too.
+QUEUE_DEPTH = Gauge("permitflow_verification_queue_depth", "Document checks waiting for a worker.")
+QUEUE_OLDEST_SECONDS = Gauge(
+    "permitflow_verification_queue_oldest_seconds", "Age of the oldest waiting check, 0 when none."
+)
+ACTIVE_LEASES = Gauge("permitflow_verification_active_leases", "Checks a worker is running right now.")
+DEAD_RUNS = Gauge("permitflow_verification_dead_runs", "Checks the workers gave up on (status dead).")
+REAPED = Counter(
+    "permitflow_verification_reaped_total",
+    "Checks taken back from a worker whose lease expired, by outcome (requeued, dead).",
+    ["outcome"],
+)
 QUOTA_REFUSALS = Counter(
     "permitflow_quota_refusals_total", "Refusals by a database quota (US-058).", ["quota"]
 )

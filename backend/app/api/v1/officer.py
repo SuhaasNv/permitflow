@@ -23,7 +23,7 @@ from app.services.licence import LicenceService
 from app.services.officer_queue import OfficerQueueService
 from app.services.officer_view import OfficerViewService
 from app.services.site_visit import SiteVisitService
-from app.services.verification import VerificationService, run_verification
+from app.services.verification import VerificationService, start_run
 from app.services.workflow import WorkflowService
 
 router = APIRouter(prefix="/officer")
@@ -69,7 +69,7 @@ def officer_rerun_check(
     """Re-run the AI check on a document (AI-009). Same rules as the operator re-run: only when the latest run
     is terminal; audited as `verification.requested` with the officer as actor."""
     run = VerificationService(db).rerun(user, application_id, document_id)
-    background.add_task(run_verification, run.id)
+    background.add_task(start_run, run.id)
     service = OfficerViewService(db)
     return service.get(user, application_id)
 

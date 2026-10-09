@@ -58,6 +58,7 @@ class ChecksOut(BaseModel):
     unreadable: int
     failed_or_unavailable: int
     still_running: int
+    dead: int  # US-098: checks the worker gave up on (served to clients as failed)
     average_seconds: float | None
     p95_seconds: float | None
     provider: str

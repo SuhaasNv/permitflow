@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, new_id, str_enum, utcnow
@@ -37,6 +37,17 @@ class VerificationRun(Base):
     __table_args__ = (
         Index("ix_verification_runs_created_at", "created_at"),
         Index("ix_verification_runs_started_at", "started_at"),
+        # US-098: the worker's claim (oldest queued run) and the reaper's scan (expired leases).
+        Index(
+            "ix_verification_runs_queued",
+            "created_at",
+            postgresql_where=text("status = 'pending'"),
+        ),
+        Index(
+            "ix_verification_runs_lease",
+            "lease_until",
+            postgresql_where=text("status = 'running'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_id)
@@ -58,3 +69,8 @@ class VerificationRun(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    # US-098 (worker mode): how many times a worker has claimed the run, until when the claim is good, and
+    # who holds it. They stay at their defaults in inline mode.
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    worker_id: Mapped[str | None] = mapped_column(String(64), nullable=True)

@@ -19,6 +19,13 @@ scrape_configs:
       - targets: ["__TARGET__"]
         labels:
           environment: __ENVIRONMENT__
+  # US-098: the verification worker (docker compose --profile worker). Its port is private and carries no
+  # token. Down when VERIFICATION_MODE=inline, which is expected: the panel only reads "Worker" in worker mode.
+  - job_name: permitflow-worker
+    static_configs:
+      - targets: ["__WORKER_TARGET__"]
+        labels:
+          environment: __ENVIRONMENT__
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]

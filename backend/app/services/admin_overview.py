@@ -135,6 +135,7 @@ class AdminOverviewService:
             unreadable=by[VerificationStatus.UNREADABLE],
             failed_or_unavailable=by[VerificationStatus.FAILED] + by[VerificationStatus.UNAVAILABLE],
             still_running=by[VerificationStatus.PENDING] + by[VerificationStatus.RUNNING],
+            dead=by[VerificationStatus.DEAD],
             average_seconds=average,
             p95_seconds=round(p95, 2) if p95 is not None else None,
             provider=provider,

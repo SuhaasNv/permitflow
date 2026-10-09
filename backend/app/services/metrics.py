@@ -1,6 +1,8 @@
 """Gauges that are read from the database at scrape time (US-077). Counters are updated where the
 events happen; only the state of the world needs a query."""
 
+from datetime import UTC, datetime
+
 from sqlalchemy.orm import Session
 
 from app.core import metrics
@@ -12,7 +14,17 @@ from app.repositories.documents import DocumentRepository
 from app.services.auth import AuthService
 
 
+def refresh_queue_gauges(db: Session) -> None:
+    """The queue behind the document checks (US-098): depth, oldest wait, runs being worked, dead runs."""
+    depth, oldest, leases, dead = DocumentRepository(db).queue_stats(datetime.now(UTC))
+    metrics.QUEUE_DEPTH.set(depth)
+    metrics.QUEUE_OLDEST_SECONDS.set(oldest)
+    metrics.ACTIVE_LEASES.set(leases)
+    metrics.DEAD_RUNS.set(dead)
+
+
 def refresh_gauges(db: Session) -> None:
+    refresh_queue_gauges(db)
     counts = ApplicationRepository(db).count_by_status()
     for status in ApplicationStatus:
         metrics.APPLICATIONS.labels(status.value).set(counts.get(status, 0))

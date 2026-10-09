@@ -35,7 +35,7 @@ from app.services.resubmission import ResubmissionService
 from app.services.site_visit import SiteVisitService
 from app.services.submission import SubmissionService
 from app.services.uploads import storage_usage, storage_view
-from app.services.verification import VerificationService, run_verification
+from app.services.verification import VerificationService, start_run
 from app.services.visit_scope import earlier_visit_nos
 from app.services.withdrawal import WithdrawalService
 
@@ -327,7 +327,7 @@ def upload_document(
         user, application_id, document_type, file.filename or "", file.content_type, file.file
     )
     if result.run is not None and not result.unchanged:
-        background.add_task(run_verification, result.run.id)
+        background.add_task(start_run, result.run.id)
     service = ApplicationService(db)
     return UploadOut(
         application=_view(service, result.application),
@@ -377,7 +377,7 @@ def rerun_verification(
     """Re-run the check on a current document (SCOPE S2). Owner only: an officer uses the officer route
     (this response is the operator working copy). 409 while one is running."""
     run = VerificationService(db).rerun(user, application_id, document_id)
-    background.add_task(run_verification, run.id)
+    background.add_task(start_run, run.id)
     service = ApplicationService(db)
     app = service.get_for(user, application_id)
     doc = next(d for d, _ in service.documents_with_runs(app) if d.id == document_id)
