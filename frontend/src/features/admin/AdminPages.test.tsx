@@ -49,6 +49,7 @@ const overview: AdminOverview = {
     unreadable: 0,
     failed_or_unavailable: 1,
     still_running: 0,
+    dead: 0,
     average_seconds: 4.1,
     p95_seconds: 9.8,
     provider: 'OpenAI',
@@ -188,6 +189,17 @@ describe('admin overview (S-40, US-070)', () => {
     expect(screen.getByText('Nothing is stuck')).toBeInTheDocument()
     expect(screen.getByText(/Provider: none \(mock\)\./)).toBeInTheDocument()
     expect(screen.getAllByText('no runs yet')).toHaveLength(2)
+  })
+
+  it('shows checks the worker gave up on (US-098), and only when there are some', async () => {
+    const get = vi.spyOn(api, 'getAdminOverview').mockResolvedValue({ ...overview, checks: { ...overview.checks, dead: 2 } })
+    const { unmount } = renderAt('/admin/overview')
+    expect(await screen.findByText('Gave up after 3 tries')).toBeInTheDocument()
+    unmount()
+    get.mockResolvedValue(overview)
+    renderAt('/admin/overview')
+    await screen.findByText('Checks run')
+    expect(screen.queryByText('Gave up after 3 tries')).not.toBeInTheDocument()
   })
 
   it('shows the error state with a retry', async () => {
