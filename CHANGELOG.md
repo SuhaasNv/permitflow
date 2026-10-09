@@ -2,6 +2,14 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Unreleased / v0.5.0-rc.3: follow-ups from the rc.2 UAT on development (10 Oct 2026, `fix/rc2-uat-followups`)
+
+- The officer's check result explains `ai_paused` ("Automatic checks are paused by the administrator; re-run once they resume.") instead of showing the raw code; a vitest covers it. The operator side already shows its own wording.
+- `deploy.yml` also redeploys and waits for the `worker` service, in development only; production has no worker service yet and is unchanged.
+- `prometheus.railway.yml` has the `permitflow-worker` job (`worker.railway.internal:9100`, `environment: development`); `OBSERVABILITY.md` and `OPERATIONS.md` say so.
+- README, `OPERATIONS.md` and the threat model state the owner's decision of 9 Oct 2026: the production operator, officer and spare officer accounts stay public on the published password; the administrator stays private.
+- `OPERATIONS.md` records the development environment as it runs since 10 Oct 2026 (the `worker` service, bucket `uploads-dev`, `STORAGE_BACKEND=s3`, `VERIFICATION_MODE=worker`; production still inline and local disk until v0.5.0), and `UAT_PLAN.md` records the 10 Oct UAT run (Pass with one finding).
+
 ## v0.5.0-rc.2: release candidate on the development environment (10 Oct 2026)
 
 Wave 2 of v0.5.0: US-098 (the verification worker and queue behind `VERIFICATION_MODE`, default `inline`; PDF extraction in a limited child process in both modes; the re-check before the provider call; the image decode slots and the platform storage ceiling), the independent review fixes (M1 to M4, L1 to L8), the US098 UAT group and scenarios U35 to U40, a bandit fix on the Telegram notifier (CI's blocking step, found on rc.1) and an exact match in the What's new end-to-end test. Migration 0016. Every switch defaults to the rc.1 behaviour; the Railway worker service does not exist yet. Full local run green before the cut.
