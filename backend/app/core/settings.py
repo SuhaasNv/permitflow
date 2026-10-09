@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     s3_secret_access_key: str = ""  # required with `s3`
     s3_addressing_style: Literal["auto", "path", "virtual"] = "auto"  # MinIO needs `path`
 
+    # US-098: image decode memory and the platform-wide stored-bytes ceiling. At most this many images are
+    # decoded and re-encoded at once in this process (a 40 MP image is hundreds of MB while it is open);
+    # a caller waits a bounded time, then gets a 503. The total ceiling counts every stored document
+    # version and clarification attachment, on either backend; 0 means no ceiling and is refused in
+    # production (the gauge `permitflow_storage_bytes{kind="limit"}` and the 80 % alert read it).
+    image_decode_concurrency: int = Field(default=2, ge=1)
+    storage_total_max_bytes: int = Field(default=5 * 1024**3, ge=0)
+
     # Mark site visit done and the checklist submit wait for the visit day (Singapore date; UAT run 5, F12).
     # Off only where a whole appointment must run in one sitting: the automated suites and a demonstration.
     site_visit_day_guard: bool = True
@@ -125,6 +133,8 @@ class Settings(BaseSettings):
         placeholder from `.env.example` counts as unset."""
         if len(self.jwt_secret) < 16 or self.jwt_secret == "change-me-to-a-long-random-string":
             raise RuntimeError("JWT_SECRET must be set to at least 16 random characters")
+        if self.app_env == "production" and self.storage_total_max_bytes <= 0:
+            raise RuntimeError("STORAGE_TOTAL_MAX_BYTES must be above 0 in production")
         if self.storage_backend == "s3" and self.s3_missing():
             raise RuntimeError(f"STORAGE_BACKEND=s3 needs {', '.join(self.s3_missing())} to be set")
 

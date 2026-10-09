@@ -18,7 +18,7 @@ from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.services.applications import ApplicationService
 from app.services.quotas import new_run
-from app.services.uploads import receive, storage_usage
+from app.services.uploads import platform_remaining, receive, storage_usage
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,14 @@ class DocumentService:
         # One pipeline for every upload (US-085): size cap, magic bytes, images without metadata, the
         # application's storage budget; the digest is that of the stored bytes.
         key = new_storage_key(app.id, ext)
-        received = receive(self.storage, key, ext, stream, storage_usage(self.db, app.id, self.storage))
+        received = receive(
+            self.storage,
+            key,
+            ext,
+            stream,
+            storage_usage(self.db, app.id, self.storage),
+            platform_remaining(self.db),
+        )
         sha, size = received.sha256, received.size_bytes
         previous = self.documents.current_of_type(app.id, document_type)
         if previous is not None and previous.sha256 == sha:

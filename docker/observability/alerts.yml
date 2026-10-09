@@ -56,3 +56,11 @@ groups:
         labels: { severity: warning }
         annotations:
           summary: "The upload volume is more than 80 % full (US-089): raise it before it fills"
+      - alert: PermitFlowStorageCeiling
+        expr: |
+          sum by (environment, instance) (permitflow_storage_bytes{kind="stored"})
+            / sum by (environment, instance) (permitflow_storage_bytes{kind="limit"}) > 0.8
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Stored files are above 80 % of STORAGE_TOTAL_MAX_BYTES (US-098): raise the ceiling or clear space before uploads are refused"

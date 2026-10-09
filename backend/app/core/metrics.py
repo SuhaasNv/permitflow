@@ -88,7 +88,8 @@ ATTACHMENT_BYTES = Counter(
 )
 STORAGE_BYTES = Gauge(
     "permitflow_storage_bytes",
-    "Bytes on the upload volume by kind (documents, attachments, volume_used, volume_total), per scrape.",
+    "Bytes stored by kind (documents, attachments, stored, limit) and on the volume (volume_used, "
+    "volume_total), per scrape.",
     ["kind"],
 )
 
