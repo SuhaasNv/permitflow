@@ -42,7 +42,7 @@ def _send(text: str) -> None:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS):  # noqa: S310
+        with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS):  # noqa: S310 - fixed https URL  # nosec B310
             pass
     except Exception as exc:  # noqa: BLE001 - never let an announcement fail a change
         # The URL carries the bot token; log the exception type only.
