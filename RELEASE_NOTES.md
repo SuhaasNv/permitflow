@@ -14,6 +14,14 @@ Format: the product reads this file at build time for its What's new page (the v
 
 **After that:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
 
+## v0.5.0-rc.3, 10 October 2026: clearer paused checks and a development worker
+
+**New for licensing officers**
+- When the administrator has paused the automatic checks, a check now says so in plain words instead of showing a code, and tells you to re-run it once checks resume.
+
+**Also**
+- The development environment now runs the automatic checks on their own worker and keeps uploads in object storage; production is unchanged until the release.
+
 ## v0.5.0-rc.2, 10 October 2026: checks that survive slow files, and storage that cannot run out
 
 **New for operators**

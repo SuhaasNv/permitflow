@@ -2,7 +2,7 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
-## Unreleased / v0.5.0-rc.3: follow-ups from the rc.2 UAT on development (10 Oct 2026, `fix/rc2-uat-followups`)
+## v0.5.0-rc.3: release candidate on the development environment (10 Oct 2026)
 
 - The officer's check result explains `ai_paused` ("Automatic checks are paused by the administrator; re-run once they resume.") instead of showing the raw code; a vitest covers it. The operator side already shows its own wording.
 - `deploy.yml` also redeploys and waits for the `worker` service, in development only; production has no worker service yet and is unchanged.
