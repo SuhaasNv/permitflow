@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
-import { downloadLicence } from '@/api/documents'
+import { downloadLicence, scanMessage } from '@/api/documents'
 import { Alert } from '@/features/shared/Alert'
 import { Button, buttonClasses } from '@/features/shared/Button'
 import { TextAreaField } from '@/features/shared/Controls'
@@ -46,6 +46,11 @@ export function ApplicationPage() {
   const [confirm, setConfirm] = useState(false)
   /** A 409 means the application moved under us (the officer decided, another tab acted): reload, never show the raw reason. */
   const explainConflict = (e: Error, title: string) => {
+    if (e instanceof AppError && e.status === 409 && scanMessage(e)) {
+      toast.push({ title, body: scanMessage(e) ?? e.message, tone: 'error' })
+      void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(id) })
+      return
+    }
     if (e instanceof AppError && e.status === 409) {
       toast.push({ title, body: 'This application changed since you opened it. Showing the latest.', tone: 'error' })
       void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(id) })
@@ -84,6 +89,8 @@ export function ApplicationPage() {
   // Readiness counts flagged targets (sections and document types), never feedback items.
   const changedTargets = view.resubmit ? view.resubmit.changed_sections.length + view.resubmit.changed_document_types.length : 0
   const flaggedTargets = view.resubmit ? changedTargets + view.resubmit.untouched_targets.length : 0
+  // The backend words the reason; this only picks the title when a file that is blocked or being scanned holds Resubmit.
+  const scanHold = view.document_slots.some((sl) => sl.document?.scan_state === 'infected' || sl.document?.scan_state === 'scanning')
   const doResubmit = () => {
     if (resubmit.isPending) return
     resubmit.mutate(undefined, {
@@ -150,6 +157,10 @@ export function ApplicationPage() {
                 <Link to={`/app/applications/${id}/review`} className={buttonClasses('secondary')}>
                   Review and submit
                 </Link>
+              ) : view.submit_blocked_reason ? (
+                <Button variant="secondary" disabled title={view.submit_blocked_reason}>
+                  Review and submit
+                </Button>
               ) : null}
               <Link to={`/app/applications/${id}/form${nextSection ? `/${nextSection.key}` : ''}`} className={buttonClasses('primary')}>
                 {view.completeness.percent === 0 ? 'Start application' : 'Continue application'}
@@ -220,7 +231,9 @@ export function ApplicationPage() {
             title={
               view.resubmit.can_resubmit
                 ? `Ready to resubmit: ${changedTargets} of ${flaggedTargets} flagged ${flaggedTargets === 1 ? 'item' : 'items'} changed.`
-                : 'Nothing has changed yet.'
+                : scanHold
+                  ? 'Resubmit is on hold.'
+                  : 'Nothing has changed yet.'
             }
           >
             {view.resubmit.can_resubmit

@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AppError, setUnauthorizedHandler } from './client'
-import { downloadDocument, downloadLicence, fetchLicencePreview, setUploadTokenProvider, uploadDocument, validateFile } from './documents'
+import {
+  downloadDocument,
+  downloadLicence,
+  fetchLicencePreview,
+  scanMessage,
+  setUploadTokenProvider,
+  uploadDocument,
+  validateFile,
+} from './documents'
 
 function file(name: string, size: number, type = 'application/pdf'): File {
   const f = new File([new Uint8Array(size)], name, { type })
@@ -166,5 +174,30 @@ describe('downloads', () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 401 }))
     await downloadDocument('app-1', 'doc-1', 'plan.pdf').catch(() => undefined)
     expect(onUnauthorized).toHaveBeenCalledTimes(1)
+  })
+
+  it('maps the scan codes on a refused download: the server wording for a blocked file, one sentence for the rest', async () => {
+    const body = (code: string, message: string) => new Response(JSON.stringify({ error: { code, message } }), { status: 403 })
+    fetchMock.mockResolvedValueOnce(body('file_infected', 'This file was blocked by the security check and cannot be opened.'))
+    const blocked = (await downloadDocument('app-1', 'doc-1', 'plan.pdf').catch((x: unknown) => x)) as AppError
+    expect(blocked.code).toBe('file_infected')
+    expect(blocked.message).toBe('This file was blocked by the security check and cannot be opened.')
+
+    fetchMock.mockResolvedValueOnce(body('file_scanning', 'raw'))
+    const scanning = (await downloadDocument('app-1', 'doc-1', 'plan.pdf').catch((x: unknown) => x)) as AppError
+    expect(scanning.message).toBe('This file is still being scanned. Try again in a moment.')
+
+    fetchMock.mockResolvedValueOnce(body('forbidden', 'raw'))
+    const other = (await downloadDocument('app-1', 'doc-1', 'plan.pdf').catch((x: unknown) => x)) as AppError
+    expect(other.message).toBe('Could not download this file.')
+  })
+
+  it('scanMessage words the four codes and ignores anything else', () => {
+    const err = (code: string) => new AppError(500, { code, message: 'raw' })
+    expect(scanMessage(err('file_infected'))).toBe('This file was blocked by the security check. Upload a different copy.')
+    expect(scanMessage(err('scanner_unavailable'))).toMatch(/not available right now/)
+    expect(scanMessage(err('documents_not_clear'))).toMatch(/no document is blocked or being scanned/)
+    expect(scanMessage(err('storage_full'))).toBeNull()
+    expect(scanMessage(new Error('x'))).toBeNull()
   })
 })
