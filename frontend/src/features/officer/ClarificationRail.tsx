@@ -81,7 +81,8 @@ function Thread({ view, thread, n }: { view: OfficerApplication; thread: Clarifi
                   <li key={a.id}>
                     <button
                       type="button"
-                      className="inline-flex max-w-full items-center gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-1.5 text-[13px] font-medium hover:border-text-3"
+                      disabled={a.scan_state === 'infected' || a.scan_state === 'scanning'}
+                      className="inline-flex max-w-full items-center gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-1.5 text-[13px] font-medium enabled:hover:border-text-3"
                       onClick={() =>
                         void downloadAttachment(view.id, a.id, a.original_filename).catch((e: unknown) =>
                           toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
@@ -90,6 +91,8 @@ function Thread({ view, thread, n }: { view: OfficerApplication; thread: Clarifi
                     >
                       <span className="truncate">{a.original_filename}</span>
                       <span className="text-xs text-text-3">{formatBytes(a.size_bytes)}</span>
+                      {a.scan_state === 'infected' ? <StatusBadge label="Blocked, cannot be opened" tone="error" /> : null}
+                      {a.scan_state === 'scanning' ? <StatusBadge label="Scanning" tone="info" live /> : null}
                     </button>
                   </li>
                 ))}

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
+import type { ScanState } from '@/api/documents'
+import { scanMessage } from '@/api/documents'
 import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
 import { Dialog } from '@/features/shared/Dialog'
@@ -11,17 +13,21 @@ import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/sh
 import { ApplicationHeader } from './ApplicationHeader'
 import { CompletionCard } from './CompletionCard'
 import { SectionSummary } from './SectionSummary'
+import { scanGateReason } from './scanGate'
 import { applicationKeys, useApplication, useFormSchema, useSubmitApplication } from './queries'
 import { useQueryClient } from '@tanstack/react-query'
 
 const ATTENTION = new Set(['issues_found', 'needs_review', 'failed', 'unavailable', 'unreadable'])
 
-function docStatus(slot: { document: { verification: { status: string; issues: unknown[] } | null } | null }): {
+function docStatus(slot: { document: { scan_state?: ScanState; verification: { status: string; issues: unknown[] } | null } | null }): {
   label: string
   tone: Tone
 } {
   const v = slot.document?.verification
   if (!slot.document) return { label: 'Missing', tone: 'neutral' }
+  const scan = slot.document.scan_state
+  if (scan === 'infected') return { label: 'Blocked', tone: 'error' }
+  if (scan === 'scanning') return { label: 'Scanning', tone: 'info' }
   if (!v) return { label: 'Uploaded', tone: 'success' }
   switch (v.status) {
     case 'verified':
@@ -88,6 +94,9 @@ export function ReviewPage() {
   const missing =
     submitError?.status === 422 && Array.isArray(submitError.details?.missing) ? (submitError.details.missing as string[]) : []
 
+  const gate = scanGateReason(view.document_slots, 'Submit application')
+  const notClear = submitError?.code === 'documents_not_clear'
+
   const doSubmit = () => {
     if (submit.isPending) return
     submit.mutate(undefined, {
@@ -103,8 +112,10 @@ export function ReviewPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex flex-col gap-5">
           {submit.isError && !missing.length ? (
-            <Alert tone="error" title={submitError?.status === 409 ? 'Already submitted' : 'Could not submit'}>
-              {submitError?.status === 409
+            <Alert tone="error" title={notClear ? 'Not ready to submit' : submitError?.status === 409 ? 'Already submitted' : 'Could not submit'}>
+              {notClear
+                ? scanMessage(submitError)
+                : submitError?.status === 409
                 ? 'This application was submitted from another tab or device. Nothing was sent twice.'
                 : (submitError?.message ?? 'Try again in a moment. Nothing you entered has been lost.')}
             </Alert>
@@ -202,9 +213,10 @@ export function ReviewPage() {
               </p>
             </div>
             <div className="flex flex-col gap-2 px-5 pb-5 pt-5">
-              <Button size="lg" disabled={!view.can_submit} loading={submit.isPending} onClick={() => setConfirm(true)}>
+              <Button size="lg" disabled={!view.can_submit || gate !== null} loading={submit.isPending} onClick={() => setConfirm(true)}>
                 Submit application
               </Button>
+              {gate ? <p className="text-[13px] leading-[19px] text-text-2">{gate}</p> : null}
               <Link
                 to="/app/dashboard"
                 className="inline-flex h-10 items-center justify-center rounded-md text-sm font-semibold text-text-2 no-underline transition-colors hover:bg-neutral-soft hover:text-text"

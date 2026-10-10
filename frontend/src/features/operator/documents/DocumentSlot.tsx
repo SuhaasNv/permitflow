@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 
 import type { DocumentSlotView, OperatorFeedback } from '@/api/applications'
 import { AppError } from '@/api/client'
-import { deleteDocument, downloadDocument, rerunVerification, uploadDocument, validateFile } from '@/api/documents'
+import { BLOCKED_MESSAGE, deleteDocument, downloadDocument, rerunVerification, scanMessage, uploadDocument, validateFile } from '@/api/documents'
 import type { UploadResult } from '@/api/documents'
 import { Alert } from '@/features/shared/Alert'
-import { Button } from '@/features/shared/Button'
+import { Button, buttonClasses } from '@/features/shared/Button'
 import { Dialog } from '@/features/shared/Dialog'
 import { StatusBadge } from '@/features/shared/StatusBadge'
 import { useToast } from '@/features/shared/Toast'
@@ -13,7 +13,7 @@ import { cn } from '@/lib/cn'
 import { formatBytes, formatDateTime } from '@/lib/format'
 import { CHECK_STALE_MS, isCheckStale } from '../queries'
 import { DropZone } from './DropZone'
-import { VerificationBlock } from './VerificationBlock'
+import { SecurityCheck, VerificationBlock } from './VerificationBlock'
 
 interface DocumentSlotProps {
   applicationId: string
@@ -56,6 +56,27 @@ const FileIcon = ({ image }: { image: boolean }) => (
   </svg>
 )
 
+const PICK_FOCUS = 'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus'
+
+/** A file picker that looks like a button: Replace file, and Upload a different copy for a blocked file. */
+function FilePick({ label, className, onFile }: { label: string; className: string; onFile: (file: File) => void }) {
+  return (
+    <label className={cn(className, PICK_FOCUS)}>
+      {label}
+      <input
+        type="file"
+        className="sr-only"
+        accept=".pdf,.png,.jpg,.jpeg,.txt"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) onFile(file)
+          e.target.value = ''
+        }}
+      />
+    </label>
+  )
+}
+
 const RERUNNABLE = new Set(['verified', 'issues_found', 'needs_review', 'unreadable', 'failed', 'unavailable'])
 
 /** One required document type: empty drop zone, or the current file with its verification result. */
@@ -97,7 +118,7 @@ export function DocumentSlot({
       setState({
         phase: 'error',
         title: 'Upload did not complete',
-        message: error instanceof Error ? error.message : 'Upload failed. Try again.',
+        message: scanMessage(error) ?? (error instanceof Error ? error.message : 'Upload failed. Try again.'),
       })
     }
   }
@@ -137,6 +158,8 @@ export function DocumentSlot({
     }
   }
 
+  const blocked = doc?.scan_state === 'infected'
+  const scanning = doc?.scan_state === 'scanning'
   const live = doc?.verification?.status === 'running' || doc?.verification?.status === 'pending'
   const requestedAt = doc?.verification?.requested_at
   const stale = Boolean(requestedAt && live && isCheckStale(requestedAt))
@@ -196,7 +219,11 @@ export function DocumentSlot({
           </div>
         </div>
         {doc ? (
-          live ? (
+          blocked ? (
+            <StatusBadge label="Blocked" tone="error" />
+          ) : scanning ? (
+            <StatusBadge label="Scanning" tone="info" live />
+          ) : live ? (
             <StatusBadge label="Checking" tone="info" live />
           ) : (
             <StatusBadge label="Uploaded" tone="success" />
@@ -245,7 +272,22 @@ export function DocumentSlot({
         </div>
       ) : null}
 
-      <div aria-live="polite">{doc?.verification ? <VerificationBlock verification={doc.verification} stale={stale} /> : null}</div>
+      <div aria-live="polite">
+        {blocked ? (
+          <div className="px-4 pb-4 sm:px-5">
+            <Alert tone="error">{BLOCKED_MESSAGE}</Alert>
+          </div>
+        ) : scanning ? (
+          <SecurityCheck scanning />
+        ) : doc?.verification && doc.scan_state === 'clean' ? (
+          <div className="grid xl:grid-cols-2 xl:divide-x xl:divide-line">
+            <SecurityCheck scanning={false} />
+            <VerificationBlock verification={doc.verification} stale={stale} />
+          </div>
+        ) : doc?.verification ? (
+          <VerificationBlock verification={doc.verification} stale={stale} />
+        ) : null}
+      </div>
 
       {!doc && state.phase !== 'uploading' && slot.editable ? (
         <div className="px-4 pb-4 sm:px-5">
@@ -265,29 +307,33 @@ export function DocumentSlot({
 
       {doc ? (
         <div className="flex flex-wrap items-center gap-1 border-t border-line bg-surface-2 px-3 py-2 sm:px-4">
-          <Button variant="ghost" size="sm" onClick={() => void download()}>
-            Download
-          </Button>
-          {canRerun ? (
-            <Button variant="ghost" size="sm" loading={busy} onClick={() => void rerun()}>
-              Re-run check
-            </Button>
-          ) : null}
-          {slot.editable && (!live || stale) ? (
-            <label className="inline-flex h-8 cursor-pointer items-center rounded-md px-3 text-[13px] font-semibold text-text-2 transition-colors hover:bg-neutral-soft hover:text-text has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus">
-              Replace file
-              <input
-                type="file"
-                className="sr-only"
-                accept=".pdf,.png,.jpg,.jpeg,.txt"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) void start(file)
-                  e.target.value = ''
-                }}
-              />
-            </label>
-          ) : null}
+          {blocked ? (
+            slot.editable ? (
+              <>
+                <FilePick label="Upload a different copy" className={cn(buttonClasses('secondary', 'sm'), 'cursor-pointer')} onFile={(f) => void start(f)} />
+                <span className="px-2 text-[13px] text-text-3">PDF recommended, up to 10 MB</span>
+              </>
+            ) : null
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" disabled={scanning} onClick={() => void download()}>
+                Download
+              </Button>
+              {scanning ? <span className="px-2 text-[13px] text-text-3">Available after the security check</span> : null}
+              {canRerun ? (
+                <Button variant="ghost" size="sm" loading={busy} onClick={() => void rerun()}>
+                  Re-run check
+                </Button>
+              ) : null}
+              {slot.editable && (!live || stale) && !scanning ? (
+                <FilePick
+                  label="Replace file"
+                  className="inline-flex h-8 cursor-pointer items-center rounded-md px-3 text-[13px] font-semibold text-text-2 transition-colors hover:bg-neutral-soft hover:text-text"
+                  onFile={(f) => void start(f)}
+                />
+              ) : null}
+            </>
+          )}
           {slot.editable && canDelete ? (
             <Button variant="ghost" size="sm" className="ml-auto text-text-3" onClick={() => setConfirmDelete(true)}>
               Remove

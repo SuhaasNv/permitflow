@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
-import { downloadLicence } from '@/api/documents'
+import { downloadLicence, scanMessage } from '@/api/documents'
 import { Alert } from '@/features/shared/Alert'
 import { Button, buttonClasses } from '@/features/shared/Button'
 import { TextAreaField } from '@/features/shared/Controls'
@@ -17,6 +17,7 @@ import { CompletionCard } from './CompletionCard'
 import { FeedbackNotice, targetHref } from './FeedbackNotice'
 import { ClarificationNotice } from './ClarificationNotice'
 import { SiteVisitCard } from './SiteVisitCard'
+import { scanGateReason } from './scanGate'
 import { applicationKeys, useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
 
 const ArrowIcon = (
@@ -46,6 +47,11 @@ export function ApplicationPage() {
   const [confirm, setConfirm] = useState(false)
   /** A 409 means the application moved under us (the officer decided, another tab acted): reload, never show the raw reason. */
   const explainConflict = (e: Error, title: string) => {
+    if (e instanceof AppError && e.status === 409 && scanMessage(e)) {
+      toast.push({ title, body: scanMessage(e) ?? e.message, tone: 'error' })
+      void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(id) })
+      return
+    }
     if (e instanceof AppError && e.status === 409) {
       toast.push({ title, body: 'This application changed since you opened it. Showing the latest.', tone: 'error' })
       void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(id) })
@@ -99,6 +105,7 @@ export function ApplicationPage() {
     })
   }
 
+  const gate = scanGateReason(view.document_slots, view.resubmit ? 'Resubmit' : 'Review and submit')
   const withdrawn = view.withdrawal_reason !== null || view.status_label === 'Withdrawn'
   const untouched = view.completeness.percent === 0 && view.completeness.documents_present === 0
   const doDelete = () => {
@@ -140,16 +147,22 @@ export function ApplicationPage() {
                   Respond to feedback
                 </Link>
               ) : null}
-              <Button disabled={!view.resubmit?.can_resubmit} title={view.resubmit?.reason ?? undefined} onClick={() => setConfirm(true)}>
+              <Button disabled={!view.resubmit?.can_resubmit || gate !== null} title={gate ?? view.resubmit?.reason ?? undefined} onClick={() => setConfirm(true)}>
                 Resubmit
               </Button>
             </>
           ) : view.can_edit ? (
             <>
               {view.can_submit ? (
-                <Link to={`/app/applications/${id}/review`} className={buttonClasses('secondary')}>
-                  Review and submit
-                </Link>
+                gate ? (
+                  <Button variant="secondary" disabled title={gate}>
+                    Review and submit
+                  </Button>
+                ) : (
+                  <Link to={`/app/applications/${id}/review`} className={buttonClasses('secondary')}>
+                    Review and submit
+                  </Link>
+                )
               ) : null}
               <Link to={`/app/applications/${id}/form${nextSection ? `/${nextSection.key}` : ''}`} className={buttonClasses('primary')}>
                 {view.completeness.percent === 0 ? 'Start application' : 'Continue application'}
@@ -228,6 +241,7 @@ export function ApplicationPage() {
                 ? `Not changed yet: ${view.resubmit.untouched_targets.join(', ')}. You can resubmit now or keep editing.`
                 : 'Every flagged item has been changed. Press Resubmit to send your changes back to the licensing office.'
               : view.resubmit.reason}
+            {gate ? <span className="mt-1 block font-medium">{gate}</span> : null}
           </Alert>
         </div>
       ) : null}

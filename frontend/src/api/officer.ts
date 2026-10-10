@@ -1,6 +1,7 @@
 import type { ChecklistSummary } from './checklist'
 import type { ClarificationOfficerView } from './clarification'
 import { request } from './client'
+import type { ScanState } from './documents'
 import type { SiteVisitOfficer } from './siteVisit'
 import type { Tone } from '@/features/shared/StatusBadge'
 
@@ -75,6 +76,9 @@ export interface OfficerDocument {
   uploaded_at: string
   in_current_revision: boolean
   verification: OfficerVerification | null
+  /** US-099: null, scanning, clean or infected; active_content flags a PDF that can run things when opened. */
+  scan_state?: ScanState
+  active_content?: boolean
 }
 
 export interface Revision {

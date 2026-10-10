@@ -26,6 +26,38 @@ export interface DocumentView {
   uploaded_at: string
   replaces_filename: string | null
   verification: VerificationView | null
+  /** US-099: null (stored with the scan off), scanning, clean or infected. Only null and clean can be opened. */
+  scan_state?: ScanState
+}
+
+export type ScanState = 'scanning' | 'clean' | 'infected' | null
+
+export const BLOCKED_MESSAGE = 'This file was blocked by the security check. Upload a different copy.'
+
+/** One wording per scan error code (US-099). file_infected on a download is worded by the server for the reader's role. */
+const SCAN_MESSAGES: Record<string, string> = {
+  file_infected: BLOCKED_MESSAGE,
+  file_scanning: 'This file is still being scanned. Try again in a moment.',
+  scanner_unavailable: 'The security check is not available right now. Try again in a moment.',
+  documents_not_clear: 'Review and submit opens when no document is blocked or being scanned.',
+}
+
+/** The clear message for a scan error code, or null when the error is not one of them. */
+export function scanMessage(error: unknown): string | null {
+  return error instanceof AppError ? (SCAN_MESSAGES[error.code] ?? null) : null
+}
+
+/** The failure of a direct download: the server's code decides the wording, the status is the fallback. */
+export async function downloadError(res: Response, fallback: string): Promise<AppError> {
+  let body: ApiErrorBody['error'] | undefined
+  try {
+    body = ((await res.json()) as ApiErrorBody).error
+  } catch {
+    body = undefined
+  }
+  const code = body?.code ?? 'http_error'
+  const message = code === 'file_infected' && body ? body.message : (SCAN_MESSAGES[code] ?? fallback)
+  return new AppError(res.status, { code, message })
 }
 
 export interface UploadResult {
@@ -125,10 +157,7 @@ export async function downloadDocument(applicationId: string, documentId: string
   })
   if (!res.ok) {
     if (res.status === 401) notifyUnauthorized()
-    throw new AppError(res.status, {
-      code: 'http_error',
-      message: res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.',
-    })
+    throw await downloadError(res, res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.')
   }
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)

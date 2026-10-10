@@ -93,6 +93,38 @@ function CheckProgress({ status }: { status: 'pending' | 'running' }) {
   )
 }
 
+/** US-099: the virus scan's own block, beside the document check once the file is clean, alone while it scans. */
+export function SecurityCheck({ scanning }: { scanning: boolean }) {
+  return (
+    <div className="pf-enter-fast flex gap-3 border-t border-line px-4 py-4 sm:px-5" data-scan={scanning ? 'scanning' : 'clean'}>
+      <span
+        className={cn(
+          'mt-px flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
+          scanning ? TINT.running : TINT.verified,
+        )}
+      >
+        <Icon kind={scanning ? 'running' : 'verified'} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-sm font-semibold">{scanning ? 'Scanning for viruses' : 'No virus found'}</span>
+          <span className="text-xs text-text-3">Security check</span>
+        </div>
+        <div className="mt-0.5 text-[13px] leading-[19px] text-text-2">
+          {scanning
+            ? 'Every file is scanned for viruses before anyone can open it. You can leave this page; the check carries on.'
+            : 'The file can be opened.'}
+        </div>
+        {scanning ? (
+          <div className="mt-2 text-[13px] leading-[19px] text-text-3">
+            Next: the document check, which starts when the security check passes.
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 /** Operator-facing verification result: state, plain explanation, issues, what to do. No confidence numbers. */
 export function VerificationBlock({ verification, stale = false }: { verification: VerificationView; stale?: boolean }) {
   const copy = COPY[verification.status]

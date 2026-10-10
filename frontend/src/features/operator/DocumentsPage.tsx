@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 
 import type { ApplicationView } from '@/api/applications'
 import { AppError } from '@/api/client'
-import { buttonClasses } from '@/features/shared/Button'
+import { Button, buttonClasses } from '@/features/shared/Button'
+import { StatusBadge } from '@/features/shared/StatusBadge'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
 import { cn } from '@/lib/cn'
 import { ApplicationHeader } from './ApplicationHeader'
@@ -11,6 +12,7 @@ import { DocumentSlot } from './documents/DocumentSlot'
 import { FeedbackNotice } from './FeedbackNotice'
 import { StorageRoom } from '@/features/shared/StorageRoom'
 import { applicationKeys, useApplication } from './queries'
+import { scanGateReason } from './scanGate'
 
 export function DocumentsPage() {
   const { id = '' } = useParams()
@@ -45,6 +47,8 @@ export function DocumentsPage() {
   const c = view.completeness
   const canDelete = view.revision_count === 0 && view.can_edit
   const base = `/app/applications/${id}`
+  const gate = scanGateReason(view.document_slots, view.resubmit ? 'Resubmit' : 'Review and submit')
+  const blockedOrScanning = view.document_slots.filter((sl) => sl.document?.scan_state === 'infected' || sl.document?.scan_state === 'scanning')
 
   return (
     <>
@@ -62,14 +66,19 @@ export function DocumentsPage() {
               <Link to={`${base}/form`} className={buttonClasses('secondary')}>
                 Back to form
               </Link>
-              <Link to={view.resubmit ? base : `${base}/review`} className={buttonClasses('primary')}>
-                {view.resubmit ? (view.resubmit.can_resubmit ? 'Go to resubmit' : 'Back to application') : 'Review and submit'}
-              </Link>
+              {gate ? (
+                <Button disabled>{view.resubmit ? 'Go to resubmit' : 'Review and submit'}</Button>
+              ) : (
+                <Link to={view.resubmit ? base : `${base}/review`} className={buttonClasses('primary')}>
+                  {view.resubmit ? (view.resubmit.can_resubmit ? 'Go to resubmit' : 'Back to application') : 'Review and submit'}
+                </Link>
+              )}
             </>
           ) : undefined
         }
       />
 
+      {gate && view.can_edit ? <p className="mb-6 text-sm text-text-2">{gate}</p> : null}
       {view.feedback.length > 0 ? (
         <div className="mb-6">
           <FeedbackNotice view={view} compact />
@@ -96,7 +105,7 @@ export function DocumentsPage() {
             <div className="flex items-baseline justify-between px-5 pt-4">
               <h2 className="text-[15px] font-semibold">Required documents</h2>
               <span className="font-mono text-sm tabular-nums text-text-2">
-                {c.documents_present}/{c.documents_total}
+                {c.documents_present - blockedOrScanning.length}/{c.documents_total}
               </span>
             </div>
             <ul className="mt-2 divide-y divide-line px-5 pb-2">
@@ -105,11 +114,11 @@ export function DocumentsPage() {
                   <span
                     className={cn(
                       'flex h-[18px] w-[18px] items-center justify-center rounded-full transition-colors duration-[var(--dur-base)]',
-                      slot.present ? 'bg-success text-white' : 'border-[1.5px] border-line-strong',
+                      slot.present && !blockedOrScanning.includes(slot) ? 'bg-success text-white' : 'border-[1.5px] border-line-strong',
                     )}
                     aria-hidden="true"
                   >
-                    {slot.present ? (
+                    {slot.present && !blockedOrScanning.includes(slot) ? (
                       <svg
                         width="10"
                         height="10"
@@ -125,10 +134,21 @@ export function DocumentsPage() {
                     ) : null}
                   </span>
                   <span className="min-w-0 flex-1 break-words">{slot.label}</span>
-                  <span className="text-xs text-text-3">{slot.present ? 'Uploaded' : 'Missing'}</span>
+                  {slot.document?.scan_state === 'infected' ? (
+                    <StatusBadge label="Blocked" tone="error" />
+                  ) : slot.document?.scan_state === 'scanning' ? (
+                    <StatusBadge label="Scanning" tone="info" live />
+                  ) : (
+                    <span className="text-xs text-text-3">{slot.present ? 'Uploaded' : 'Missing'}</span>
+                  )}
                 </li>
               ))}
             </ul>
+            {blockedOrScanning.some((sl) => sl.document?.scan_state === 'infected') ? (
+              <p className="px-5 pb-4 text-[13px] leading-[19px] text-text-2">
+                A blocked file does not count. Upload a different copy to continue.
+              </p>
+            ) : null}
           </section>
           <div className="px-1 text-[13px] leading-[19px] text-text-2">
             <div className="mb-1.5 font-semibold text-text">About the automatic check</div>

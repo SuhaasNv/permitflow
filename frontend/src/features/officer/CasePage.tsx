@@ -297,6 +297,7 @@ export function OfficerCasePage() {
   if (schema.isError) return <ErrorPanel error={schema.error} onRetry={() => void schema.refetch()} />
 
   const view = app.data
+  const scanCount = (state: string) => view.documents.filter((d) => d.scan_state === state).length
   // Anything but Verified or still checking: the same set the queue counts as "to check".
   const unresolvedChecks = view.verification_summary.issues_found + view.verification_summary.needs_review + view.verification_summary.other
   const targets: Target[] = [
@@ -484,6 +485,8 @@ export function OfficerCasePage() {
               </h2>
               <span className="text-xs text-text-3">
                 {view.documents.length} attached
+                {scanCount('infected') ? ` · ${scanCount('infected')} blocked` : ''}
+                {scanCount('scanning') ? ` · ${scanCount('scanning')} scanning` : ''}
                 {view.missing_document_types.length ? ` · ${view.missing_document_types.length} missing` : ''}
               </span>
             </div>
@@ -491,7 +494,12 @@ export function OfficerCasePage() {
               {view.documents.map((d, i) => (
                 <li key={d.id} id={`target-document-${d.document_type}`} className="scroll-mt-24 px-5 py-5 sm:px-7">
                   <div className="flex items-start gap-3.5">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-ink text-white">
+                    <span
+                      className={cn(
+                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
+                        d.scan_state === 'infected' ? 'bg-surface-3 text-text-2' : 'bg-ink text-white',
+                      )}
+                    >
                       <svg
                         width="16"
                         height="16"
@@ -511,6 +519,9 @@ export function OfficerCasePage() {
                       <div className="flex flex-wrap items-baseline gap-x-2">
                         <span className="font-mono text-xs text-text-3">0{i + 1}</span>
                         <h3 className="text-[15px] font-semibold leading-[22px]">{d.label}</h3>
+                        {d.scan_state === 'clean' ? <StatusBadge label="Scan clean" tone="success" /> : null}
+                        {d.scan_state === 'scanning' ? <StatusBadge label="Scanning" tone="info" live /> : null}
+                        {d.scan_state === 'infected' ? <StatusBadge label="Blocked" tone="error" /> : null}
                         {!d.in_current_revision ? <StatusBadge label="Uploaded after submission" tone="info" /> : null}
                         {openFor('document', d.document_type).length ? (
                           <StatusBadge label={`${openFor('document', d.document_type).length} open feedback`} tone="warning" />
@@ -524,19 +535,42 @@ export function OfficerCasePage() {
                         {formatDateTime(d.uploaded_at)}
                       </div>
                     </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        void downloadDocument(id, d.id, d.original_filename).catch((e: unknown) =>
-                          toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
-                        )
-                      }
-                    >
-                      Open
-                    </Button>
+                    {d.scan_state === 'infected' ? null : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={d.scan_state === 'scanning'}
+                        onClick={() =>
+                          void downloadDocument(id, d.id, d.original_filename).catch((e: unknown) =>
+                            toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                          )
+                        }
+                      >
+                        Open
+                      </Button>
+                    )}
                   </div>
-                  {d.verification ? (
+                  {d.scan_state === 'infected' ? (
+                    <div className="mt-4">
+                      <Alert tone="error" title="Blocked, no download">
+                        The security scan found a virus. The file is quarantined: it cannot be opened or downloaded. The operator is told to
+                        upload a different copy. Treat this document as not provided until a clean copy arrives.
+                      </Alert>
+                    </div>
+                  ) : d.scan_state === 'scanning' ? (
+                    <p className="mt-4 text-[13px] leading-[19px] text-text-3">
+                      Not available to open yet. It opens when the security scan finishes. The document check starts after that.
+                    </p>
+                  ) : null}
+                  {d.active_content && d.scan_state !== 'infected' ? (
+                    <div className="mt-4">
+                      <Alert tone="warning" title="This PDF contains active content">
+                        It passed the virus scan, but it can run things when it is opened: an automatic action with a script, a launch
+                        action or an embedded file. Open it only in a viewer that blocks scripts, or ask the operator for a flattened copy.
+                      </Alert>
+                    </div>
+                  ) : null}
+                  {d.verification && d.scan_state !== 'infected' && d.scan_state !== 'scanning' ? (
                     <div className="mt-4 rounded-md border border-line bg-surface-2 px-4 py-3.5">
                       <CheckResult verification={d.verification} />
                       {!readOnly &&

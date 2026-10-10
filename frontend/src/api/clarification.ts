@@ -1,6 +1,7 @@
 import type { StorageView } from './applications'
-import { API_URL, AppError, notifyUnauthorized, request } from './client'
-import { uploadToken, uploadWithProgress } from './documents'
+import { API_URL, notifyUnauthorized, request } from './client'
+import type { ScanState } from './documents'
+import { downloadError, uploadToken, uploadWithProgress } from './documents'
 
 export interface ClarificationRequest {
   id: string
@@ -15,6 +16,8 @@ export interface ClarificationAttachment {
   content_type: string
   size_bytes: number
   uploaded_at: string
+  /** US-099: null (stored with the scan off), scanning, clean or infected. A blocked file cannot be opened. */
+  scan_state?: ScanState
 }
 
 export interface ClarificationResponse {
@@ -107,10 +110,7 @@ export async function downloadAttachment(applicationId: string, attachmentId: st
   })
   if (!res.ok) {
     if (res.status === 401) notifyUnauthorized()
-    throw new AppError(res.status, {
-      code: 'http_error',
-      message: res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.',
-    })
+    throw await downloadError(res, res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.')
   }
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)
