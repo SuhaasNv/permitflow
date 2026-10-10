@@ -17,7 +17,6 @@ import { ClarificationPage } from './ClarificationPage'
 import { DocumentsPage } from './DocumentsPage'
 import { DocumentSlot } from './documents/DocumentSlot'
 import { ReviewPage } from './ReviewPage'
-import { scanGateReason } from './scanGate'
 
 const BLOCKED = 'This file was blocked by the security check. Upload a different copy.'
 
@@ -81,6 +80,17 @@ describe('operator document slot by scan state (US-099, artboard 2a)', () => {
     expect(screen.getByText('Replace file')).toBeInTheDocument()
   })
 
+  it('a clean file says when it was scanned, in Singapore time', () => {
+    const slot = scanned('floor_plan', 'clean')
+    renderSlot({ ...slot, document: { ...slot.document!, scanned_at: '2026-10-10T06:02:00Z' } })
+    expect(screen.getByText('Scanned 10 Oct, 14:02. The file can be opened.')).toBeInTheDocument()
+  })
+
+  it('a clean file without a scan time still reads The file can be opened.', () => {
+    renderSlot(scanned('floor_plan', 'clean'))
+    expect(screen.getByText('The file can be opened.')).toBeInTheDocument()
+  })
+
   it('a null scan state (scan off) looks as before: no security block, no scan chip', () => {
     renderSlot(scanned('floor_plan', null))
     expect(screen.queryByText('Security check')).not.toBeInTheDocument()
@@ -110,17 +120,6 @@ describe('operator document slot by scan state (US-099, artboard 2a)', () => {
   })
 })
 
-describe('scanGateReason', () => {
-  it('names what holds the submit, counts each kind and is null when nothing does', () => {
-    const slots = [scanned('business_profile', 'clean'), scanned('floor_plan', 'scanning'), scanned('tenancy_agreement', 'infected')]
-    expect(scanGateReason(slots, 'Review and submit')).toBe(
-      'Review and submit opens when no document is blocked or being scanned. 1 blocked, 1 being scanned.',
-    )
-    expect(scanGateReason([slots[2]!], 'Review and submit')).toMatch(/\. 1 blocked\.$/)
-    expect(scanGateReason([scanned('a', 'clean'), scanned('b', null), scanned('c', undefined)], 'Review and submit')).toBeNull()
-  })
-})
-
 function renderRoutes(path: string) {
   return render(
     <AppProviders>
@@ -135,12 +134,16 @@ function renderRoutes(path: string) {
   )
 }
 
-const draft = (slots: DocumentSlotView[]) =>
+const HOLD = 'Review and submit opens when no document is blocked or being scanned.'
+
+/** What the backend sends: with a reason, can_submit is false. */
+const draft = (slots: DocumentSlotView[], reason: string | null = null) =>
   applicationView({
     status_label: 'Draft',
     status_tone: 'neutral',
     can_edit: true,
-    can_submit: true,
+    can_submit: reason === null,
+    submit_blocked_reason: reason,
     revision_count: 0,
     revisions: [],
     sections: [sectionView('business', { editable: true }), sectionView('premises', { editable: true })],
@@ -154,7 +157,7 @@ describe('Documents page and Review page with a blocked or scanning document (US
   })
 
   it('disables Review and submit with its reason and counts only the clear documents as ready', async () => {
-    vi.spyOn(appsApi, 'getApplication').mockResolvedValue(draft([scanned('business_profile', 'clean'), scanned('floor_plan', 'scanning')]))
+    vi.spyOn(appsApi, 'getApplication').mockResolvedValue(draft([scanned('business_profile', 'clean'), scanned('floor_plan', 'scanning')], `${HOLD} 1 being scanned.`))
     renderRoutes('/app/applications/app-1/documents')
     expect(await screen.findByText('Review and submit opens when no document is blocked or being scanned. 1 being scanned.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review and submit' })).toBeDisabled()
@@ -163,7 +166,7 @@ describe('Documents page and Review page with a blocked or scanning document (US
   })
 
   it('a blocked document adds the rail note and a Blocked chip', async () => {
-    vi.spyOn(appsApi, 'getApplication').mockResolvedValue(draft([scanned('business_profile', 'clean'), scanned('floor_plan', 'infected')]))
+    vi.spyOn(appsApi, 'getApplication').mockResolvedValue(draft([scanned('business_profile', 'clean'), scanned('floor_plan', 'infected')], `${HOLD} 1 blocked.`))
     renderRoutes('/app/applications/app-1/documents')
     expect(await screen.findByText('A blocked file does not count. Upload a different copy to continue.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review and submit' })).toBeDisabled()
@@ -178,10 +181,10 @@ describe('Documents page and Review page with a blocked or scanning document (US
   })
 
   it('the review page disables Submit with the reason and lists the held documents with their state', async () => {
-    vi.spyOn(appsApi, 'getApplication').mockResolvedValue(draft([scanned('business_profile', 'infected'), scanned('floor_plan', 'scanning')]))
+    vi.spyOn(appsApi, 'getApplication').mockResolvedValue(draft([scanned('business_profile', 'infected'), scanned('floor_plan', 'scanning')], `${HOLD} 1 blocked, 1 being scanned.`))
     renderRoutes('/app/applications/app-1/review')
     expect(await screen.findByRole('button', { name: 'Submit application' })).toBeDisabled()
-    expect(screen.getByText(/Submit application opens when no document is blocked or being scanned. 1 blocked, 1 being scanned./)).toBeInTheDocument()
+    expect(screen.getByText(`${HOLD} 1 blocked, 1 being scanned.`)).toBeInTheDocument()
     expect(screen.getByText('Blocked')).toBeInTheDocument()
     expect(screen.getByText('Scanning')).toBeInTheDocument()
   })

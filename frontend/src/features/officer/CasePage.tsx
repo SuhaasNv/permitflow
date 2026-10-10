@@ -553,7 +553,7 @@ export function OfficerCasePage() {
                   {d.scan_state === 'infected' ? (
                     <div className="mt-4">
                       <Alert tone="error" title="Blocked, no download">
-                        The security scan found a virus. The file is quarantined: it cannot be opened or downloaded. The operator is told to
+                        The security scan found a virus{d.scanned_at ? ` on ${formatDateTime(d.scanned_at)}` : ''}. The file is quarantined: it cannot be opened or downloaded. The operator is told to
                         upload a different copy. Treat this document as not provided until a clean copy arrives.
                       </Alert>
                     </div>

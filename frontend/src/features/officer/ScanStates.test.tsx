@@ -56,7 +56,14 @@ describe('officer documents by scan state (US-099, artboard 2b)', () => {
     expect(within(bad).queryByRole('button', { name: 'Open' })).not.toBeInTheDocument()
     expect(within(bad).getByText('Blocked, no download')).toBeInTheDocument()
     expect(within(bad).getByText(/cannot be opened or downloaded/)).toBeInTheDocument()
+    expect(within(bad).getByText(/found a virus\.|found a virus on/)).toBeInTheDocument()
     expect(screen.getByText(/3 attached/)).toHaveTextContent('3 attached · 1 blocked · 1 scanning')
+  })
+
+  it('the blocked alert says when the virus was found, in Singapore time', async () => {
+    renderWith([docOf('Bad', 'infected', { scanned_at: '2026-10-10T07:12:00Z' })])
+    const row = await rowOf('Bad')
+    expect(within(row).getByText(/The security scan found a virus on 10 Oct, 15:12\. The file is quarantined/)).toBeInTheDocument()
   })
 
   it('active content shows the note to the officer and Open stays available', async () => {

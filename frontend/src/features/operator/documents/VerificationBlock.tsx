@@ -1,6 +1,7 @@
 
 import type { VerificationView } from '@/api/documents'
 import { cn } from '@/lib/cn'
+import { formatDateTime } from '@/lib/format'
 
 type Kind = 'pending' | 'running' | 'verified' | 'issues' | 'review' | 'unreadable' | 'failed' | 'unavailable'
 
@@ -94,7 +95,7 @@ function CheckProgress({ status }: { status: 'pending' | 'running' }) {
 }
 
 /** US-099: the virus scan's own block, beside the document check once the file is clean, alone while it scans. */
-export function SecurityCheck({ scanning }: { scanning: boolean }) {
+export function SecurityCheck({ scanning, scannedAt }: { scanning: boolean; scannedAt?: string | null }) {
   return (
     <div className="pf-enter-fast flex gap-3 border-t border-line px-4 py-4 sm:px-5" data-scan={scanning ? 'scanning' : 'clean'}>
       <span
@@ -113,7 +114,7 @@ export function SecurityCheck({ scanning }: { scanning: boolean }) {
         <div className="mt-0.5 text-[13px] leading-[19px] text-text-2">
           {scanning
             ? 'Every file is scanned for viruses before anyone can open it. You can leave this page; the check carries on.'
-            : 'The file can be opened.'}
+            : `${scannedAt ? `Scanned ${formatDateTime(scannedAt)}. ` : ''}The file can be opened.`}
         </div>
         {scanning ? (
           <div className="mt-2 text-[13px] leading-[19px] text-text-3">

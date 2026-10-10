@@ -79,6 +79,7 @@ export interface OfficerDocument {
   /** US-099: null, scanning, clean or infected; active_content flags a PDF that can run things when opened. */
   scan_state?: ScanState
   active_content?: boolean
+  scanned_at?: string | null
 }
 
 export interface Revision {

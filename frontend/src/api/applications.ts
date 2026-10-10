@@ -86,6 +86,8 @@ export interface ApplicationView {
   status_explanation: string
   can_edit: boolean
   can_submit: boolean
+  /** US-099: why Review and submit is closed while a file is blocked or being scanned; shown as is. */
+  submit_blocked_reason?: string | null
   sections: SectionView[]
   document_slots: DocumentSlotView[]
   completeness: Completeness

@@ -17,7 +17,6 @@ import { CompletionCard } from './CompletionCard'
 import { FeedbackNotice, targetHref } from './FeedbackNotice'
 import { ClarificationNotice } from './ClarificationNotice'
 import { SiteVisitCard } from './SiteVisitCard'
-import { scanGateReason } from './scanGate'
 import { applicationKeys, useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
 
 const ArrowIcon = (
@@ -105,7 +104,6 @@ export function ApplicationPage() {
     })
   }
 
-  const gate = scanGateReason(view.document_slots, view.resubmit ? 'Resubmit' : 'Review and submit')
   const withdrawn = view.withdrawal_reason !== null || view.status_label === 'Withdrawn'
   const untouched = view.completeness.percent === 0 && view.completeness.documents_present === 0
   const doDelete = () => {
@@ -147,22 +145,20 @@ export function ApplicationPage() {
                   Respond to feedback
                 </Link>
               ) : null}
-              <Button disabled={!view.resubmit?.can_resubmit || gate !== null} title={gate ?? view.resubmit?.reason ?? undefined} onClick={() => setConfirm(true)}>
+              <Button disabled={!view.resubmit?.can_resubmit} title={view.resubmit?.reason ?? undefined} onClick={() => setConfirm(true)}>
                 Resubmit
               </Button>
             </>
           ) : view.can_edit ? (
             <>
               {view.can_submit ? (
-                gate ? (
-                  <Button variant="secondary" disabled title={gate}>
-                    Review and submit
-                  </Button>
-                ) : (
-                  <Link to={`/app/applications/${id}/review`} className={buttonClasses('secondary')}>
-                    Review and submit
-                  </Link>
-                )
+                <Link to={`/app/applications/${id}/review`} className={buttonClasses('secondary')}>
+                  Review and submit
+                </Link>
+              ) : view.submit_blocked_reason ? (
+                <Button variant="secondary" disabled title={view.submit_blocked_reason}>
+                  Review and submit
+                </Button>
               ) : null}
               <Link to={`/app/applications/${id}/form${nextSection ? `/${nextSection.key}` : ''}`} className={buttonClasses('primary')}>
                 {view.completeness.percent === 0 ? 'Start application' : 'Continue application'}
@@ -233,7 +229,9 @@ export function ApplicationPage() {
             title={
               view.resubmit.can_resubmit
                 ? `Ready to resubmit: ${changedTargets} of ${flaggedTargets} flagged ${flaggedTargets === 1 ? 'item' : 'items'} changed.`
-                : 'Nothing has changed yet.'
+                : changedTargets > 0
+                  ? 'Resubmit is on hold.'
+                  : 'Nothing has changed yet.'
             }
           >
             {view.resubmit.can_resubmit
@@ -241,7 +239,6 @@ export function ApplicationPage() {
                 ? `Not changed yet: ${view.resubmit.untouched_targets.join(', ')}. You can resubmit now or keep editing.`
                 : 'Every flagged item has been changed. Press Resubmit to send your changes back to the licensing office.'
               : view.resubmit.reason}
-            {gate ? <span className="mt-1 block font-medium">{gate}</span> : null}
           </Alert>
         </div>
       ) : null}

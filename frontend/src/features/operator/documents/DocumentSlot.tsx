@@ -281,7 +281,7 @@ export function DocumentSlot({
           <SecurityCheck scanning />
         ) : doc?.verification && doc.scan_state === 'clean' ? (
           <div className="grid xl:grid-cols-2 xl:divide-x xl:divide-line">
-            <SecurityCheck scanning={false} />
+            <SecurityCheck scanning={false} scannedAt={doc.scanned_at} />
             <VerificationBlock verification={doc.verification} stale={stale} />
           </div>
         ) : doc?.verification ? (

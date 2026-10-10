@@ -13,7 +13,6 @@ import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/sh
 import { ApplicationHeader } from './ApplicationHeader'
 import { CompletionCard } from './CompletionCard'
 import { SectionSummary } from './SectionSummary'
-import { scanGateReason } from './scanGate'
 import { applicationKeys, useApplication, useFormSchema, useSubmitApplication } from './queries'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -94,7 +93,6 @@ export function ReviewPage() {
   const missing =
     submitError?.status === 422 && Array.isArray(submitError.details?.missing) ? (submitError.details.missing as string[]) : []
 
-  const gate = scanGateReason(view.document_slots, 'Submit application')
   const notClear = submitError?.code === 'documents_not_clear'
 
   const doSubmit = () => {
@@ -213,10 +211,12 @@ export function ReviewPage() {
               </p>
             </div>
             <div className="flex flex-col gap-2 px-5 pb-5 pt-5">
-              <Button size="lg" disabled={!view.can_submit || gate !== null} loading={submit.isPending} onClick={() => setConfirm(true)}>
+              <Button size="lg" disabled={!view.can_submit} loading={submit.isPending} onClick={() => setConfirm(true)}>
                 Submit application
               </Button>
-              {gate ? <p className="text-[13px] leading-[19px] text-text-2">{gate}</p> : null}
+              {view.submit_blocked_reason ? (
+                <p className="text-[13px] leading-[19px] text-text-2">{view.submit_blocked_reason}</p>
+              ) : null}
               <Link
                 to="/app/dashboard"
                 className="inline-flex h-10 items-center justify-center rounded-md text-sm font-semibold text-text-2 no-underline transition-colors hover:bg-neutral-soft hover:text-text"

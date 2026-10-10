@@ -28,6 +28,8 @@ export interface DocumentView {
   verification: VerificationView | null
   /** US-099: null (stored with the scan off), scanning, clean or infected. Only null and clean can be opened. */
   scan_state?: ScanState
+  /** When the verdict (clean or infected) landed; null while scanning or when the scan never ran. */
+  scanned_at?: string | null
 }
 
 export type ScanState = 'scanning' | 'clean' | 'infected' | null
