@@ -6,7 +6,7 @@
  ],
  "timezone": "Asia/Singapore",
  "schemaVersion": 39,
- "version": 2,
+ "version": 3,
  "editable": false,
  "refresh": "30s",
  "time": {
@@ -2227,6 +2227,494 @@
     }
    },
    "description": "requeued: a worker died or hung and the check went back to the queue. dead: it had been claimed three times and was given up on."
+  },
+  {
+   "id": 106,
+   "type": "row",
+   "title": "What did each check cost? By document type and outcome (US-100)",
+   "gridPos": {
+    "x": 0,
+    "y": 109,
+    "w": 24,
+    "h": 1
+   },
+   "collapsed": false
+  },
+  {
+   "id": 71,
+   "type": "stat",
+   "title": "Recorded cost in the range",
+   "gridPos": {
+    "x": 0,
+    "y": 110,
+    "w": 6,
+    "h": 5
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(increase(permitflow_ai_cost_usd_total{environment=~\"$environment\"}[$__range]))",
+     "legendFormat": "Recorded cost in the range",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "currencyUSD",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "green"
+     },
+     "decimals": 4
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "justifyMode": "center"
+   }
+  },
+  {
+   "id": 72,
+   "type": "stat",
+   "title": "Checks recorded in the range",
+   "gridPos": {
+    "x": 6,
+    "y": 110,
+    "w": 6,
+    "h": 5
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(increase(permitflow_ai_checks_total{environment=~\"$environment\"}[$__range]))",
+     "legendFormat": "Checks recorded in the range",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "purple"
+     },
+     "decimals": 0
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "justifyMode": "center"
+   }
+  },
+  {
+   "id": 73,
+   "type": "stat",
+   "title": "Average cost per check",
+   "gridPos": {
+    "x": 12,
+    "y": 110,
+    "w": 6,
+    "h": 5
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(increase(permitflow_ai_cost_usd_total{environment=~\"$environment\"}[$__range])) / sum(increase(permitflow_ai_checks_total{environment=~\"$environment\"}[$__range]))",
+     "legendFormat": "Average cost per check",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "currencyUSD",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "green"
+     },
+     "decimals": 5
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "justifyMode": "center"
+   }
+  },
+  {
+   "id": 74,
+   "type": "stat",
+   "title": "Tokens in the range",
+   "gridPos": {
+    "x": 18,
+    "y": 110,
+    "w": 6,
+    "h": 5
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(increase(permitflow_ai_tokens_total{environment=~\"$environment\"}[$__range]))",
+     "legendFormat": "Tokens in the range",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "purple"
+     },
+     "decimals": 0
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "justifyMode": "center"
+   }
+  },
+  {
+   "id": 75,
+   "type": "timeseries",
+   "title": "Cost per hour, by document type (USD)",
+   "gridPos": {
+    "x": 0,
+    "y": 115,
+    "w": 12,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (document_type) (increase(permitflow_ai_cost_usd_total{environment=~\"$environment\"}[1h]))",
+     "legendFormat": "{{document_type}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "currencyUSD",
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 35,
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "description": "From the AI usage record: tokens times the price of the model in force when each check ran. Mock and refused checks cost 0. Counted where the check runs: with VERIFICATION_MODE=worker, the worker's own /metrics must be scraped."
+  },
+  {
+   "id": 76,
+   "type": "timeseries",
+   "title": "Cost per hour, by outcome (USD)",
+   "gridPos": {
+    "x": 12,
+    "y": 115,
+    "w": 12,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (outcome) (increase(permitflow_ai_cost_usd_total{environment=~\"$environment\"}[1h]))",
+     "legendFormat": "{{outcome}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "currencyUSD",
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 35,
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "description": "Where the money went: a check that failed or found nothing readable still cost what the model billed."
+  },
+  {
+   "id": 77,
+   "type": "timeseries",
+   "title": "Checks per hour, by document type",
+   "gridPos": {
+    "x": 0,
+    "y": 122,
+    "w": 12,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (document_type) (increase(permitflow_ai_checks_total{environment=~\"$environment\"}[1h]))",
+     "legendFormat": "{{document_type}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 35,
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
+  },
+  {
+   "id": 78,
+   "type": "bargauge",
+   "title": "Average cost per check in the range, by document type (USD)",
+   "gridPos": {
+    "x": 12,
+    "y": 122,
+    "w": 12,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (document_type) (increase(permitflow_ai_cost_usd_total{environment=~\"$environment\"}[$__range])) / sum by (document_type) (increase(permitflow_ai_checks_total{environment=~\"$environment\"}[$__range]))",
+     "legendFormat": "{{document_type}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "currencyUSD",
+     "decimals": 5
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "orientation": "horizontal",
+    "displayMode": "gradient"
+   }
+  },
+  {
+   "id": 79,
+   "type": "timeseries",
+   "title": "Tokens per hour, by document type",
+   "gridPos": {
+    "x": 0,
+    "y": 129,
+    "w": 12,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (document_type) (increase(permitflow_ai_tokens_total{environment=~\"$environment\"}[1h]))",
+     "legendFormat": "{{document_type}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 35,
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
+  },
+  {
+   "id": 80,
+   "type": "timeseries",
+   "title": "Tokens per hour, by outcome",
+   "gridPos": {
+    "x": 12,
+    "y": 129,
+    "w": 12,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (outcome) (increase(permitflow_ai_tokens_total{environment=~\"$environment\"}[1h]))",
+     "legendFormat": "{{outcome}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 35,
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
   }
  ],
  "templating": {
