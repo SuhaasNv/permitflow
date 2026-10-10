@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-099 CI, EICAR against a real clamd (10 Oct 2026, `ci/clamav-eicar`, not merged)
+
+- The backend job runs a ClamAV service container (`clamav/clamav:1.5.4-debian`, pinned by digest), waits up to 10 minutes for `PING`/`PONG`, then runs the EICAR test with `CLAMD_HOST` set and fails if it is skipped. Needs the US-099 backend branch.
+
 ## US-111, build once and promote (10 Oct 2026, `feat/us-111-build-once-promote`, not merged)
 
 - The version is read at run time (backend `APP_VERSION`, frontend `appVersion` in `config.js`); CI builds once per commit, a candidate tag names that commit's dev image by digest, and the push to `main` and the release tag promote the last candidate's images instead of rebuilding (ADR-019); the release guard counts `RELEASE_NOTES.md` as shipped and checks the candidate carries the release section; What's new hides sections newer than the running version; `deploy.yml` takes the release version for production. `RELEASING.md` and `OPERATIONS.md` describe the flow.

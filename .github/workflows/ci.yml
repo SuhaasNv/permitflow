@@ -31,6 +31,11 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U permitflow -d permitflow_test"
           --health-interval 5s --health-timeout 3s --health-retries 10
+      # Loads ~1.2 GiB of signatures for a few minutes after start. No health-cmd on purpose: the job
+      # would wait for it before the first step; the wait step below polls instead (US-099).
+      clamav:
+        image: clamav/clamav:1.5.4-debian@sha256:9bb8712a50f0e75166e936c452cd82dd5e5be0b85586598930b5bbb84a99a578
+        ports: ["3310:3310"]
     env:
       APP_ENV: test
       TEST_DATABASE_URL: postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow_test
@@ -51,6 +56,22 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy
       - run: uv run pytest --cov=app --cov-report=term --cov-report=xml --cov-fail-under=80
+      - name: Wait for clamd
+        run: |
+          for _ in $(seq 120); do
+            reply=$(timeout 5 bash -c "exec 3<>/dev/tcp/localhost/3310; echo PING >&3; read -r r <&3; echo \$r" 2>/dev/null || true)
+            [ "$reply" = PONG ] && exit 0
+            sleep 5
+          done
+          echo '::error::clamd did not answer PING within 10 minutes' && exit 1
+      - name: EICAR against a real clamd
+        env:
+          CLAMD_HOST: localhost
+          CLAMD_PORT: "3310"
+        run: |
+          # exactly one pass; a skip (CLAMD_HOST ignored) must fail the job
+          uv run pytest tests/integration/test_virus_scan.py -k eicar -rs | tee eicar.log
+          grep -qE '^1 passed' eicar.log
       - name: Coverage summary
         if: always()
         run: |

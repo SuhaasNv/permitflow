@@ -146,4 +146,6 @@ The E2E test signs in with the seeded `operator@permitflow.example.sg` and `offi
 
 Playwright runs in CI (US-006): the `e2e` job starts Postgres, the migrated and seeded backend on the mock provider, and a production build served by `vite preview`, then runs every spec; the report is uploaded on failure.
 
+The backend CI job also runs a ClamAV service container (`clamav/clamav:1.5.4-debian`) and, with `CLAMD_HOST` set, the EICAR test in `test_virus_scan.py` against the real scanner (US-099); the job fails if that test is skipped instead of passing. Locally the test skips unless `CLAMD_HOST` is set.
+
 A story is not Done until its tests exist and are green at every layer it touches (`../05-planning/DEFINITION_OF_DONE.md`, "Tests"). Every endpoint added in Sprint 2 shipped with an authorization test in the same commit.
