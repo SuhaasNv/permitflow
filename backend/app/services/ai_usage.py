@@ -42,6 +42,7 @@ from app.infra.db import session_factory
 from app.models import AiUsage, Document, VerificationRun
 from app.models.enums import VerificationStatus
 from app.repositories.ai_usage import AiUsageRepository, UsageFilters, UsageRow, UsageTotals
+from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.schemas.ai_usage import AiUsageOut, AiUsageRowOut, AiUsageTodayOut, AiUsageTotalsOut
 from app.services.admin_feed import decode_cursor, encode_cursor
@@ -51,6 +52,13 @@ from app.services.quotas import NOT_COUNTED_REASONS
 logger = logging.getLogger("permitflow.ai_usage")
 
 MAX_LIMIT = 100
+# The export is bounded: this many rows, each statement within this time.
+CSV_MAX_ROWS = 100_000
+CSV_STATEMENT_TIMEOUT = "60s"
+CSV_CUT_NOTICE = (
+    "Export cut at {rows} rows. "
+    "Narrow it with from, to, user_id, application_id or reference and export again."
+)
 
 
 def record_usage(
@@ -68,10 +76,12 @@ def record_usage(
     """Add the usage row of a run to `db`; the caller commits it with the run's result."""
     repo = AiUsageRepository(db)
     now = datetime.now(UTC)
+    # The price in force when the check ran: when it started, or when it was created if it never started.
+    ran_at = run.started_at or run.created_at or now
     cost = Decimal(0)
     price_id: uuid.UUID | None = None
     if model and (input_tokens or output_tokens):
-        price = repo.price_at(model, now)
+        price = repo.price_at(model, ran_at)
         if price is None:
             logger.warning("ai_price_missing", extra={"extra_fields": {"model": model}})
         else:
@@ -97,13 +107,13 @@ def record_usage(
     )
 
 
-def record_refused(db: Session, run: VerificationRun, doc: Document) -> None:
+def record_refused(db: Session, run: VerificationRun, doc: Document) -> AiUsage | None:
     """A run stored already finished at creation (over a quota, or the AI paused): it never reaches the
-    provider, so it has a row of zeros and its outcome. A pending run is recorded when its result is."""
+    provider, so it has a row of zeros and its outcome. A pending run is recorded when its result is. The
+    caller commits, then calls `publish` with the row: nothing is counted for a rolled-back transaction."""
     if run.status == VerificationStatus.PENDING:
-        return
-    row = record_usage(db, run=run, doc=doc, outcome=run.status, provider=run.provider, model=None)
-    publish(row, None, announce=False)
+        return None
+    return record_usage(db, run=run, doc=doc, outcome=run.status, provider=run.provider, model=None)
 
 
 def record_ended_runs(db: Session, run_ids: list[uuid.UUID]) -> list[AiUsage]:
@@ -131,15 +141,17 @@ def record_ended_runs(db: Session, run_ids: list[uuid.UUID]) -> list[AiUsage]:
 
 
 def publish(row: AiUsage, reference_no: str | None, *, announce: bool) -> None:
-    """After the commit: the counters, then (for a check that ran, with the switch on) the Telegram line.
-    Labels come from the closed vocabularies; an id or a free-form string never reaches a metric."""
+    """After the commit: the counters, then the Telegram line when `announce` is set, the switch is on and
+    the check reached a provider. A check that never did (refused, paused, unreadable file, no provider
+    configured, ended by the system) gets no line, wherever it stopped. Labels come from the closed
+    vocabularies; an id or a free-form string never reaches a metric."""
     doc_type = bounded_label(row.document_type, DOCUMENT_TYPE_LABELS)
     outcome = bounded_label(row.outcome, OUTCOME_LABELS)
     metrics.AI_CHECKS.labels(doc_type, outcome).inc()
     metrics.AI_TOKENS.labels(doc_type, outcome, "input").inc(row.input_tokens)
     metrics.AI_TOKENS.labels(doc_type, outcome, "output").inc(row.output_tokens)
     metrics.AI_COST.labels(doc_type, outcome).inc(float(row.cost_usd))
-    if not announce:
+    if not announce or row.provider == "none":
         return
     try:
         if live().bool_value("telegram_per_check_messages"):
@@ -154,6 +166,13 @@ def publish(row: AiUsage, reference_no: str | None, *, announce: bool) -> None:
             )
     except Exception:  # noqa: BLE001 - an announcement never fails a check that is already committed
         logger.exception("ai_usage_announce_failed")
+
+
+def count_unrecorded(tokens: tuple[int, int]) -> None:
+    """Tokens billed for a result that was dropped (the lease changed hands, the draft was deleted): no row
+    holds them, so they are counted here and the ledger's undercount can be seen."""
+    metrics.AI_UNRECORDED_TOKENS.labels("input").inc(tokens[0])
+    metrics.AI_UNRECORDED_TOKENS.labels("output").inc(tokens[1])
 
 
 def trace_ids(user_id: uuid.UUID | None, application_id: uuid.UUID) -> dict[str, str]:
@@ -180,12 +199,17 @@ def filters_for(
     """Days are Singapore calendar days, both ends included (the same day as the admin overview)."""
     if day_from and day_to and day_from > day_to:
         raise BadRequest("The start day is after the end day.", details={"reason": "bad_range"})
+    try:  # the first and last days the calendar has do not fit in UTC with the offset applied
+        since = singapore_day_window(day_from)[0] if day_from else None
+        until = singapore_day_window(day_to)[1] if day_to else None
+    except (OverflowError, ValueError) as exc:
+        raise BadRequest("That day is outside the supported range.", details={"reason": "bad_range"}) from exc
     return UsageFilters(
         user_id=user_id,
         application_id=application_id,
         reference=reference or None,
-        since=singapore_day_window(day_from)[0] if day_from else None,
-        until=singapore_day_window(day_to)[1] if day_to else None,
+        since=since,
+        until=until,
     )
 
 
@@ -256,9 +280,12 @@ class AiUsageService:
         )
 
 
-def csv_stream(f: UsageFilters) -> Iterator[str]:
+def csv_stream(f: UsageFilters, actor_id: uuid.UUID) -> Iterator[str]:
     """The export, one CSV line at a time, from a session of its own: the streaming response outlives the
-    request's session. Every cell is formula-safe."""
+    request's session. Every cell is formula-safe. At most `CSV_MAX_ROWS` rows: when more match, the file ends
+    with a line saying it was cut and how to narrow it. Every statement is capped at `CSV_STATEMENT_TIMEOUT`.
+    The export is audited (`admin.ai_usage_exported`: the filters and the row count, no names), also when the
+    reader goes away halfway."""
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\r\n")
 
@@ -270,29 +297,56 @@ def csv_stream(f: UsageFilters) -> Iterator[str]:
         return text
 
     yield line(list(CSV_COLUMNS))
+    rows = 0
+    cut = False
     with session_factory()() as db:
-        for r in AiUsageRepository(db).stream(f):
-            u = r.usage
-            yield line(
-                [
-                    csv_cell(c)
-                    for c in (
-                        u.created_at.astimezone(UTC).isoformat(),
-                        r.reference_no,
-                        r.business_name,
-                        u.application_id,
-                        u.document_id,
-                        u.run_id,
-                        u.user_id,
-                        r.user_name,
-                        u.document_type,
-                        u.provider,
-                        u.model,
-                        u.input_tokens,
-                        u.output_tokens,
-                        f"{u.cost_usd:f}",
-                        u.latency_ms,
-                        u.outcome,
-                    )
-                ]
+        repo = AiUsageRepository(db)
+        repo.limit_statement_time(CSV_STATEMENT_TIMEOUT)
+        try:
+            for r in repo.stream(f, limit=CSV_MAX_ROWS + 1):
+                if rows == CSV_MAX_ROWS:
+                    cut = True
+                    break
+                rows += 1
+                u = r.usage
+                yield line(
+                    [
+                        csv_cell(c)
+                        for c in (
+                            u.created_at.astimezone(UTC).isoformat(),
+                            r.reference_no,
+                            r.business_name,
+                            u.application_id,
+                            u.document_id,
+                            u.run_id,
+                            u.user_id,
+                            r.user_name,
+                            u.document_type,
+                            u.provider,
+                            u.model,
+                            u.input_tokens,
+                            u.output_tokens,
+                            f"{u.cost_usd:f}",
+                            u.latency_ms,
+                            u.outcome,
+                        )
+                    ]
+                )
+            if cut:
+                yield line([CSV_CUT_NOTICE.format(rows=CSV_MAX_ROWS)])
+        finally:
+            AuditRepository(db).record(
+                application_id=None,
+                actor_id=actor_id,
+                event_type="admin.ai_usage_exported",
+                payload={
+                    "user_id": str(f.user_id) if f.user_id else None,
+                    "application_id": str(f.application_id) if f.application_id else None,
+                    "reference": f.reference,
+                    "since": f.since.isoformat() if f.since else None,
+                    "until": f.until.isoformat() if f.until else None,
+                    "rows": rows,
+                    "cut": cut,
+                },
             )
+            db.commit()

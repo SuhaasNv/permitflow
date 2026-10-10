@@ -25,8 +25,8 @@ class AiPrice(Base):
 class AiUsage(Base):
     """One row per verification run: who ran it, on what, how many tokens, what it cost (US-100). Written
     in the transaction that stores the run's result. `run_id`, `document_id` and `application_id` are plain
-    columns, not foreign keys: deleting a draft removes its runs and documents, but money already spent
-    stays on the books."""
+    columns, not foreign keys: deleting a draft removes its runs and documents, but the row of a run that was
+    recorded stays. Tokens billed for a result that was dropped are not in any row (ADR-020)."""
 
     __tablename__ = "ai_usage"
     __table_args__ = (

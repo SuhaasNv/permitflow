@@ -36,7 +36,14 @@ from app.models import Application, Document, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
-from app.services.ai_usage import publish, record_ended_runs, record_refused, record_usage, trace_ids
+from app.services.ai_usage import (
+    count_unrecorded,
+    publish,
+    record_ended_runs,
+    record_refused,
+    record_usage,
+    trace_ids,
+)
 from app.services.applications import ApplicationService
 from app.services.platform_settings import live
 from app.services.quotas import AI_PAUSED_REASON, new_run
@@ -97,6 +104,7 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
         # checks cannot park every connection and starve the API. `_finish` opens a new one to write.
         db.commit()
         started = time.perf_counter()
+        provider: VerificationProvider | None = None
 
         try:
             data = b"".join(get_storage().open(doc.stored_key))
@@ -234,13 +242,16 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
             db.rollback()
             run = db.get(VerificationRun, run_id)
             if run is not None and run.status == VerificationStatus.RUNNING and run.worker_id == worker_id:
+                # A crash after the provider answered still cost what it billed: keep it on the row.
                 _finish(
                     db,
                     run,
                     app,
                     VerificationStatus.FAILED,
-                    provider="none",
+                    provider=provider.name if provider else "none",
+                    model=provider.model if provider else None,
                     error_reason=_reason(exc),
+                    tokens=_billed(provider) if provider else (0, 0),
                     started=started,
                 )
 
@@ -288,6 +299,7 @@ def _finish(
         # Log first: after the rollback `run.id` would reload a row that is gone if the draft was deleted.
         logger.warning("verification_result_dropped", extra={"extra_fields": {"run_id": str(run.id)}})
         db.rollback()
+        count_unrecorded(tokens)  # billed, but no row will hold them
         return
     run.lease_until = None
     run.status = status
@@ -330,7 +342,7 @@ def _finish(
     )
     db.commit()
     if usage is not None:
-        publish(usage, app.reference_no if app else None, announce=True)
+        publish(usage, app.reference_no if app else None, announce=provider != "none")
     metrics.VERIFICATION_RUNS.labels(status.value, provider).inc()
     metrics.VERIFICATION_SECONDS.labels(provider).observe(run.latency_ms / 1000)
     logger.info(
@@ -452,7 +464,7 @@ class VerificationService:
             raise Conflict("A check is already in progress for this document.")
         run = new_run(self.db, doc.id, app.operator_id, user.id)
         self.documents.add_run(run)
-        record_refused(self.db, run, doc)
+        refused = record_refused(self.db, run, doc)
         self.audit.record(
             application_id=app.id,
             actor_id=user.id,
@@ -460,5 +472,7 @@ class VerificationService:
             payload={"document_id": str(doc.id), "document_type": doc.document_type.value},
         )
         self.db.commit()
+        if refused is not None:
+            publish(refused, None, announce=False)  # only now that the row is committed
         self.db.refresh(run)
         return run

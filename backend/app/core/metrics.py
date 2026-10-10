@@ -79,6 +79,12 @@ AI_COST = Counter(
     "Cost in USD of document checks at the price in force when each ran, by document type and outcome.",
     ["document_type", "outcome"],
 )
+AI_UNRECORDED_TOKENS = Counter(
+    "permitflow_ai_unrecorded_tokens_total",
+    "Tokens the provider billed for a check whose result was then dropped (lease lost, draft deleted), so "
+    "no usage row holds them, by kind (input, output).",
+    ["kind"],
+)
 APPLICATIONS = Gauge(
     "permitflow_applications", "Applications by status, refreshed on every scrape.", ["status"]
 )

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.models import AiPrice, AiUsage, Application, User
@@ -109,9 +109,13 @@ class AiUsageRepository:
             )
         return [UsageRow(u, name, ref, biz) for u, name, ref, biz in self.db.execute(stmt.limit(limit))]
 
-    def stream(self, f: UsageFilters, *, batch: int = 500) -> Iterator[UsageRow]:
-        """Every matching row, newest first, fetched in batches (the CSV export)."""
-        result = self.db.execute(self._rows(f).execution_options(yield_per=batch))
+    def limit_statement_time(self, timeout: str) -> None:
+        """Cap every statement of the current transaction (`SET LOCAL`); the transaction's end lifts it."""
+        self.db.execute(text("SELECT set_config('statement_timeout', :t, true)"), {"t": timeout})
+
+    def stream(self, f: UsageFilters, *, limit: int, batch: int = 500) -> Iterator[UsageRow]:
+        """Up to `limit` matching rows, newest first, fetched in batches (the CSV export)."""
+        result = self.db.execute(self._rows(f).limit(limit).execution_options(yield_per=batch))
         for u, name, ref, biz in result:
             yield UsageRow(u, name, ref, biz)
 

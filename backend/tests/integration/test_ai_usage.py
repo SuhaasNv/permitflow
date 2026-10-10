@@ -6,9 +6,10 @@ import os
 import subprocess
 import sys
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,15 +19,19 @@ from sqlalchemy.orm import Session
 
 from app.core.settings import get_settings
 from app.domain.ai_usage import DOCUMENT_TYPE_LABELS, OUTCOME_LABELS, pseudonym
+from app.domain.enums import DocumentType
 from app.domain.verification_rules import VerificationRequest, VerificationResult
 from app.infra import db as dbmod
 from app.infra import notifier
+from app.infra.ai import ProviderError
 from app.infra.ai.mock import MockProvider
-from app.models import AiPrice, AiUsage, Application, AuditEvent, User, VerificationRun
+from app.models import AiPrice, AiUsage, Application, AuditEvent, Document, User, VerificationRun
 from app.models.enums import Role, VerificationStatus
 from app.repositories.ai_usage import AiUsageRepository
+from app.repositories.audit import AuditRepository
+from app.services import ai_usage as ai_usage_module
 from app.services import verification as module
-from app.services.ai_usage import publish
+from app.services.ai_usage import publish, record_usage
 from app.services.verification import (
     MAX_ATTEMPTS,
     claim_next_run,
@@ -618,6 +623,9 @@ def test_counters_move_by_document_type_and_outcome_with_bounded_labels(
     for series in _families().values():
         for labelset in series:
             d = dict(labelset)
+            if set(d) == {"kind"}:  # the unrecorded-tokens counter has no other label
+                assert d["kind"] in {"input", "output"}
+                continue
             assert set(d) <= {"document_type", "outcome", "kind"}  # never a user or an application
             assert d["document_type"] in DOCUMENT_TYPE_LABELS | {"other"}
             assert d["outcome"] in OUTCOME_LABELS | {"other"}
@@ -773,6 +781,358 @@ def test_trace_metadata_carries_keyed_hashes_never_the_ids_or_the_email(
     assert str(user.id) not in flat and app_id not in flat and "op@example.sg" not in flat
     assert "application_id" not in request.extra and "user_id" not in request.extra
     assert request.document_type == "business_profile"
+
+
+# ---- review fixes: undercounts, the export bound, rollbacks, ranges ----
+
+
+def _unrecorded(kind: str) -> float:
+    return _sample("permitflow_ai_unrecorded_tokens_total", kind=kind)
+
+
+class _TwoAttempts(MockProvider):
+    """Billed 1200/80 the first time it is asked and 900/50 the second: tells whose tokens a row holds."""
+
+    name = "openai"
+    model = MODEL
+    calls = 0
+    between: Callable[[], None] | None = None
+
+    def verify(self, request: VerificationRequest) -> VerificationResult:
+        type(self).calls += 1
+        first = type(self).calls == 1
+        self.input_tokens, self.output_tokens = (1200, 80) if first else (900, 50)
+        if first and type(self).between is not None:
+            type(self).between()  # while the first attempt is "in flight"
+        return super().verify(request)
+
+
+def test_a_lost_lease_leaves_one_row_with_the_new_holders_tokens_and_counts_the_dropped_ones(
+    client: TestClient, db: Session, worker_mode: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _price(db)
+    _TwoAttempts.calls = 0
+    monkeypatch.setattr(module, "get_provider", lambda: _TwoAttempts())
+    _operator_upload(client, db)
+    run_id = claim_next_run("a")
+    assert run_id is not None
+
+    def lose_the_lease() -> None:
+        with dbmod.session_factory()() as other:
+            other.execute(
+                update(VerificationRun)
+                .where(VerificationRun.id == run_id)
+                .values(lease_until=datetime.now(UTC) - timedelta(seconds=1))
+            )
+            other.commit()
+        assert reap_expired_runs() == (1, 0)
+        assert claim_next_run("b") == run_id
+
+    _TwoAttempts.between = staticmethod(lose_the_lease)  # type: ignore[assignment]
+    before = (_unrecorded("input"), _unrecorded("output"))
+    execute_run(run_id, "a")  # finishes after losing the lease: dropped
+    assert _usage(db) == []
+    assert (_unrecorded("input") - before[0], _unrecorded("output") - before[1]) == (1200, 80)
+    execute_run(run_id, "b")
+    (row,) = _usage(db)
+    assert (row.input_tokens, row.output_tokens) == (900, 50)
+    assert row.cost_usd == Decimal("0.00044000")  # (900 x 0.40 + 50 x 1.60) / 1e6
+
+
+def test_a_draft_deleted_after_the_call_counts_its_billed_tokens_as_unrecorded(
+    client: TestClient, db: Session, worker_mode: None, billing: Billing, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, app_id, h = _operator_upload(client, db)
+    real = billing.verify
+
+    def verify_then_delete(request: VerificationRequest) -> VerificationResult:
+        out = real(request)
+        client.delete(f"{API}/applications/{app_id}", headers=h)
+        return out
+
+    monkeypatch.setattr(billing, "verify", verify_then_delete)
+    before = _unrecorded("input")
+    run_id = claim_next_run("w")
+    assert run_id is not None
+    execute_run(run_id, "w")
+    assert _usage(db) == [] and _unrecorded("input") - before == 1200
+
+
+class _BilledThenRefused(MockProvider):
+    name = "openai"
+    model = MODEL
+
+    def verify(self, request: VerificationRequest) -> VerificationResult:
+        self.input_tokens, self.output_tokens = 1200, 80
+        raise ProviderError("the answer did not match the schema")
+
+
+def test_billed_then_a_provider_error_records_the_billed_tokens(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _price(db)
+    monkeypatch.setattr(module, "get_provider", lambda: _BilledThenRefused())
+    _operator_upload(client, db)
+    (row,) = _usage(db)
+    assert (row.outcome, row.provider, row.model) == ("failed", "openai", MODEL)
+    assert (row.input_tokens, row.output_tokens, row.cost_usd) == (1200, 80, Decimal("0.00060800"))
+
+
+def test_a_crash_after_the_provider_answered_keeps_the_billed_tokens(
+    client: TestClient, db: Session, billing: Billing, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _price(db)
+
+    def boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("the rules crashed")
+
+    monkeypatch.setattr(module, "apply_rules", boom)
+    _operator_upload(client, db)
+    (row,) = _usage(db)
+    assert (row.outcome, row.provider) == ("failed", "openai")
+    assert (row.input_tokens, row.output_tokens) == (1200, 80)
+
+
+def test_the_stranded_inline_sweep_writes_one_failed_row(
+    client: TestClient, db: Session, worker_mode: None
+) -> None:
+    user, _, _ = _operator_upload(client, db)
+    run = db.scalar(select(VerificationRun))
+    assert run is not None
+    db.execute(
+        update(VerificationRun)
+        .where(VerificationRun.id == run.id)
+        .values(status=VerificationStatus.RUNNING, started_at=datetime.now(UTC) - timedelta(days=1))
+    )
+    db.commit()
+    reap_expired_runs()
+    reap_expired_runs()
+    (row,) = _usage(db)
+    assert (row.run_id, row.outcome, row.user_id) == (run.id, "failed", user.id)
+    assert (row.input_tokens, row.cost_usd) == (0, Decimal(0))
+
+
+def test_a_sweep_that_meets_an_existing_row_changes_nothing(client: TestClient, db: Session) -> None:
+    _operator_upload(client, db)
+    (before,) = _usage(db)
+    db.execute(update(VerificationRun).values(status=VerificationStatus.PENDING))  # as the edge test does
+    db.commit()
+    assert mark_stale_runs_failed() == 1
+    (after,) = _usage(db)
+    assert (after.id, after.outcome) == (before.id, before.outcome)
+
+
+def test_a_price_change_after_the_check_started_does_not_reprice_it(db: Session) -> None:
+    """Priced at the moment the run started, not at the moment the row is written."""
+    _price(db, datetime(2025, 1, 1, tzinfo=UTC), "0.40", "1.60")
+    _price(db, datetime(2026, 1, 1, tzinfo=UTC), "1.00", "2.00")
+    user = make_user(db, "op@example.sg", Role.OPERATOR)
+    app = Application(operator_id=user.id, reference_no="PF-2026-009999")
+    db.add(app)
+    db.flush()
+    doc = Document(
+        application_id=app.id,
+        document_type=DocumentType.FLOOR_PLAN,
+        original_filename="p.txt",
+        stored_key="k-us100-price",
+        content_type="text/plain",
+        size_bytes=1,
+        sha256="0" * 64,
+        uploaded_by=user.id,
+    )
+    db.add(doc)
+    db.flush()
+    run = VerificationRun(id=uuid.uuid4(), document_id=doc.id, started_at=datetime(2025, 6, 1, tzinfo=UTC))
+    row = record_usage(
+        db,
+        run=run,
+        doc=doc,
+        outcome=VerificationStatus.VERIFIED,
+        provider="openai",
+        model=MODEL,
+        input_tokens=1200,
+        output_tokens=80,
+    )
+    db.commit()
+    assert row.cost_usd == Decimal("0.00060800")  # the 2025 price, not the 2026 one in force today
+    never_started = VerificationRun(
+        id=uuid.uuid4(), document_id=doc.id, created_at=datetime(2026, 5, 1, tzinfo=UTC)
+    )
+    later = record_usage(
+        db, run=never_started, doc=doc, outcome=VerificationStatus.FAILED, provider="openai", model=MODEL,
+        input_tokens=1000, output_tokens=0,
+    )  # fmt: skip
+    assert later.cost_usd == Decimal("0.00100000")  # no start: priced when it was created
+
+
+def test_extreme_and_invalid_ranges_are_400_not_500(client: TestClient, db: Session) -> None:
+    adm = _admin(client, db)
+    for path in ("ai-usage", "ai-usage.csv"):
+        for params in (
+            {"from": "0001-01-01"},
+            {"from": "0001-01-01", "to": "9999-12-31"},
+            {"from": "2026-03-12", "to": "2026-03-11"},
+        ):
+            r = client.get(f"{API}/admin/{path}", headers=adm, params=params)
+            assert r.status_code == 400, (path, params, r.status_code)
+            assert r.json()["error"]["details"]["reason"] == "bad_range"
+        for params in ({"to": "9999-12-31"}, {"from": "9999-12-31"}, {"from": "0001-01-02"}):
+            assert client.get(f"{API}/admin/{path}", headers=adm, params=params).status_code in (200, 400)
+        assert client.get(f"{API}/admin/{path}", headers=adm, params={"to": "2026-13-45"}).status_code == 422
+    assert client.get(f"{API}/admin/ai-usage", headers=adm, params={"before": "junk"}).status_code == 400
+    assert (
+        client.get(f"{API}/admin/ai-usage", headers=adm, params={"before": "9" * 50 + ",x"}).status_code
+        == 400
+    )
+
+
+def test_the_csv_follows_the_day_range(client: TestClient, db: Session, billing: Billing) -> None:
+    _seed_rows(client, db)
+    adm = _admin(client, db)
+    rows = _usage(db)
+    db.execute(
+        update(AiUsage)
+        .where(AiUsage.id == rows[0].id)
+        .values(created_at=datetime(2026, 3, 10, 18, 30, tzinfo=UTC))
+    )
+    db.commit()
+
+    def lines(**params: str) -> int:
+        r = client.get(f"{API}/admin/ai-usage.csv", headers=adm, params=params)
+        assert r.status_code == 200, r.text
+        return len(r.text.strip().split("\r\n")) - 1
+
+    assert lines(**{"from": "2026-03-11", "to": "2026-03-11"}) == 1  # 11 March in Singapore
+    assert lines(**{"from": "2026-03-10", "to": "2026-03-10"}) == 0
+    assert lines(**{"from": "2026-03-12"}) == 2
+    assert lines() == 3
+
+
+def test_the_export_is_cut_at_the_cap_with_a_notice_and_is_audited(
+    client: TestClient, db: Session, billing: Billing, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    user = _seed_rows(client, db)[0]
+    adm = _admin(client, db)
+    monkeypatch.setattr(ai_usage_module, "CSV_MAX_ROWS", 2)
+    r = client.get(f"{API}/admin/ai-usage.csv", headers=adm, params={"user_id": str(user.id)})
+    lines = r.text.strip().split("\r\n")
+    assert len(lines) == 1 + 2  # the header and the user's two rows: exactly at the cap, so not cut
+    r = client.get(f"{API}/admin/ai-usage.csv", headers=adm)
+    lines = r.text.strip().split("\r\n")
+    assert len(lines) == 1 + 2 + 1  # header, two rows, then the notice
+    assert lines[-1].startswith('"Export cut at 2 rows. Narrow it with from, to, user_id')
+    events = [e for e in db.scalars(select(AuditEvent)) if e.event_type == "admin.ai_usage_exported"]
+    assert [(e.payload["rows"], e.payload["cut"]) for e in events] == [(2, False), (2, True)]
+    assert events[-1].payload["user_id"] is None and events[-1].actor_id is not None
+    assert set(events[-1].payload) == {
+        "user_id",
+        "application_id",
+        "reference",
+        "since",
+        "until",
+        "rows",
+        "cut",
+    }
+    assert user.full_name not in str(events[0].payload) and "@example" not in str(events[0].payload)
+
+
+def test_the_export_runs_under_a_statement_timeout(
+    client: TestClient, db: Session, billing: Billing, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _operator_upload(client, db)
+    seen: list[str] = []
+    real = AiUsageRepository.limit_statement_time
+
+    def spy(self: AiUsageRepository, timeout: str) -> None:
+        seen.append(timeout)
+        real(self, timeout)
+
+    monkeypatch.setattr(AiUsageRepository, "limit_statement_time", spy)
+    assert client.get(f"{API}/admin/ai-usage.csv", headers=_admin(client, db)).status_code == 200
+    assert seen == ["60s"]
+
+
+def test_nothing_is_counted_for_a_refused_run_whose_transaction_rolls_back(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adm = _admin(client, db)
+    client.put(
+        f"{API}/admin/settings/ai_paused",
+        headers=adm,
+        json={"value": True, "reason": "Spend review", "password": DEFAULT_PASSWORD},
+    )
+    make_user(db, "op@example.sg", Role.OPERATOR)
+    h = login(client, "op@example.sg")
+    app_id = str(client.post(f"{API}/applications", headers=h).json()["id"])
+    labels = {"document_type": "business_profile", "outcome": "unavailable"}
+    before = _sample("permitflow_ai_checks_total", **labels)
+    real = AuditRepository.record
+
+    def failing(self: AuditRepository, **kw: Any) -> AuditEvent:
+        if kw["event_type"] == "document.uploaded":
+            raise RuntimeError("the database went away")
+        return real(self, **kw)
+
+    with monkeypatch.context() as patched:
+        patched.setattr(AuditRepository, "record", failing)
+        failed = upload(client, h, app_id, "business_profile", "profile.txt", PROFILE_TXT, "text/plain")
+        assert failed.status_code == 500
+    assert _sample("permitflow_ai_checks_total", **labels) == before
+    assert _usage(db) == []
+    # and a committed one is counted once
+    assert (
+        upload(client, h, app_id, "business_profile", "profile.txt", PROFILE_TXT, "text/plain").status_code
+        == 201
+    )
+    assert _sample("permitflow_ai_checks_total", **labels) == before + 1
+
+
+# ---- Telegram: no line for a check that never reached a provider ----
+
+
+def test_no_line_for_a_check_that_never_reached_a_provider_at_either_point(
+    client: TestClient, db: Session, billing: Billing, sent: _Sent, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adm = _admin(client, db)
+    _switch(client, adm, True)
+    sent.texts.clear()
+    # an unreadable file: the run ends at extraction
+    make_user(db, "op@example.sg", Role.OPERATOR)
+    h = login(client, "op@example.sg")
+    app_id = str(client.post(f"{API}/applications", headers=h).json()["id"])
+    assert upload(client, h, app_id, "floor_plan", "empty.txt", b" \n " * 20, "text/plain").status_code == 201
+    assert sent.texts == []
+    # paused after the check was created: stopped at execution, before any provider is chosen
+    monkeypatch.setattr(get_settings(), "verification_mode", "worker")
+    assert (
+        upload(client, h, app_id, "business_profile", "profile.txt", PROFILE_TXT, "text/plain").status_code
+        == 201
+    )
+    client.put(
+        f"{API}/admin/settings/ai_paused",
+        headers=adm,
+        json={"value": True, "reason": "Spend review", "password": DEFAULT_PASSWORD},
+    )
+    sent.texts.clear()  # the settings announcement is not a check
+    run_id = claim_next_run("w")
+    assert run_id is not None
+    monkeypatch.setattr(get_settings(), "verification_mode", "inline")
+    execute_run(run_id, "w")
+    assert sent.texts == []
+    outcomes = [(u.outcome, u.provider) for u in _usage(db)]
+    assert outcomes == [("unreadable", "none"), ("unavailable", "none")]
+
+
+def test_a_check_that_reached_the_provider_and_failed_still_gets_its_line(
+    client: TestClient, db: Session, sent: _Sent, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adm = _admin(client, db)
+    _switch(client, adm, True)
+    sent.texts.clear()
+    monkeypatch.setattr(module, "get_provider", lambda: _BilledThenRefused())
+    _operator_upload(client, db)
+    (text,) = sent.texts
+    assert text.startswith("Document check: business profile · failed ·")
 
 
 # ---- the migration ----

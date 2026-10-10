@@ -32,7 +32,7 @@ Option C.
 
 **Tables (migration 0017).**
 
-- `ai_prices(id, model, input_per_million, output_per_million, effective_from)`, unique on `(model, effective_from)`. A price is never edited: a new row with a later date replaces it. The price of a run is the row of its model with the latest `effective_from` not after the moment the result is stored. The migration seeds the default model (`gpt-4.1-mini`, USD 0.40 and 1.60 per million tokens, effective 14 Apr 2025). There is no screen or endpoint to add a price: an operator inserts a row (documented in `OPERATIONS.md`).
+- `ai_prices(id, model, input_per_million, output_per_million, effective_from)`, unique on `(model, effective_from)`. A price is never edited: a new row with a later date replaces it. The price of a run is the row of its model with the latest `effective_from` not after the moment the run started (when it was created, for a run that never started), so a price change while a check is in flight does not reprice it. The migration seeds the default model (`gpt-4.1-mini`, USD 0.40 and 1.60 per million tokens, effective 14 Apr 2025). There is no screen or endpoint to add a price: an operator inserts a row (documented in `OPERATIONS.md`).
 - `ai_usage(id, run_id unique, document_id, application_id, user_id, document_type, provider, model, input_tokens, output_tokens, cost_usd, price_id, latency_ms, outcome, created_at)`. `cost_usd` is `NUMERIC(14,8)`. `run_id`, `document_id` and `application_id` are plain columns, not foreign keys: draft deletion removes the runs and documents, and the money already spent stays. `user_id` is a foreign key to `users` (accounts are deactivated, never deleted).
 - `verification_runs.requested_by` (nullable foreign key to `users`): the person whose upload or re-run created the run. An officer's re-run is charged to the officer; the quota still counts against the application's owner, as before.
 
@@ -42,6 +42,8 @@ Option C.
 
 **Tokens come from the provider.** `VerificationProvider` gains `input_tokens` and `output_tokens`, set by `verify` (OpenAI: the `usage` block, recorded before the answer is parsed, so a malformed answer that was billed is counted). The mock reports zero. A provider is built per check, so the fields belong to one check. The cached-token discount is not applied: the price table has one input price, so `cost_usd` is an upper estimate of the invoice, which stays the truth.
 
+**One Telegram rule.** A line is sent only for a check that reached a provider (a result, a provider error, a timeout). A check that never did sends nothing, wherever it stopped: refused by a quota or the pause switch when it was created, paused between creation and execution, an unreadable file, no provider configured, a replaced document, or ended by the reaper. The counters still count it.
+
 **A model with no price row costs 0**, is logged as `ai_price_missing`, and still gets its row with `price_id` empty. A missing price shows up as a warning and a gap in the page, never as a failed check.
 
 **What leaves the building.**
@@ -50,14 +52,14 @@ Option C.
 |-------|---------|---------------|
 | Administrator page and CSV | the person's name and id, the case reference and id, document type, provider, model, tokens, cost, latency, outcome | document text, filenames |
 | Prometheus | counters `permitflow_ai_checks_total`, `..._ai_tokens_total`, `..._ai_cost_usd_total` labelled by `document_type`, `outcome` (and `kind`) | any id, name or free-form string: both labels pass through `bounded_label` against the enum values, anything else becomes `other` |
-| Telegram (per check, off by default) | document type, outcome, cost, time, the case reference | names, email, filename, document content, tokens, the person's id |
+| Telegram (per check, off by default) | document type, outcome, cost, time, the case reference; only for a check that reached a provider | names, email, filename, document content, tokens, the person's id |
 | LangSmith (trace metadata) | run id, document id, document type, `application_hash`, `user_pseudonym` | application id, user id, email |
 
 The pseudonyms are the first 16 hex characters of HMAC-SHA256 over a label (`user` or `application`) and the id, keyed with a sub-key derived from the server secret (`k = HMAC-SHA256(JWT_SECRET, "permitflow-pseudonym-v1")`, so the secret itself never keys the pseudonyms directly; the same derivation pattern US-104 uses for its CSRF token): stable, so one person's traces group together, and not reversible by anyone without the key. Rotating the secret changes every pseudonym, which only splits traces at that date. The Telegram send happens after the commit, through the existing notifier, inside a guard: a failure is logged and the check is not affected.
 
-**The export** is `GET /admin/ai-usage.csv`, a streamed response from a session of its own, one line at a time. Every cell that begins with `=`, `+`, `-`, `@`, tab or CR gets a single quote in front, so a spreadsheet shows a person's name that starts with `=` as text.
+**The export** is `GET /admin/ai-usage.csv`, a streamed response from a session of its own, one line at a time. Every cell that begins with `=`, `+`, `-`, `@`, tab or CR gets a single quote in front, so a spreadsheet shows a person's name that starts with `=` as text. The export is bounded: at most 100,000 rows (the file then ends with a line saying it was cut and which filters narrow it), every statement under a 60 second `statement_timeout` (`SET LOCAL` on the export's own session), and each export writes one audit event, `admin.ai_usage_exported`, with the filters, the row count and whether it was cut, and no names. The event is written when the stream ends, also if the reader goes away halfway.
 
-**Reads.** `GET /admin/ai-usage` is keyset-paged like the audit feed, filters by person, application and a Singapore day range (both ends included), and returns the totals over everything the filters match and today's numbers beside the live `ai_runs_per_day` cap. The cap itself is counted by the quota over a rolling 24 hours; the page reports the Singapore day, as the overview does, and says which runs count toward the cap.
+**Reads.** `GET /admin/ai-usage` is keyset-paged like the audit feed, filters by person, application and a Singapore day range (both ends included), and returns the totals over everything the filters match and today's numbers beside the live `ai_runs_per_day` cap. The cap itself is counted by the quota over a rolling 24 hours; the page reports the Singapore day, as the overview does, and `today.runs` is the number of checks that count toward the cap (not the number of ledger rows today: quota refusals and pause stops are left out).
 
 ## Rationale
 
@@ -70,7 +72,14 @@ The pseudonyms are the first 16 hex characters of HMAC-SHA256 over a label (`use
 
 - One more row per check (a few hundred bytes) and a one-row price lookup per result. Negligible at this volume.
 - With `VERIFICATION_MODE=worker` the Prometheus counters are incremented in the worker process, so the worker's `/metrics` must be scraped for the dashboard and `/cost` to see them (the local Prometheus does; the Railway job exists for development). The page and the CSV read the database and are right in both modes.
-- Tokens are zero for runs ended without a result, and for a crash after the provider was billed but before the result was stored (the crash handler records the run `failed` with zero tokens). The ledger can undercount in those rare cases; it never overcounts.
+- **The ledger can undercount; it never overcounts.** Tokens the provider billed are missing from every row in these cases:
+  1. A result dropped because the lease changed hands (a slow worker whose run was taken back): the first attempt's tokens are lost, the row holds the second holder's. `permitflow_ai_unrecorded_tokens_total{kind}` counts them.
+  2. A result dropped because the draft was deleted after the provider answered: counted the same way.
+  3. A run the reaper marks `dead` after hung attempts that were billed: the row has zero tokens; if a hung attempt ever finishes it is dropped and counted as in case 1, if it never does nothing records it.
+  4. A run ended by the system without a result (`failed: interrupted`): zero tokens.
+  5. A crash after the provider answered is not an undercount: the crash handler keeps the billed tokens on the `failed` row. A crash inside the provider call before it reports usage is.
+  The OpenAI invoice remains the truth; the unrecorded counter is the size of the gap the process can see.
+- Runs before migration 0017 have no row (no backfill: nothing recorded their tokens). The page starts at the day the migration ran.
 - No price administration UI. A new price is an `INSERT`; until one exists for a new model its checks cost 0 in the ledger.
 - `cost_usd` ignores the cached-input discount, so it can sit slightly above the invoice.
 

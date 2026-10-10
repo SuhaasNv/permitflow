@@ -16,7 +16,7 @@ from app.models import Application, Document, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
-from app.services.ai_usage import record_refused
+from app.services.ai_usage import publish, record_refused
 from app.services.applications import ApplicationService
 from app.services.quotas import new_run
 from app.services.uploads import platform_remaining, receive, storage_usage
@@ -97,7 +97,7 @@ class DocumentService:
         self.db.flush()
         run = new_run(self.db, doc.id, app.operator_id, operator.id)
         self.documents.add_run(run)
-        record_refused(self.db, run, doc)
+        refused = record_refused(self.db, run, doc)
         self.audit.record(
             application_id=app.id,
             actor_id=operator.id,
@@ -116,6 +116,8 @@ class DocumentService:
         except Exception:
             self.storage.delete(key)
             raise
+        if refused is not None:
+            publish(refused, None, announce=False)  # only now that the row is committed
         self.db.refresh(app)
         self.db.refresh(doc)
         self.db.refresh(run)

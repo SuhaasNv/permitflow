@@ -244,7 +244,7 @@ def ai_usage_csv(
         day_to=day_to,
     )
     return StreamingResponse(
-        csv_stream(f),
+        csv_stream(f, user.id),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="ai-usage.csv"', "Cache-Control": "no-store"},
     )
