@@ -4,7 +4,7 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 
 ## US-111, build once and promote (10 Oct 2026, `feat/us-111-build-once-promote`, not merged)
 
-- The version is read at run time (backend `APP_VERSION`, frontend `appVersion` in `config.js`); CI promotes the last candidate's images by digest on the push to `main` and the release tag instead of rebuilding; the release guard counts `RELEASE_NOTES.md` as shipped and checks the candidate carries the release section; What's new hides sections newer than the running version; `deploy.yml` takes the release version for production. `RELEASING.md` and `OPERATIONS.md` describe the flow.
+- The version is read at run time (backend `APP_VERSION`, frontend `appVersion` in `config.js`); CI builds once per commit, a candidate tag names that commit's dev image by digest, and the push to `main` and the release tag promote the last candidate's images instead of rebuilding (ADR-017); the release guard counts `RELEASE_NOTES.md` as shipped and checks the candidate carries the release section; What's new hides sections newer than the running version; `deploy.yml` takes the release version for production. `RELEASING.md` and `OPERATIONS.md` describe the flow.
 
 ## v0.5.0-rc.3: release candidate on the development environment (10 Oct 2026)
 
