@@ -260,10 +260,10 @@ jobs:
           retention-days: 7
 
   images:
-    # US-111, build once and promote. This job builds, scans and pushes: every pull request and every push to
-    # dev. A release candidate tag (vX.Y.Z-rc.N) builds only when the commit has no image yet; normally dev
-    # already built it (`sha-<commit>`, the image the development environment runs), and the tag just names that
-    # image. It does NOT run for the push to main or for a release tag vX.Y.Z: those are promoted from the last
+    # US-111, build once and promote. This job builds, scans and pushes for every pull request and every push to
+    # dev, and only for those. A release candidate tag (vX.Y.Z-rc.N) builds nothing: it names the image dev already
+    # built for that commit (`sha-<commit>`, the image the development environment runs) and fails if there is
+    # none. It does NOT run for the push to main or for a release tag vX.Y.Z: those are promoted from the last
     # candidate's images by the `promote` job below, never rebuilt.
     name: Images
     if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || (github.ref_type == 'tag' && !contains(github.ref_name, '-rc.')))) }}
@@ -317,50 +317,36 @@ jobs:
           fi
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
-      # US-111: a candidate tag names the image dev already built and tested for this commit. Read-only check
-      # first (the packages are public, so no login yet); when both `sha-<commit>` images exist they are tagged
-      # `:vX.Y.Z-rc.N` by digest and every build, scan and push step below is skipped. Trivy scanned them when the
-      # dev push built them. When either is missing (the tag came before the dev run finished) the job builds.
-      - name: Is this commit's dev image already in the registry? (candidate tags)
-        id: reuse
+      # US-111: a candidate tag names the image dev already built and Trivy-scanned for this commit; nothing is
+      # built on a tag run, so logging in here does not put the `packages: write` token near a scanner. If either
+      # `sha-<commit>` image is missing the job fails: that commit was never built by dev, so it cannot be a
+      # candidate. There is no fallback build.
+      - name: Log in to GHCR (candidate tags)
         if: github.ref_type == 'tag'
-        run: |
-          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-          short=${GITHUB_SHA::7}
-          digest_of() { docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}' 2>/dev/null; }
-          backend=$(digest_of "ghcr.io/$owner/permitflow-backend:sha-$short") || backend=""
-          frontend=$(digest_of "ghcr.io/$owner/permitflow-frontend:sha-$short") || frontend=""
-          if [ -n "$backend" ] && [ -n "$frontend" ]; then
-            printf 'reused=true\nbackend=%s\nfrontend=%s\n' "$backend" "$frontend" >> "$GITHUB_OUTPUT"
-            echo "found sha-$short: backend $backend, frontend $frontend"
-          else
-            echo "reused=false" >> "$GITHUB_OUTPUT"
-            echo "no dev image for sha-$short yet; building"
-          fi
-      - name: Log in to GHCR (to name the dev image)
-        if: steps.reuse.outputs.reused == 'true'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Name the dev image for this candidate (same digest, no build)
-        if: steps.reuse.outputs.reused == 'true'
-        env:
-          BACKEND_DIGEST: ${{ steps.reuse.outputs.backend }}
-          FRONTEND_DIGEST: ${{ steps.reuse.outputs.frontend }}
+        if: github.ref_type == 'tag'
         run: |
           owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          short=${GITHUB_SHA::7}
+          digest_of() { docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'; }
           : > "$RUNNER_TEMP/digests.txt"
           for image in backend frontend; do
             repo="ghcr.io/$owner/permitflow-$image"
-            if [ "$image" = backend ]; then digest="$BACKEND_DIGEST"; else digest="$FRONTEND_DIGEST"; fi
+            if ! digest=$(digest_of "$repo:sha-$short"); then
+              echo "no dev image $repo:sha-$short for $GITHUB_REF_NAME: dev never built this commit, so it cannot be a candidate. Wait for the dev push run of $short to finish, then re-run this job." >&2
+              exit 1
+            fi
             docker buildx imagetools create -t "$repo:$GITHUB_REF_NAME" "$repo@$digest"
-            now=$(docker buildx imagetools inspect "$repo:$GITHUB_REF_NAME" --format '{{.Manifest.Digest}}')
-            test "$now" = "$digest" || { echo "$repo:$GITHUB_REF_NAME is $now, expected $digest"; exit 1; }
+            now=$(digest_of "$repo:$GITHUB_REF_NAME")
+            test "$now" = "$digest" || { echo "$repo:$GITHUB_REF_NAME is $now, expected $digest" >&2; exit 1; }
             echo "$repo@$digest" >> "$RUNNER_TEMP/digests.txt"
           done
-          echo "Reused the dev images of sha-${GITHUB_SHA::7} for $GITHUB_REF_NAME; nothing built." >> "$GITHUB_STEP_SUMMARY"
+          echo "$GITHUB_REF_NAME names the dev images of sha-$short; nothing built." >> "$GITHUB_STEP_SUMMARY"
       # US-103: each image is built once, loaded into the runner and scanned there; the image that is pushed is
       # that same image (tagged and pushed with `docker push`), not a second build. The GHCR login comes after
       # both scans, so the `packages: write` token is not on disk while the scanner runs. Trivy is the pinned
@@ -369,7 +355,7 @@ jobs:
       # not block, because nothing can be done about it today. An accepted finding goes in `.trivyignore` with
       # its reason and a review date, never as a bare id.
       - name: Install Trivy (pinned, checksum verified)
-        if: steps.reuse.outputs.reused != 'true'
+        if: github.ref_type != 'tag'
         run: |
           curl -fsSL --retry 3 -o /tmp/trivy.tar.gz \
             "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
@@ -380,7 +366,7 @@ jobs:
       # rate limited like ghcr.io. It is fetched here with retries and the scans run with `--skip-db-update`; if
       # all three attempts fail the job fails: a release is never cleared by a scan that did not run.
       - name: Trivy database (retried)
-        if: steps.reuse.outputs.reused != 'true'
+        if: github.ref_type != 'tag'
         run: |
           for attempt in 1 2 3; do
             if /tmp/trivy image --download-db-only --no-progress; then exit 0; fi
@@ -388,7 +374,7 @@ jobs:
           done
           echo "Trivy database could not be downloaded; failing the check rather than skipping it"; exit 1
       - name: Backend image (build once, loaded into the runner)
-        if: steps.reuse.outputs.reused != 'true'
+        if: github.ref_type != 'tag'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./backend
@@ -399,17 +385,17 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
       - name: Trivy, backend image (blocking at HIGH and CRITICAL)
-        if: steps.reuse.outputs.reused != 'true'
+        if: github.ref_type != 'tag'
         run: |
           /tmp/trivy image --skip-db-update --no-progress --scanners vuln --severity HIGH,CRITICAL \
             --ignore-unfixed --exit-code 1 --ignorefile .trivyignore permitflow-backend:scan
       # The What's new page reads RELEASE_NOTES.md at build time (US-094); the image build's context is the
       # frontend folder alone, so the file is copied in first (ignored by git, see .gitignore).
       - name: Release notes into the frontend build context
-        if: steps.reuse.outputs.reused != 'true'
+        if: github.ref_type != 'tag'
         run: cp RELEASE_NOTES.md frontend/RELEASE_NOTES.md
       - name: Frontend image (build once, loaded into the runner)
-        if: steps.reuse.outputs.reused != 'true'
+        if: github.ref_type != 'tag'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./frontend
@@ -419,19 +405,19 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
       - name: Trivy, frontend image (blocking at HIGH and CRITICAL)
-        if: steps.reuse.outputs.reused != 'true'
+        if: github.ref_type != 'tag'
         run: |
           /tmp/trivy image --skip-db-update --no-progress --scanners vuln --severity HIGH,CRITICAL \
             --ignore-unfixed --exit-code 1 --ignorefile .trivyignore permitflow-frontend:scan
       - name: Log in to GHCR (after the scans)
-        if: github.event_name == 'push' && steps.reuse.outputs.reused != 'true'
+        if: github.event_name == 'push' && github.ref_type != 'tag'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push the scanned images (the same image ids Trivy read)
-        if: github.event_name == 'push' && steps.reuse.outputs.reused != 'true'
+        if: github.event_name == 'push' && github.ref_type != 'tag'
         env:
           BACKEND_TAGS: ${{ steps.tags.outputs.backend }}
           FRONTEND_TAGS: ${{ steps.tags.outputs.frontend }}
@@ -457,7 +443,7 @@ jobs:
             echo
             echo '`'"${{ steps.tags.outputs.frontend }}"'`'
             echo
-            echo "Pushed: ${{ github.event_name == 'push' && steps.reuse.outputs.reused != 'true' }} (pull requests only build; a candidate tag reuses the dev image)"
+            echo "Pushed: ${{ github.event_name == 'push' && github.ref_type != 'tag' }} (pull requests only build; a candidate tag names the dev image)"
             if [ -f "$RUNNER_TEMP/digests.txt" ]; then
               echo
               echo "Digests (backend, then frontend):"
