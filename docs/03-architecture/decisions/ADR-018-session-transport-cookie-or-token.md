@@ -1,4 +1,4 @@
-# ADR-017: The session travels in an HttpOnly cookie, behind a switch
+# ADR-018: The session travels in an HttpOnly cookie, behind a switch
 
 Date: 10 October 2026. Story: US-104 (wave 3a of v0.5.0, backend only; the frontend follows in wave 3b). Status: accepted, built behind a switch (`AUTH_MODE`) whose default is the old behaviour; not switched on in any deployed environment. Related: ADR-005 (server-side authorisation), US-093 (one session per account), US-101 (the settings panel, a dependency of the plan), threat model T12, T14, T27.
 
@@ -13,7 +13,7 @@ The deployment shape matters for the design. The frontend is at `https://dev.per
 ## Constraints
 
 - Default behaviour unchanged: every existing test passes untouched with `AUTH_MODE=token`.
-- Reversible with a setting, not a redeploy (build control, 9 Oct 2026).
+- Reversible with a setting (build control, 9 Oct 2026): rolling back is setting `AUTH_MODE=token` and redeploying the API, because the settings are read once at startup. No migration, no data change.
 - No credential the frontend can read in cookie mode, and no wildcard CORS.
 - One live session per account, take-over and revocation keep working (US-093).
 - No schema change, no new dependency.
@@ -43,34 +43,34 @@ Option B, behind `AUTH_MODE=token|cookie` (default `token`).
 | Cookie | Value | Attributes |
 |--------|-------|------------|
 | `__Host-pf_session` | the JWT (carries `sub`, `sid`, `exp`) | `Secure; HttpOnly; SameSite=Strict; Path=/; Max-Age=<JWT_EXPIRES_MINUTES * 60>`, no `Domain` |
-| `__Host-pf_csrf` | `HMAC-SHA256(JWT_SECRET, "csrf:" + sid)` as hex | `Secure; SameSite=Strict; Path=/; Max-Age=<same>`, not HttpOnly, no `Domain` |
+| `__Host-pf_csrf` | the session-bound CSRF value below, as hex | `Secure; SameSite=Strict; Path=/; Max-Age=<same>`, not HttpOnly, no `Domain` |
 
 The `__Host-` prefix makes the browser refuse the cookie unless it is Secure, Path=/ and has no Domain, so a sibling subdomain cannot plant or overwrite it. Sign-out sends both again with `Max-Age=0` and the same attributes.
 
 **The sign-in body carries no bearer token.** It is `{ expires_at, user, csrf_token }`. `GET /auth/me` (the existing endpoint) also returns `csrf_token` in cookie mode, so a page reload learns who is signed in and gets the value again without reading any cookie. In token mode both bodies are exactly as before (`/auth/me` omits the field).
 
-**CSRF: double submit, bound to the session.** Every unsafe method (anything but GET, HEAD, OPTIONS) on an authenticated route must send `X-CSRF-Token`. The server accepts it only if the header equals the CSRF cookie and equals the value derived from the request's own session id, each compared with `hmac.compare_digest`. Binding to the session means a value planted for, or minted by, another session fails; knowing the algorithm without `JWT_SECRET` is not enough. The failure is `403 csrf_failed`. The check sits in `get_current_user`, after the session check, so every authenticated unsafe route is covered by the one place the route-lock test already proves every route uses, and a revoked session still answers `401 session_revoked`.
+**CSRF: double submit, bound to the session.** Every unsafe method (anything but GET, HEAD, OPTIONS) on an authenticated route must send `X-CSRF-Token`. The server accepts it only if the header equals the CSRF cookie and equals the value derived from the request's own session id, each compared with `hmac.compare_digest`. The value is `HMAC-SHA256(k, session id)` where `k = HMAC-SHA256(JWT_SECRET, "permitflow-csrf-v1")`, a sub-key, so the key that signs the tokens never signs the CSRF values directly. Binding to the session means a value planted for, or minted by, another session fails; knowing the algorithm without `JWT_SECRET` is not enough. Every refusal writes one structured `csrf_failed` log event (reason, method, path, user id; never a token value). The failure is `403 csrf_failed`. The check sits in `get_current_user`, after the session check, so every authenticated unsafe route is covered by the one place the route-lock test already proves every route uses, and a revoked session still answers `401 session_revoked`.
 
 **Why the token also travels in the body.** The frontend and the API are different hosts, so the frontend's script cannot read the API-host CSRF cookie that classic double submit expects. The server therefore hands the same value over in the body and the frontend keeps it in memory. This is safe: the CSRF value is not a credential (it is useless without the HttpOnly cookie), and the check still requires the cookie to be present and equal. The cookie remains readable (not HttpOnly) for same-origin setups such as local development.
 
 **Sign-in itself.** There is no session yet, so no token to compare. It is protected by two things: `SameSite=Strict` on the cookies it sets, and an `Origin` check before the password is looked at. In cookie mode the request must carry an `Origin` header equal to one of `CORS_ORIGINS`; otherwise `403 csrf_failed`, with no cookie and no hint about the password or the live session. Every browser sends `Origin` on a cross-origin POST, so the frontend needs no change; command-line clients must send it. This prevents login CSRF (an attacker page signing the victim into the attacker's account). The existing limiters (T13) still apply.
 
-**CORS.** In cookie mode: `Access-Control-Allow-Credentials: true`, `Access-Control-Allow-Origin` echoing only an origin in `CORS_ORIGINS`, and `X-CSRF-Token` added to the allowed headers. Startup refuses `AUTH_MODE=cookie` when `CORS_ORIGINS` is empty or contains `*`, and in production when any entry is not `https://` (the cookie is Secure). In token mode CORS is exactly as before.
+**CORS.** In cookie mode: `Access-Control-Allow-Credentials: true`, `Access-Control-Allow-Origin` echoing only an origin in `CORS_ORIGINS`, and `X-CSRF-Token` added to the allowed headers. Startup refuses `AUTH_MODE=cookie` when `CORS_ORIGINS` is empty or contains `*`, when any entry is not a bare `scheme://host[:port]` (a path, a trailing slash and the literal `null` are refused: an Origin header never carries a path, and `null` is what sandboxed pages send), and in production when any entry is not `https://` (the cookie is Secure). In token mode CORS is exactly as before.
 
 **One session per account.** Unchanged and tested in cookie mode: a second sign-in is `409 session_active` (and sets no cookie); `take_over: true` revokes the other session, whose cookie then answers `401 session_revoked`.
 
 ## Consequences
 
 - An injected script can still make requests as the user while the page is open (it runs in the page); it can no longer copy the session away. T14 moves from "token stolen" to "session used only while the page is open".
-- The frontend (wave 3b) must send `credentials: "include"`, stop storing a token, keep `csrf_token` in memory, send `X-CSRF-Token` on writes, and call `GET /auth/me` on load.
-- A stale cookie cannot be cleared from script. If the session ended elsewhere, the cookie stays until `Max-Age` or the next sign-in; every call it makes is a `401`, which the frontend treats as signed out.
+- The frontend (wave 3b) must send `credentials: "include"`, stop storing a token, keep `csrf_token` in memory, send `X-CSRF-Token` on writes, and call `GET /auth/me` on load. The two XMLHttpRequest upload paths (`frontend/src/api/documents.ts` and `frontend/src/api/clarification.ts`) do not go through `fetch`: each needs `xhr.withCredentials = true` and the `X-CSRF-Token` header, and drops its `Authorization` header, or every upload answers 401 or 403.
+- A stale cookie cannot be cleared from script. If the session ended elsewhere, the cookie stays until `Max-Age` or the next sign-in; every call it makes is a `401`, which the frontend treats as signed out. Sign-out is the exception that cleans up: `POST /auth/logout` clears both cookies even when it is refused as `401` (revoked, expired or missing session).
 - Downloads and images served from the API now work with the cookie alone (no bearer needed in a URL).
 - Local development: `__Host-` needs Secure. Chrome and Firefox accept Secure cookies on `http://localhost`; Safari does not, so use Chrome or Firefox, or stay in token mode locally.
 - The automated suites that sign in over the API (UAT scripts, Playwright) keep `AUTH_MODE=token` until wave 3b moves the frontend; a cookie-mode run must send `Origin`.
 
 ## Rollout and rollback
 
-The switch is the rollback. Set `AUTH_MODE=cookie` on the API and deploy the frontend of wave 3b together; to go back, set `AUTH_MODE=token` (or unset it) and redeploy. Either change signs everyone out once (the frontend of the other mode does not hold the credential the API now wants). No data changes, no migration. See `OPERATIONS.md`.
+The switch is the rollback. Set `AUTH_MODE=cookie` on the API and deploy the frontend of wave 3b together; to go back, set `AUTH_MODE=token` (or unset it) and redeploy the API (the setting is read at startup, so a redeploy or restart is what applies it). Either change signs everyone out once (the frontend of the other mode does not hold the credential the API now wants). No data changes, no migration. See `OPERATIONS.md`.
 
 ## Revisit when
 

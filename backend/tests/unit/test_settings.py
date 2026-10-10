@@ -93,6 +93,11 @@ def test_cookie_mode_startup_rules() -> None:
             check(app_env="development", cors_origins=bad)
     with pytest.raises(RuntimeError, match="https"):
         check(app_env="production", cors_origins="https://a.example,http://b.example")
+    # An Origin header is scheme://host[:port]: `null`, a path, a trailing slash or a query never match it.
+    for bad in ("null", "https://a.example/", "https://a.example/app", "https://a.example?x=1", "a.example"):
+        with pytest.raises(RuntimeError, match="CORS_ORIGINS"):
+            check(app_env="development", cors_origins=f"https://ok.example,{bad}")
+    check(app_env="development", cors_origins="https://a.example:8443")
     # Token mode keeps accepting what it always did.
     token = {"auth_mode": "token", "app_env": "production", "cors_origins": "http://x"}
     base.model_copy(update=token).validate_for_startup()

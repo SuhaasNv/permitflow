@@ -19,7 +19,7 @@ from app.core.errors import AppError
 from app.core.logging import configure_logging, request_logging_middleware
 from app.core.metrics import RATE_LIMITED, metrics_middleware
 from app.core.rate_limit import RequestLimiter
-from app.core.session_cookie import CSRF_HEADER
+from app.core.session_cookie import CSRF_HEADER, clear_session_cookies
 from app.core.settings import get_settings
 from app.core.version import APP_VERSION
 from app.domain.uploads import too_large_message
@@ -181,7 +181,12 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content=exc.to_body())
+        response = JSONResponse(status_code=exc.status_code, content=exc.to_body())
+        # Sign-out always ends with no cookies in the browser, even when the session was already revoked
+        # or expired and the request is refused as 401 (US-104).
+        if exc.status_code == 401 and request.url.path == "/api/v1/auth/logout" and cookie_mode:
+            clear_session_cookies(response)
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

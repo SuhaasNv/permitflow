@@ -26,7 +26,7 @@ def get_current_user(
     db: DbSession,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> User:
-    # One transport per mode (ADR-017): the cookie in cookie mode, the bearer header in token mode, never
+    # One transport per mode (ADR-018): the cookie in cookie mode, the bearer header in token mode, never
     # both, so the other one cannot be used to dodge the CSRF check or the HttpOnly flag.
     cookie_mode = get_settings().auth_mode == "cookie"
     if cookie_mode:
@@ -45,12 +45,12 @@ def get_current_user(
         raise Unauthorized("Invalid or missing credentials.") from exc
     # Role, active flag and the session row are re-checked on every request (T19, T27).
     user = AuthService(db).current_user(user_id, session_id)
+    request.state.user_id = str(user.id)  # before the CSRF check, so a refusal is logged with the user
+    request.state.session_id = session_id
     # A cookie is sent by the browser on any request to this host, so unsafe methods need the CSRF token.
     # After the session check, so a revoked session still answers 401 session_revoked.
     if cookie_mode and request.method not in SAFE_METHODS:
         check_csrf(request, session_id)
-    request.state.user_id = str(user.id)
-    request.state.session_id = session_id
     return user
 
 

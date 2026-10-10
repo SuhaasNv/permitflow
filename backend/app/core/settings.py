@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000"
 
-    # US-104 (ADR-017): how the signed-in session travels. `token` (default) is the bearer token in the
+    # US-104 (ADR-018): how the signed-in session travels. `token` (default) is the bearer token in the
     # Authorization header, as before. `cookie` is a `__Host-` HttpOnly cookie plus a double-submit CSRF
     # token; the sign-in body then carries no bearer token. The frontend origins are CORS_ORIGINS.
     auth_mode: Literal["token", "cookie"] = "token"
@@ -155,6 +156,15 @@ class Settings(BaseSettings):
             origins = self.cors_origin_list
             if not origins or "*" in origins:
                 raise RuntimeError("AUTH_MODE=cookie needs CORS_ORIGINS to list the frontend origins, not *")
+            for origin in origins:
+                # An Origin header is scheme://host[:port] and nothing else; `null` is what a sandboxed or
+                # file page sends, so listing it would let any such page sign in.
+                parts = urlsplit(origin)
+                bare = f"{parts.scheme}://{parts.netloc}"
+                if parts.scheme not in ("http", "https") or origin != bare:
+                    raise RuntimeError(
+                        f"AUTH_MODE=cookie needs CORS_ORIGINS like https://host[:port]: not {origin!r}"
+                    )
             if self.app_env == "production" and not all(o.startswith("https://") for o in origins):
                 raise RuntimeError(
                     "AUTH_MODE=cookie in production needs every CORS_ORIGINS entry to be https"
