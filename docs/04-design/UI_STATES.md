@@ -68,6 +68,25 @@ Verification results never block anything: submit stays enabled with a warning s
 
 Progress on S-15: "Items addressed n of m"; Resubmit enabled once n ≥ 1.
 
+## Virus scan states (US-099, S-12, S-21, S-18; artboards 2a and 2b of wave 3a)
+
+The API's `scan_state` is null, `scanning`, `clean` or `infected`. Null (stored with `SCAN_MODE=off`, or before the scan existed) looks exactly as before: no security block, no scan chip, nothing disabled. The scan state sits beside the verification stages above; a file that is not clean never shows a document check.
+
+| State | Operator document card (S-12) | Officer case, documents (S-21) |
+|-------|-------------------------------|--------------------------------|
+| `scanning` | Chip "Scanning" (info, live). Security block "Scanning for viruses" (Security check): "Every file is scanned for viruses before anyone can open it. You can leave this page; the check carries on." and "Next: the document check, which starts when the security check passes." Download disabled with "Available after the security check"; no Re-run or Replace; Remove stays | Chip "Scanning". Open disabled. "Not available to open yet. It opens when the security scan finishes. The document check starts after that." No document check shown |
+| `clean` | Chip as before ("Uploaded" or "Checking"). Security block "No virus found" (Security check): "The file can be opened.", beside the document check from 1280 px, above it below that | Chip "Scan clean" (success). Open enabled. The document check as before |
+| `infected` | Chip "Blocked" (error). Red alert, exactly: "This file was blocked by the security check. Upload a different copy." No Download, no document check. Footer: "Upload a different copy" (the normal upload), "PDF recommended, up to 10 MB", Remove | Chip "Blocked". No Open control. Red alert "Blocked, no download": "The security scan found a virus. The file is quarantined: it cannot be opened or downloaded. The operator is told to upload a different copy. Treat this document as not provided until a clean copy arrives." |
+| `active_content` (officer only, never blocks) | not shown | Warning alert "This PDF contains active content": "It passed the virus scan, but it can run things when it is opened: an automatic action with a script, a launch action or an embedded file. Open it only in a viewer that blocks scripts, or ask the operator for a flattened copy." The artboard's list of which of the three was found is not built: the API serves one flag |
+
+Around the cards:
+
+- **Documents page (operator).** While any document is blocked or scanning, "Review and submit" is a disabled button and the line under the header says why: "Review and submit opens when no document is blocked or being scanned. 1 blocked, 1 being scanned." (only the kinds present are counted). The same reason disables "Review and submit" on the application page, "Submit application" on the review page and "Resubmit" (worded with its own action). The rail shows "Blocked" or "Scanning" chips, leaves the tick off those rows, counts only the clear ones, and adds "A blocked file does not count. Upload a different copy to continue." when one is blocked.
+- **Review page.** The document list shows "Blocked" (error) or "Scanning" (info) for those files.
+- **Clarification attachments (S-18, S-31).** A blocked attachment is a red row with the "Blocked" chip and the same sentence; its name cannot be opened, Remove stays, and "Send responses" is disabled with "Remove the file the security check blocked, then send your answers." A scanning one shows "Scanning" and cannot be opened. On the officer's rail a blocked attachment shows "Blocked, cannot be opened" and cannot be opened.
+- **Error codes to words (one place, `api/documents.ts`).** `file_infected`: the sentence above (a download is worded by the server for the reader's role: officers and administrators get "This file was blocked by the security check and cannot be opened."); `file_scanning`: "This file is still being scanned. Try again in a moment."; `scanner_unavailable` (503, a clarification attachment): "The security check is not available right now. Try again in a moment." (said once, not retried silently); `documents_not_clear` (409 on submit or resubmit): "Review and submit opens when no document is blocked or being scanned." A 422 `file_infected` on an attachment shows the blocked sentence and loads the blocked row so it can be removed. The officer's check result words the held reason `scanner_unavailable`.
+- Not shown: when the file was scanned or found infected (the artboard's timestamps). The API has no scan time.
+
 ## Per-screen states
 
 | Screen | Loading | Empty | Error | Success / other |
