@@ -22,7 +22,7 @@ from app.repositories.revisions import RevisionRepository
 from app.schemas.applications import OperatorFeedbackView, ResubmitReadiness
 from app.services.feedback import target_label
 from app.services.notifications import NotificationService
-from app.services.scan import ensure_submittable
+from app.services.scan import ensure_submittable, submit_blocked_reason
 
 
 class ResubmissionService:
@@ -81,14 +81,18 @@ class ResubmissionService:
             *(_section_label(k) for k in sorted(flagged.sections - changes.sections)),
             *(DOCUMENT_TYPE_LABELS[t] for t in flagged.document_types if t not in changes.document_types),
         ]
+        blocked = submit_blocked_reason(docs, "Resubmit opens when no document is blocked or being scanned.")
         return ResubmitReadiness(
-            can_resubmit=changes.any,
+            can_resubmit=changes.any and blocked is None,
             changed_sections=sorted(changes.sections),
             changed_document_types=sorted(t.value for t in changes.document_types),
             untouched_targets=untouched,
-            reason=None
-            if changes.any
-            else "Change at least one flagged section or document before resubmitting.",
+            reason=blocked
+            or (
+                None
+                if changes.any
+                else "Change at least one flagged section or document before resubmitting."
+            ),
         )
 
     # ---------- write side ----------

@@ -187,6 +187,7 @@ def _assemble(
             verification=_verification(runs.get(d.id)),
             scan_state=d.scan_state,
             active_content=d.active_content,
+            scanned_at=d.scanned_at,
         )
         for d in docs
     ]

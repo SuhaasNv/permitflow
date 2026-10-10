@@ -47,6 +47,8 @@ class DocumentView(BaseModel):
     # US-099: null (stored with the scan off), scanning, clean or infected. Only null and clean can be opened;
     # for infected, the verification's error_reason is `file_infected`.
     scan_state: str | None = None
+    # When the verdict (clean or infected) landed; null while scanning or when the scan never ran.
+    scanned_at: datetime | None = None
 
 
 class DocumentSlotView(BaseModel):
@@ -150,6 +152,9 @@ class ApplicationOperatorView(BaseModel):
     status_explanation: str
     can_edit: bool
     can_submit: bool
+    # US-099: why Review and submit is closed while a document is blocked or being scanned (shown as is).
+    # Null when the scan is not what stops it.
+    submit_blocked_reason: str | None = None
     sections: list[SectionView]
     document_slots: list[DocumentSlotView]
     completeness: CompletenessView

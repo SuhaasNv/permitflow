@@ -87,6 +87,7 @@ class OfficerDocumentOut(BaseModel):
     # active_content flags a PDF with an automatic action plus a script, a launch action or an embedded file.
     scan_state: str | None = None
     active_content: bool = False
+    scanned_at: datetime | None = None
 
 
 class RevisionOut(BaseModel):

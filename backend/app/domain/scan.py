@@ -6,6 +6,7 @@ With `SCAN_MODE=enforce` it is `scanning` from the upload until the scanner answ
 """
 
 import re
+from collections.abc import Iterable
 
 SCANNING = "scanning"
 CLEAN = "clean"
@@ -29,6 +30,18 @@ def servable(scan_state: str | None) -> bool:
 
 
 DOCUMENTS_NOT_CLEAR_MESSAGE = "Review and submit opens when no document is blocked or being scanned."
+
+
+def blocked_reason(states: Iterable[str | None], lead: str = DOCUMENTS_NOT_CLEAR_MESSAGE) -> str | None:
+    """The sentence the screens show when the documents' scan states stop a submission, with the counts
+    ("1 blocked, 1 being scanned."); None when nothing stops it."""
+    states = list(states)
+    parts = [
+        f"{n} {label}"
+        for n, label in ((states.count(INFECTED), "blocked"), (states.count(SCANNING), "being scanned"))
+        if n
+    ]
+    return f"{lead} {', '.join(parts)}." if parts else None
 
 
 def quarantine_key(key: str) -> str:

@@ -33,7 +33,16 @@ from app.worker import Worker
 from tests.conftest import BACKEND_DIR
 from tests.factories import login, make_user
 from tests.integration.test_clarification import _attach, _respond, _submitted
-from tests.journeys import PDF, TXT, complete_draft, draft, submitted, upload
+from tests.journeys import (
+    PDF,
+    TXT,
+    VALID_PREMISES,
+    complete_draft,
+    draft,
+    flag_and_request,
+    submitted,
+    upload,
+)
 
 API = "/api/v1"
 EICAR = rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
@@ -167,7 +176,8 @@ def test_clean_file_is_released_from_quarantine_and_served(
     assert got.status_code == 200 and got.content == TXT  # type: ignore[attr-defined]
     view = client.get(f"{API}/applications/{app_id}", headers=h).json()
     slot = next(s for s in view["document_slots"] if s["type"] == "business_profile")
-    assert slot["document"]["scan_state"] == CLEAN
+    assert slot["document"]["scan_state"] == CLEAN and slot["document"]["scanned_at"] is not None
+    assert doc.scanned_at is not None
 
 
 def test_a_file_is_quarantined_while_it_waits_for_its_scan(
@@ -178,6 +188,7 @@ def test_a_file_is_quarantined_while_it_waits_for_its_scan(
     upload(client, h, app_id, "floor_plan", "plan.pdf", PDF)
     doc = _doc(db)
     assert doc.scan_state == SCANNING and doc.stored_key.startswith("quarantine/") and _stored(doc.stored_key)
+    assert doc.scanned_at is None  # no verdict yet
     got = _download(client, h, app_id, doc.id)
     assert got.status_code == 409 and got.json()["error"]["code"] == "file_scanning"  # type: ignore[attr-defined]
     assert scanner.seen == []  # the API itself never scans in worker mode
@@ -186,6 +197,7 @@ def test_a_file_is_quarantined_while_it_waits_for_its_scan(
     execute_run(run_id, "w1")
     doc = _doc(db)
     assert doc.scan_state == CLEAN and _stored(doc.stored_key) and not _stored("quarantine/" + doc.stored_key)
+    assert doc.scanned_at is not None
     assert _download(client, h, app_id, doc.id).status_code == 200  # type: ignore[attr-defined]
 
 
@@ -211,6 +223,7 @@ def test_infected_file_is_blocked_everywhere_and_never_reaches_the_ai(
     view = client.get(f"{API}/applications/{app_id}", headers=h).json()
     slot = next(s for s in view["document_slots"] if s["type"] == "floor_plan")["document"]
     assert slot["scan_state"] == INFECTED and slot["verification"]["error_reason"] == "file_infected"
+    assert slot["scanned_at"] is not None and doc.scanned_at is not None
     # audit event, and one Telegram message without a file name or a person
     event = db.scalar(select(AuditEvent).where(AuditEvent.event_type == "document.infected"))
     assert event is not None and event.payload["signature"] == "Test.Signature-1"
@@ -244,7 +257,12 @@ def test_officer_and_admin_are_refused_a_blocked_file_with_their_own_wording(
     adm = login(client, "adm@example.sg")
     doc = _doc(db)
     assert _download(client, off, app_id, doc.id).status_code == 200  # type: ignore[attr-defined]  # NULL: legacy
-    db.execute(update(Document).where(Document.id == doc.id).values(scan_state=INFECTED, active_content=True))
+    found = datetime(2026, 10, 9, 3, 15, tzinfo=UTC)
+    db.execute(
+        update(Document)
+        .where(Document.id == doc.id)
+        .values(scan_state=INFECTED, active_content=True, scanned_at=found)
+    )
     db.commit()
     for h in (off, adm):
         got = _download(client, h, app_id, doc.id)
@@ -254,6 +272,7 @@ def test_officer_and_admin_are_refused_a_blocked_file_with_their_own_wording(
     case = client.get(f"{API}/officer/applications/{app_id}", headers=off).json()
     flagged = next(d for d in case["documents"] if d["id"] == str(doc.id))
     assert flagged["scan_state"] == INFECTED and flagged["active_content"] is True
+    assert datetime.fromisoformat(flagged["scanned_at"]) == found
     db.execute(update(Document).where(Document.id == doc.id).values(scan_state=SCANNING))
     db.commit()
     assert _download(client, off, app_id, doc.id).status_code == 409  # type: ignore[attr-defined]
@@ -488,6 +507,65 @@ def test_submission_is_unchanged_with_the_scan_off(client: TestClient, db: Sessi
     assert _submit(client, h, app_id).status_code == 200  # type: ignore[attr-defined]
 
 
+def _view(client: TestClient, h: dict[str, str], app_id: str) -> dict[str, object]:
+    return client.get(f"{API}/applications/{app_id}", headers=h).json()  # type: ignore[no-any-return]
+
+
+def test_can_submit_follows_the_scan_and_explains_why(
+    client: TestClient, db: Session, scanner: FakeScanner
+) -> None:
+    app_id, h = _ready(client, db)
+    view = _view(client, h, app_id)
+    assert view["can_submit"] is True and view["submit_blocked_reason"] is None  # every file scanned clean
+    docs = db.scalars(select(Document).order_by(Document.uploaded_at)).all()
+    db.execute(update(Document).where(Document.id == docs[0].id).values(scan_state=INFECTED))
+    db.execute(update(Document).where(Document.id == docs[1].id).values(scan_state=SCANNING))
+    db.commit()
+    view = _view(client, h, app_id)
+    assert view["can_submit"] is False
+    assert view["submit_blocked_reason"] == (
+        "Review and submit opens when no document is blocked or being scanned. 1 blocked, 1 being scanned."
+    )
+    db.execute(update(Document).where(Document.id == docs[0].id).values(scan_state=CLEAN))
+    db.commit()
+    view = _view(client, h, app_id)
+    assert view["submit_blocked_reason"] == (
+        "Review and submit opens when no document is blocked or being scanned. 1 being scanned."
+    )
+    db.execute(update(Document).values(scan_state=CLEAN))
+    db.commit()
+    view = _view(client, h, app_id)
+    assert view["can_submit"] is True and view["submit_blocked_reason"] is None
+
+
+def test_can_submit_ignores_scan_states_with_the_scan_off(client: TestClient, db: Session) -> None:
+    app_id, h = _ready(client, db)
+    db.execute(update(Document).values(scan_state=INFECTED))
+    db.commit()
+    view = _view(client, h, app_id)
+    assert view["can_submit"] is True and view["submit_blocked_reason"] is None
+
+
+def test_resubmit_readiness_explains_a_blocked_or_scanning_document(
+    client: TestClient, db: Session, scanner: FakeScanner
+) -> None:
+    app_id, op, off = flag_and_request(client, db)
+    premises = {**VALID_PREMISES, "address_line_1": "10 Jalan Besar #01-21"}
+    r = client.patch(f"{API}/applications/{app_id}/sections/premises", headers=op, json=premises)
+    assert r.json()["resubmit"]["can_resubmit"] is True
+    doc = db.scalars(select(Document).where(Document.is_current.is_(True))).first()
+    assert doc is not None
+    db.execute(update(Document).where(Document.id == doc.id).values(scan_state=INFECTED))
+    db.commit()
+    resubmit = _view(client, op, app_id)["resubmit"]
+    assert isinstance(resubmit, dict) and resubmit["can_resubmit"] is False
+    assert resubmit["reason"] == "Resubmit opens when no document is blocked or being scanned. 1 blocked."
+    db.execute(update(Document).where(Document.id == doc.id).values(scan_state=CLEAN))
+    db.commit()
+    resubmit = _view(client, op, app_id)["resubmit"]
+    assert isinstance(resubmit, dict) and resubmit["can_resubmit"] is True and resubmit["reason"] is None
+
+
 # ---- clarification attachments ----
 
 
@@ -508,6 +586,10 @@ def test_attachment_is_scanned_in_its_upload_request(
     assert r.status_code == 201, r.text
     row = db.scalar(select(ClarificationAttachment))
     assert row is not None and row.scan_state == CLEAN and not row.stored_key.startswith("quarantine/")
+    assert row.scanned_at is not None
+    view = client.get(f"{API}/applications/{app_id}/clarifications", headers=op).json()
+    sent = next(i for i in view["items"] if i["key"] == "coved_edges")["responses"][0]["attachments"][0]
+    assert sent["scan_state"] == CLEAN and sent["scanned_at"] is not None
     assert _stored(row.stored_key) and not _stored("quarantine/" + row.stored_key)
     url = f"{API}/applications/{app_id}/clarifications/attachments/{row.id}/download"
     assert client.get(url, headers=op).status_code == 200
@@ -525,6 +607,7 @@ def test_infected_attachment_is_rejected_kept_quarantined_and_blocks_the_send(
     assert r.json()["error"]["code"] == "file_infected" and r.json()["error"]["message"] == INFECTED_MESSAGE
     row = db.scalar(select(ClarificationAttachment))
     assert row is not None and row.scan_state == INFECTED and row.stored_key.startswith("quarantine/")
+    assert row.scanned_at is not None
     assert _stored(row.stored_key)
     url = f"{API}/applications/{app_id}/clarifications/attachments/{row.id}/download"
     for h in (op, off):
@@ -583,7 +666,7 @@ def test_migration_0018_downgrades_cleanly_and_upgrades_back(client: TestClient,
             rows = conn.execute(
                 text(
                     "select table_name || '.' || column_name from information_schema.columns "
-                    "where column_name in ('scan_state', 'scan_signature', 'active_content')"
+                    "where column_name in ('scan_state', 'scan_signature', 'active_content', 'scanned_at')"
                 )
             )
             return {r[0] for r in rows}
@@ -591,7 +674,7 @@ def test_migration_0018_downgrades_cleanly_and_upgrades_back(client: TestClient,
     wanted = {
         f"{t}.{c}"
         for t in ("documents", "clarification_attachments")
-        for c in ("scan_state", "scan_signature", "active_content")
+        for c in ("scan_state", "scan_signature", "active_content", "scanned_at")
     }
     assert columns() == wanted
     admin = make_user(db, "adm-mig@example.sg", Role.ADMIN)

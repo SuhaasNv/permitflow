@@ -31,6 +31,7 @@ from app.domain.scan import (
     OFFICER_INFECTED_MESSAGE,
     SCANNING,
     SCANNING_MESSAGE,
+    blocked_reason,
     pdf_active_content,
     released_key,
     servable,
@@ -178,6 +179,11 @@ def ensure_submittable(docs: Iterable[Document]) -> None:
     with it off, `scan_state` is null for every new file and nothing changes."""
     if enforcing() and any(d.scan_state in (SCANNING, INFECTED) for d in docs):
         raise DocumentsNotClear(DOCUMENTS_NOT_CLEAR_MESSAGE, details={"reason": "documents_not_clear"})
+
+
+def submit_blocked_reason(docs: Iterable[Document], lead: str = DOCUMENTS_NOT_CLEAR_MESSAGE) -> str | None:
+    """Why the scan stops a submission or resubmission, for the operator view; None with the scan off."""
+    return blocked_reason([d.scan_state for d in docs], lead) if enforcing() else None
 
 
 def ensure_servable(scan_state: str | None, user: User) -> None:

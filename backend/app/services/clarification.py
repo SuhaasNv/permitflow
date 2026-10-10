@@ -213,6 +213,7 @@ class ClarificationService:
                             size_bytes=a.size_bytes,
                             uploaded_at=a.uploaded_at,
                             scan_state=a.scan_state,
+                            scanned_at=a.scanned_at,
                         )
                         for a in attachments.get(r.id, [])
                     ],
@@ -343,6 +344,7 @@ class ClarificationService:
             uploaded_at=datetime.now(UTC),
             scan_state=scan_state,
             scan_signature=signature if scan_state == INFECTED else None,
+            scanned_at=datetime.now(UTC) if scan_state else None,
             active_content=active_content,
         )
         self.checklists.add(row)
@@ -779,6 +781,7 @@ class ClarificationService:
                                     size_bytes=a.size_bytes,
                                     uploaded_at=a.uploaded_at,
                                     scan_state=a.scan_state,
+                                    scanned_at=a.scanned_at,
                                 )
                                 for a in attachments.get(r.id, [])
                             ],

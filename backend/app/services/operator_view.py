@@ -24,6 +24,7 @@ from app.schemas.applications import (
 from app.schemas.clarification import ClarificationBlock
 from app.schemas.site_visit import SiteVisitOperatorView
 from app.schemas.storage import StorageView
+from app.services.scan import submit_blocked_reason
 
 LICENCE_TITLE = "Food Establishment Licence"
 
@@ -157,6 +158,7 @@ def document_view(
         replaces_filename=replaces.original_filename if replaces else None,
         verification=verification,
         scan_state=doc.scan_state,
+        scanned_at=doc.scanned_at,
     )
 
 
@@ -213,6 +215,9 @@ def operator_view(
     comp = completeness_rules.compute(
         app.draft_data, set(docs_by_type), snapshot=app.status != ApplicationStatus.DRAFT
     )
+    blocked = (
+        submit_blocked_reason(d for d, _ in documents) if app.status == ApplicationStatus.DRAFT else None
+    )
     editable_sections = editable_sections or set()
     editable_document_types = editable_document_types or set()
     sections = [
@@ -248,7 +253,8 @@ def operator_view(
         status_tone=tone_for(app.status),
         status_explanation=_explanation(app.status, site_visit, open_clarifications),
         can_edit=bool(editable_sections or editable_document_types),
-        can_submit=app.status == ApplicationStatus.DRAFT and comp.is_complete,
+        can_submit=app.status == ApplicationStatus.DRAFT and comp.is_complete and blocked is None,
+        submit_blocked_reason=blocked,
         sections=sections,
         document_slots=slots,
         completeness=CompletenessView(

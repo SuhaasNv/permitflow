@@ -58,6 +58,7 @@ class ClarificationAttachment(Base):
     # US-099 (migration 0018): the virus scan, as on documents.
     scan_state: Mapped[str | None] = mapped_column(String(16), nullable=True)
     scan_signature: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     active_content: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false"), nullable=False
     )

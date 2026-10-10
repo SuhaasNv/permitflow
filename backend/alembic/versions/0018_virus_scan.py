@@ -6,12 +6,13 @@ Revises: 0016
 `scan_state` is NULL for every existing row and for every upload made with SCAN_MODE=off: those are served
 as before. With SCAN_MODE=enforce it is `scanning`, `clean` or `infected` (a VARCHAR without a CHECK, like
 the other state columns). `scan_signature` is the scanner's name for what it found; `active_content` is the
-PDF flag (an automatic action with a script, a launch action, an embedded file).
+PDF flag (an automatic action with a script, a launch action, an embedded file). `scanned_at` is when the
+verdict (clean or infected) landed; NULL while `scanning` and for rows the scan never touched.
 
 The stored `scanner_fail_mode` setting changes its words (US-101 stored `closed` and `open`): `closed` becomes
 `retry` and `open` becomes `hold`; the downgrade maps them back.
 
-Downgrade drops the three columns. Files still under `quarantine/` keep their key and are served by the
+Downgrade drops the four columns. Files still under `quarantine/` keep their key and are served by the
 older code once it reads them, so run a downgrade only with SCAN_MODE=off and nothing left `scanning`.
 """
 
@@ -45,6 +46,7 @@ def upgrade() -> None:
     for table in TABLES:
         op.add_column(table, sa.Column("scan_state", sa.String(length=16), nullable=True))
         op.add_column(table, sa.Column("scan_signature", sa.String(length=120), nullable=True))
+        op.add_column(table, sa.Column("scanned_at", sa.DateTime(timezone=True), nullable=True))
         op.add_column(
             table, sa.Column("active_content", sa.Boolean(), nullable=False, server_default=sa.text("false"))
         )
@@ -55,5 +57,6 @@ def downgrade() -> None:
     _rename_fail_mode(tuple((new, old) for old, new in RENAMES))
     for table in TABLES:
         op.drop_column(table, "active_content")
+        op.drop_column(table, "scanned_at")
         op.drop_column(table, "scan_signature")
         op.drop_column(table, "scan_state")

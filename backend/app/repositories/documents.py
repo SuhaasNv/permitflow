@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import String, and_, delete, func, literal_column, or_, select, text, update
 from sqlalchemy.orm import Session
@@ -266,6 +266,7 @@ class DocumentRepository:
             "scan_state": state,
             "scan_signature": signature,
             "active_content": active_content,
+            "scanned_at": datetime.now(UTC),  # the verdict landed (clean or infected)
         }
         if new_key is not None:
             values["stored_key"] = new_key
