@@ -109,6 +109,7 @@ export const router = createBrowserRouter([
               { path: '/admin/activity', ...lazyPage(() => import('@/features/admin/ActivityPage'), 'AdminActivityPage'), handle: titled('Activity') },
               { path: '/admin/users', ...lazyPage(() => import('@/features/admin/UsersPage'), 'AdminUsersPage'), handle: titled('Users') },
               { path: '/admin/settings', ...lazyPage(() => import('@/features/admin/SettingsPage'), 'AdminSettingsPage'), handle: titled('Settings') },
+              { path: '/admin/ai-usage', ...lazyPage(() => import('@/features/admin/AiUsagePage'), 'AiUsagePage'), handle: titled('AI usage') },
               // The officer screens, read-only (US-072): the server sends no actions, the components render no controls.
               {
                 element: (

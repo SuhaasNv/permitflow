@@ -75,6 +75,7 @@ const NAV: Record<Role, NavItem[]> = {
       to: '/admin/settings',
       icon: icon('M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6'),
     },
+    { label: 'AI usage', short: 'AI usage', to: '/admin/ai-usage', icon: icon('M3 3v18h18M8 17v-5M13 17V8M18 17v-9') },
   ],
 }
 
