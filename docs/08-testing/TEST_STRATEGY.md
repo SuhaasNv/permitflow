@@ -81,7 +81,7 @@ The first run missed the overview budget at 2.8 s: the idle list loaded every op
 
 ## Bundle size (US-087)
 
-`npm run size` (`scripts/check-bundle-size.mjs`) runs in the frontend CI job after the build and fails above 250 KB gzipped for the JavaScript the respond page loads; the app ships one bundle, so the figure is the whole app: 215 KB gzipped (763 KB raw) on 21 Sep 2026.
+`npm run size` (`scripts/check-bundle-size.mjs`) runs in the frontend CI job after the build and fails above 250 KB gzipped for the JavaScript a first visit loads: the entry chunk and the chunks it imports statically, read from `dist/.vite/manifest.json`. The officer and administrator screens are lazy chunks (`app/router.tsx`), so they are outside that figure; the script also prints the total of every chunk, for information only. 210 KB gzipped first load, 254 KB gzipped in all, on 10 Oct 2026 (215 KB, one bundle, on 21 Sep 2026).
 
 ## Object storage (US-097)
 
