@@ -53,7 +53,8 @@ describe('AuthProvider (UC0-A session handling)', () => {
     const clear = vi.spyOn(QueryClient.prototype, 'clear')
     const logout = vi.spyOn(authApi, 'logout').mockResolvedValue(undefined)
     renderAuth()
-    expect(await screen.findByTestId('ready')).toHaveTextContent('true')
+    // With no stored token the provider first asks /auth/me for a cookie session (US-104), so ready follows.
+    await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'))
     await userEvent.click(screen.getByText('sign in'))
     expect(screen.getByTestId('user')).toHaveTextContent(user.email)
     expect(JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? '{}')).toMatchObject({ token: 'tok', user: { email: user.email } })

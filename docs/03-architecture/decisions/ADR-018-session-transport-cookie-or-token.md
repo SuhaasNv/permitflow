@@ -68,6 +68,10 @@ The `__Host-` prefix makes the browser refuse the cookie unless it is Secure, Pa
 - Local development: `__Host-` needs Secure. Chrome and Firefox accept Secure cookies on `http://localhost`; Safari does not, so use Chrome or Firefox, or stay in token mode locally.
 - The automated suites that sign in over the API (UAT scripts, Playwright) keep `AUTH_MODE=token` until wave 3b moves the frontend; a cookie-mode run must send `Origin`.
 
+## Frontend (wave 3b)
+
+One client serves both modes, with no build flag or variable. The sign-in answer decides: `access_token` present is token mode (unchanged: `sessionStorage`, bearer header); absent with `csrf_token` is cookie mode (`credentials: "include"` on every request, the CSRF value in memory only and sent as `X-CSRF-Token` on POST, PUT, PATCH and DELETE, nothing in `sessionStorage` or `localStorage`, `withCredentials` plus the header on the two XMLHttpRequest uploads). A token server answers no `Allow-Credentials`, so the browser refuses a credentialed cross-origin call; the sign-in and the load-time `GET /auth/me` therefore try with credentials and repeat plainly on a network failure, and remember it for the page load. A reload with no stored token asks `/auth/me`: a cookie session restores the user and its CSRF value. `403 csrf_failed` re-reads `/auth/me` and retries the request once. Flipping `AUTH_MODE` needs no frontend rebuild.
+
 ## Rollout and rollback
 
 The switch is the rollback. Set `AUTH_MODE=cookie` on the API and deploy the frontend of wave 3b together; to go back, set `AUTH_MODE=token` (or unset it) and redeploy the API (the setting is read at startup, so a redeploy or restart is what applies it). Either change signs everyone out once (the frontend of the other mode does not hold the credential the API now wants). No data changes, no migration. See `OPERATIONS.md`.

@@ -1,5 +1,5 @@
 import type { StorageView } from './applications'
-import { API_URL, AppError, notifyUnauthorized, request } from './client'
+import { API_URL, AppError, authInit, notifyUnauthorized, request } from './client'
 import { uploadToken, uploadWithProgress } from './documents'
 
 export interface ClarificationRequest {
@@ -101,10 +101,10 @@ export function sendClarifications(id: string): Promise<ClarificationView> {
 
 /** Downloads an attachment for the owner, an officer or an admin (same path for every role). */
 export async function downloadAttachment(applicationId: string, attachmentId: string, filename: string): Promise<void> {
-  const token = uploadToken()
-  const res = await fetch(`${API_URL}/applications/${applicationId}/clarifications/attachments/${attachmentId}/download`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
+  const res = await fetch(
+    `${API_URL}/applications/${applicationId}/clarifications/attachments/${attachmentId}/download`,
+    authInit(uploadToken()),
+  )
   if (!res.ok) {
     if (res.status === 401) notifyUnauthorized()
     throw new AppError(res.status, {

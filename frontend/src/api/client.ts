@@ -1,5 +1,6 @@
 /**
- * Thin fetch client. Adds the bearer token, maps the standard error body
+ * Thin fetch client. Sends the session (a bearer token, or in cookie mode the cookie plus the CSRF header,
+ * US-104 / ADR-018), maps the standard error body
  * `{ error: { code, message, details? } }` to an AppError (REL-001).
  */
 
@@ -32,6 +33,39 @@ export function setTokenProvider(fn: () => string | null): void {
   tokenProvider = fn
 }
 
+/**
+ * Cookie mode (US-104): the server keeps the session in an HttpOnly cookie and hands the page only a CSRF value,
+ * held here in memory and never stored. A non-null value IS the mode; the sign-in answer decides it.
+ */
+let csrfToken: string | null = null
+export function setCsrfToken(value: string | null): void {
+  csrfToken = value
+}
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+
+/** Where the server refused credentialed requests (token mode sends no Allow-Credentials): stop asking. */
+let credentialsRefused = false
+
+/** Fetch options carrying the session, for direct fetches outside `request` (downloads). Token mode: the bearer. */
+export function authInit(token: string | null, method = 'GET'): { headers: Record<string, string>; credentials?: 'include' } {
+  if (csrfToken === null) return { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+  return { headers: SAFE_METHODS.has(method) ? {} : { 'X-CSRF-Token': csrfToken }, credentials: 'include' }
+}
+
+/** The same for an XMLHttpRequest (uploads): the cookie goes with `withCredentials`, the bearer as a header. */
+export function authXhr(xhr: XMLHttpRequest, token: string | null): void {
+  const { headers, credentials } = authInit(token, 'POST')
+  xhr.withCredentials = credentials === 'include'
+  for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value)
+}
+
+/** One re-read of /auth/me for a fresh CSRF value; false when it gave none (not a cookie session any more). */
+export async function refreshCsrf(): Promise<boolean> {
+  const out = await request<{ csrf_token?: string }>('/auth/me')
+  if (out.csrf_token) csrfToken = out.csrf_token
+  return Boolean(out.csrf_token)
+}
+
 /** What a 401 said, so the sign-in page can explain why the session ended (US-093). */
 export interface UnauthorizedInfo {
   code: string
@@ -61,6 +95,11 @@ export interface RequestOptions {
   signal?: AbortSignal
   /** Let the browser finish the request after the page is hidden or unloaded (a last autosave). */
   keepalive?: boolean
+  /** Before any session is known (sign-in, the load-time /auth/me): try with credentials, so a cookie server's
+   * Set-Cookie sticks, and fall back to none for a token server, which refuses credentialed requests. */
+  probe?: boolean
+  /** Set by `request` itself on the one retry after a refreshed CSRF value. */
+  retried?: boolean
 }
 
 /** When a signed-in request last succeeded: the server's idle clock restarts on each one (US-093, US-095). */
@@ -72,7 +111,11 @@ export function lastActivity(): number {
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {}
   const token = tokenProvider()
-  if (token) headers.Authorization = `Bearer ${token}`
+  const method = options.method ?? 'GET'
+  const cookie = csrfToken !== null
+  if (cookie) {
+    if (!SAFE_METHODS.has(method)) headers['X-CSRF-Token'] = csrfToken as string
+  } else if (token) headers.Authorization = `Bearer ${token}`
   let body: BodyInit | undefined
   if (options.formData) {
     body = options.formData
@@ -80,15 +123,24 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     headers['Content-Type'] = 'application/json'
     body = JSON.stringify(options.body)
   }
+  const send = (credentials?: 'include') =>
+    fetch(`${API_URL}${path}`, { method, headers, body, signal: options.signal, keepalive: options.keepalive, credentials })
   let response: Response
   try {
-    response = await fetch(`${API_URL}${path}`, {
-      method: options.method ?? 'GET',
-      headers,
-      body,
-      signal: options.signal,
-      keepalive: options.keepalive,
-    })
+    if (cookie) {
+      response = await send('include')
+    } else if (options.probe && !token && !credentialsRefused) {
+      try {
+        response = await send('include')
+      } catch {
+        // A token server answers a credentialed request without Allow-Credentials, which the browser turns
+        // into a network error before any preflighted request is sent: ask again plainly.
+        response = await send()
+        credentialsRefused = true
+      }
+    } else {
+      response = await send()
+    }
   } catch {
     throw new AppError(0, {
       code: 'network_error',
@@ -96,7 +148,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     })
   }
   const requestId = response.headers.get('X-Request-ID') ?? undefined
-  if (token && response.ok) lastActivityAt = Date.now()
+  if ((token || cookie) && response.ok) lastActivityAt = Date.now()
   if (response.status === 204) return undefined as T
   const text = await response.text()
   let parsed: unknown = null
@@ -108,6 +160,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     }
   }
   if (!response.ok) {
+    if (cookie && !options.retried && response.status === 403 && isApiErrorBody(parsed) && parsed.error.code === 'csrf_failed') {
+      // The CSRF value went stale (a new sign-in elsewhere in this browser): read it again and retry once.
+      if (await refreshCsrf().catch(() => false)) return request<T>(path, { ...options, retried: true })
+    }
     if (response.status === 401) {
       notifyUnauthorized(
         isApiErrorBody(parsed)
