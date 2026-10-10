@@ -1,4 +1,4 @@
-# ADR-017: A ledger of what each check cost, written with the result
+# ADR-020: A ledger of what each check cost, written with the result
 
 Date: 10 October 2026. Story: US-100 (wave 3 of v0.5.0). Status: accepted, built; behind no switch of its own (the Telegram line has the US-101 setting `telegram_per_check_messages`, off by default). Related: ADR-004 and ADR-016 (where checks run), ADR-006 (AI advisory), ADR-008 (same-transaction records), ADR-012 (quotas), ADR-014 (the administrator reads), US-101 (live settings).
 
@@ -53,7 +53,7 @@ Option C.
 | Telegram (per check, off by default) | document type, outcome, cost, time, the case reference | names, email, filename, document content, tokens, the person's id |
 | LangSmith (trace metadata) | run id, document id, document type, `application_hash`, `user_pseudonym` | application id, user id, email |
 
-The pseudonyms are the first 16 hex characters of HMAC-SHA256, keyed with the server secret (`JWT_SECRET`), over a label (`user` or `application`) and the id: stable, so one person's traces group together, and not reversible by anyone without the key. Rotating the secret changes every pseudonym, which only splits traces at that date. The Telegram send happens after the commit, through the existing notifier, inside a guard: a failure is logged and the check is not affected.
+The pseudonyms are the first 16 hex characters of HMAC-SHA256 over a label (`user` or `application`) and the id, keyed with a sub-key derived from the server secret (`k = HMAC-SHA256(JWT_SECRET, "permitflow-pseudonym-v1")`, so the secret itself never keys the pseudonyms directly; the same derivation pattern US-104 uses for its CSRF token): stable, so one person's traces group together, and not reversible by anyone without the key. Rotating the secret changes every pseudonym, which only splits traces at that date. The Telegram send happens after the commit, through the existing notifier, inside a guard: a failure is logged and the check is not affected.
 
 **The export** is `GET /admin/ai-usage.csv`, a streamed response from a session of its own, one line at a time. Every cell that begins with `=`, `+`, `-`, `@`, tab or CR gets a single quote in front, so a spreadsheet shows a person's name that starts with `=` as text.
 
@@ -87,4 +87,4 @@ The pseudonyms are the first 16 hex characters of HMAC-SHA256, keyed with the se
 
 ## Links
 
-Stories: US-100 (this), US-098 (where checks run), US-101 (the Telegram setting, the daily cap). Documents: `docs/03-architecture/DOMAIN_MODEL.md` (tables), `docs/03-architecture/ARCHITECTURE.md` (API table), `docs/13-observability/OBSERVABILITY.md` (counters, dashboard row, `/cost`), `docs/06-security/THREAT_MODEL.md` (T33), `docs/09-operations/OPERATIONS.md` (prices, the switch), `docs/07-ai/AI_VERIFICATION_DESIGN.md`.
+Stories: US-100 (this), US-098 (where checks run), US-101 (the Telegram setting, the daily cap). Documents: `docs/03-architecture/DOMAIN_MODEL.md` (tables), `docs/03-architecture/ARCHITECTURE.md` (API table), `docs/13-observability/OBSERVABILITY.md` (counters, dashboard row, `/cost`), `docs/06-security/THREAT_MODEL.md` (T34), `docs/09-operations/OPERATIONS.md` (prices, the switch), `docs/07-ai/AI_VERIFICATION_DESIGN.md`.

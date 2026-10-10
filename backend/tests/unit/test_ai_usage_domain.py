@@ -1,6 +1,8 @@
 """US-100: the pure rules behind the AI usage record: cost arithmetic, bounded metric labels, the keyed
 pseudonyms, the Telegram line and the formula-safe CSV cell."""
 
+import hashlib
+import hmac
 import uuid
 from decimal import Decimal
 
@@ -56,6 +58,15 @@ def test_pseudonyms_are_stable_keyed_and_do_not_contain_the_id() -> None:
     assert a != pseudonym("secret-one", "user", uuid.uuid4())
     assert len(a) == 16 and int(a, 16) >= 0
     assert str(user) not in a and user.hex[:8] not in a
+
+
+def test_pseudonyms_come_from_a_derived_sub_key_not_the_secret_itself() -> None:
+    user = uuid.uuid4()
+    sub_key = hmac.new(b"the-server-secret", b"permitflow-pseudonym-v1", hashlib.sha256).digest()
+    expected = hmac.new(sub_key, f"user:{user}".encode(), hashlib.sha256).hexdigest()[:16]
+    assert pseudonym("the-server-secret", "user", user) == expected
+    direct = hmac.new(b"the-server-secret", f"user:{user}".encode(), hashlib.sha256).hexdigest()[:16]
+    assert pseudonym("the-server-secret", "user", user) != direct
 
 
 def test_the_telegram_line_has_the_check_and_no_person() -> None:

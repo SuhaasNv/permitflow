@@ -191,7 +191,7 @@ One administrator override of an environment default. A missing row means "follo
 There is no history table: the history is the audit trail (`settings.changed`, `settings.reverted`, below), which already records the old and new value, the actor and the reason, and is append-only. Migration 0015.
 
 ### AiPrice and AiUsage (v0.5.0, US-100, migration 0017)
-What a model costs, and what each check cost. ADR-017.
+What a model costs, and what each check cost. ADR-020.
 
 `AiPrice` is versioned and never edited: a new row with a later `effective_from` replaces the price from that moment. The price of a run is the row of its model with the latest `effective_from` not after the moment the result is stored. The migration seeds `gpt-4.1-mini` at USD 0.40 input and 1.60 output per million tokens, effective 14 Apr 2025.
 | Field | Type | Notes |

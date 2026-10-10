@@ -79,7 +79,7 @@ Eight of the variables above are the **default and the hard ceiling** of a setti
 - **Pausing the AI** stops new checks (stored `unavailable`, reason `ai_paused`; known gap until the worker, US-098, queues them). Switching it back on records how many checks the pause stopped in the audit row and the Telegram message; those documents need a manual re-check.
 - Migration order: apply migration 0015 before the new API serves traffic (the image does on start). If the table is missing the API logs `platform_settings_unreadable` and keeps the last good snapshot (the environment values only before the first load), so a late migration never takes a limit away.
 
-### AI usage record and prices (US-100, ADR-017)
+### AI usage record and prices (US-100, ADR-020)
 
 No new environment variable. What the record needs, and how to run it:
 
@@ -88,8 +88,8 @@ No new environment variable. What the record needs, and how to run it:
 - **Who sees it.** `GET /admin/ai-usage` and `GET /admin/ai-usage.csv` as an administrator (filters: person, application, Singapore day range); no screen yet, the page follows its artboards. The CSV is streamed, so a large export does not load the table into memory.
 - **Per-check Telegram line.** Off by default. An administrator switches `telegram_per_check_messages` in the admin settings (reason and password step-up, as for any setting); it needs `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` on the backend (and on the worker, in worker mode, because the line is sent where the check runs). The plan is on in development, off in production. The line carries no name or personal data.
 - **Worker mode.** The usage row is written by whichever process stores the result, the API inline and the worker otherwise, so the admin page is right in both. The Prometheus counters and the Telegram line come from the same process: the worker needs `TELEGRAM_*` too, and its `/metrics` must be scraped for the dashboard row and `/cost`.
-- **LangSmith.** Trace metadata carries `application_hash` and `user_pseudonym`, keyed hashes made with `JWT_SECRET`. Rotating `JWT_SECRET` changes them all: traces before and after the rotation no longer group by person. Tracing off (no `LANGSMITH_API_KEY`): nothing is sent.
-- **Retention.** The table grows by one small row per check and is never pruned. It keeps the person's id; if a retention rule is ever set for personal data, a job would clear `user_id` (ADR-017, "Revisit when").
+- **LangSmith.** Trace metadata carries `application_hash` and `user_pseudonym`, keyed hashes made with a sub-key derived from `JWT_SECRET` (`HMAC-SHA256(JWT_SECRET, "permitflow-pseudonym-v1")`). Rotating `JWT_SECRET` changes them all: traces before and after the rotation no longer group by person. Tracing off (no `LANGSMITH_API_KEY`): nothing is sent.
+- **Retention.** The table grows by one small row per check and is never pruned. It keeps the person's id; if a retention rule is ever set for personal data, a job would clear `user_id` (ADR-020, "Revisit when").
 - **Check that it works.** Upload a document, then `SELECT document_type, outcome, input_tokens, output_tokens, cost_usd FROM ai_usage ORDER BY created_at DESC LIMIT 5;` With `AI_PROVIDER=mock` the tokens and cost are 0 by design.
 
 ## Seeding

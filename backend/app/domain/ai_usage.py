@@ -31,11 +31,17 @@ def cost_usd(
     return raw.quantize(COST_PLACES, rounding=ROUND_HALF_UP)
 
 
+PSEUDONYM_KEY_INFO = b"permitflow-pseudonym-v1"
+
+
 def pseudonym(secret: str, label: str, value: uuid.UUID | str) -> str:
-    """A stable, non-reversible stand-in for an id: the first 16 hex characters of an HMAC-SHA256 keyed
-    with a server secret. The same id always gives the same stand-in, so one person's traces group
-    together in LangSmith, but neither the id nor the email can be recovered from it."""
-    digest = hmac.new(secret.encode(), f"{label}:{value}".encode(), hashlib.sha256)
+    """A stable, non-reversible stand-in for an id: the first 16 hex characters of an HMAC-SHA256. The key
+    is a sub-key, `HMAC-SHA256(secret, "permitflow-pseudonym-v1")`, so the server secret itself never keys
+    anything but derivations and a pseudonym tells nothing about the session tokens the same secret signs.
+    The same id always gives the same stand-in, so one person's traces group together in LangSmith, but
+    neither the id nor the email can be recovered from it."""
+    key = hmac.new(secret.encode(), PSEUDONYM_KEY_INFO, hashlib.sha256).digest()
+    digest = hmac.new(key, f"{label}:{value}".encode(), hashlib.sha256)
     return digest.hexdigest()[:16]
 
 

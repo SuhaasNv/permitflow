@@ -102,9 +102,9 @@ The mock is intentionally simple; it exists so the whole product works without a
 
 Estimated cost per verification with `gpt-4.1-mini`: well under one cent for a 20 000-character document (input-dominated); demo traffic on the developer's key.
 
-**What each check cost is recorded (US-100, ADR-017).** Every run has one row in `ai_usage`, stored in the same transaction as its result: who started it (`verification_runs.requested_by`), the document type, provider, model, the input and output tokens the provider billed (`VerificationProvider.input_tokens` and `output_tokens`, read after `verify`; the mock reports 0), the cost at the price of that model in force when the result was stored (`ai_prices`, versioned, never edited), the latency and the outcome. A run that never called the provider (quota, pause switch, unreadable file, provider not configured, `dead`, `failed: interrupted`) has a row of zeros. The prompt, the schema and the rules are unchanged.
+**What each check cost is recorded (US-100, ADR-020).** Every run has one row in `ai_usage`, stored in the same transaction as its result: who started it (`verification_runs.requested_by`), the document type, provider, model, the input and output tokens the provider billed (`VerificationProvider.input_tokens` and `output_tokens`, read after `verify`; the mock reports 0), the cost at the price of that model in force when the result was stored (`ai_prices`, versioned, never edited), the latency and the outcome. A run that never called the provider (quota, pause switch, unreadable file, provider not configured, `dead`, `failed: interrupted`) has a row of zeros. The prompt, the schema and the rules are unchanged.
 
-LangSmith trace metadata (when tracing is on) is the run id, the document id, the document type, the model, the prompt version and two keyed hashes, `application_hash` and `user_pseudonym` (first 16 hex characters of HMAC-SHA256 with the server secret). The application id, the user id and the email are not sent.
+LangSmith trace metadata (when tracing is on) is the run id, the document id, the document type, the model, the prompt version and two keyed hashes, `application_hash` and `user_pseudonym` (first 16 hex characters of HMAC-SHA256 with a sub-key derived from the server secret). The application id, the user id and the email are not sent.
 
 ## Failure handling summary
 
