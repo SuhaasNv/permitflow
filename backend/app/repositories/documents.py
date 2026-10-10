@@ -100,9 +100,9 @@ class DocumentRepository:
         )
         return int(getattr(result, "rowcount", 0) or 0) == 1
 
-    def fail_interrupted_runs(self, running_before: datetime, finished_at: datetime) -> int:
+    def fail_interrupted_runs(self, running_before: datetime, finished_at: datetime) -> list[uuid.UUID]:
         """Runs still `running` since before `running_before`, and every `pending` run, become
-        `failed: interrupted` (startup after a restart); returns how many."""
+        `failed: interrupted` (startup after a restart); returns their ids."""
         result = self.db.execute(
             update(VerificationRun)
             .where(
@@ -115,8 +115,10 @@ class DocumentRepository:
                 )
             )
             .values(status=VerificationStatus.FAILED, error_reason="interrupted", finished_at=finished_at)
+            .returning(VerificationRun.id)
+            .execution_options(synchronize_session=False)
         )
-        return int(getattr(result, "rowcount", 0) or 0)
+        return list(result.scalars())
 
     # ---- the work queue (US-098, ADR-016): `pending` is queued, `running` is leased ----
 
@@ -196,7 +198,7 @@ class DocumentRepository:
         )
         return int(getattr(requeued, "rowcount", 0) or 0), dead_ids
 
-    def fail_stranded_inline(self, started_before: datetime, finished_at: datetime) -> int:
+    def fail_stranded_inline(self, started_before: datetime, finished_at: datetime) -> list[uuid.UUID]:
         """`running` runs with no lease, started before the cutoff: they began inline, before the switch to
         worker mode, and no process is left to finish them. Same outcome as the startup sweep."""
         result = self.db.execute(
@@ -207,8 +209,10 @@ class DocumentRepository:
                 VerificationRun.started_at < started_before,
             )
             .values(status=VerificationStatus.FAILED, error_reason="interrupted", finished_at=finished_at)
+            .returning(VerificationRun.id)
+            .execution_options(synchronize_session=False)
         )
-        return int(getattr(result, "rowcount", 0) or 0)
+        return list(result.scalars())
 
     def lock_state(
         self, run_id: uuid.UUID, application_id: uuid.UUID | None = None

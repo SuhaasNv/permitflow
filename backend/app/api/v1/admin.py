@@ -2,9 +2,11 @@
 the platform settings."""
 
 import uuid
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request, status
+from fastapi.responses import StreamingResponse
 
 from app.api.deps import AdminUser, DbSession
 from app.api.v1 import auth as auth_api
@@ -20,6 +22,7 @@ from app.schemas.admin import (
     UserCreateIn,
     UserPatchIn,
 )
+from app.schemas.ai_usage import AiUsageOut
 from app.schemas.officer import OfficerApplicationOut
 from app.schemas.platform_settings import (
     SettingChangeIn,
@@ -31,6 +34,7 @@ from app.schemas.platform_settings import (
 from app.services.admin_feed import AdminFeedService
 from app.services.admin_overview import AdminOverviewService
 from app.services.admin_users import AdminUserService, Change
+from app.services.ai_usage import AiUsageService, csv_stream, filters_for
 from app.services.auth import AuthService
 from app.services.officer_view import OfficerViewService
 from app.services.platform_settings import PlatformSettingsService
@@ -186,3 +190,61 @@ def revert_platform_setting(
         },
     )
     return service.revert(user, event_id, payload.reason)
+
+
+UsageUser = Annotated[uuid.UUID | None, Query(description="Only checks started by this person.")]
+UsageApplication = Annotated[uuid.UUID | None, Query(description="Only checks on this application.")]
+UsageReference = Annotated[
+    str | None, Query(max_length=20, description="Only checks on the application with this exact reference.")
+]
+UsageFrom = Annotated[date | None, Query(alias="from", description="First Singapore day, inclusive.")]
+UsageTo = Annotated[date | None, Query(alias="to", description="Last Singapore day, inclusive.")]
+
+
+@router.get("/ai-usage", response_model=AiUsageOut)
+def ai_usage(
+    user: AdminUser,
+    db: DbSession,
+    user_id: UsageUser = None,
+    application_id: UsageApplication = None,
+    reference: UsageReference = None,
+    day_from: UsageFrom = None,
+    day_to: UsageTo = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    before: Annotated[str | None, Query(max_length=80)] = None,
+) -> AiUsageOut:
+    """What each automatic check cost and who ran it (US-100): a keyset-paged list (newest first), the
+    totals over everything the filters match, and today's numbers against the daily AI cap."""
+    f = filters_for(
+        user_id=user_id,
+        application_id=application_id,
+        reference=reference,
+        day_from=day_from,
+        day_to=day_to,
+    )
+    return AiUsageService(db).page(f, limit=limit, before=before)
+
+
+@router.get("/ai-usage.csv")
+def ai_usage_csv(
+    user: AdminUser,
+    user_id: UsageUser = None,
+    application_id: UsageApplication = None,
+    reference: UsageReference = None,
+    day_from: UsageFrom = None,
+    day_to: UsageTo = None,
+) -> StreamingResponse:
+    """The same rows as a CSV file, streamed (US-100). A cell that begins with = + - @ tab or CR is
+    prefixed with a single quote so a spreadsheet shows it as text."""
+    f = filters_for(
+        user_id=user_id,
+        application_id=application_id,
+        reference=reference,
+        day_from=day_from,
+        day_to=day_to,
+    )
+    return StreamingResponse(
+        csv_stream(f, user.id),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="ai-usage.csv"', "Cache-Control": "no-store"},
+    )

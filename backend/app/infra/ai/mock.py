@@ -29,6 +29,9 @@ _EXPIRY_WORDS = re.compile(r"(expir(?:y|es|ed|ation)|valid (?:until|till|to|thro
 class MockProvider:
     name = "mock"
     model: str | None = None
+    # The mock bills nothing: its usage row has zero tokens and zero cost (US-100).
+    input_tokens = 0
+    output_tokens = 0
 
     def verify(self, request: VerificationRequest) -> VerificationResult:
         text = request.text

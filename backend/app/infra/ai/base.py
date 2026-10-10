@@ -15,5 +15,9 @@ class ProviderUnavailable(Exception):
 class VerificationProvider(Protocol):
     name: str
     model: str | None
+    # US-100: the tokens the model billed for the last `verify`, read by the service for the usage record.
+    # A provider is built per check, so these belong to one check. Zero when the provider bills nothing.
+    input_tokens: int
+    output_tokens: int
 
     def verify(self, request: VerificationRequest) -> VerificationResult: ...

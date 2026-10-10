@@ -12,6 +12,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta, timezone
 
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = str(os.environ["TELEGRAM_CHAT_ID"])
@@ -27,7 +28,7 @@ HELP = (
     "/dev  ·  development only\n"
     "/prod  ·  production only\n"
     "/checks  ·  the document checks in the last hour\n"
-    "/cost  ·  what the checks cost (list price)\n"
+    "/cost  ·  what the checks cost, per document type (today, 7 days)\n"
     "/queue  ·  applications by status, who is waiting\n"
     "/alerts  ·  rules firing right now\n"
     "/help  ·  this list\n"
@@ -74,6 +75,30 @@ def cost_expr(e: str) -> str:
     return (f'((sum(increase(permitflow_openai_tokens_total{{{e}, kind="prompt"}}[1h])) - sum(increase(permitflow_openai_tokens_total{{{e}, kind="cached"}}[1h]))) * {PRICE_IN}'
             f' + sum(increase(permitflow_openai_tokens_total{{{e}, kind="cached"}}[1h])) * {PRICE_CACHED}'
             f' + sum(increase(permitflow_openai_tokens_total{{{e}, kind="completion"}}[1h])) * {PRICE_OUT}) / 1e6')
+
+
+def seconds_since_sgt_midnight() -> int:
+    """Seconds of the Singapore day so far (UTC+8, no daylight saving), at least 60 so the window is never empty."""
+    now = datetime.now(timezone(timedelta(hours=8)))
+    return max(60, int((now - now.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()))
+
+
+def cost_by_type(e: str) -> str:
+    """US-100: what the checks cost per document type, today (Singapore day) and over 7 days, from the usage
+    record's counters. These metrics carry no names or ids, only the document type and the outcome."""
+    rows: dict[str, dict[str, tuple[float, float]]] = {}
+    for label, window in (("today", f"{seconds_since_sgt_midnight()}s"), ("7 days", "7d")):
+        spend = {m.get("document_type", "?"): v for m, v in prom_series(f'sum by (document_type) (increase(permitflow_ai_cost_usd_total{{{e}}}[{window}]))')}
+        count = {m.get("document_type", "?"): v for m, v in prom_series(f'sum by (document_type) (increase(permitflow_ai_checks_total{{{e}}}[{window}]))')}
+        for kind in set(spend) | set(count):
+            rows.setdefault(kind, {})[label] = (spend.get(kind, 0.0), count.get(kind, 0.0))
+    if not rows:
+        return "By document type  <i>no checks recorded yet</i>"
+    lines = []
+    for kind in sorted(rows):
+        parts = [f"{label} <b>USD {rows[kind].get(label, (0.0, 0.0))[0]:.4f}</b> ({rows[kind].get(label, (0.0, 0.0))[1]:.0f})" for label in ("today", "7 days")]
+        lines.append(f"{kind.replace('_', ' ')}  ·  " + "  ·  ".join(parts))
+    return "By document type  <i>(checks in brackets)</i>\n" + "\n".join(lines)
 
 
 def build_of(env: str) -> str:
@@ -132,7 +157,8 @@ def cost(envs: list[str]) -> str:
         runs = prom(f'sum(increase(permitflow_verification_runs_total{{{e}, provider="openai"}}[24h]))') or 0
         per = spend24 / runs if runs else 0
         parts.append(f"<b>{env.capitalize()}</b>  ·  last 24 h\nTokens  prompt <b>{tokens['prompt']:.0f}</b>  ·  cached <b>{tokens['cached']:.0f}</b>  ·  output <b>{tokens['completion']:.0f}</b>\n"
-                     f"Spend  <b>USD {spend24:.3f}</b>   ·   per check  <b>USD {per:.4f}</b>   ·   at this rate  <b>USD {spend24 * 30:.2f}</b> a month")
+                     f"Spend  <b>USD {spend24:.3f}</b>   ·   per check  <b>USD {per:.4f}</b>   ·   at this rate  <b>USD {spend24 * 30:.2f}</b> a month\n"
+                     f"{cost_by_type(e)}")
     return (f"<b>Cost of the document checks</b>\n<i>gpt-4.1-mini list price: 0.40 / 0.10 cached / 1.60 USD per million tokens; the invoice is the truth</i>\n{RULE}\n"
             + f"\n{RULE}\n".join(parts) + f"\n{RULE}\nDashboard  {DASHBOARD}")
 

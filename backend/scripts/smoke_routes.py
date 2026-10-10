@@ -829,6 +829,14 @@ def main() -> None:
         json={"items": [], "version": 1},
     )
     call(adm, "POST", "/applications", "/applications", 403)
+    # ---- admin: AI usage (US-100). Read by the administrator only; the CSV is a download. ----
+    usage = call(adm, "GET", "/admin/ai-usage?limit=5", "/admin/ai-usage", 200).json()
+    note("the usage page has its totals and today's cap", "totals" in usage and "daily_cap" in usage["today"])
+    export = call(adm, "GET", "/admin/ai-usage.csv", "/admin/ai-usage.csv", 200)
+    note("the usage CSV starts with its header", export.text.startswith("created_at,"))
+    for h, code in ((op, 403), (off, 403), (None, 401)):
+        call(h, "GET", "/admin/ai-usage", "/admin/ai-usage", code)
+        call(h, "GET", "/admin/ai-usage.csv", "/admin/ai-usage.csv", code)
     call(None, "GET", "/applications", "/applications", 401)
     call(None, "GET", "/officer/applications", "/officer/applications", 401)
     call(None, "GET", "/admin/overview", "/admin/overview", 401)

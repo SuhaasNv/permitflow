@@ -17,6 +17,7 @@ from app.core import metrics
 from app.core.errors import Conflict
 from app.domain.enums import VerificationStatus
 from app.models import VerificationRun
+from app.models.base import new_id
 from app.repositories.applications import ApplicationRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.users import UserRepository
@@ -68,15 +69,26 @@ def verification_over_quota(db: Session, operator_id: uuid.UUID) -> str | None:
     return None
 
 
-def new_run(db: Session, document_id: uuid.UUID, operator_id: uuid.UUID) -> VerificationRun:
+def new_run(
+    db: Session, document_id: uuid.UUID, operator_id: uuid.UUID, requested_by: uuid.UUID
+) -> VerificationRun:
     """A pending run, or an already-finished `unavailable` one when the applicant or the platform is over
-    the daily quota. The background task only picks up pending runs, so nothing is sent to the model."""
+    the daily quota. The background task only picks up pending runs, so nothing is sent to the model.
+    `requested_by` is the person whose upload or re-run created it (US-100)."""
     reason = verification_over_quota(db, operator_id)
     if reason is None:
-        return VerificationRun(document_id=document_id, status=VerificationStatus.PENDING, provider="none")
+        return VerificationRun(
+            id=new_id(),
+            document_id=document_id,
+            status=VerificationStatus.PENDING,
+            provider="none",
+            requested_by=requested_by,
+        )
     now = datetime.now(UTC)
     metrics.VERIFICATION_RUNS.labels(VerificationStatus.UNAVAILABLE.value, "none").inc()
     return VerificationRun(
+        id=new_id(),
+        requested_by=requested_by,
         document_id=document_id,
         status=VerificationStatus.UNAVAILABLE,
         provider="none",

@@ -148,10 +148,25 @@ panels = [
           desc="Read from the database on every scrape of the API and every ten seconds by the worker, so it is true in both modes. With VERIFICATION_MODE=inline the queue is empty except for a moment."),
     panel(68, "Leases taken back, by outcome, per hour", [(f'sum by (outcome) (increase({m("permitflow_verification_reaped_total")}[1h]))', "{{outcome}}")], 12, 102, w=12, h=7, unit="short", stack=True,
           desc="requeued: a worker died or hung and the check went back to the queue. dead: it had been claimed three times and was given up on."),
+
+    row(106, "What did each check cost? By document type and outcome (US-100)", 109),
+    stat(71, "Recorded cost in the range", f'sum(increase({m("permitflow_ai_cost_usd_total")}[$__range]))', 0, 110, 6, h=5, unit="currencyUSD", decimals=4, color="green"),
+    stat(72, "Checks recorded in the range", f'sum(increase({m("permitflow_ai_checks_total")}[$__range]))', 6, 110, 6, h=5, unit="short", decimals=0, color="purple"),
+    stat(73, "Average cost per check", f'sum(increase({m("permitflow_ai_cost_usd_total")}[$__range])) / sum(increase({m("permitflow_ai_checks_total")}[$__range]))', 12, 110, 6, h=5, unit="currencyUSD", decimals=5, color="green"),
+    stat(74, "Tokens in the range", f'sum(increase({m("permitflow_ai_tokens_total")}[$__range]))', 18, 110, 6, h=5, unit="short", decimals=0, color="purple"),
+    panel(75, "Cost per hour, by document type (USD)", [(f'sum by (document_type) (increase({m("permitflow_ai_cost_usd_total")}[1h]))', "{{document_type}}")], 0, 115, w=12, h=7, unit="currencyUSD", stack=True,
+          desc="From the AI usage record: tokens times the price of the model in force when each check ran. Mock and refused checks cost 0. Counted where the check runs: with VERIFICATION_MODE=worker, the worker's own /metrics must be scraped."),
+    panel(76, "Cost per hour, by outcome (USD)", [(f'sum by (outcome) (increase({m("permitflow_ai_cost_usd_total")}[1h]))', "{{outcome}}")], 12, 115, w=12, h=7, unit="currencyUSD", stack=True,
+          desc="Where the money went: a check that failed or found nothing readable still cost what the model billed."),
+    panel(77, "Checks per hour, by document type", [(f'sum by (document_type) (increase({m("permitflow_ai_checks_total")}[1h]))', "{{document_type}}")], 0, 122, w=12, h=7, unit="short", stack=True),
+    panel(78, "Average cost per check in the range, by document type (USD)", [(f'sum by (document_type) (increase({m("permitflow_ai_cost_usd_total")}[$__range])) / sum by (document_type) (increase({m("permitflow_ai_checks_total")}[$__range]))', "{{document_type}}")], 12, 122, w=12, h=7, kind="bargauge", unit="currencyUSD",
+          extra={"options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "horizontal", "displayMode": "gradient"}, "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 5}, "overrides": []}}),
+    panel(79, "Tokens per hour, by document type", [(f'sum by (document_type) (increase({m("permitflow_ai_tokens_total")}[1h]))', "{{document_type}}")], 0, 129, w=12, h=7, unit="short", stack=True),
+    panel(80, "Tokens per hour, by outcome", [(f'sum by (outcome) (increase({m("permitflow_ai_tokens_total")}[1h]))', "{{outcome}}")], 12, 129, w=12, h=7, unit="short", stack=True),
 ]
 
 dashboard = {
-    "uid": "permitflow", "title": "PermitFlow", "tags": ["permitflow"], "timezone": "Asia/Singapore", "schemaVersion": 39, "version": 2,
+    "uid": "permitflow", "title": "PermitFlow", "tags": ["permitflow"], "timezone": "Asia/Singapore", "schemaVersion": 39, "version": 3,
     "editable": False, "refresh": "30s", "time": {"from": "now-6h", "to": "now"}, "panels": panels,
     "templating": {"list": [{
         "name": "environment", "label": "Environment", "type": "query", "datasource": DS,

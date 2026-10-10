@@ -26,6 +26,7 @@ from app.domain.verification_rules import (
     apply_rules,
 )
 from app.infra.ai import ProviderError, ProviderUnavailable
+from app.infra.ai.base import VerificationProvider
 from app.infra.ai.factory import get_provider
 from app.infra.ai.openai_provider import PROMPT_VERSION
 from app.infra.db import session_factory
@@ -35,6 +36,14 @@ from app.models import Application, Document, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
+from app.services.ai_usage import (
+    count_unrecorded,
+    publish,
+    record_ended_runs,
+    record_refused,
+    record_usage,
+    trace_ids,
+)
 from app.services.applications import ApplicationService
 from app.services.platform_settings import live
 from app.services.quotas import AI_PAUSED_REASON, new_run
@@ -95,6 +104,7 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
         # checks cannot park every connection and starve the API. `_finish` opens a new one to write.
         db.commit()
         started = time.perf_counter()
+        provider: VerificationProvider | None = None
 
         try:
             data = b"".join(get_storage().open(doc.stored_key))
@@ -169,7 +179,13 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
                 document_type_description=DOCUMENT_TYPE_DESCRIPTIONS[doc.document_type.value],
                 form_section=redact_form_section(dict(app.draft_data.get(section_key) or {})),
                 text=prepared.text,
-                extra={"verification_run_id": run.id, "application_id": app.id, "document_id": doc.id},
+                # LangSmith metadata (US-100): the run and document ids, and keyed hashes for the case and the
+                # person; neither the application id, the user id nor the email.
+                extra={
+                    "verification_run_id": run.id,
+                    "document_id": doc.id,
+                    **trace_ids(run.requested_by, app.id),
+                },
             )
             try:
                 result: VerificationResult = provider.verify(request)
@@ -182,6 +198,7 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
                     provider=provider.name,
                     model=provider.model,
                     error_reason=_reason(exc),
+                    tokens=_billed(provider),
                     started=started,
                 )
                 return
@@ -195,6 +212,7 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
                     model=provider.model,
                     error_reason=_reason(exc),
                     raw_output_valid=False,
+                    tokens=_billed(provider),
                     started=started,
                 )
                 return
@@ -216,6 +234,7 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
                 provider=provider.name,
                 model=provider.model,
                 raw_output_valid=True,
+                tokens=_billed(provider),
                 started=started,
             )
         except Exception as exc:  # noqa: BLE001 - last line of defence: the task must never raise
@@ -223,13 +242,16 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
             db.rollback()
             run = db.get(VerificationRun, run_id)
             if run is not None and run.status == VerificationStatus.RUNNING and run.worker_id == worker_id:
+                # A crash after the provider answered still cost what it billed: keep it on the row.
                 _finish(
                     db,
                     run,
                     app,
                     VerificationStatus.FAILED,
-                    provider="none",
+                    provider=provider.name if provider else "none",
+                    model=provider.model if provider else None,
                     error_reason=_reason(exc),
+                    tokens=_billed(provider) if provider else (0, 0),
                     started=started,
                 )
 
@@ -248,6 +270,11 @@ def _reason(exc: Exception) -> str:
     return "internal_error"
 
 
+def _billed(provider: VerificationProvider) -> tuple[int, int]:
+    """(input, output) tokens the provider billed for this check, zero for one that bills nothing."""
+    return int(getattr(provider, "input_tokens", 0) or 0), int(getattr(provider, "output_tokens", 0) or 0)
+
+
 def _finish(
     db: Session,
     run: VerificationRun,
@@ -258,6 +285,7 @@ def _finish(
     model: str | None = None,
     error_reason: str | None = None,
     raw_output_valid: bool | None = None,
+    tokens: tuple[int, int] = (0, 0),
     started: float,
 ) -> None:
     # Only the holder of the run writes its result, under a row lock: if the draft was deleted (the run
@@ -271,6 +299,7 @@ def _finish(
         # Log first: after the rollback `run.id` would reload a row that is gone if the draft was deleted.
         logger.warning("verification_result_dropped", extra={"extra_fields": {"run_id": str(run.id)}})
         db.rollback()
+        count_unrecorded(tokens)  # billed, but no row will hold them
         return
     run.lease_until = None
     run.status = status
@@ -294,7 +323,26 @@ def _finish(
             "error_reason": error_reason,
         },
     )
+    # US-100: the usage row commits with the result, never before or after it.
+    doc = db.get(Document, run.document_id)
+    usage = (
+        record_usage(
+            db,
+            run=run,
+            doc=doc,
+            outcome=status,
+            provider=provider,
+            model=model,
+            input_tokens=tokens[0],
+            output_tokens=tokens[1],
+            latency_ms=run.latency_ms,
+        )
+        if doc is not None
+        else None
+    )
     db.commit()
+    if usage is not None:
+        publish(usage, app.reference_no if app else None, announce=provider != "none")
     metrics.VERIFICATION_RUNS.labels(status.value, provider).inc()
     metrics.VERIFICATION_SECONDS.labels(provider).observe(run.latency_ms / 1000)
     logger.info(
@@ -364,10 +412,13 @@ def reap_expired_runs() -> tuple[int, int]:
                 },
             )
             metrics.VERIFICATION_RUNS.labels(VerificationStatus.DEAD.value, run.provider).inc()
+        ended = record_ended_runs(db, [*dead_ids, *stranded])
         db.commit()
+    for usage in ended:
+        publish(usage, None, announce=False)
     metrics.REAPED.labels("requeued").inc(requeued)
     metrics.REAPED.labels("dead").inc(len(dead_ids))
-    metrics.REAPED.labels("interrupted").inc(stranded)
+    metrics.REAPED.labels("interrupted").inc(len(stranded))
     return requeued, len(dead_ids)
 
 
@@ -378,9 +429,12 @@ def mark_stale_runs_failed(grace_seconds: int = 60) -> int:
     forever."""
     cutoff = datetime.now(UTC) - _interrupted_after(grace_seconds)
     with session_factory()() as db:
-        count = DocumentRepository(db).fail_interrupted_runs(cutoff, datetime.now(UTC))
+        ended = DocumentRepository(db).fail_interrupted_runs(cutoff, datetime.now(UTC))
+        usages = record_ended_runs(db, ended)
         db.commit()
-        return count
+    for usage in usages:
+        publish(usage, None, announce=False)
+    return len(ended)
 
 
 class VerificationService:
@@ -408,8 +462,9 @@ class VerificationService:
         latest = self.documents.latest_run(doc.id)
         if latest is not None and latest.status not in TERMINAL:
             raise Conflict("A check is already in progress for this document.")
-        run = new_run(self.db, doc.id, app.operator_id)
+        run = new_run(self.db, doc.id, app.operator_id, user.id)
         self.documents.add_run(run)
+        refused = record_refused(self.db, run, doc)
         self.audit.record(
             application_id=app.id,
             actor_id=user.id,
@@ -417,5 +472,7 @@ class VerificationService:
             payload={"document_id": str(doc.id), "document_type": doc.document_type.value},
         )
         self.db.commit()
+        if refused is not None:
+            publish(refused, None, announce=False)  # only now that the row is committed
         self.db.refresh(run)
         return run

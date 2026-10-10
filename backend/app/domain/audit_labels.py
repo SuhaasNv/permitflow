@@ -88,6 +88,10 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
             if stopped is not None:
                 text += f" ({stopped} checks ended as ai_paused while paused)"
             return text
+        case "admin.ai_usage_exported":
+            rows = p.get("rows", 0)
+            cut = ", cut" if p.get("cut") else ""
+            return f"AI usage exported to CSV ({rows} {'row' if rows == 1 else 'rows'}{cut})"
         case "settings.step_up_failed":
             return f"Wrong password on a setting change: {p.get('key') or p.get('history_entry', '')}"
         case "user.step_up_failed":

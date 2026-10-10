@@ -62,6 +62,29 @@ OPENAI_TOKENS = Counter(
     "Tokens billed by OpenAI for document checks, by model and kind (prompt, cached, completion).",
     ["model", "kind"],
 )
+# US-100: what each check cost. Labels are the document type and the outcome, both from closed enums
+# (`domain.ai_usage.bounded_label`); a user or an application id is never a label.
+AI_CHECKS = Counter(
+    "permitflow_ai_checks_total",
+    "Document checks recorded in the AI usage table, by document type and outcome.",
+    ["document_type", "outcome"],
+)
+AI_TOKENS = Counter(
+    "permitflow_ai_tokens_total",
+    "Tokens used by document checks, by document type, outcome and kind (input, output).",
+    ["document_type", "outcome", "kind"],
+)
+AI_COST = Counter(
+    "permitflow_ai_cost_usd_total",
+    "Cost in USD of document checks at the price in force when each ran, by document type and outcome.",
+    ["document_type", "outcome"],
+)
+AI_UNRECORDED_TOKENS = Counter(
+    "permitflow_ai_unrecorded_tokens_total",
+    "Tokens the provider billed for a check whose result was then dropped (lease lost, draft deleted), so "
+    "no usage row holds them, by kind (input, output).",
+    ["kind"],
+)
 APPLICATIONS = Gauge(
     "permitflow_applications", "Applications by status, refreshed on every scrape.", ["status"]
 )
