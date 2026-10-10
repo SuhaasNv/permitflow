@@ -135,17 +135,45 @@ jobs:
         run: |
           curl -fsS "$FRONTEND_URL/config.js" | tee /tmp/config.js
           grep -q "$BACKEND_URL" /tmp/config.js
-      - name: Post-deploy gate (production reports the release version on both tiers)
+      - name: Full history and tags (production version gate)
+        if: env.RAILWAY_ENV == 'production'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Post-deploy gate (production reports the release version and the candidate's commit)
         if: env.RAILWAY_ENV == 'production'
         run: |
+          # The promoted image is the last candidate's image: /health must report the release version (APP_VERSION)
+          # and the commit that candidate was built from (BUILD_COMMIT is the first 7 characters of GIT_SHA).
+          rc=$(git tag --list "v$VERSION-rc.*" --sort=-version:refname | head -n 1)
+          test -n "$rc" || { echo "no candidate tag v$VERSION-rc.N exists; $VERSION cannot be a promoted release"; exit 1; }
+          want=$(git rev-list -n 1 "refs/tags/$rc" | cut -c1-7)
+          field() { python3 -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
           for i in $(seq 1 12); do
-            reported=$(curl -fsS "$BACKEND_URL/api/v1/health" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])') || reported=""
-            if [ "$reported" = "$VERSION" ] && curl -fsS "$FRONTEND_URL/config.js" | grep -q "appVersion: \"$VERSION\""; then
-              echo "backend and frontend report $VERSION"; exit 0
+            health=$(curl -fsS "$BACKEND_URL/api/v1/health") || health="{}"
+            reported=$(echo "$health" | field version 2>/dev/null) || reported=""
+            commit=$(echo "$health" | field commit 2>/dev/null) || commit=""
+            config=$(curl -fsS "$FRONTEND_URL/config.js") || config=""
+            if [ "$reported" = "$VERSION" ]; then
+              if [ "$commit" = "$want" ]; then
+                # A promoted image: its frontend must carry the version too.
+                if echo "$config" | grep -q "appVersion: \"$VERSION\""; then
+                  echo "backend and frontend report $VERSION, built from $want ($rc)"; exit 0
+                fi
+                echo "frontend config.js does not carry appVersion $VERSION yet (attempt $i of 12)"
+              elif ! echo "$config" | grep -q "appVersion"; then
+                # A rollback to an image from before US-111: it has no appVersion and reports its own build commit.
+                echo "rollback to a pre-US-111 image: backend reports $VERSION (commit $commit); no frontend appVersion to check"; exit 0
+              else
+                echo "backend reports $VERSION but commit '$commit', not $want of $rc (attempt $i of 12)"
+              fi
+            else
+              echo "backend reports '$reported', waiting for $VERSION (attempt $i of 12)"
             fi
-            echo "backend reports '$reported', waiting for $VERSION (attempt $i of 12)"; sleep 10
+            sleep 10
           done
-          echo "production does not report $VERSION"; exit 1
+          echo "production does not report $VERSION from $rc ($want): check APP_VERSION on both services and the image tag they are pinned to"; exit 1
 
   zap-baseline:
     # US-103. An OWASP ZAP baseline (passive) scan of the development site once the new deployment is healthy.

@@ -333,7 +333,7 @@ jobs:
         run: |
           owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
           short=${GITHUB_SHA::7}
-          digest_of() { docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'; }
+          digest_of() { docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r .digest; }
           : > "$RUNNER_TEMP/digests.txt"
           for image in backend frontend; do
             repo="ghcr.io/$owner/permitflow-$image"
@@ -341,7 +341,8 @@ jobs:
               echo "no dev image $repo:sha-$short for $GITHUB_REF_NAME: dev never built this commit, so it cannot be a candidate. Wait for the dev push run of $short to finish, then re-run this job." >&2
               exit 1
             fi
-            docker buildx imagetools create -t "$repo:$GITHUB_REF_NAME" "$repo@$digest"
+            # --prefer-index=false: a single-manifest image is copied as it is, not wrapped in a new index (the digest must not change)
+            docker buildx imagetools create --prefer-index=false -t "$repo:$GITHUB_REF_NAME" "$repo@$digest"
             now=$(digest_of "$repo:$GITHUB_REF_NAME")
             test "$now" = "$digest" || { echo "$repo:$GITHUB_REF_NAME is $now, expected $digest" >&2; exit 1; }
             echo "$repo@$digest" >> "$RUNNER_TEMP/digests.txt"
@@ -514,14 +515,15 @@ jobs:
         run: |
           owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
           short=${GITHUB_SHA::7}
-          digest_of() { docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'; }
+          digest_of() { docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r .digest; }
           : > "$RUNNER_TEMP/digests.txt"
           for image in backend frontend; do
             repo="ghcr.io/$owner/permitflow-$image"
             digest=$(digest_of "$repo:$CANDIDATE")
             # The candidate's run wrote :vX.Y.Z-rc.N and sha-<its commit> from one image; they must agree.
             test "$(digest_of "$repo:sha-$RC_SHORT")" = "$digest" || { echo "$repo: $CANDIDATE and sha-$RC_SHORT differ"; exit 1; }
-            docker buildx imagetools create -t "$repo:$NAMES" -t "$repo:sha-$short" "$repo@$digest"
+            # --prefer-index=false: the manifest is copied as it is, so the digest does not change
+            docker buildx imagetools create --prefer-index=false -t "$repo:$NAMES" -t "$repo:sha-$short" "$repo@$digest"
             for t in "$NAMES" "sha-$short"; do
               test "$(digest_of "$repo:$t")" = "$digest" || { echo "$repo:$t is not $digest"; exit 1; }
             done

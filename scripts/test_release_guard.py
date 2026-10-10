@@ -7,6 +7,9 @@ import json
 import os
 import sys
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -222,6 +225,40 @@ class HighestCandidateTests(unittest.TestCase):
 
     def test_other_versions_and_releases_ignored(self) -> None:
         self.assertIsNone(rg.highest_candidate(["v0.4.0-rc.3", "v0.4.1", "junk"], "0.4.1"))
+
+
+class RevArgumentTests(unittest.TestCase):
+    def run_main(self, argv: list[str]) -> tuple[int, str]:
+        out = StringIO()
+        with redirect_stdout(out), redirect_stderr(out):
+            code = rg.main(["release_guard.py", *argv])
+        return code, out.getvalue()
+
+    def test_rev_is_passed_to_the_check(self) -> None:
+        with mock.patch.object(rg, "check", return_value=([], "PASS")) as check:
+            self.assertEqual(self.run_main(["v0.5.0", "--rev", "abc1234"])[0], 0)
+        check.assert_called_once_with("v0.5.0", "abc1234")
+
+    def test_tag_alone_has_no_rev(self) -> None:
+        with mock.patch.object(rg, "check", return_value=([], "PASS")) as check:
+            self.assertEqual(self.run_main(["v0.5.0"])[0], 0)
+        check.assert_called_once_with("v0.5.0", None)
+
+    def test_bad_argument_shapes_print_usage(self) -> None:
+        for argv in ([], ["v0.5.0", "--rev"], ["v0.5.0", "abc1234"], ["v0.5.0", "--rev", "a", "b"], ["v0.5.0", "--sha", "abc1234"]):
+            with self.subTest(argv=argv), mock.patch.object(rg, "check") as check:
+                code, text = self.run_main(argv)
+                self.assertEqual(code, 2)
+                self.assertIn("usage", text)
+                check.assert_not_called()
+
+    def test_rev_with_a_candidate_tag_is_refused(self) -> None:
+        problems, _ = rg.check("v0.5.0-rc.1", "abc1234")
+        self.assertEqual(len(problems), 1)
+        self.assertIn("--rev", problems[0])
+        code, text = self.run_main(["v0.5.0-rc.1", "--rev", "abc1234"])
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL", text)
 
 
 if __name__ == "__main__":
