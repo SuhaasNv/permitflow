@@ -120,6 +120,7 @@ One AI verification attempt for a document. The latest run is the document's dis
 | attempts | int, default 0 | US-098 (migration 0016): how many times a worker has claimed the run; `dead` after the third claim whose lease expires. Stays 0 in `inline` mode |
 | lease_until | datetime, nullable | US-098: until when the claim of a `running` run is good; cleared when the run finishes or is requeued. Null in `inline` mode |
 | worker_id | str(64), nullable | US-098: the worker holding the run; the result is written only while it matches |
+| requested_by | FK User, nullable | US-100 (migration 0017): the person whose upload or re-run created the run; null for runs that predate the migration. The AI usage row names this person |
 
 Indexes (migration 0016): `ix_verification_runs_queued (created_at) WHERE status = 'pending'` serves the worker's claim; `ix_verification_runs_lease (lease_until) WHERE status = 'running'` serves the reaper.
 
@@ -188,6 +189,37 @@ One administrator override of an environment default. A missing row means "follo
 | reason | text | required on every change |
 
 There is no history table: the history is the audit trail (`settings.changed`, `settings.reverted`, below), which already records the old and new value, the actor and the reason, and is append-only. Migration 0015.
+
+### AiPrice and AiUsage (v0.5.0, US-100, migration 0017)
+What a model costs, and what each check cost. ADR-017.
+
+`AiPrice` is versioned and never edited: a new row with a later `effective_from` replaces the price from that moment. The price of a run is the row of its model with the latest `effective_from` not after the moment the result is stored. The migration seeds `gpt-4.1-mini` at USD 0.40 input and 1.60 output per million tokens, effective 14 Apr 2025.
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | |
+| model | str(64) | as the provider reports it (`OPENAI_MODEL`) |
+| input_per_million, output_per_million | numeric(12,6) | USD per million tokens |
+| effective_from | datetime | unique with `model` |
+
+`AiUsage` is one row per verification run, added in the transaction that stores the run's result (both `VERIFICATION_MODE` values). `run_id`, `document_id` and `application_id` are plain columns, not foreign keys: deleting a draft removes its runs and documents, and the spend stays.
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | |
+| run_id | UUID, unique | the verification run |
+| document_id | UUID | |
+| application_id | UUID, nullable | |
+| user_id | FK User, nullable | `VerificationRun.requested_by`; an officer's re-run is the officer's |
+| document_type | str(32) | the `DocumentType` value |
+| provider | str(16) | `openai`, `mock`, `none` |
+| model | str(64), nullable | null when no provider ran |
+| input_tokens, output_tokens | int | what the provider billed; 0 for the mock and for runs that never reached a provider |
+| cost_usd | numeric(14,8) | tokens times the price in force; 0 when no tokens or no price row for the model |
+| price_id | FK AiPrice, nullable | the price the cost was computed at |
+| latency_ms | int | |
+| outcome | str(16) | the `VerificationStatus` value the run ended in |
+| created_at | datetime | |
+
+Indexes: `(created_at)`, `(user_id, created_at)`, `(application_id, created_at)`. A run that never called the provider (a quota refusal, the pause switch, an unreadable file, no provider configured, `dead`, `failed: interrupted`) still has its row, with zero tokens and cost.
 
 ### AuditEvent
 Append-only.

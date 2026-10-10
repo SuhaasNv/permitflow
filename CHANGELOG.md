@@ -2,6 +2,22 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## Unreleased (dev)
+
+### US-100, what each check cost and who ran it (10 Oct 2026, `feat/us-100-ai-usage`, backend only, not merged)
+
+Every document check now leaves one row saying who started it, on which application and document type, how many tokens the model billed and what that cost at the price in force when it ran. The licensing office can read it as a filtered page and a CSV, Grafana shows it by document type and outcome, Telegram can announce each check without names, and LangSmith traces carry hashes instead of ids.
+
+- **Tables.** Migration 0017: `ai_prices` (versioned by `effective_from`, never edited; `gpt-4.1-mini` seeded at USD 0.40 and 1.60 per million tokens), `ai_usage` (one row per run; the run, document and application ids are plain columns so the spend outlives a deleted draft) and `verification_runs.requested_by` (the person whose upload or re-run created the run; an officer's re-run is the officer's).
+- **Same transaction.** `_finish` adds the row with the result, the audit event and the status, in `inline` and `worker` mode alike; a dropped result writes none and a failed commit takes the row with it. Runs that never reached a provider (quota, AI pause, unreadable file, no provider) have a row of zeros and their outcome; `dead` and `failed: interrupted` runs get one from the reaper and the startup sweep, once. The providers report `input_tokens` and `output_tokens`; the mock reports 0.
+- **Admin.** `GET /api/v1/admin/ai-usage` (person, application, Singapore day range, cursor, totals, today against the live `ai_runs_per_day`) and `GET /api/v1/admin/ai-usage.csv` (streamed; a cell starting with `=`, `+`, `-`, `@`, tab or CR gets a leading quote). Administrator only. No screen yet.
+- **Observability.** Counters `permitflow_ai_checks_total`, `permitflow_ai_tokens_total`, `permitflow_ai_cost_usd_total` labelled by `document_type` and `outcome` only (bounded against the enums); a dashboard row of ten panels from `build_dashboard.py` (JSON regenerated); the Telegram line `Document check: floor plan · verified · USD 0.0006 · 3.5 s · case <reference>` when the US-101 setting `telegram_per_check_messages` is on (failures never touch the check); `/cost` in the bot adds cost and checks per document type for today and 7 days.
+- **LangSmith.** Trace metadata carries `application_hash` and `user_pseudonym` (first 16 hex characters of an HMAC-SHA256 keyed with `JWT_SECRET`) instead of the application id; no user id or email is sent. Tracing off: unchanged.
+- **Behaviour changes.** The settings API now reports `telegram_per_check_messages` with `in_use: true`. `DocumentRepository.fail_interrupted_runs` and `fail_stranded_inline` return the ids they ended instead of a count. `new_run` takes the requesting user. `smoke_routes.py` calls the two new routes.
+- **Docs.** ADR-017, ADR-014 amended, DOMAIN_MODEL, ARCHITECTURE (API table, request flow), OBSERVABILITY, OPERATIONS (prices, the switch, worker mode), THREAT_MODEL (T33; T21 amended), AI_VERIFICATION_DESIGN, TEST_STRATEGY, `.env.example` (comment only, no new variable), USER_STORIES.
+- **Checks.** 1605 backend tests, coverage 95.4 %, ruff, ruff format, mypy and bandit clean. New: `test_ai_usage.py` (integration), `test_ai_usage_domain.py` and `test_ai_usage_provider.py` (unit).
+- **Not done.** The admin AI usage screen (needs its artboards and the owner's yes, then a UAT group `US100` in `uat_edges.py` and a scenario in `UAT_PLAN.md`); no screen or endpoint to add a price (an `INSERT`, see `OPERATIONS.md`); the cost ignores the cached-input discount; with `VERIFICATION_MODE=worker` the dashboard row and `/cost` need the worker's `/metrics` scraped. Notion sync pending: US-100 In progress. **Handover:** run `uv run pytest tests/integration/test_ai_usage.py` against a Postgres, then `smoke_routes.py` against a local stack, then switch `telegram_per_check_messages` on in development.
+
 ## v0.5.0-rc.3: release candidate on the development environment (10 Oct 2026)
 
 - The officer's check result explains `ai_paused` ("Automatic checks are paused by the administrator; re-run once they resume.") instead of showing the raw code; a vitest covers it. The operator side already shows its own wording.
