@@ -11,6 +11,12 @@ name: Deploy
 # "Run workflow" (workflow_dispatch) redeploys either environment from its current images by hand,
 # for example after a platform incident. Railway pulls the images CI pushed to GHCR; nothing is
 # built here. Rollback: redeploy an earlier sha- tag from the Railway dashboard.
+#
+# US-111, build once and promote: the images behind :main and sha-<merge> are the last release candidate's
+# images, given their release names by the `promote` job in ci.yml (same digest, no rebuild). They still carry
+# the candidate's version, so a production run takes the release version as an input and sets APP_VERSION on
+# the backend and frontend services (the backend reads it at start, the frontend writes it into config.js);
+# the post-deploy gate then requires /health and config.js to report that version.
 
 on:
   workflow_run:
@@ -25,6 +31,10 @@ on:
         required: true
         default: development
         options: [development, production]
+      version:
+        description: Production only. The release version being deployed, without the v (for example 0.5.0). Set as APP_VERSION on backend and frontend.
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -46,17 +56,28 @@ jobs:
       RAILWAY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.workflow_run.head_branch == 'main' && 'production' || 'development') }}
       BACKEND_URL: ${{ vars.BACKEND_URL }}
       FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+      VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
     steps:
       - name: Pre-deploy gate (the run being deployed is the head of the branch)
         run: |
           test -n "$RAILWAY_TOKEN" || { echo "RAILWAY_TOKEN secret is missing"; exit 1; }
           test -n "$RAILWAY_PROJECT_ID" || { echo "RAILWAY_PROJECT_ID variable is missing"; exit 1; }
           test -n "$BACKEND_URL" -a -n "$FRONTEND_URL" || { echo "BACKEND_URL / FRONTEND_URL environment variables are missing"; exit 1; }
+          if [ "$RAILWAY_ENV" = production ]; then
+            echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "production needs the version input as X.Y.Z (got '$VERSION')"; exit 1; }
+          fi
           echo "deploying ${{ github.event.workflow_run.head_sha || 'current images (manual run)' }} to $RAILWAY_ENV"
       # Pinned to the version the subcommands and flags below were checked against (deployment list --json,
       # redeploy --from-source --yes). Bump it in a pull request after running them with the new version.
       - name: Install Railway CLI
         run: npm install -g @railway/cli@5.59.0
+      - name: Label the promoted image with the release version (production)
+        if: env.RAILWAY_ENV == 'production'
+        run: |
+          # No redeploy here: the redeploy below picks the variable up with the new image.
+          for service in backend frontend; do
+            railway variable set "APP_VERSION=$VERSION" --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENV" --service "$service" --skip-deploys
+          done
       - name: Record the deployments that are live before the redeploy
         id: before
         run: |
@@ -114,6 +135,17 @@ jobs:
         run: |
           curl -fsS "$FRONTEND_URL/config.js" | tee /tmp/config.js
           grep -q "$BACKEND_URL" /tmp/config.js
+      - name: Post-deploy gate (production reports the release version on both tiers)
+        if: env.RAILWAY_ENV == 'production'
+        run: |
+          for i in $(seq 1 12); do
+            reported=$(curl -fsS "$BACKEND_URL/api/v1/health" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])') || reported=""
+            if [ "$reported" = "$VERSION" ] && curl -fsS "$FRONTEND_URL/config.js" | grep -q "appVersion: \"$VERSION\""; then
+              echo "backend and frontend report $VERSION"; exit 0
+            fi
+            echo "backend reports '$reported', waiting for $VERSION (attempt $i of 12)"; sleep 10
+          done
+          echo "production does not report $VERSION"; exit 1
 
   zap-baseline:
     # US-103. An OWASP ZAP baseline (passive) scan of the development site once the new deployment is healthy.
