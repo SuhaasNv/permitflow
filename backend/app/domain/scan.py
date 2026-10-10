@@ -28,6 +28,9 @@ def servable(scan_state: str | None) -> bool:
     return scan_state is None or scan_state == CLEAN
 
 
+DOCUMENTS_NOT_CLEAR_MESSAGE = "Review and submit opens when no document is blocked or being scanned."
+
+
 def quarantine_key(key: str) -> str:
     return QUARANTINE_PREFIX + key
 

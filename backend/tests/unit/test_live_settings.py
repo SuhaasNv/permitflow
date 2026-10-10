@@ -39,7 +39,7 @@ def test_an_empty_table_is_the_environment_for_every_setting() -> None:
         if spec.env_field is not None:
             assert live.value(spec.key) == getattr(s, spec.env_field), spec.key
     assert live.bool_value("ai_paused") is False
-    assert live.value("scanner_fail_mode") == "closed"
+    assert live.value("scanner_fail_mode") == "retry"
 
 
 def test_a_row_overrides_and_is_read_from_memory_for_ten_seconds() -> None:

@@ -27,11 +27,13 @@ from app.models.enums import Role, VerificationStatus
 from app.services import scan as scan_module
 from app.services import verification as verification_module
 from app.services.draft_deletion import DraftDeletionService
+from app.services.platform_settings import live
 from app.services.verification import MAX_ATTEMPTS, claim_next_run, execute_run, reap_expired_runs
+from app.worker import Worker
 from tests.conftest import BACKEND_DIR
 from tests.factories import login, make_user
 from tests.integration.test_clarification import _attach, _respond, _submitted
-from tests.journeys import PDF, TXT, draft, submitted, upload
+from tests.journeys import PDF, TXT, complete_draft, draft, submitted, upload
 
 API = "/api/v1"
 EICAR = rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
@@ -257,7 +259,7 @@ def test_officer_and_admin_are_refused_a_blocked_file_with_their_own_wording(
     assert _download(client, off, app_id, doc.id).status_code == 409  # type: ignore[attr-defined]
 
 
-# ---- enforce: the scanner is down (fail closed) ----
+# ---- enforce: the scanner is down (no verdict is never clean) ----
 
 
 def test_scanner_down_holds_the_file_and_never_marks_it_clean(
@@ -321,10 +323,10 @@ def test_worker_retries_a_held_file_later_then_gives_up_after_the_attempts(
     assert reap_expired_runs() == (0, 0)
 
 
-def test_open_fail_mode_holds_without_retrying_and_never_releases(
+def test_hold_fail_mode_holds_without_retrying_and_never_releases(
     client: TestClient, db: Session, scanner: FakeScanner, worker_mode: None, alerts: list[str]
 ) -> None:
-    _set_fail_mode(db, "open")
+    _set_fail_mode(db, "hold")
     scanner.mode = "down"
     h = _operator(client, db)
     app_id = draft(client, h)
@@ -388,6 +390,102 @@ def test_clean_scan_metric_counts_results(client: TestClient, db: Session, scann
         scanner.mode = mode
         upload(client, h, app_id, "floor_plan", name, PDF + name.encode())
     assert {r: count(r) - before[r] for r in before} == {"clean": 1, "infected": 1, "error": 1}
+
+
+# ---- a paused AI never holds the scan ----
+
+
+def _pause(db: Session, paused: bool) -> None:
+    admin = make_user(db, f"adm{uuid.uuid4().hex[:6]}@example.sg", Role.ADMIN)
+    db.merge(
+        PlatformSetting(
+            key="ai_paused", value=paused, updated_by=admin.id, updated_at=datetime.now(UTC), reason="t"
+        )
+    )
+    db.commit()
+    live().refresh()
+
+
+def test_an_upload_during_an_ai_pause_is_still_scanned(
+    client: TestClient, db: Session, scanner: FakeScanner, ai_calls: list[int]
+) -> None:
+    _pause(db, True)
+    h = _operator(client, db)
+    app_id = draft(client, h)
+    upload(client, h, app_id, "business_profile", "profile.txt", TXT, "text/plain")
+    doc = _doc(db)
+    assert (
+        doc.scan_state == CLEAN and not doc.stored_key.startswith("quarantine/") and _stored(doc.stored_key)
+    )
+    run = _run(db)
+    assert run.status == VerificationStatus.UNAVAILABLE and run.error_reason == "ai_paused"
+    assert ai_calls == [] and scanner.seen == [TXT]
+    assert _download(client, h, app_id, doc.id).status_code == 200  # type: ignore[attr-defined]
+
+
+def test_the_worker_scans_a_queued_file_while_paused_and_keeps_the_check_queued(
+    client: TestClient, db: Session, scanner: FakeScanner, worker_mode: None, ai_calls: list[int]
+) -> None:
+    h = _operator(client, db)
+    app_id = draft(client, h)
+    upload(client, h, app_id, "business_profile", "profile.txt", TXT, "text/plain")
+    assert _doc(db).scan_state == SCANNING
+    _pause(db, True)
+    w = Worker()
+    assert w.fill_slots() == 1  # claimed for the scan only
+    for t in list(w._active.values()):
+        t.join(20)
+    doc = _doc(db)
+    assert doc.scan_state == CLEAN and _stored(doc.stored_key)
+    run = _run(db)
+    assert run.status == VerificationStatus.PENDING and run.attempts == 0 and run.worker_id is None
+    assert ai_calls == []  # the AI step is still held
+    assert w.fill_slots() == 0  # nothing left to scan: the check stays queued
+    _pause(db, False)
+    assert w.fill_slots() == 1
+    for t in list(w._active.values()):
+        t.join(20)
+    assert _run(db).status != VerificationStatus.PENDING and ai_calls
+
+
+# ---- submission needs every document clear ----
+
+
+def _ready(client: TestClient, db: Session) -> tuple[str, dict[str, str]]:
+    h = _operator(client, db)
+    app_id = complete_draft(client, h)
+    return app_id, h
+
+
+def _submit(client: TestClient, h: dict[str, str], app_id: str) -> object:
+    return client.post(f"{API}/applications/{app_id}/submit", headers=h)
+
+
+@pytest.mark.parametrize("state", [SCANNING, INFECTED])
+def test_submission_is_refused_while_a_document_is_scanning_or_blocked(
+    client: TestClient, db: Session, scanner: FakeScanner, state: str
+) -> None:
+    app_id, h = _ready(client, db)
+    doc = db.scalars(select(Document).order_by(Document.uploaded_at)).first()
+    assert doc is not None and doc.scan_state == CLEAN
+    db.execute(update(Document).where(Document.id == doc.id).values(scan_state=state))
+    db.commit()
+    r = _submit(client, h, app_id)
+    assert r.status_code == 409  # type: ignore[attr-defined]
+    error = r.json()["error"]  # type: ignore[attr-defined]
+    assert error["code"] == "documents_not_clear"
+    assert error["message"] == "Review and submit opens when no document is blocked or being scanned."
+    db.execute(update(Document).where(Document.id == doc.id).values(scan_state=CLEAN))
+    db.commit()
+    assert _submit(client, h, app_id).status_code == 200  # type: ignore[attr-defined]
+
+
+def test_submission_is_unchanged_with_the_scan_off(client: TestClient, db: Session) -> None:
+    app_id, h = _ready(client, db)
+    assert get_settings().scan_mode == "off"
+    db.execute(update(Document).values(scan_state=SCANNING))  # nothing reads it with the scan off
+    db.commit()
+    assert _submit(client, h, app_id).status_code == 200  # type: ignore[attr-defined]
 
 
 # ---- clarification attachments ----
@@ -496,15 +594,28 @@ def test_migration_0018_downgrades_cleanly_and_upgrades_back(client: TestClient,
         for c in ("scan_state", "scan_signature", "active_content")
     }
     assert columns() == wanted
+    admin = make_user(db, "adm-mig@example.sg", Role.ADMIN)
+    for key, value in (("scanner_fail_mode", "hold"), ("rate_limit_per_minute", 100)):
+        db.add(PlatformSetting(key=key, value=value, updated_by=admin.id, reason="t"))
+    db.commit()
+    db.close()
+    dbmod.reset_engine()
+
+    def stored() -> dict[str, object]:
+        with dbmod.get_engine().connect() as conn:
+            return {r[0]: r[1] for r in conn.execute(text("select key, value from platform_settings"))}
+
     alembic("downgrade", "0016")
     try:
         dbmod.reset_engine()
         assert columns() == set()
+        assert stored() == {"scanner_fail_mode": "open", "rate_limit_per_minute": 100}  # the old words
     finally:
         dbmod.reset_engine()
         alembic("upgrade", "head")
         dbmod.reset_engine()
     assert columns() == wanted
+    assert stored()["scanner_fail_mode"] == "hold"
 
 
 # ---- the real scanner ----

@@ -18,7 +18,7 @@ from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.settings import get_settings
 from app.domain.ai_input import prepare_text, redact_form_section
 from app.domain.enums import Role, VerificationStatus
-from app.domain.scan import CLEAN, REASON_INFECTED, REASON_SCANNER_UNAVAILABLE
+from app.domain.scan import CLEAN, REASON_INFECTED, REASON_SCANNER_UNAVAILABLE, SCANNING
 from app.domain.verification_rules import (
     DOCUMENT_TYPE_DESCRIPTIONS,
     SECTION_FOR_DOCUMENT,
@@ -39,7 +39,7 @@ from app.repositories.documents import DocumentRepository
 from app.services.applications import ApplicationService
 from app.services.platform_settings import live
 from app.services.quotas import AI_PAUSED_REASON, new_run
-from app.services.scan import ScanOutcome, alert_scanner_down, scan_document, will_retry
+from app.services.scan import ScanOutcome, alert_scanner_down, enforcing, scan_document, will_retry
 
 logger = logging.getLogger("permitflow.verification")
 
@@ -61,6 +61,7 @@ SCANNER_RETRY_SECONDS = 60
 def start_run(run_id: uuid.UUID) -> None:
     """The request's background task. Inline: run the check here. Worker: the run is already queued, so
     only wake the workers (a missed wake-up costs at most the polling interval)."""
+    scan_unqueued(run_id)
     if get_settings().verification_mode == "inline":
         run_verification(run_id)
         return
@@ -70,6 +71,22 @@ def start_run(run_id: uuid.UUID) -> None:
             db.commit()
     except Exception:  # noqa: BLE001 - the workers poll anyway; the request has already been answered
         logger.exception("verification_notify_failed")
+
+
+def scan_unqueued(run_id: uuid.UUID) -> None:
+    """US-099: a run stored finished at creation (the AI paused, a quota refusal) is never claimed, so its
+    file would wait in quarantine for ever. The virus scan does not depend on the AI: scan it here."""
+    if not enforcing():
+        return
+    try:
+        with session_factory()() as db:
+            run = db.get(VerificationRun, run_id)
+            doc = db.get(Document, run.document_id) if run else None
+            app = db.get(Application, doc.application_id) if doc else None
+            if run and doc and app and run.status in TERMINAL and doc.scan_state == SCANNING:
+                scan_document(db, doc, app)
+    except Exception:  # noqa: BLE001 - a background task; the file stays held and a re-run scans it
+        logger.exception("scan_unqueued_failed", extra={"extra_fields": {"run_id": str(run_id)}})
 
 
 def run_verification(run_id: uuid.UUID) -> None:
@@ -121,6 +138,10 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
                         db, run, app, VerificationStatus.UNAVAILABLE,
                         provider="none", error_reason=REASON_SCANNER_UNAVAILABLE, started=started,
                     )  # fmt: skip
+                    return
+                if worker_id is not None and live().bool_value("ai_paused"):
+                    # Scanned while the AI is paused: the file is released, the check goes back to the queue.
+                    release_run(run.id, worker_id)
                     return
 
             data = b"".join(get_storage().open(doc.stored_key))
@@ -338,13 +359,13 @@ def _finish(
     )
 
 
-def claim_next_run(worker_id: str) -> uuid.UUID | None:
+def claim_next_run(worker_id: str, *, scan_only: bool = False) -> uuid.UUID | None:
     """Worker mode: take the oldest queued run and commit the claim at once. From here the lease, not a
     transaction, says the run is being worked."""
     now = datetime.now(UTC)
     lease_until = now + timedelta(seconds=get_settings().worker_lease_seconds)
     with session_factory()() as db:
-        run_id = DocumentRepository(db).claim_next(worker_id, now, lease_until)
+        run_id = DocumentRepository(db).claim_next(worker_id, now, lease_until, scan_only=scan_only)
         db.commit()
         return run_id
 
@@ -371,7 +392,7 @@ def reap_expired_runs() -> tuple[int, int]:
     with session_factory()() as db:
         requeued, dead_ids = DocumentRepository(db).reap_expired(now, MAX_ATTEMPTS)
         stranded = DocumentRepository(db).fail_stranded_inline(now - _interrupted_after(), now)
-        if live().value("scanner_fail_mode") == "closed":
+        if live().value("scanner_fail_mode") == "retry":
             # US-099: checks held because the scanner was down are retried (up to MAX_ATTEMPTS claims).
             requeued += DocumentRepository(db).requeue_scanner_held(
                 now - timedelta(seconds=SCANNER_RETRY_SECONDS), MAX_ATTEMPTS

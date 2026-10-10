@@ -120,17 +120,23 @@ class DocumentRepository:
 
     # ---- the work queue (US-098, ADR-016): `pending` is queued, `running` is leased ----
 
-    def claim_next(self, worker_id: str, now: datetime, lease_until: datetime) -> uuid.UUID | None:
+    def claim_next(
+        self, worker_id: str, now: datetime, lease_until: datetime, *, scan_only: bool = False
+    ) -> uuid.UUID | None:
         """Atomically take the oldest queued run: one statement, so two workers never get the same one.
         `SKIP LOCKED` lets a second worker pass over a row the first is claiming; LIMIT stays inside the
-        subquery. The caller commits at once: the claim is held by the lease, not by a transaction."""
+        subquery. The caller commits at once: the claim is held by the lease, not by a transaction.
+        `scan_only` takes only runs whose document is still `scanning`."""
         # The status is inlined, not bound, so Postgres can match the partial index
         # `ix_verification_runs_queued` (a generic plan with a bound parameter cannot).
         pending = literal_column(f"'{VerificationStatus.PENDING.value}'", String)
+        queued = select(VerificationRun.id).where(VerificationRun.status == pending)
+        if scan_only:  # US-099: while the AI is paused, only the runs whose file still waits for its scan
+            queued = queued.where(
+                VerificationRun.document_id.in_(select(Document.id).where(Document.scan_state == "scanning"))
+            )
         oldest = (
-            select(VerificationRun.id)
-            .where(VerificationRun.status == pending)
-            .order_by(VerificationRun.created_at)
+            queued.order_by(VerificationRun.created_at)
             .limit(1)
             .with_for_update(skip_locked=True)
             .scalar_subquery()

@@ -158,14 +158,13 @@ SPECS: tuple[SettingSpec, ...] = (
         label="Virus scanner failure mode",
         description=(
             "What happens to an upload when the scanner is down. No choice ever opens an unscanned file: "
-            "closed holds it and retries by itself, open holds it until a person re-runs the check. "
-            "Open is refused in production."
+            "retry holds it and tries again by itself; hold keeps it until a person re-runs the check."
         ),
         group="uploads",
         kind="choice",
         env_field=None,
-        fallback="closed",
-        choices=("closed", "open"),
+        fallback="retry",
+        choices=("retry", "hold"),
     ),
 )
 
@@ -235,12 +234,6 @@ def validate(spec: SettingSpec, value: object, env_value: int | None, app_env: s
                 reason="not_a_choice",
                 details={"choices": list(spec.choices)},
             )
-        if spec.key == "scanner_fail_mode" and value == "open" and app_env == "production":
-            raise SettingRejected(
-                "The scanner cannot be set to fail open in production; it stays closed.",
-                reason="production_fail_open",
-                details={"allowed": ["closed"]},
-            )
         return value
     if isinstance(value, bool) or not isinstance(value, int):
         raise SettingRejected(f"{spec.label} must be a whole number.", reason="wrong_type")
@@ -268,7 +261,7 @@ def effective(
     """The value in force: the stored one when it is valid inside today's bounds, else the default.
 
     A stored number above the ceiling is clamped to it (the environment was lowered after the row was
-    written); one below the minimum, of the wrong type or, for the scanner in production, open is ignored.
+    written); one below the minimum, or of the wrong type or not a listed choice, is ignored.
     """
     default = default_for(spec, env_value)
     if not present:

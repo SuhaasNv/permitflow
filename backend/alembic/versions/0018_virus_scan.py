@@ -8,6 +8,9 @@ as before. With SCAN_MODE=enforce it is `scanning`, `clean` or `infected` (a VAR
 the other state columns). `scan_signature` is the scanner's name for what it found; `active_content` is the
 PDF flag (an automatic action with a script, a launch action, an embedded file).
 
+The stored `scanner_fail_mode` setting changes its words (US-101 stored `closed` and `open`): `closed` becomes
+`retry` and `open` becomes `hold`; the downgrade maps them back.
+
 Downgrade drops the three columns. Files still under `quarantine/` keep their key and are served by the
 older code once it reads them, so run a downgrade only with SCAN_MODE=off and nothing left `scanning`.
 """
@@ -25,6 +28,17 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 TABLES = ("documents", "clarification_attachments")
+RENAMES = (("closed", "retry"), ("open", "hold"))
+
+
+def _rename_fail_mode(pairs: tuple[tuple[str, str], ...]) -> None:
+    for old, new in pairs:
+        op.execute(
+            sa.text(
+                "UPDATE platform_settings SET value = CAST(:new AS json) "
+                "WHERE key = 'scanner_fail_mode' AND CAST(value AS text) = :old"
+            ).bindparams(new=f'"{new}"', old=f'"{old}"')
+        )
 
 
 def upgrade() -> None:
@@ -34,9 +48,11 @@ def upgrade() -> None:
         op.add_column(
             table, sa.Column("active_content", sa.Boolean(), nullable=False, server_default=sa.text("false"))
         )
+    _rename_fail_mode(RENAMES)
 
 
 def downgrade() -> None:
+    _rename_fail_mode(tuple((new, old) for old, new in RENAMES))
     for table in TABLES:
         op.drop_column(table, "active_content")
         op.drop_column(table, "scan_signature")

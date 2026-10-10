@@ -9,24 +9,27 @@ With `SCAN_MODE=off` nothing here runs and every file is served as before. With 
 - a clarification attachment is scanned inside its upload request (small, three per answer);
 - a download is refused unless the state is `clean` (or NULL: stored before the scan existed or with it off);
 - when clamd cannot answer, the file is never marked clean. It stays `scanning`; what happens next is the
-  administrator's `scanner_fail_mode` (see `retry_scanner_held`).
+  administrator's `scanner_fail_mode` (see `will_retry`).
 """
 
 import enum
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
 from app.core import metrics
-from app.core.errors import FileBlocked, FileScanning
+from app.core.errors import DocumentsNotClear, FileBlocked, FileScanning
 from app.core.settings import get_settings
 from app.domain.enums import Role
 from app.domain.scan import (
     CLEAN,
+    DOCUMENTS_NOT_CLEAR_MESSAGE,
     INFECTED,
     INFECTED_MESSAGE,
     OFFICER_INFECTED_MESSAGE,
+    SCANNING,
     SCANNING_MESSAGE,
     pdf_active_content,
     released_key,
@@ -163,11 +166,18 @@ def _remember(doc: Document, state: str, verdict: Verdict, key: str) -> None:
 
 
 def will_retry(attempts: int) -> bool:
-    """True when a worker will try this held file again by itself: fail mode `closed`, in worker mode, and
-    attempts left. In `open` mode (never in production) the file is held until a person re-runs the check."""
+    """True when a worker will try this held file again by itself: fail mode `retry`, in worker mode, and
+    attempts left. In `hold` mode the file is held until a person re-runs the check."""
     from app.services.verification import MAX_ATTEMPTS  # noqa: PLC0415 - verification imports this module
 
     return live().value("scanner_fail_mode") == "closed" and 0 < attempts < MAX_ATTEMPTS
+
+
+def ensure_submittable(docs: Iterable[Document]) -> None:
+    """Refuse a submission while a current document is `scanning` or `infected`. Only with the scan enforced:
+    with it off, `scan_state` is null for every new file and nothing changes."""
+    if enforcing() and any(d.scan_state in (SCANNING, INFECTED) for d in docs):
+        raise DocumentsNotClear(DOCUMENTS_NOT_CLEAR_MESSAGE, details={"reason": "documents_not_clear"})
 
 
 def ensure_servable(scan_state: str | None, user: User) -> None:

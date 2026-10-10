@@ -120,6 +120,12 @@ class FileScanning(Conflict):
     code = "file_scanning"
 
 
+class DocumentsNotClear(Conflict):
+    """A submission with a document the virus scan is still checking or has blocked (US-099)."""
+
+    code = "documents_not_clear"
+
+
 class ScannerUnavailable(Unavailable):
     """The virus scanner could not be reached; nothing was stored as clean (US-099)."""
 

@@ -32,7 +32,7 @@ def test_defaults_are_the_environment_values_so_an_empty_table_changes_nothing()
         if spec.env_field is not None:
             assert default_for(spec, getattr(s, spec.env_field)) == getattr(s, spec.env_field)
     assert default_for(spec_for("ai_paused"), None) is False
-    assert default_for(spec_for("scanner_fail_mode"), None) == "closed"
+    assert default_for(spec_for("scanner_fail_mode"), None) == "retry"
     assert default_for(spec_for("telegram_per_check_messages"), None) is False
 
 
@@ -110,14 +110,16 @@ def test_switches_take_only_a_boolean_and_choices_only_their_choices() -> None:
     assert exc.value.reason == "not_a_choice"
 
 
-def test_the_scanner_may_fail_open_in_development_but_never_in_production() -> None:
+def test_the_scanner_fail_mode_is_retry_or_hold_in_every_environment() -> None:
+    """Neither value lets an unscanned file through, so neither is restricted in production."""
     spec = spec_for("scanner_fail_mode")
-    assert validate(spec, "open", None, "development") == "open"
-    assert validate(spec, "open", None, "test") == "open"
-    with pytest.raises(SettingRejected) as exc:
-        validate(spec, "open", None, "production")
-    assert exc.value.reason == "production_fail_open"
-    assert validate(spec, "closed", None, "production") == "closed"
+    for env in ("development", "test", "production"):
+        assert validate(spec, "retry", None, env) == "retry"
+        assert validate(spec, "hold", None, env) == "hold"
+    for old in ("open", "closed"):  # the words US-101 stored before the owner's decision
+        with pytest.raises(SettingRejected) as exc:
+            validate(spec, old, None, "production")
+        assert exc.value.reason == "not_a_choice"
 
 
 def test_effective_follows_the_environment_without_a_row() -> None:
@@ -141,10 +143,10 @@ def test_a_stored_value_below_the_minimum_or_of_the_wrong_type_is_ignored() -> N
         assert effective(spec, bad, 240, "production", present=True) == 240
 
 
-def test_a_stored_fail_open_is_ignored_in_production() -> None:
+def test_a_stored_fail_mode_is_honoured_and_an_old_word_is_ignored() -> None:
     spec = spec_for("scanner_fail_mode")
-    assert effective(spec, "open", None, "production", present=True) == "closed"
-    assert effective(spec, "open", None, "development", present=True) == "open"
+    assert effective(spec, "hold", None, "production", present=True) == "hold"
+    assert effective(spec, "open", None, "production", present=True) == "retry"
 
 
 def test_unknown_key() -> None:

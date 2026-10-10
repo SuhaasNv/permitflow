@@ -189,7 +189,7 @@ Document checks run in one of two places, chosen by `VERIFICATION_MODE`. The cod
 
 **Railway: set a draining window on the worker.** Railway sends SIGTERM and then SIGKILLs the old deployment once its draining time (`RAILWAY_DEPLOYMENT_DRAINING_SECONDS`) has passed; without a value set the worker can be killed almost at once, never hands its unfinished runs back, and recovery waits for the lease (`WORKER_LEASE_SECONDS`, 180 s by default) and the reaper. On the `worker` service set `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=15` (more than the worker's 8 s grace for running checks), so a deploy hands the runs back to the queue straight away.
 
-**Pause.** While the administrator has paused the AI (Settings, "Pause AI checks"), the worker claims nothing: queued checks stay queued and run after unpause. Checks requested during the pause are stored `unavailable: ai_paused` at once, as in `inline` mode.
+**Pause.** While the administrator has paused the AI (Settings, "Pause AI checks"), the worker claims nothing for the AI: queued checks stay queued and run after unpause (the one exception is the virus scan, below). Checks requested during the pause are stored `unavailable: ai_paused` at once, as in `inline` mode.
 
 **Watch it.** Dashboard row "Is the verification worker keeping up?" (checks waiting, oldest waiting check, checks being worked, dead checks, worker up, leases taken back). Admin overview, "Document checks": a "Gave up after 3 tries" line appears when a check died in the last 24 hours. A dead check is served as `failed` to applicants and officers, who can re-run it.
 
@@ -225,10 +225,10 @@ The scan is shipped dormant: the default is `SCAN_MODE=off`, which is how every 
 
 | `scanner_fail_mode` | A document | A clarification attachment |
 |---|---|---|
-| `closed` (default) | stays `scanning` and its check ends `unavailable: scanner_unavailable`; in `worker` mode the reaper queues it again after 60 s, up to three claims; after that it waits for a person to re-run the check, and Telegram says the scanner could not be reached | the upload is refused (503 `scanner_unavailable`) and nothing is kept; the operator tries again |
-| `open` (not allowed in production) | stays `scanning`, check `unavailable: scanner_unavailable`, no automatic retry; Telegram says so | as above |
+| `retry` (default; stored as `closed` before 0018) | stays `scanning` and its check ends `unavailable: scanner_unavailable`; in `worker` mode the reaper queues it again after 60 s, up to three claims; after that it waits for a person to re-run the check, and Telegram says the scanner could not be reached | the upload is refused (503 `scanner_unavailable`) and nothing is kept; the operator tries again |
+| `hold` (stored as `open` before 0018) | stays `scanning`, check `unavailable: scanner_unavailable`, no automatic retry; Telegram says so | as above |
 
-In `inline` mode nothing retries by itself (there is no reaper): the applicant or the officer re-runs the check once the scanner is back. Look for `scan_unavailable` in the logs and `permitflow_scans_total{result="error"}` in Prometheus. While the administrator has paused the AI the worker claims nothing, so scans wait too.
+In `inline` mode nothing retries by itself (there is no reaper): the applicant or the officer re-runs the check once the scanner is back. Look for `scan_unavailable` in the logs and `permitflow_scans_total{result="error"}` in Prometheus. A paused AI does not hold the scan: a file uploaded during a pause is scanned by the API's background task (its check is stored `unavailable: ai_paused` as usual), and a queued file is claimed by the worker for the scan only, then its check goes back to the queue until unpause. **Submission.** With `enforce`, submit and resubmit answer 409 `documents_not_clear` while a current document is `scanning` or `infected`; with `off` nothing changes.
 
 **Held documents.** `SELECT d.id, d.original_filename, d.scan_state, r.status, r.error_reason FROM documents d JOIN verification_runs r ON r.document_id = d.id WHERE d.scan_state = 'scanning' AND d.is_current ORDER BY d.uploaded_at;` A re-run from the UI (or the reaper) scans it again. An infected file cannot be released: ask for a different copy.
 

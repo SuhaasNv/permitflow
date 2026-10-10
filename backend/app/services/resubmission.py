@@ -22,6 +22,7 @@ from app.repositories.revisions import RevisionRepository
 from app.schemas.applications import OperatorFeedbackView, ResubmitReadiness
 from app.services.feedback import target_label
 from app.services.notifications import NotificationService
+from app.services.scan import ensure_submittable
 
 
 class ResubmissionService:
@@ -122,6 +123,7 @@ class ResubmissionService:
                 "Nothing has changed since the last submission.", details={"reason": "no_change"}
             )
 
+        ensure_submittable(docs)
         number = self.revisions.next_number(app.id)
         revision = ApplicationRevision(
             application_id=app.id,
