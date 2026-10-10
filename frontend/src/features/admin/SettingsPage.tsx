@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import type { PlatformSetting, SettingHistoryEntry } from '@/api/admin'
@@ -74,7 +74,7 @@ function Tag({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neut
 }
 
 /** On or off. It never flips by itself: pressing it asks first, and the page shows what the server then says. */
-function Switch({ on, label, shown, onPress }: { on: boolean; label: string; shown: string; onPress: () => void }) {
+function Switch({ on, label, settingKey, shown, onPress }: { on: boolean; label: string; settingKey: string; shown: string; onPress: () => void }) {
   return (
     <span className="inline-flex items-center gap-2.5">
       <button
@@ -82,6 +82,7 @@ function Switch({ on, label, shown, onPress }: { on: boolean; label: string; sho
         role="switch"
         aria-checked={on}
         aria-label={label}
+        data-setting={settingKey}
         onClick={onPress}
         className={cn(
           'relative h-6 w-11 shrink-0 rounded-xl border-2 p-0 transition-colors duration-[var(--dur-fast)] focus-visible:rounded-xl',
@@ -111,6 +112,7 @@ function SettingRow({ s, onChange, onSwitch }: { s: PlatformSetting; onChange: (
       <Switch
         on={s.value === true}
         label={s.label}
+        settingKey={s.key}
         shown={s.value === true && s.key === 'ai_paused' ? 'On, paused' : formatValue(s, s.value)}
         onPress={onSwitch}
       />
@@ -244,9 +246,10 @@ function HistoryRow({ e, setting, onRevert }: { e: SettingHistoryEntry; setting?
         </div>
         <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5">
           <span className="font-mono text-[13px]">{show(e.old)}</span>
-          <span className="text-text-3" aria-label="changed to">
+          <span className="text-text-3" aria-hidden="true">
             &rarr;
           </span>
+          <span className="sr-only">changed to</span>
           <span className="font-mono text-[13px] font-semibold">{show(e.new)}</span>
           {unit ? <span className="text-[13px] text-text-3">{unit}</span> : null}
         </div>
@@ -291,6 +294,8 @@ export function AdminSettingsPage() {
   const settings = usePlatformSettings()
   const [filter, setFilter] = useState('')
   const history = useSettingsHistory(filter || null)
+  // The header's "last change" is the newest entry of the whole history, whatever the filter says.
+  const everything = useSettingsHistory(null)
   const filterId = useId()
   const [changingKey, setChangingKey] = useState<string | null>(null)
   const [toggling, setToggling] = useState<{ key: string; at: number } | null>(null)
@@ -306,11 +311,16 @@ export function AdminSettingsPage() {
   const reverting = entries.find((e) => e.id === revertingId) ?? null
 
   const overridden = list.filter((s) => s.overridden).length
-  const latest = list.reduce<PlatformSetting | null>(
-    (best, s) => (s.updated_at && (!best?.updated_at || s.updated_at > best.updated_at) ? s : best),
-    null,
-  )
+  const latest = everything.data?.pages[0]?.entries[0]
   const paused = list.find((s) => s.key === 'ai_paused' && s.value === true)
+
+  // After "Switch back on" the banner and its button are gone: focus goes to the switch, once the dialog has closed.
+  const refocus = useRef(false)
+  useEffect(() => {
+    if (!refocus.current || paused || toggling !== null) return
+    refocus.current = false
+    document.querySelector<HTMLElement>('[role="switch"][data-setting="ai_paused"]')?.focus()
+  }, [paused, toggling])
 
   const filterSelect = (
     <div className="flex w-full max-w-[300px] flex-col gap-1.5">
@@ -341,12 +351,12 @@ export function AdminSettingsPage() {
                 <span>
                   {overridden} of {list.length} overridden
                 </span>
-                {latest?.updated_at ? (
+                {latest ? (
                   <>
                     <span aria-hidden="true">&middot;</span>
                     <span>
-                      Last change {formatWhen(latest.updated_at)}
-                      {latest.updated_by_name ? ` by ${latest.updated_by_name}` : ''}
+                      Last change {formatWhen(latest.created_at)}
+                      {latest.actor_name ? ` by ${latest.actor_name}` : ''}
                     </span>
                   </>
                 ) : null}
@@ -444,7 +454,14 @@ export function AdminSettingsPage() {
       )}
 
       <ChangeDialog setting={byKey(changingKey) ?? null} onClose={() => setChangingKey(null)} />
-      <ToggleDialog setting={byKey(toggling?.key ?? null) ?? null} openedAt={toggling?.at ?? 0} onClose={() => setToggling(null)} />
+      <ToggleDialog
+        setting={byKey(toggling?.key ?? null) ?? null}
+        openedAt={toggling?.at ?? 0}
+        onSaved={() => {
+          refocus.current = paused !== undefined && toggling?.key === 'ai_paused'
+        }}
+        onClose={() => setToggling(null)}
+      />
       <RevertDialog entry={reverting} setting={byKey(reverting?.key ?? null)} onClose={() => setRevertingId(null)} />
     </>
   )

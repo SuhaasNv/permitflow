@@ -119,8 +119,27 @@ function ReasonField({ value, error, onChange, autoFocus }: { value: string; err
   )
 }
 
-function Sub({ children }: { children: ReactNode }) {
-  return <p className="text-[13px] leading-5 text-text-3">{children}</p>
+function Sub({ id, children }: { id?: string; children: ReactNode }) {
+  return (
+    <p id={id} className="text-[13px] leading-5 text-text-3">
+      {children}
+    </p>
+  )
+}
+
+/** The arrow between an old and a new value: a screen reader says "changed to" instead. */
+function ChangedTo() {
+  return (
+    <>
+      <span aria-hidden="true">&rarr;</span>
+      <span className="sr-only">changed to</span>
+    </>
+  )
+}
+
+/** Lets Enter send the form from a field: the dialog's own button sits outside it. */
+function SubmitOnEnter() {
+  return <button type="submit" tabIndex={-1} aria-hidden="true" className="sr-only" />
 }
 
 function Mono({ children, strong }: { children: ReactNode; strong?: boolean }) {
@@ -140,6 +159,7 @@ export function ChangeDialog({ setting, onClose }: { setting: PlatformSetting | 
   const change = useChangeSetting()
   const toast = useToast()
   const form = useWriteForm(setting?.key ?? null, setting ? inputText(setting, setting.value) : '')
+  const subId = useId()
   const isChoice = setting?.kind === 'choice'
 
   const typed = setting && !isChoice ? parseNumber(setting, form.value) : null
@@ -147,7 +167,7 @@ export function ChangeDialog({ setting, onClose }: { setting: PlatformSetting | 
   const showDelta = setting !== null && next !== null && next !== setting.value && form.errors.value === undefined
 
   const submit = () => {
-    if (!setting) return
+    if (!setting || change.isPending) return
     let valueProblem: string | undefined
     if (isChoice) {
       if (!setting.choices.includes(form.value)) valueProblem = `${setting.label} must be one of: ${setting.choices.join(', ')}.`
@@ -156,7 +176,7 @@ export function ChangeDialog({ setting, onClose }: { setting: PlatformSetting | 
     } else if (typed?.value !== undefined) {
       valueProblem = boundError(setting, typed.value) ?? undefined
     }
-    if (!valueProblem && next === setting.value) valueProblem = `${setting.label} is already ${formatValue(setting, setting.value).toLowerCase()}.`
+    if (!valueProblem && next === setting.value) valueProblem = `${setting.label} is already ${isChoice ? formatValue(setting, setting.value).toLowerCase() : formatWithUnit(setting, setting.value)}.`
     const found = form.problems(valueProblem)
     form.setErrors(found)
     if (Object.keys(found).length || next === null) return
@@ -165,7 +185,7 @@ export function ChangeDialog({ setting, onClose }: { setting: PlatformSetting | 
       {
         onSuccess: (s) => {
           toast.push({ title: 'Setting changed', body: `${s.label} is now ${formatWithUnit(s, s.value)}. ${WITHIN}`, tone: 'success' })
-          onClose()
+          close()
         },
         onError: (e) => form.fail(writeFailure(e, setting)),
       },
@@ -183,6 +203,7 @@ export function ChangeDialog({ setting, onClose }: { setting: PlatformSetting | 
       title={setting ? `Change ${lowerFirst(setting.label)}?` : ''}
       confirmLabel="Save change"
       busy={change.isPending}
+      describedBy={subId}
       onConfirm={submit}
       onCancel={close}
     >
@@ -195,7 +216,7 @@ export function ChangeDialog({ setting, onClose }: { setting: PlatformSetting | 
             submit()
           }}
         >
-          <Sub>{setting.description}</Sub>
+          <Sub id={subId}>{setting.description}</Sub>
           <dl className="flex flex-wrap gap-x-6 gap-y-2 border-y border-line py-2.5">
             {[
               ['Now', formatWithUnit(setting, setting.value)],
@@ -236,7 +257,7 @@ export function ChangeDialog({ setting, onClose }: { setting: PlatformSetting | 
             <div className="flex flex-wrap items-baseline gap-x-2 text-[15px] text-text" aria-live="polite">
               <span className="pf-eyebrow">Change</span>
               <Mono>{formatValue(setting, setting.value)}</Mono>
-              <span aria-label="changed to">&rarr;</span>
+              <ChangedTo />
               <Mono strong>{formatValue(setting, next)}</Mono>
               <span className="text-[13px] text-text-3">{unitLabel(setting)}</span>
             </div>
@@ -244,6 +265,7 @@ export function ChangeDialog({ setting, onClose }: { setting: PlatformSetting | 
           <ReasonField value={form.reason} error={form.errors.reason} onChange={form.setReason} />
           <StepUpField value={form.password} error={form.errors.password} onChange={form.setPassword} />
           <GeneralError message={form.errors.general} />
+          <SubmitOnEnter />
         </form>
       ) : null}
     </Dialog>
@@ -251,15 +273,27 @@ export function ChangeDialog({ setting, onClose }: { setting: PlatformSetting | 
 }
 
 /** A switch's confirmation. The AI pause has its own words; any other switch gets the plain ones. */
-export function ToggleDialog({ setting, openedAt, onClose }: { setting: PlatformSetting | null; openedAt: number; onClose: () => void }) {
+export function ToggleDialog({
+  setting,
+  openedAt,
+  onSaved,
+  onClose,
+}: {
+  setting: PlatformSetting | null
+  openedAt: number
+  /** Called once a write went through, before the dialog closes. */
+  onSaved?: () => void
+  onClose: () => void
+}) {
   const change = useChangeSetting()
   const toast = useToast()
   const form = useWriteForm(setting?.key ?? null)
+  const subId = useId()
   const next = setting ? setting.value !== true : false
   const paused = setting?.key === 'ai_paused'
 
   const submit = () => {
-    if (!setting) return
+    if (!setting || change.isPending) return
     const found = form.problems()
     form.setErrors(found)
     if (Object.keys(found).length) return
@@ -272,7 +306,8 @@ export function ToggleDialog({ setting, openedAt, onClose }: { setting: Platform
             body: paused ? (next ? 'New uploads are stored without a check.' : 'New uploads are checked again.') : `${s.label} is now ${formatValue(s, s.value).toLowerCase()}. ${WITHIN}`,
             tone: 'success',
           })
-          onClose()
+          onSaved?.()
+          close()
         },
         onError: (e) => form.fail(writeFailure(e, setting)),
       },
@@ -316,7 +351,16 @@ export function ToggleDialog({ setting, openedAt, onClose }: { setting: Platform
   }
 
   return (
-    <Dialog open={setting !== null} title={title} confirmLabel={confirm} danger={paused && next} busy={change.isPending} onConfirm={submit} onCancel={close}>
+    <Dialog
+      open={setting !== null}
+      title={title}
+      confirmLabel={confirm}
+      danger={paused && next}
+      busy={change.isPending}
+      describedBy={sub ? subId : null}
+      onConfirm={submit}
+      onCancel={close}
+    >
       {setting ? (
         <form
           className="flex flex-col gap-4"
@@ -326,11 +370,12 @@ export function ToggleDialog({ setting, openedAt, onClose }: { setting: Platform
             submit()
           }}
         >
-          {sub ? <Sub>{sub}</Sub> : null}
+          {sub ? <Sub id={subId}>{sub}</Sub> : null}
           {body}
           <ReasonField value={form.reason} error={form.errors.reason} onChange={form.setReason} autoFocus />
           <StepUpField value={form.password} error={form.errors.password} onChange={form.setPassword} />
           <GeneralError message={form.errors.general} />
+          <SubmitOnEnter />
         </form>
       ) : null}
     </Dialog>
@@ -342,14 +387,17 @@ export function RevertDialog({ entry, setting, onClose }: { entry: SettingHistor
   const revert = useRevertSetting()
   const toast = useToast()
   const form = useWriteForm(entry?.id ?? null)
+  const noteId = useId()
 
   const target: SettingValue | null = !entry ? null : entry.old_was_default && setting ? setting.default : entry.old
   const tooOld =
-    entry && setting && setting.kind === 'int' && typeof target === 'number' ? boundError(setting, target) : null
+    entry && !entry.old_was_default && setting && setting.kind === 'int' && typeof target === 'number'
+      ? boundError(setting, target)
+      : null
   const refusal = tooOld ?? form.errors.value
 
   const submit = () => {
-    if (!entry) return
+    if (!entry || revert.isPending) return
     const found = form.problems()
     form.setErrors(found)
     if (Object.keys(found).length) return
@@ -358,7 +406,7 @@ export function RevertDialog({ entry, setting, onClose }: { entry: SettingHistor
       {
         onSuccess: (s) => {
           toast.push({ title: 'Change reverted', body: `${s.label} is back to ${formatWithUnit(s, s.value)}. ${WITHIN}`, tone: 'success' })
-          onClose()
+          close()
         },
         onError: (e) => form.fail(writeFailure(e, setting ?? null)),
       },
@@ -378,6 +426,7 @@ export function RevertDialog({ entry, setting, onClose }: { entry: SettingHistor
       title="Revert this change?"
       confirmLabel="Revert change"
       busy={revert.isPending}
+      describedBy={refusal && !tooOld ? null : noteId}
       onConfirm={submit}
       onCancel={close}
     >
@@ -390,10 +439,10 @@ export function RevertDialog({ entry, setting, onClose }: { entry: SettingHistor
             submit()
           }}
         >
-          {tooOld ? <Sub>Checked against today&apos;s bounds before anything is changed.</Sub> : null}
+          {tooOld ? <Sub id={noteId}>Checked against today&apos;s bounds before anything is changed.</Sub> : null}
           <dl className="grid gap-2 border-y border-line py-3">
             {[
-              ['Change', <>{entry.label}, <Mono>{setting ? formatValue(setting, entry.old) : String(entry.old)}</Mono> <span aria-label="changed to">&rarr;</span> <Mono strong>{setting ? formatValue(setting, entry.new) : String(entry.new)}</Mono></>],
+              ['Change', <>{entry.label}, <Mono>{setting ? formatValue(setting, entry.old) : String(entry.old)}</Mono> <ChangedTo /> <Mono strong>{setting ? formatValue(setting, entry.new) : String(entry.new)}</Mono></>],
               ['Made', `${formatWhen(entry.created_at)} by ${entry.actor_name ?? 'unknown'}`],
               ['Reason then', entry.reason],
             ].map(([term, text]) => (
@@ -409,7 +458,7 @@ export function RevertDialog({ entry, setting, onClose }: { entry: SettingHistor
               {tooOld ? ' The bounds changed after this change, so the old value is no longer allowed.' : ''}
             </Alert>
           ) : target !== null ? (
-            <p>
+            <p id={noteId}>
               This sets it back to <b className="text-text">{shown(target)}</b>
               {setting ? <>, replacing {shown(setting.value)} now</> : null}. The value is checked against today&apos;s bounds.
             </p>
@@ -417,6 +466,7 @@ export function RevertDialog({ entry, setting, onClose }: { entry: SettingHistor
           <ReasonField value={form.reason} error={form.errors.reason} onChange={form.setReason} autoFocus />
           <StepUpField value={form.password} error={form.errors.password} onChange={form.setPassword} />
           <GeneralError message={form.errors.general} />
+          <SubmitOnEnter />
         </form>
       ) : null}
     </Dialog>

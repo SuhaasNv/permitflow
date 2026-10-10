@@ -47,7 +47,9 @@ function replaceUser(users: { users: AdminUser[]; self_id: string } | undefined,
 
 export function usePatchUser() {
   const qc = useQueryClient()
+  // gcTime 0: the variables carry a password, so the mutation is dropped as soon as nothing observes it.
   return useMutation({
+    gcTime: 0,
     mutationFn: ({ id, body }: { id: string; body: UserPatch }) => patchAdminUser(id, body),
     onSuccess: (user) => {
       qc.setQueryData(adminKeys.users, (current: { users: AdminUser[]; self_id: string } | undefined) => replaceUser(current, user))
@@ -58,7 +60,9 @@ export function usePatchUser() {
 
 export function useCreateUser() {
   const qc = useQueryClient()
+  // gcTime 0: the variables carry a password, so the mutation is dropped as soon as nothing observes it.
   return useMutation({
+    gcTime: 0,
     mutationFn: (body: UserCreate) => createAdminUser(body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: adminKeys.users })
@@ -96,7 +100,9 @@ function useAfterSettingWrite() {
 
 export function useChangeSetting() {
   const after = useAfterSettingWrite()
+  // gcTime 0: the variables carry a password, so the mutation is dropped as soon as nothing observes it.
   return useMutation({
+    gcTime: 0,
     mutationFn: ({ key, value, ...write }: SettingWrite & { key: string; value: SettingValue }) =>
       changePlatformSetting(key, { value, ...write }),
     onSuccess: after,
@@ -105,7 +111,9 @@ export function useChangeSetting() {
 
 export function useRevertSetting() {
   const after = useAfterSettingWrite()
+  // gcTime 0: the variables carry a password, so the mutation is dropped as soon as nothing observes it.
   return useMutation({
+    gcTime: 0,
     mutationFn: ({ entryId, ...write }: SettingWrite & { entryId: string }) => revertSettingChange(entryId, write),
     onSuccess: after,
   })

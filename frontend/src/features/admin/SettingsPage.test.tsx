@@ -184,7 +184,8 @@ describe('admin settings page (US-101)', () => {
     mockLoad()
     renderPage()
     expect(await screen.findByText('2 of 8 overridden')).toBeInTheDocument()
-    expect(screen.getByText(/Last change 10 Oct 2026, 09:14 by Priya Nair/)).toBeInTheDocument()
+    // The newest history entry (9 Oct), not the newest row that is still overridden (10 Oct).
+    expect(screen.getByText(/Last change 9 Oct 2026, 17:31 by Priya Nair/)).toBeInTheDocument()
     const traffic = screen.getByRole('region', { name: 'Traffic' })
     const ai = screen.getByRole('region', { name: 'AI checks' })
     const uploads = screen.getByRole('region', { name: 'Uploads' })
@@ -354,6 +355,55 @@ describe('admin settings page (US-101)', () => {
       expect(within(dialog).getByLabelText(/New value/)).toHaveAttribute('aria-invalid', 'true')
     })
 
+    it('describes the dialog by its short text, sends once however often Save is pressed, and takes Enter in a field', async () => {
+      mockLoad()
+      let finish: (s: PlatformSetting) => void = () => undefined
+      const put = vi.spyOn(api, 'changePlatformSetting').mockReturnValue(new Promise((resolve) => (finish = resolve)))
+      renderPage()
+      await userEvent.click(await screen.findByRole('button', { name: 'Change Requests per minute per client' }))
+      const dialog = await screen.findByRole('dialog', { name: /Change requests per minute/ })
+      const described = document.getElementById(dialog.getAttribute('aria-describedby') ?? '')
+      expect(described).toHaveTextContent('Every request from one client address, sliding minute.')
+      expect(described).not.toContainElement(within(dialog).getByLabelText(/New value/))
+      const field = within(dialog).getByLabelText(/New value/)
+      await userEvent.clear(field)
+      await userEvent.type(field, '200')
+      await userEvent.type(within(dialog).getByLabelText(/Reason/), 'Load test finished')
+      await userEvent.type(within(dialog).getByLabelText(/Your password/), `${PASSWORD}{Enter}`)
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Save change' }))
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Save change' }))
+      expect(put).toHaveBeenCalledTimes(1)
+      finish({ ...rate, value: 200 })
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: /Change requests per minute/ })).not.toBeInTheDocument())
+      // Reopened, nothing typed before is left, the password least of all.
+      await userEvent.click(screen.getByRole('button', { name: 'Change Requests per minute per client' }))
+      const again = await screen.findByRole('dialog', { name: /Change requests per minute/ })
+      expect(within(again).getByLabelText(/Your password/)).toHaveValue('')
+      expect(within(again).getByLabelText(/Reason/)).toHaveValue('')
+    })
+
+    it('sets a ceiling that is not a whole step of MB, and sees an untouched value as no change', async () => {
+      const odd = { ...upload, value: 4_000_000, maximum: 5_000_000 }
+      mockLoad({ environment: 'development', settings: [odd] })
+      const put = vi.spyOn(api, 'changePlatformSetting').mockResolvedValue({ ...odd, value: 5_000_000 })
+      renderPage()
+      await userEvent.click(await screen.findByRole('button', { name: 'Change Upload size' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Change upload size?' })
+      const field = within(dialog).getByLabelText(/New value/)
+      expect(field).toHaveValue('3.81')
+      expect(within(dialog).getByText('1 MB to 4.77 MB')).toBeInTheDocument()
+      await userEvent.type(within(dialog).getByLabelText(/Reason/), 'Use the whole ceiling')
+      await userEvent.type(within(dialog).getByLabelText(/Your password/), PASSWORD)
+      // Untouched: what the page shows for the current value is the current value.
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Save change' }))
+      expect(within(dialog).getByText('Upload size is already 3.81 MB.')).toBeInTheDocument()
+      expect(put).not.toHaveBeenCalled()
+      await userEvent.clear(field)
+      await userEvent.type(field, '4.77')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Save change' }))
+      await waitFor(() => expect(put).toHaveBeenCalledWith('upload_max_bytes', { value: 5_000_000, reason: 'Use the whole ceiling', password: PASSWORD }))
+    })
+
     it('shows the upload size in MB and sends bytes', async () => {
       mockLoad()
       const put = vi.spyOn(api, 'changePlatformSetting').mockResolvedValue({ ...upload, value: 5 * MB, overridden: true })
@@ -464,6 +514,8 @@ describe('admin settings page (US-101)', () => {
       await userEvent.click(within(dialog).getByRole('button', { name: 'Switch on' }))
       await waitFor(() => expect(put).toHaveBeenCalledWith('ai_paused', { value: false, reason: 'Provider recovered', password: PASSWORD }))
       await waitFor(() => expect(screen.queryByText('AI checks are paused')).not.toBeInTheDocument())
+      // The banner and its button are gone: focus lands on the switch, not on the page.
+      await waitFor(() => expect(screen.getByRole('switch', { name: 'Pause AI checks' })).toHaveFocus())
     })
   })
 
@@ -479,6 +531,9 @@ describe('admin settings page (US-101)', () => {
       expect(items[0]).toHaveTextContent('240')
       expect(items[0]).toHaveTextContent('180')
       expect(items[0]).toHaveTextContent('Scraper traffic from one address range')
+      // The arrow is for the eye; a screen reader hears "changed to".
+      expect(within(items[0]!).getByText('changed to')).toHaveClass('sr-only')
+      expect(within(items[0]!).getByText('\u2192')).toHaveAttribute('aria-hidden', 'true')
       expect(items[1]).toHaveTextContent('Revert')
       expect(items[1]).toHaveTextContent('Drafts per person')
       expect(screen.getByText('2 entries shown')).toBeInTheDocument()
@@ -511,6 +566,17 @@ describe('admin settings page (US-101)', () => {
       await userEvent.click(within(dialog).getByRole('button', { name: 'Revert change' }))
       await waitFor(() => expect(post).toHaveBeenCalledWith('h-rate', { reason: 'No longer needed', password: PASSWORD }))
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Revert this change?' })).not.toBeInTheDocument())
+    })
+
+    it('does not check a revert to the default against the bounds', async () => {
+      const odd = { ...rate, default: 300 }
+      mockLoad({ environment: 'development', settings: [odd] })
+      renderPage()
+      const list = await screen.findByRole('list', { name: 'Changes and reverts' })
+      await userEvent.click(within(list).getByRole('button', { name: /^Revert Requests per minute per client change/ }))
+      const dialog = await screen.findByRole('dialog', { name: 'Revert this change?' })
+      expect(within(dialog).queryByText('This change cannot be reverted')).not.toBeInTheDocument()
+      expect(dialog).toHaveTextContent('This sets it back to 300 requests')
     })
 
     it('lets a revert entry be reverted too', async () => {

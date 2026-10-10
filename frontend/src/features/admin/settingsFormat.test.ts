@@ -57,6 +57,17 @@ describe('settings values', () => {
     expect(parseNumber(base, '').error).toBe('Requests per minute per client must be a whole number.')
   })
 
+  it('snaps a figure typed at display precision to the exact value, default or bound', () => {
+    const odd: PlatformSetting = { ...upload, value: 4_000_000, default: 5_000_000, maximum: 5_000_000 }
+    expect(inputText(odd, 5_000_000)).toBe('4.77')
+    expect(parseNumber(odd, '4.77')).toEqual({ value: 5_000_000 })
+    expect(parseNumber(odd, inputText(odd, 4_000_000))).toEqual({ value: 4_000_000 })
+    expect(boundError(odd, parseNumber(odd, '4.77').value ?? 0)).toBeNull()
+    // Anything further from them than half a display step is what was typed.
+    expect(parseNumber(odd, '4.5')).toEqual({ value: 4_718_592 })
+    expect(parseNumber(odd, '2.555').error).toMatch(/number of megabytes/)
+  })
+
   it('says a bound the way the server does, in megabytes for a size', () => {
     expect(boundError(base, 9)).toBe('Requests per minute per client cannot go below 10; a limit cannot be switched off from the panel.')
     expect(boundError(base, 1241)).toBe('Requests per minute per client cannot go above 1,240 (the environment ceiling).')

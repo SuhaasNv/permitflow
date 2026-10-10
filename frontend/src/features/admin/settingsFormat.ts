@@ -73,9 +73,12 @@ export type Parsed = { value: number; error?: undefined } | { value?: undefined;
 export function parseNumber(s: PlatformSetting, text: string): Parsed {
   const t = text.trim()
   if (isBytes(s)) {
-    if (!/^\d+(\.\d{1,3})?$/.test(t)) return { error: `${s.label} must be a number of megabytes, such as 5 or 2.5.` }
-    const value = Math.round(Number(t) * BYTES_PER_MB)
-    return { value }
+    // Two decimals, the precision the page shows. A figure within half a display step of the value, the default or
+    // a bound is that exact number, so a ceiling of 5,000,000 bytes (shown 4.77 MB) can be set and typed back.
+    if (!/^\d+(\.\d{1,2})?$/.test(t)) return { error: `${s.label} must be a number of megabytes, such as 5 or 2.5.` }
+    const typed = Math.round(Number(t) * BYTES_PER_MB)
+    const exact = [s.value, s.default, s.minimum, s.maximum].find((n): n is number => typeof n === 'number' && Math.abs(n - typed) <= BYTES_PER_MB / 200)
+    return { value: exact ?? typed }
   }
   if (!/^\d+$/.test(t)) return { error: `${s.label} must be a whole number.` }
   return { value: Number(t) }
