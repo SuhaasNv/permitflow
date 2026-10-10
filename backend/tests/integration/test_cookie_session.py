@@ -213,6 +213,16 @@ def test_cors_allows_credentials_for_listed_origins_only(cookie_app: TestClient)
     assert "access-control-allow-origin" not in simple.headers
 
 
+def test_token_mode_wildcard_origin_never_gets_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(get_settings(), "cors_origins", "*")
+    with TestClient(create_app()) as c:
+        r = c.get("/api/v1/health", headers={"Origin": "https://any.example"})
+    assert r.headers["access-control-allow-origin"] == "*"
+    assert "access-control-allow-credentials" not in r.headers
+
+
 def test_token_mode_cors_and_responses_are_unchanged(client: TestClient, db: Session) -> None:
     make_user(db, "op@example.sg", Role.OPERATOR)
     origin = get_settings().cors_origin_list[0]
@@ -221,11 +231,28 @@ def test_token_mode_cors_and_responses_are_unchanged(client: TestClient, db: Ses
         headers={
             "Origin": origin,
             "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "authorization,x-csrf-token",
+            "Access-Control-Request-Headers": "authorization",
         },
     )
-    assert "access-control-allow-credentials" not in pre.headers
+    # The frontend sends credentials on sign-in before it knows the mode: a listed origin gets them here too.
+    assert pre.headers["access-control-allow-origin"] == origin
+    assert pre.headers["access-control-allow-credentials"] == "true"
     assert "x-csrf-token" not in pre.headers.get("access-control-allow-headers", "").lower()
+    csrf = client.options(
+        LOGIN,
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "x-csrf-token",
+        },
+    )
+    assert csrf.status_code == 400  # the CSRF header is a cookie-mode header only
+    unlisted = client.options(
+        LOGIN,
+        headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"},
+    )
+    assert unlisted.status_code == 400
+    assert "access-control-allow-origin" not in unlisted.headers  # no origin granted: the browser blocks it
 
     r = client.post(LOGIN, json={"email": "op@example.sg", "password": DEFAULT_PASSWORD})  # no Origin needed
     assert r.status_code == 200

@@ -43,9 +43,6 @@ export function setCsrfToken(value: string | null): void {
 }
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
-/** Where the server refused credentialed requests (token mode sends no Allow-Credentials): stop asking. */
-let credentialsRefused = false
-
 /** Fetch options carrying the session, for direct fetches outside `request` (downloads). Token mode: the bearer. */
 export function authInit(token: string | null, method = 'GET'): { headers: Record<string, string>; credentials?: 'include' } {
   if (csrfToken === null) return { headers: token ? { Authorization: `Bearer ${token}` } : {} }
@@ -95,9 +92,9 @@ export interface RequestOptions {
   signal?: AbortSignal
   /** Let the browser finish the request after the page is hidden or unloaded (a last autosave). */
   keepalive?: boolean
-  /** Before any session is known (sign-in, the load-time /auth/me): try with credentials, so a cookie server's
-   * Set-Cookie sticks, and fall back to none for a token server, which refuses credentialed requests. */
-  probe?: boolean
+  /** Before any session is known (sign-in, the load-time /auth/me): send credentials, so a cookie server's
+   * Set-Cookie sticks and its cookie is read. Both server modes allow credentials for the listed origins. */
+  credentials?: 'include'
   /** Set by `request` itself on the one retry after a refreshed CSRF value. */
   retried?: boolean
 }
@@ -127,20 +124,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     fetch(`${API_URL}${path}`, { method, headers, body, signal: options.signal, keepalive: options.keepalive, credentials })
   let response: Response
   try {
-    if (cookie) {
-      response = await send('include')
-    } else if (options.probe && !token && !credentialsRefused) {
-      try {
-        response = await send('include')
-      } catch {
-        // A token server answers a credentialed request without Allow-Credentials, which the browser turns
-        // into a network error before any preflighted request is sent: ask again plainly.
-        response = await send()
-        credentialsRefused = true
-      }
-    } else {
-      response = await send()
-    }
+    response = await send(cookie ? 'include' : options.credentials)
   } catch {
     throw new AppError(0, {
       code: 'network_error',

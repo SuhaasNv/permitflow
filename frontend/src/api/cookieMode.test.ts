@@ -182,21 +182,28 @@ describe('the sign-in response decides the mode', () => {
     fetchMock.mockReset()
   })
 
-  it('tries the sign-in with credentials first so a cookie server can set its cookie', async () => {
+  it('sends the sign-in with credentials so a cookie server can set its cookie', async () => {
     fetchMock.mockImplementation(async () => reply(200, { expires_at: 'x', user, csrf_token: 'c' }))
     const out = await login(user.email, 'pw')
     expect(fetchMock.mock.calls[0][1]!.credentials).toBe('include')
     expect('access_token' in out).toBe(false)
   })
 
-  // Last in the file: the "server refuses credentials" memory lives for the page load.
-  it('falls back to a plain request when a token server refuses credentialed ones', async () => {
-    fetchMock
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
-      .mockResolvedValueOnce(reply(200, { access_token: 't', token_type: 'bearer', expires_at: 'x', user }))
+  it('has no fallback: a network failure on sign-in is one attempt and a network_error', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    await expect(login(user.email, 'pw')).rejects.toMatchObject({ status: 0, code: 'network_error' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('token mode is unchanged: access_token in the answer, no CSRF header on later writes', async () => {
+    fetchMock.mockImplementation(async () => reply(200, { access_token: 't', token_type: 'bearer', expires_at: 'x', user }))
     const out = await login(user.email, 'pw')
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(fetchMock.mock.calls[1][1]!.credentials).toBeUndefined()
     expect('access_token' in out).toBe(true)
+    setTokenProvider(() => 't')
+    await request('/things', { method: 'POST' })
+    const sent = fetchMock.mock.calls[1][1]!
+    expect((sent.headers as Record<string, string>).Authorization).toBe('Bearer t')
+    expect((sent.headers as Record<string, string>)['X-CSRF-Token']).toBeUndefined()
+    expect(sent.credentials).toBeUndefined()
   })
 })

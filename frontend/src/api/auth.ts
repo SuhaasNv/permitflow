@@ -35,7 +35,7 @@ export interface MeResponse extends User {
 export function login(email: string, password: string, takeOver = false): Promise<LoginResponse> {
   return request<LoginResponse>('/auth/login', {
     method: 'POST',
-    probe: true,
+    credentials: 'include',
     body: takeOver ? { email, password, take_over: true } : { email, password },
   })
 }
@@ -45,7 +45,7 @@ export function logout(): Promise<void> {
   return request<void>('/auth/logout', { method: 'POST', keepalive: true })
 }
 
-/** `probe`: no session is known yet (the load-time check for a cookie session). */
-export function me(probe = false): Promise<MeResponse> {
-  return request<MeResponse>('/auth/me', probe ? { probe } : {})
+/** `first`: no session is known yet (the load-time check for a cookie session), so send credentials. */
+export function me(first = false): Promise<MeResponse> {
+  return request<MeResponse>('/auth/me', first ? { credentials: 'include' } : {})
 }
