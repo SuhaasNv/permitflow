@@ -4,7 +4,7 @@ import { downloadAiUsageCsv } from './aiUsage'
 import { AppError } from './client'
 import { setUploadTokenProvider } from './documents'
 
-const query = { user: 'u1', application: '', from: '2026-10-04', to: '2026-10-10' }
+const query = { user: 'u1', reference: 'PF-2026-001109', from: '2026-10-04', to: '2026-10-10' }
 
 describe('downloadAiUsageCsv', () => {
   afterEach(() => {
@@ -21,10 +21,9 @@ describe('downloadAiUsageCsv', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
     await downloadAiUsageCsv(query)
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toContain('/admin/ai-usage.csv?user_id=u1&from=2026-10-04&to=2026-10-10')
+    expect(url).toContain('/admin/ai-usage.csv?user_id=u1&reference=PF-2026-001109&from=2026-10-04&to=2026-10-10')
     expect(url).not.toContain('secret-token')
-    expect(url).not.toContain('application_id')
-    expect(init.headers).toEqual({ Authorization: 'Bearer secret-token' })
+        expect(init.headers).toEqual({ Authorization: 'Bearer secret-token' })
     expect(click).toHaveBeenCalledOnce()
   })
 

@@ -9,6 +9,8 @@ export interface AiUsageRow {
   application_id: string | null
   /** Null once a deleted draft's application is gone. */
   reference_no: string | null
+  /** Null for a deleted draft. */
+  business_name: string | null
   user_id: string | null
   user_name: string | null
   document_type: string
@@ -21,11 +23,16 @@ export interface AiUsageRow {
   outcome: string
 }
 
-export interface AiUsageTotals {
+interface Spend {
   runs: number
   input_tokens: number
   output_tokens: number
   cost_usd: string
+}
+
+export interface AiUsageTotals extends Spend {
+  /** Over the checks that reached a provider; null when none did. */
+  avg_latency_ms: number | null
 }
 
 export interface AiUsagePage {
@@ -34,13 +41,14 @@ export interface AiUsagePage {
   /** Over every row the filters match, not only this page. */
   totals: AiUsageTotals
   /** The Singapore day so far; `runs` are the checks that count toward `daily_cap`. */
-  today: AiUsageTotals & { daily_cap: number }
+  today: Spend & { daily_cap: number }
 }
 
 /** Singapore days, both ends included; empty means open-ended. */
 export interface AiUsageQuery {
   user: string
-  application: string
+  /** An application reference, matched exactly by the server. */
+  reference: string
   from: string
   to: string
 }
@@ -48,7 +56,7 @@ export interface AiUsageQuery {
 function filterParams(q: AiUsageQuery): URLSearchParams {
   const p = new URLSearchParams()
   if (q.user) p.set('user_id', q.user)
-  if (q.application) p.set('application_id', q.application)
+  if (q.reference) p.set('reference', q.reference)
   if (q.from) p.set('from', q.from)
   if (q.to) p.set('to', q.to)
   return p

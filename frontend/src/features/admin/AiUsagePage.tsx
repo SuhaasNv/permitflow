@@ -24,7 +24,6 @@ const RANGES: { value: Range; label: string }[] = [
   { value: 'custom', label: 'Custom' },
 ]
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 
 const OUTCOMES: Record<string, { label: string; tone: Tone }> = {
@@ -55,6 +54,8 @@ export function usd(value: string): string {
 }
 
 const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)} s`
+/** A refused or paused check never reached the provider: no tokens, no time. */
+const duration = (r: AiUsageRow): string => (r.latency_ms === 0 && r.input_tokens + r.output_tokens === 0 ? 'Not run' : seconds(r.latency_ms))
 
 function shift(day: string, by: number): string {
   const d = new Date(`${day}T00:00:00Z`)
@@ -107,9 +108,12 @@ function Row({ row }: { row: AiUsageRow }) {
       </span>
       <span role="cell" className={cn('min-w-0 break-words', CELL.app)}>
         {row.application_id && row.reference_no ? (
-          <Link to={`/admin/applications/${row.application_id}`} className="font-mono text-[13px]">
-            {row.reference_no}
-          </Link>
+          <>
+            <Link to={`/admin/applications/${row.application_id}`} className="font-mono text-[13px]">
+              {row.reference_no}
+            </Link>
+            {row.business_name ? <span className="block text-xs leading-4 text-text-3">{row.business_name}</span> : null}
+          </>
         ) : (
           <span className="text-[13px] text-text-3">Deleted draft</span>
         )}
@@ -122,7 +126,7 @@ function Row({ row }: { row: AiUsageRow }) {
       </span>
       <Metric label="Tokens">{number.format(row.input_tokens + row.output_tokens)}</Metric>
       <Metric label="Cost">{usd(row.cost_usd)}</Metric>
-      <Metric label="Duration">{seconds(row.latency_ms)}</Metric>
+      <Metric label="Duration">{duration(row)}</Metric>
     </li>
   )
 }
@@ -155,18 +159,18 @@ function Label({ htmlFor, children, note }: { htmlFor?: string; children: ReactN
 /** The admin's AI usage page (US-100): today against the daily cap, the filtered totals, and the checks behind them. */
 export function AiUsagePage() {
   const [params, setParams] = useSearchParams()
-  const ids = { person: useId(), application: useId(), from: useId(), to: useId(), refs: useId() }
+  const ids = { person: useId(), reference: useId(), from: useId(), to: useId() }
   const users = useAdminUsers()
 
   // The filters live in the URL, so a view can be shared; anything malformed counts as not set.
   const user = params.get('user') ?? ''
-  const application = UUID.test(params.get('application') ?? '') ? (params.get('application') ?? '') : ''
+  const reference = params.get('reference') ?? ''
   const rawRange = params.get('range')
   const range: Range = rawRange === '7' || rawRange === '30' || rawRange === 'custom' ? rawRange : 'today'
   const day = (key: string): string => (DAY.test(params.get(key) ?? '') ? (params.get(key) ?? '') : '')
   const { from, to } = span(range, day('from'), day('to'))
   const reversed = Boolean(from && to && from > to)
-  const query: AiUsageQuery = { user, application, from, to }
+  const query: AiUsageQuery = { user, reference, from, to }
 
   const set = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params)
@@ -175,31 +179,21 @@ export function AiUsagePage() {
     setParams(next, { replace: true })
   }
 
-  // The server filters by application id; the box takes a reference, resolved from the checks seen so far.
-  const [known, setKnown] = useState<Record<string, string>>({})
+  // The box applies on Enter or when it loses focus, so a half-typed reference never asks the server.
   const [draft, setDraft] = useState<string | null>(null)
   const usage = useInfiniteQuery({
     queryKey: ['admin', 'ai-usage', query],
-    queryFn: async ({ pageParam }) => {
-      const page = await getAiUsage(query, pageParam)
-      const found = page.items.filter((r) => r.reference_no && r.application_id)
-      setKnown((prev) => ({ ...prev, ...Object.fromEntries(found.map((r) => [r.reference_no?.toUpperCase(), r.application_id])) }))
-      return page
-    },
+    queryFn: ({ pageParam }) => getAiUsage(query, pageParam),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.next_cursor,
     enabled: !reversed,
   })
   const first = usage.data?.pages[0]
   const items = usage.data?.pages.flatMap((p) => p.items) ?? []
-  const references = Object.keys(known)
-  const shownApplication = draft ?? (application ? (references.find((k) => known[k] === application) ?? application) : '')
-  const unresolved = draft !== null && draft.trim() !== '' && !application
-
-  const setApplication = (text: string) => {
-    setDraft(text)
-    const t = text.trim()
-    set({ application: UUID.test(t) ? t.toLowerCase() : (known[t.toUpperCase()] ?? '') })
+  const applyReference = () => {
+    if (draft === null) return
+    set({ reference: draft.trim().toUpperCase() })
+    setDraft(null)
   }
 
   const [exporting, setExporting] = useState(false)
@@ -212,7 +206,7 @@ export function AiUsagePage() {
       .finally(() => setExporting(false))
   }
 
-  const filtered = Boolean(user || application || range !== 'today')
+  const filtered = Boolean(user || reference || range !== 'today')
   const clear = () => {
     setDraft(null)
     setParams({}, { replace: true })
@@ -266,6 +260,7 @@ export function AiUsagePage() {
                 <b className="font-semibold text-text">{checks(totals.runs)}</b> · {number.format(totals.input_tokens + totals.output_tokens)} tokens (
                 {number.format(totals.input_tokens)} in, {number.format(totals.output_tokens)} out) ·{' '}
                 <b className="font-semibold text-text">{usd(totals.cost_usd)}</b>
+                {totals.avg_latency_ms === null ? null : ` · average ${seconds(totals.avg_latency_ms)}`}
               </p>
             ) : null}
           </section>
@@ -302,29 +297,22 @@ export function AiUsagePage() {
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={ids.application}>Application</Label>
+              <Label htmlFor={ids.reference}>Application</Label>
               <input
-                id={ids.application}
+                id={ids.reference}
                 type="text"
-                list={ids.refs}
-                value={shownApplication}
-                onChange={(e) => setApplication(e.target.value)}
+                value={draft ?? reference}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={applyReference}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applyReference()
+                }}
+                maxLength={20}
                 placeholder="PF-2026-001109"
                 autoComplete="off"
                 spellCheck={false}
-                aria-describedby={unresolved ? `${ids.application}-help` : undefined}
                 className={cn(inputClasses(), 'font-mono text-sm')}
               />
-              <datalist id={ids.refs}>
-                {references.map((r) => (
-                  <option key={r} value={r} />
-                ))}
-              </datalist>
-              {unresolved ? (
-                <p id={`${ids.application}-help`} className="text-[13px] leading-[18px] text-text-3">
-                  No application with this reference among the checks seen so far. Not applied.
-                </p>
-              ) : null}
             </div>
             <div role="group" aria-labelledby={`${ids.person}-range`} className="flex flex-col gap-1.5 min-[768px]:col-span-2 min-[1400px]:col-span-1">
               <span id={`${ids.person}-range`} className="flex items-baseline gap-1.5 text-[13px] font-semibold leading-[18px] text-text">
@@ -388,7 +376,7 @@ export function AiUsagePage() {
             <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
               <h2 className="text-[17px] font-semibold leading-6">No checks match these filters</h2>
               <p className="mb-2 max-w-[52ch] text-sm text-text-2">
-                {`No document checks ${person ? `by ${person} ` : ''}${application ? `on ${shownApplication} ` : ''}${when}. Try a wider day range${filtered ? ', or clear the filters' : ''}.`}
+                {`No document checks ${person ? `by ${person} ` : ''}${reference ? `on ${reference} ` : ''}${when}. Try a wider day range${filtered ? ', or clear the filters' : ''}.`}
               </p>
               {filtered ? (
                 <Button variant="secondary" onClick={clear}>

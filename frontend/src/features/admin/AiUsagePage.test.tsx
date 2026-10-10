@@ -20,6 +20,7 @@ const row = (over: Partial<AiUsageRow> = {}): AiUsageRow => ({
   created_at: '2026-10-10T07:42:00Z',
   application_id: APP_ID,
   reference_no: 'PF-2026-001109',
+  business_name: 'Kopi & Kaya Toast House Pte. Ltd.',
   user_id: USER_ID,
   user_name: 'Tan Wei Ling',
   document_type: 'floor_plan',
@@ -35,7 +36,7 @@ const row = (over: Partial<AiUsageRow> = {}): AiUsageRow => ({
 const page = (over: Partial<Page> = {}): Page => ({
   items: [row(), row({ id: 'r2', document_type: 'tenancy_agreement', outcome: 'issues_found', cost_usd: '0.00210000', latency_ms: 8400 })],
   next_cursor: null,
-  totals: { runs: 412, input_tokens: 1401982, output_tokens: 443778, cost_usd: '0.64000000' },
+  totals: { runs: 412, input_tokens: 1401982, output_tokens: 443778, cost_usd: '0.64000000', avg_latency_ms: 6800 },
   today: { runs: 412, input_tokens: 1401982, output_tokens: 443778, cost_usd: '0.64000000', daily_cap: 600 },
   ...over,
 })
@@ -78,7 +79,7 @@ describe('AI usage (US-100)', () => {
     expect(screen.getByText(/188 left · resets at midnight, Singapore time · the cap is set in/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/admin/settings')
     expect(screen.getByLabelText('Totals for the selected range')).toHaveTextContent(
-      '412 checks · 1,845,760 tokens (1,401,982 in, 443,778 out) · US$0.64',
+      '412 checks · 1,845,760 tokens (1,401,982 in, 443,778 out) · US$0.64 · average 6.8 s',
     )
     const first = screen.getAllByRole('row')[1]
     expect(first).toHaveTextContent('Tan Wei Ling')
@@ -87,10 +88,27 @@ describe('AI usage (US-100)', () => {
     expect(first).toHaveTextContent('4,812')
     expect(first).toHaveTextContent('US$0.0016')
     expect(first).toHaveTextContent('5.9 s')
+    expect(first).toHaveTextContent('Kopi & Kaya Toast House Pte. Ltd.')
     expect(within(first).getByRole('link', { name: 'PF-2026-001109' })).toHaveAttribute('href', `/admin/applications/${APP_ID}`)
     expect(screen.getByText('Issues found')).toBeInTheDocument()
     expect(screen.getByText('Showing 2 of 412 checks')).toBeInTheDocument()
     expect(screen.getByText(/A cell that starts with =, \+, - or @ is prefixed/)).toBeInTheDocument()
+  })
+
+  it('says Not run for a check that never reached the provider and Deleted draft for a gone application', async () => {
+    vi.spyOn(usageApi, 'getAiUsage').mockResolvedValue(
+      page({
+        items: [
+          row({ id: 'x1', input_tokens: 0, output_tokens: 0, latency_ms: 0, cost_usd: '0.00000000', outcome: 'unavailable' }),
+          row({ id: 'x2', application_id: null, reference_no: null, business_name: null }),
+        ],
+      }),
+    )
+    renderAt()
+    const rows = await screen.findAllByRole('row')
+    expect(rows[1]).toHaveTextContent('Not run')
+    expect(rows[1]).not.toHaveTextContent('0.0 s')
+    expect(rows[2]).toHaveTextContent('Deleted draft')
   })
 
   it('writes the filters to the address and asks the server for them', async () => {
@@ -98,11 +116,11 @@ describe('AI usage (US-100)', () => {
     renderAt()
     const today = todayInSingapore()
     await screen.findByText('of 600 checks')
-    expect(get).toHaveBeenLastCalledWith({ user: '', application: '', from: today, to: today }, null)
+    expect(get).toHaveBeenLastCalledWith({ user: '', reference: '', from: today, to: today }, null)
 
     await userEvent.selectOptions(screen.getByLabelText('Person'), USER_ID)
     expect(screen.getByTestId('where')).toHaveTextContent(`user=${USER_ID}`)
-    expect(get).toHaveBeenLastCalledWith({ user: USER_ID, application: '', from: today, to: today }, null)
+    expect(get).toHaveBeenLastCalledWith({ user: USER_ID, reference: '', from: today, to: today }, null)
 
     await userEvent.click(screen.getByRole('button', { name: '7 days' }))
     expect(screen.getByTestId('where')).toHaveTextContent('range=7')
@@ -111,16 +129,20 @@ describe('AI usage (US-100)', () => {
     expect(last !== undefined && last.from < today).toBe(true)
     expect(screen.getByRole('button', { name: '7 days' })).toHaveAttribute('aria-pressed', 'true')
 
-    await userEvent.type(screen.getByLabelText('Application'), 'PF-2026-001109')
-    expect(get).toHaveBeenLastCalledWith(expect.objectContaining({ application: APP_ID }), null)
-    expect(screen.getByTestId('where')).toHaveTextContent(`application=${APP_ID}`)
+    // A half-typed reference asks nothing; Enter applies it, upper-cased.
+    const calls = get.mock.calls.length
+    await userEvent.type(screen.getByLabelText('Application'), 'pf-2026-001109')
+    expect(get.mock.calls.length).toBe(calls)
+    await userEvent.keyboard('{Enter}')
+    expect(get).toHaveBeenLastCalledWith(expect.objectContaining({ reference: 'PF-2026-001109' }), null)
+    expect(screen.getByTestId('where')).toHaveTextContent('reference=PF-2026-001109')
   })
 
   it('reads the filters from a shared address, a custom range included', async () => {
     const get = vi.spyOn(usageApi, 'getAiUsage').mockResolvedValue(page())
-    renderAt(`/admin/ai-usage?user=${USER_ID}&application=${APP_ID}&range=custom&from=2026-10-04&to=2026-10-10`)
+    renderAt(`/admin/ai-usage?user=${USER_ID}&reference=PF-2026-001109&range=custom&from=2026-10-04&to=2026-10-10`)
     await screen.findByText('of 600 checks')
-    expect(get).toHaveBeenCalledWith({ user: USER_ID, application: APP_ID, from: '2026-10-04', to: '2026-10-10' }, null)
+    expect(get).toHaveBeenCalledWith({ user: USER_ID, reference: 'PF-2026-001109', from: '2026-10-04', to: '2026-10-10' }, null)
     expect(screen.getByLabelText('From')).toHaveValue('2026-10-04')
     expect(screen.getByLabelText('To')).toHaveValue('2026-10-10')
     expect(screen.getByRole('button', { name: 'Custom' })).toHaveAttribute('aria-pressed', 'true')
@@ -149,12 +171,13 @@ describe('AI usage (US-100)', () => {
 
   it('names the filters in the empty state and clears them', async () => {
     vi.spyOn(usageApi, 'getAiUsage').mockResolvedValue(
-      page({ items: [], totals: { runs: 0, input_tokens: 0, output_tokens: 0, cost_usd: '0.00000000' } }),
+      page({ items: [], totals: { runs: 0, input_tokens: 0, output_tokens: 0, cost_usd: '0.00000000', avg_latency_ms: null } }),
     )
     renderAt(`/admin/ai-usage?user=${USER_ID}&range=7`)
     expect(await screen.findByText('No checks match these filters')).toBeInTheDocument()
     expect(screen.getByText(/No document checks by Tan Wei Ling between/)).toBeInTheDocument()
     expect(screen.getByLabelText('Totals for the selected range')).toHaveTextContent('0 checks · 0 tokens (0 in, 0 out) · US$0.00')
+    expect(screen.getByLabelText('Totals for the selected range')).not.toHaveTextContent('average')
     await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
     expect(screen.getByTestId('where')).toBeEmptyDOMElement()
   })
@@ -164,7 +187,7 @@ describe('AI usage (US-100)', () => {
     const download = vi.spyOn(usageApi, 'downloadAiUsageCsv').mockResolvedValue(undefined)
     renderAt(`/admin/ai-usage?user=${USER_ID}&range=custom&from=2026-10-04&to=2026-10-10`)
     await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }))
-    expect(download).toHaveBeenCalledWith({ user: USER_ID, application: '', from: '2026-10-04', to: '2026-10-10' })
+    expect(download).toHaveBeenCalledWith({ user: USER_ID, reference: '', from: '2026-10-04', to: '2026-10-10' })
   })
 
   it('says so when the export fails', async () => {
