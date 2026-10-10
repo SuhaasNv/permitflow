@@ -50,10 +50,10 @@ export function conflictMessage(error: unknown): string {
 
 type UserDraft = Omit<UserCreate, 'admin_password'>
 const EMPTY_DRAFT: UserDraft = { email: '', full_name: '', role: 'officer', password: '' }
-const PASSWORD_NEEDED = 'Enter your password to confirm.'
+export const PASSWORD_NEEDED = 'Enter your password to confirm.'
 
-/** The administrator's own password, asked again before any change to an account (step-up). */
-function StepUpField({ value, error, onChange }: { value: string; error?: string; onChange: (v: string) => void }) {
+/** The administrator's own password, asked again before any change to an account or a setting (step-up). */
+export function StepUpField({ value, error, onChange }: { value: string; error?: string; onChange: (v: string) => void }) {
   return (
     <Field
       label="Your password"
