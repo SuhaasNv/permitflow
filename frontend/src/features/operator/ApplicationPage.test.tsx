@@ -6,7 +6,7 @@ import { vi } from 'vitest'
 import * as api from '@/api/applications'
 import type { ApplicationView } from '@/api/applications'
 import { AppProviders } from '@/app/providers'
-import { respondingView } from '@/test/fixtures'
+import { respondingView, slotView } from '@/test/fixtures'
 import { ApplicationPage } from './ApplicationPage'
 
 const submitted: ApplicationView = {
@@ -157,5 +157,40 @@ describe('ApplicationPage feedback placement (UC1: officer comments at the top)'
     expect(screen.getByText('The floor area does not match the tenancy agreement.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Edit section' })).toHaveAttribute('href', '/app/applications/a1/form/premises')
     expect(screen.getByText('Only the flagged parts are open for editing. Everything else is kept as submitted.')).toBeInTheDocument()
+  })
+})
+
+describe('ApplicationPage resubmit held by the virus scan (US-099)', () => {
+  beforeEach(() => vi.restoreAllMocks())
+
+  const held = (changed: boolean) => {
+    const slot = slotView('floor_plan', { editable: true })
+    return respondingView({
+      id: 'a1',
+      document_slots: [{ ...slot, document: { ...slot.document!, scan_state: 'infected' } }],
+      resubmit: {
+        can_resubmit: false,
+        changed_sections: changed ? ['premises'] : [],
+        changed_document_types: [],
+        untouched_targets: changed ? [] : ['Premises'],
+        reason: 'Resubmit opens when no document is blocked or being scanned. 1 blocked.',
+      },
+    })
+  }
+
+  it.each([true, false])('is titled "Resubmit is on hold." with the backend reason, changes made: %s', async (changed) => {
+    vi.spyOn(api, 'getApplication').mockResolvedValue(held(changed))
+    renderPage()
+    expect(await screen.findByText('Resubmit is on hold.')).toBeInTheDocument()
+    expect(screen.getByText('Resubmit opens when no document is blocked or being scanned. 1 blocked.')).toBeInTheDocument()
+    expect(screen.queryByText('Nothing has changed yet.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Resubmit' })).toBeDisabled()
+  })
+
+  it('without a held file the title is still "Nothing has changed yet."', async () => {
+    vi.spyOn(api, 'getApplication').mockResolvedValue(respondingView({ id: 'a1' }))
+    renderPage()
+    expect(await screen.findByText('Nothing has changed yet.')).toBeInTheDocument()
+    expect(screen.queryByText('Resubmit is on hold.')).not.toBeInTheDocument()
   })
 })

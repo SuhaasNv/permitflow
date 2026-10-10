@@ -89,6 +89,8 @@ export function ApplicationPage() {
   // Readiness counts flagged targets (sections and document types), never feedback items.
   const changedTargets = view.resubmit ? view.resubmit.changed_sections.length + view.resubmit.changed_document_types.length : 0
   const flaggedTargets = view.resubmit ? changedTargets + view.resubmit.untouched_targets.length : 0
+  // The backend words the reason; this only picks the title when a file that is blocked or being scanned holds Resubmit.
+  const scanHold = view.document_slots.some((sl) => sl.document?.scan_state === 'infected' || sl.document?.scan_state === 'scanning')
   const doResubmit = () => {
     if (resubmit.isPending) return
     resubmit.mutate(undefined, {
@@ -229,7 +231,7 @@ export function ApplicationPage() {
             title={
               view.resubmit.can_resubmit
                 ? `Ready to resubmit: ${changedTargets} of ${flaggedTargets} flagged ${flaggedTargets === 1 ? 'item' : 'items'} changed.`
-                : changedTargets > 0
+                : scanHold
                   ? 'Resubmit is on hold.'
                   : 'Nothing has changed yet.'
             }
