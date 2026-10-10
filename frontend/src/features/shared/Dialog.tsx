@@ -21,13 +21,16 @@ export function Dialog({ open, title, children, confirmLabel, cancelLabel = 'Can
   const titleId = useId()
   const bodyId = useId()
   // Focus is set after showModal(): React's autoFocus runs at mount, while the dialog is still closed.
-  // Destructive dialogs start on Cancel, the others on the primary action.
+  // Destructive dialogs start on Cancel, the others on the primary action; a dialog with a form marks its first
+  // field `data-autofocus` and starts there.
   useEffect(() => {
     const el = ref.current
     if (!el) return
     if (open && !el.open) {
       el.showModal()
-      const target = el.querySelector<HTMLButtonElement>(danger ? '[data-dialog-cancel]' : '[data-dialog-confirm]')
+      const target = el.querySelector<HTMLElement>(
+        `[data-autofocus], ${danger ? '[data-dialog-cancel]' : '[data-dialog-confirm]'}`,
+      )
       target?.focus()
     }
     if (!open && el.open) el.close()

@@ -9,6 +9,7 @@ import { ReleasesPage } from '@/features/releases/ReleasesPage'
 import { RequireRole } from '@/features/auth/RequireRole'
 import { AdminActivityPage } from '@/features/admin/ActivityPage'
 import { AdminOverviewPage } from '@/features/admin/OverviewPage'
+import { AdminSettingsPage } from '@/features/admin/SettingsPage'
 import { AdminUsersPage } from '@/features/admin/UsersPage'
 import { ReadOnlyProvider } from '@/features/officer/readOnly'
 import { OfficerQueuePage } from '@/features/officer/QueuePage'
@@ -96,6 +97,7 @@ export const router = createBrowserRouter([
               { path: '/admin/overview', element: <AdminOverviewPage />, handle: titled('Operations overview') },
               { path: '/admin/activity', element: <AdminActivityPage />, handle: titled('Activity') },
               { path: '/admin/users', element: <AdminUsersPage />, handle: titled('Users') },
+              { path: '/admin/settings', element: <AdminSettingsPage />, handle: titled('Settings') },
               // The officer screens, read-only (US-072): the server sends no actions, the components render no controls.
               {
                 element: (
