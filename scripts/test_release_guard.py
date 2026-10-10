@@ -134,18 +134,41 @@ class VersionProblemTests(unittest.TestCase):
 
 class ShippedFilterTests(unittest.TestCase):
     def test_shipped_paths(self) -> None:
-        for path in ["backend/app/main.py", "frontend/src/App.tsx", "docker/observability/alerts.yml", "docker-compose.yml"]:
+        for path in ["backend/app/main.py", "frontend/src/App.tsx", "docker/observability/alerts.yml", "docker-compose.yml", "RELEASE_NOTES.md"]:
             with self.subTest(path=path):
                 self.assertTrue(rg.is_shipped(path))
 
     def test_not_shipped_paths(self) -> None:
-        for path in ["docs/a.md", "README.md", "RELEASE_NOTES.md", "CHANGELOG.md", ".github/workflows/ci.yml", "scripts/release_guard.py", "backendx/a.py"]:
+        for path in ["docs/a.md", "README.md", "CHANGELOG.md", ".github/workflows/ci.yml", "scripts/release_guard.py", "backendx/a.py"]:
             with self.subTest(path=path):
                 self.assertFalse(rg.is_shipped(path))
 
     def test_version_files_are_exempt(self) -> None:
         changed = list(rg.VERSION_FILES) + ["docs/x.md", "backend/app/api/x.py", "frontend/src/y.ts"]
         self.assertEqual(rg.shipped_changes(changed), ["backend/app/api/x.py", "frontend/src/y.ts"])
+
+    def test_release_notes_cannot_change_after_the_candidate(self) -> None:
+        self.assertEqual(rg.shipped_changes(["RELEASE_NOTES.md", "CHANGELOG.md", "README.md"]), ["RELEASE_NOTES.md"])
+
+
+class ReleaseSectionTests(unittest.TestCase):
+    NOTES = "# Release notes\n\n## v0.5.0, 15 October 2026: safe intake\n\n## v0.5.0-rc.2, 14 October 2026: x\n\n## v0.4.1, 9 October 2026: y\n"
+
+    def test_section_present(self) -> None:
+        self.assertEqual(rg.release_section_problems(self.NOTES, "0.5.0", "v0.5.0-rc.2"), [])
+
+    def test_candidate_heading_alone_is_not_the_release_section(self) -> None:
+        notes = self.NOTES.replace("## v0.5.0, 15 October 2026: safe intake\n\n", "")
+        self.assertEqual(len(rg.release_section_problems(notes, "0.5.0", "v0.5.0-rc.2")), 1)
+
+    def test_other_version_and_missing_file(self) -> None:
+        self.assertEqual(len(rg.release_section_problems(self.NOTES, "0.5.1", "t")), 1)
+        self.assertIn("missing", rg.release_section_problems(None, "0.5.0", "t")[0])
+
+    def test_the_real_version_py_declares_exactly_one_version(self) -> None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend", "app", "core", "version.py")
+        with open(path, encoding="utf-8") as f:
+            self.assertEqual(len(rg.extract_versions("backend/app/core/version.py", f.read())), 1)
 
 
 class LineDiffTests(unittest.TestCase):
