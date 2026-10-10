@@ -55,6 +55,10 @@ def test_worker_mode_startup_rules() -> None:
     check(worker_lease_seconds=86)
     with pytest.raises(RuntimeError, match="WORKER_LEASE_SECONDS"):
         check(worker_lease_seconds=85)
+    # With the scan enforced its timeout (30 by default) counts too: 25 + 60 + 30 = 115.
+    check(scan_mode="enforce", clamd_host="clamav", worker_lease_seconds=116)
+    with pytest.raises(RuntimeError, match="WORKER_LEASE_SECONDS"):
+        check(scan_mode="enforce", clamd_host="clamav", worker_lease_seconds=115)
 
 
 def test_pdf_extract_limits_have_lower_bounds() -> None:

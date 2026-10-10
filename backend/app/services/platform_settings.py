@@ -402,8 +402,6 @@ class PlatformSettingsService:
         b = bounds_for(spec, env)
         value = effective(spec, row.value if row else None, env, settings.app_env, present=row is not None)
         choices = list(spec.choices)
-        if spec.key == "scanner_fail_mode" and settings.app_env == "production":
-            choices = ["closed"]
         return SettingOut(
             key=spec.key,
             label=spec.label,

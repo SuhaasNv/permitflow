@@ -185,6 +185,9 @@ def _assemble(
             uploaded_at=d.uploaded_at,
             in_current_revision=str(d.id) in revision_doc_ids,
             verification=_verification(runs.get(d.id)),
+            scan_state=d.scan_state,
+            active_content=d.active_content,
+            scanned_at=d.scanned_at,
         )
         for d in docs
     ]

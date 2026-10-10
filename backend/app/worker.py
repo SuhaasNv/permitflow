@@ -8,7 +8,9 @@ the queue; there is no broker. The loop:
 - claims the oldest queued run with one atomic statement and commits the claim at once; a run is then
   held by its lease, not by an open transaction;
 - runs up to `WORKER_CONCURRENCY` checks at a time (the administrator's panel value, read live);
-- leaves queued runs alone while the administrator has paused the AI (US-101); they run after unpause;
+- leaves queued runs alone while the administrator has paused the AI (US-101); they run after unpause. The
+  one exception is the virus scan (US-099): a run whose file still waits for it is claimed, the file is
+  scanned and released, and the run goes back to the queue;
 - every `REAP_SECONDS` takes back runs whose lease has expired (requeue, or `dead` after three claims);
 - on SIGTERM stops claiming, gives running checks `SHUTDOWN_GRACE_SECONDS` to finish, and hands any
   still unfinished run back to the queue.
@@ -109,17 +111,17 @@ class Worker:
             return max(1, live().int_value("worker_concurrency")) - len(self._active)
 
     def fill_slots(self) -> int:
-        """Claim queued runs into the free slots; returns how many were started. Nothing is claimed while
-        the AI is paused (US-101): the runs stay queued."""
+        """Claim queued runs into the free slots; returns how many were started. While the AI is paused
+        (US-101) only runs whose file still waits for its virus scan are claimed (US-099); they scan the file
+        and go back to the queue, and the rest stay queued."""
         started = 0
         try:
-            if live().bool_value("ai_paused"):
-                return 0
+            paused = live().bool_value("ai_paused")
             for _ in range(self.free_slots()):
                 # One id per claim, not per worker: if a hung thread outlives its lease and this worker
                 # reclaims the run, the old thread is no longer the holder and its write is dropped.
                 claim = f"{self.id}:{uuid.uuid4().hex[:8]}"
-                run_id = claim_next_run(claim)
+                run_id = claim_next_run(claim, scan_only=paused)
                 if run_id is None:
                     break
                 thread = threading.Thread(

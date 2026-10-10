@@ -146,12 +146,12 @@ def test_an_empty_table_lists_every_setting_at_its_environment_default(
     assert s["rate_limit_per_minute"]["maximum"] == env.rate_limit_per_minute
     assert s["rate_limit_per_minute"]["max_source"] == "env"
     assert s["ai_paused"]["value"] is False and s["ai_paused"]["kind"] == "bool"
-    assert s["scanner_fail_mode"]["value"] == "closed" and s["scanner_fail_mode"]["choices"] == [
-        "closed",
-        "open",
+    assert s["scanner_fail_mode"]["value"] == "retry" and s["scanner_fail_mode"]["choices"] == [
+        "retry",
+        "hold",
     ]
     # Stored for later stories, and honest about it.
-    assert {k for k, v in s.items() if not v["in_use"]} == {"scanner_fail_mode"}
+    assert {k for k, v in s.items() if not v["in_use"]} == set()
     assert s["upload_max_bytes"]["maximum"] == 10 * 1024 * 1024
     assert "password" not in str(body).lower()
 
@@ -326,18 +326,17 @@ def test_switches_and_choices_are_typed(client: TestClient, db: Session) -> None
     assert _put(client, h, "worker_concurrency", 1).status_code == 200
 
 
-def test_fail_open_is_allowed_in_development_and_refused_in_production(
+def test_scanner_fail_mode_takes_retry_or_hold_in_any_environment(
     client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     h = _admin(client, db)
-    assert _put(client, h, "scanner_fail_mode", "open").status_code == 200
-    assert _put(client, h, "scanner_fail_mode", "closed").status_code == 200
-    monkeypatch.setattr(get_settings(), "app_env", "production")
+    monkeypatch.setattr(get_settings(), "app_env", "production")  # neither value lets a file through
+    assert _put(client, h, "scanner_fail_mode", "hold").status_code == 200
+    assert live().value("scanner_fail_mode") == "hold"
+    assert _put(client, h, "scanner_fail_mode", "retry").status_code == 200
     r = _put(client, h, "scanner_fail_mode", "open")
-    assert r.status_code == 422
-    assert r.json()["error"]["details"]["reason"] == "production_fail_open"
-    assert _by_key(client, h)["scanner_fail_mode"]["choices"] == ["closed"]
-    assert live().value("scanner_fail_mode") == "closed"
+    assert r.status_code == 422 and r.json()["error"]["details"]["reason"] == "not_a_choice"
+    assert _by_key(client, h)["scanner_fail_mode"]["choices"] == ["retry", "hold"]
 
 
 def test_a_row_written_around_the_api_cannot_loosen_a_limit_past_the_environment(
@@ -351,7 +350,7 @@ def test_a_row_written_around_the_api_cannot_loosen_a_limit_past_the_environment
     db.commit()
     monkeypatch.setattr(get_settings(), "app_env", "production")
     assert live().int_value("rate_limit_per_minute") == get_settings().rate_limit_per_minute
-    assert live().value("scanner_fail_mode") == "closed"
+    assert live().value("scanner_fail_mode") == "retry"  # an old word written by hand is ignored
 
 
 # ---- the request body ----

@@ -1,11 +1,11 @@
 import uuid
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import String, and_, delete, func, literal_column, or_, select, text, update
 from sqlalchemy.orm import Session
 
-from app.models import Application, Document, VerificationRun
+from app.models import Application, ClarificationAttachment, Document, VerificationRun
 from app.models.enums import DocumentType, VerificationStatus
 
 
@@ -122,17 +122,23 @@ class DocumentRepository:
 
     # ---- the work queue (US-098, ADR-016): `pending` is queued, `running` is leased ----
 
-    def claim_next(self, worker_id: str, now: datetime, lease_until: datetime) -> uuid.UUID | None:
+    def claim_next(
+        self, worker_id: str, now: datetime, lease_until: datetime, *, scan_only: bool = False
+    ) -> uuid.UUID | None:
         """Atomically take the oldest queued run: one statement, so two workers never get the same one.
         `SKIP LOCKED` lets a second worker pass over a row the first is claiming; LIMIT stays inside the
-        subquery. The caller commits at once: the claim is held by the lease, not by a transaction."""
+        subquery. The caller commits at once: the claim is held by the lease, not by a transaction.
+        `scan_only` takes only runs whose document is still `scanning`."""
         # The status is inlined, not bound, so Postgres can match the partial index
         # `ix_verification_runs_queued` (a generic plan with a bound parameter cannot).
         pending = literal_column(f"'{VerificationStatus.PENDING.value}'", String)
+        queued = select(VerificationRun.id).where(VerificationRun.status == pending)
+        if scan_only:  # US-099: while the AI is paused, only the runs whose file still waits for its scan
+            queued = queued.where(
+                VerificationRun.document_id.in_(select(Document.id).where(Document.scan_state == "scanning"))
+            )
         oldest = (
-            select(VerificationRun.id)
-            .where(VerificationRun.status == pending)
-            .order_by(VerificationRun.created_at)
+            queued.order_by(VerificationRun.created_at)
             .limit(1)
             .with_for_update(skip_locked=True)
             .scalar_subquery()
@@ -245,6 +251,64 @@ class DocumentRepository:
         if current is None:
             return "removed"
         return "ok" if current else "replaced"
+
+    # ---- the virus scan (US-099) ----
+
+    def record_scan(
+        self,
+        document_id: uuid.UUID,
+        stored_key: str,
+        *,
+        state: str,
+        signature: str | None,
+        active_content: bool,
+        new_key: str | None = None,
+        model: type[Document] | type[ClarificationAttachment] = Document,
+    ) -> bool:
+        """Write the scan result and the file's new key, if it moved (released when clean, quarantined when a
+        file stored before the scan turns out infected). Fenced on the key the scanner read: false when the
+        row is gone (a deleted draft) or moved on, so the caller removes its copy. `model` is Document or,
+        for the backfill, ClarificationAttachment: both carry the same scan columns."""
+        values: dict[str, object] = {
+            "scan_state": state,
+            "scan_signature": signature,
+            "active_content": active_content,
+            "scanned_at": datetime.now(UTC),  # the verdict landed (clean or infected)
+        }
+        if new_key is not None:
+            values["stored_key"] = new_key
+        result = self.db.execute(
+            update(model)
+            .where(model.id == document_id, model.stored_key == stored_key)
+            .values(**values)
+            .execution_options(synchronize_session=False)
+        )
+        return int(getattr(result, "rowcount", 0) or 0) == 1
+
+    def requeue_scanner_held(self, finished_before: datetime, max_attempts: int) -> int:
+        """Checks that ended `scanner_unavailable` on a file still waiting for its scan go back to the queue
+        (retry later), up to `max_attempts` claims; returns how many."""
+        waiting = select(Document.id).where(Document.scan_state == "scanning", Document.is_current.is_(True))
+        result = self.db.execute(
+            update(VerificationRun)
+            .where(
+                VerificationRun.status == VerificationStatus.UNAVAILABLE,
+                VerificationRun.error_reason == "scanner_unavailable",
+                VerificationRun.finished_at < finished_before,
+                VerificationRun.attempts < max_attempts,
+                VerificationRun.document_id.in_(waiting),
+            )
+            .values(
+                status=VerificationStatus.PENDING,
+                error_reason=None,
+                started_at=None,
+                finished_at=None,
+                latency_ms=None,
+                provider="none",
+            )
+            .execution_options(synchronize_session=False)
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
     def notify_queue(self) -> None:
         """Wake the workers (`LISTEN verification_runs`). Polling covers a missed notification."""

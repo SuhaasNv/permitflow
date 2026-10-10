@@ -19,6 +19,7 @@ from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.revisions import RevisionRepository
 from app.services.notifications import NotificationService
+from app.services.scan import ensure_submittable
 
 
 class SubmissionService:
@@ -43,6 +44,7 @@ class SubmissionService:
             # Operator bodies never carry internal status codes (FR-026): no `allowed` list, own label only.
             raise InvalidTransition(refusal(app.status, "submit")) from exc
 
+        ensure_submittable(docs)
         number = self.revisions.next_number(app.id)
         revision = ApplicationRevision(
             application_id=app.id,

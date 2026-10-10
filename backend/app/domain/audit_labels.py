@@ -36,6 +36,10 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
             return f"Document replaced: {p.get('document_type', '')}"
         case "document.deleted":
             return f"Document removed: {p.get('document_type', '')}"
+        case "document.infected":
+            return f"Document blocked by the virus scan: {p.get('document_type', '')}"
+        case "clarification.attachment_infected":
+            return "Clarification file blocked by the virus scan"
         case "verification.requested":
             return f"Check re-run requested for {p.get('document_type', '')}"
         case "verification.completed":
