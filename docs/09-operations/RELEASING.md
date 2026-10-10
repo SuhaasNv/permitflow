@@ -24,7 +24,7 @@ Do this when `dev` holds everything the version should contain and the full loca
 
    **Every candidate also writes or updates the upcoming release's own section**, `## vX.Y.Z, D Month YYYY: title`, in the same file, gathering what the candidates so far changed (no mention of candidates; the heading carries the planned release day). Nobody knows in advance which candidate will be the last, and the release commit may not touch `RELEASE_NOTES.md` (the notes are bundled into the frontend image, so the file is part of what the guard compares). What's new hides every section newer than the running version, with candidates ordered before their release (`0.5.0-rc.2` < `0.5.0-rc.10` < `0.5.0`): a candidate on dev never shows the release section, and production running `X.Y.Z` does. The release guard fails a release whose last candidate has no `## vX.Y.Z, ` section.
 2. Merge it into `dev` with `--no-ff`. Run the full local run (pytest, ruff, mypy, the AI gate, vitest, lint, typecheck, build, Playwright). Push `dev`, which needs the owner's yes.
-3. Once CI is green on that commit, tag it: `git tag -a vX.Y.Z-rc.N -m "PermitFlow vX.Y.Z-rc.N"` and `git push origin vX.Y.Z-rc.N` (yes). The tag's CI run writes the `:vX.Y.Z-rc.N` images.
+3. Once CI is green on that commit, tag it: `git tag -a vX.Y.Z-rc.N -m "PermitFlow vX.Y.Z-rc.N"` and `git push origin vX.Y.Z-rc.N` (yes). The tag's CI run does not rebuild: it names the image dev already built and is running for that commit (`sha-<commit>`) as `:vX.Y.Z-rc.N`, by digest. Tag only after CI is green on the commit and the dev deploy has run, so that image exists; if it does not, the tag run builds the images instead.
 4. Wait for the development deploy. Check that `https://api.dev.permitflow.space/api/v1/health` reports `X.Y.Z-rc.N` and the tagged commit.
 
 ## 2. Test the candidate on dev
@@ -66,7 +66,7 @@ Every push, merge into `main`, tag and deploy needs the owner's yes at that mome
 
 ## When the image scan or a scanner fails on a release tag
 
-The `images` job builds each image, scans it with Trivy (HIGH and CRITICAL with a fix) and only then logs in to GHCR and pushes. A failure on a candidate tag `vX.Y.Z-rc.N` therefore means **no image was pushed** (a release tag builds nothing, so it cannot fail a scan; it can only fail the guard or find no candidate image). Triage it on `dev`, like any problem found in a candidate:
+The `images` job builds each image, scans it with Trivy (HIGH and CRITICAL with a fix) and only then logs in to GHCR and pushes. A failure on `dev`, or on a candidate tag that had to build, therefore means **no image was pushed** (a release tag builds nothing, so it cannot fail a scan; it can only fail the guard or find no candidate image). Triage it on `dev`, like any problem found in a candidate:
 
 1. Read the finding in the run log. If a package in the base image has a fix, bump the base image or add the upgrade step in the Dockerfile on a `fix/` branch from `dev`, merge it, and cut a new candidate (section 1).
 2. If the finding cannot be fixed yet or does not apply, add it to `.trivyignore` on `dev`: the id, the reason it does not apply, who accepted it, and an expiry date (review within 30 days), then cut a new candidate. A bare id without a reason and a date is not accepted.
@@ -80,7 +80,8 @@ Production runs the image the candidate was tested as (US-111, from v0.5.0). The
 
 | Event | CI job | What happens |
 |---|---|---|
-| Pull request, push to `dev`, candidate tag `vX.Y.Z-rc.N` | `images` | build, Trivy scan, push (`:dev` or `:vX.Y.Z-rc.N`, `sha-<commit>`); the registry digests are in the run summary and the `image-digests` artifact |
+| Pull request, push to `dev` | `images` | build, Trivy scan, push (`:dev`, `sha-<commit>`; pull requests do not push); the registry digests are in the run summary and the `image-digests` artifact |
+| Candidate tag `vX.Y.Z-rc.N` | `images` | the commit's `sha-<commit>` images exist (dev built and scanned them, and the development environment runs them): they are tagged `:vX.Y.Z-rc.N` by digest, nothing is built; digests in the summary and the `image-digests` artifact. Only when they are missing does the job build, scan and push as for `dev` |
 | Push to `main` (the merge of the label commit) | `promote` | the release guard on the merge commit, then the last candidate's images are tagged `:main` and `sha-<merge>` with `docker buildx imagetools create`; each new tag is checked to have the candidate's digest |
 | Tag `vX.Y.Z` | `promote` | the release guard on the tag, then `:vX.Y.Z` and `sha-<tagged commit>` on the same digest; digests in the `promoted-digests` artifact |
 
@@ -91,4 +92,4 @@ What follows from it:
 - **The release is the candidate.** The label commit differs from the candidate only in the version lines, `CHANGELOG.md` and documents; the guard proves it, and `RELEASE_NOTES.md` and every file under `backend/`, `frontend/` and `docker/` are identical.
 - **`/health` in production reports the candidate's commit.** `commit` is the `GIT_SHA` baked into the image, so it is the tested candidate's commit, not the `main` merge commit; `version` is `APP_VERSION`, `X.Y.Z`. The Telegram bot, the metrics (`permitflow_build_info`) and the What's new build line show the same pair.
 - **Two environment variables are part of a production release**, set by the deploy job: `APP_VERSION=X.Y.Z` on the production backend and on the production frontend. Without it production would report the candidate's version (`X.Y.Z-rc.N`) and the deploy job's last gate fails. A rollback sets it to the version being rolled back to.
-- **What the dev environment ran is the `:dev` build of the candidate commit; the promoted image is the build CI made for the candidate tag.** Same commit, two builds. Nothing is rebuilt after the candidate tag.
+- **The candidate image is the image dev ran.** The build is made once, by the push of the commit to `dev`, and scanned then; the candidate tag, the push to `main` and the release tag only add names to that digest. The digest in the `promoted-digests` artifact of a release is the digest of the candidate's `image-digests` artifact. The one exception is a candidate tagged before its dev run finished: the tag run builds, and that build is what is promoted (tag after CI is green to avoid it).
