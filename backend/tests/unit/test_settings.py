@@ -77,3 +77,22 @@ def test_plain_postgresql_url_gets_the_psycopg_driver(monkeypatch) -> None:  # t
     monkeypatch.setenv("JWT_SECRET", "x" * 32)
     monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@host:5432/db")
     assert Settings().effective_database_url == "postgresql+psycopg://u:p@host:5432/db"
+
+
+def test_cookie_mode_startup_rules() -> None:
+    """US-104: credentialed CORS needs real origins; production also needs https."""
+    base = Settings.model_construct(jwt_secret="x" * 32, auth_mode="cookie")
+
+    def check(**update: object) -> None:
+        base.model_copy(update=update).validate_for_startup()
+
+    check(app_env="development", cors_origins="http://localhost:3000")
+    check(app_env="production", cors_origins="https://dev.permitflow.space, https://permitflow.space")
+    for bad in ("*", "", "https://a.example,*"):
+        with pytest.raises(RuntimeError, match="CORS_ORIGINS"):
+            check(app_env="development", cors_origins=bad)
+    with pytest.raises(RuntimeError, match="https"):
+        check(app_env="production", cors_origins="https://a.example,http://b.example")
+    # Token mode keeps accepting what it always did.
+    token = {"auth_mode": "token", "app_env": "production", "cors_origins": "http://x"}
+    base.model_copy(update=token).validate_for_startup()

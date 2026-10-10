@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Sixteen decisions, each in the same shape: context, the options considered with their trade-offs, the decision, why, the consequences, how it is validated, and amendments dated as the code changed. Read them in four groups.
+Seventeen decisions, each in the same shape: context, the options considered with their trade-offs, the decision, why, the consequences, how it is validated, and amendments dated as the code changed. Read them in four groups.
 
 ## How to read
 
@@ -8,7 +8,7 @@ Sixteen decisions, each in the same shape: context, the options considered with 
 - **The rules** (004 to 008): the behaviours that make the brief's guarantees true.
 - **The delivery** (009 to 012): stack, pipeline, and the one feature that is a record in its own right.
 - **v0.4.0** (013 and 014): the site visit arranged inside the case, and the administrator who reads everything and changes only accounts.
-- **v0.5.0** (015 and 016): uploads moved to a bucket behind a switch, and the document checks moved to a worker fed by the database.
+- **v0.5.0** (015 to 017): uploads moved to a bucket behind a switch, the document checks moved to a worker fed by the database, and the session moved into an HttpOnly cookie behind a switch.
 
 Each line below is the decision in one breath: chose X over Y because Z.
 
@@ -47,6 +47,7 @@ Each line below is the decision in one breath: chose X over Y because Z.
 |-----|-------|------|---------|
 | [015 Object storage behind a switch](ADR-015-object-storage-behind-a-switch.md) | `S3Storage` behind the existing `FileStorage` interface, selected by `STORAGE_BACKEND` (`local` by default, or `s3`); keys unchanged; downloads streamed through the authorised API; a copy script with a sha256 read-back; MinIO in Compose | A shared volume, a worker that fetches files over HTTP, or files in PostgreSQL | A worker service cannot mount the API's volume; the switch makes the move reversible with a setting, and the default keeps today's behaviour until the bucket has proved itself |
 | [016 Verification worker and queue](ADR-016-verification-worker-and-queue.md) | `verification_runs` as the queue (`FOR UPDATE SKIP LOCKED` claim, lease, reaper, `dead` after three claims, `LISTEN/NOTIFY`), a worker process of the same image behind `VERIFICATION_MODE` (`inline` by default), PDF extraction in a killed and capped child process, a re-check of the draft before the provider call | Hardening the in-process task, Redis with a task library, or a Postgres queue library | One source of truth that the UI, quotas and audit already read; no new service or dependency; a restart no longer loses checks; a hostile PDF no longer shares the API's memory; a deleted draft's text is never sent |
+| [017 Session in an HttpOnly cookie](ADR-017-session-transport-cookie-or-token.md) | `AUTH_MODE=cookie` (`token` by default): the same JWT in a `__Host-` Secure HttpOnly SameSite=Strict cookie, no bearer token in the body, a double-submit CSRF token bound to the session on every unsafe method, an Origin check on sign-in, credentialed CORS for the listed origins only; one transport per mode | A stricter CSP alone, a refresh token with an in-memory access token, or opaque session ids | A script injected into the page can no longer copy the session away; the session row of US-093 already gives revocation, so the cookie adds no new server state; the switch is the rollback |
 
 ## Amendments as built (19 Sep 2026)
 

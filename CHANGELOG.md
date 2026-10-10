@@ -2,6 +2,16 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-104, the session in an HttpOnly cookie (10 Oct 2026, `feat/us-104-cookie-session`, on dev after the next release candidate)
+
+Backend only; the frontend follows in wave 3b. Nothing changes until `AUTH_MODE=cookie` is set: the default `token` is today's behaviour and every earlier test passes unchanged.
+
+- **Cookie mode.** Sign-in sets `__Host-pf_session` (the JWT; `Secure; HttpOnly; SameSite=Strict; Path=/`, no `Domain`, `Max-Age` = the token lifetime) and `__Host-pf_csrf` (same attributes, readable by script). The sign-in body is `{expires_at, user, csrf_token}`: no bearer token. `GET /auth/me` also returns `csrf_token`. The bearer header is refused in cookie mode and the cookie is ignored in token mode.
+- **CSRF.** Every unsafe method on an authenticated route needs `X-CSRF-Token`, equal to the CSRF cookie and to `HMAC-SHA256(JWT_SECRET, "csrf:" + session id)`, compared in constant time; otherwise `403 csrf_failed`. Sign-in needs an `Origin` header from `CORS_ORIGINS` (login CSRF). Sign-out clears both cookies. One session per account and the take-over work as before; a taken-over cookie answers `401 session_revoked`.
+- **CORS.** In cookie mode credentials are allowed for the listed origins only and `X-CSRF-Token` is an allowed header; token mode is unchanged. The app refuses to start in cookie mode with an empty or `*` `CORS_ORIGINS`, or, in production, a non-https origin.
+- **Docs.** ADR-017, threat model T12 and T14, `OPERATIONS.md` (variable, rollout, rollback), `ARCHITECTURE.md`, `.env.example`, `README.md`.
+- **Handover.** Wave 3b (frontend): `credentials: "include"`, no token in `sessionStorage`, keep `csrf_token` in memory and send it as `X-CSRF-Token` on writes, call `GET /auth/me` on load, treat `403 csrf_failed` as "reload and retry once". Then switch `AUTH_MODE=cookie` on development and run the UAT. Not merged into dev from this branch yet; Notion not moved.
+
 ## v0.5.0-rc.3: release candidate on the development environment (10 Oct 2026)
 
 - The officer's check result explains `ai_paused` ("Automatic checks are paused by the administrator; re-run once they resume.") instead of showing the raw code; a vitest covers it. The operator side already shows its own wording.

@@ -16,7 +16,8 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `JWT_SECRET` | empty | backend | Required (at least 16 random characters) in every environment, tests included; the `.env.example` placeholder is refused; the app does not start without it. |
 | `JWT_EXPIRES_MINUTES` | `480` | backend | 8 hours. |
 | `SESSION_IDLE_MINUTES` | `60` | backend | US-093: one live session per account; a session with no request for this long ends by itself, so a device left signed in never locks the account. The sign-in page quotes the number from the server's message. |
-| `CORS_ORIGINS` | `http://localhost:3000` | backend | Comma separated allowlist. |
+| `CORS_ORIGINS` | `http://localhost:3000` | backend | Comma separated allowlist. In `cookie` mode it is also the list of origins that may sign in (the `Origin` check) and receive credentialed responses. |
+| `AUTH_MODE` | `token` | backend | US-104, ADR-017: how the session travels. `token` is the bearer token in the `Authorization` header (today's behaviour). `cookie` is an HttpOnly `__Host-pf_session` cookie plus a `__Host-pf_csrf` cookie and a required `X-CSRF-Token` header on POST, PUT, PATCH and DELETE; the sign-in body carries no bearer token and the header is refused. The app refuses to start in `cookie` mode when `CORS_ORIGINS` is empty or contains `*`, or, with `APP_ENV=production`, when any origin is not `https://`. The frontend must match the mode (wave 3b). |
 | `UPLOAD_DIR` | `./data/uploads` | backend | Local disk storage; Railway volume at `/data/uploads`. |
 | `UPLOAD_MAX_BYTES` | `10485760` | backend | 10 MB per file. |
 | `SITE_VISIT_DAY_GUARD` | `true` | backend | UAT run 5 (F12): Mark site visit done and the checklist submit wait for the confirmed visit date (Singapore date); the checklist draft can be filled before. `false` where a whole appointment must run in one sitting: the CI browser suite, `uat_edges.py` and `smoke_routes.py`, a demonstration environment. |
@@ -202,6 +203,23 @@ Document checks run in one of two places, chosen by `VERIFICATION_MODE`. The cod
 
 **Rollback.** Set `VERIFICATION_MODE=inline` on the API and redeploy (the worker can stay up or be stopped). At the API's start the sweep marks every `pending` and long-`running` run `failed: interrupted`, which is the old behaviour: let the queue drain first when that matters (the panel "Checks waiting" at 0), otherwise applicants re-run the checks that were queued. The schema change (migration 0016: `attempts`, `lease_until`, `worker_id`, two partial indexes) is additive and stays; the previous release reads the table as before. A `dead` run is read by older code as an unknown status, so before rolling back past this release run `alembic downgrade 0015` (it turns `dead` into `failed: interrupted`).
 
+## Session transport rollout (US-104, ADR-017)
+
+`AUTH_MODE` chooses how the signed-in session travels. `token` (the default) is the bearer token; `cookie` is an HttpOnly `__Host-` cookie with a CSRF token. The backend of wave 3a supports both; the frontend of wave 3b speaks `cookie`. Until that frontend is deployed in an environment, leave that environment on `token`.
+
+**What cookie mode sets.** `__Host-pf_session` (the JWT; `Secure; HttpOnly; SameSite=Strict; Path=/`, no `Domain`, `Max-Age` = `JWT_EXPIRES_MINUTES` in seconds) and `__Host-pf_csrf` (`Secure; SameSite=Strict; Path=/`, same `Max-Age`, readable by script). Sign-out sends both with `Max-Age=0`. The frontend (`https://dev.permitflow.space`) and the API (`https://api.dev.permitflow.space`) are the same site, so `SameSite=Strict` cookies set by the API ride along on the frontend's calls; the frontend must send `credentials: "include"`.
+
+**Rollout, one environment at a time (development first).**
+
+1. Check `CORS_ORIGINS` on the API lists exactly the frontend origins, all `https://` (the app refuses to start otherwise).
+2. Deploy the frontend image of wave 3b and the backend image together, then set `AUTH_MODE=cookie` on the API service and redeploy it. The frontend needs no variable for the mode: it reads the sign-in body.
+3. Everyone is signed out once. Sign in as each role and check in the browser: the two cookies exist with the attributes above (the session cookie is not visible to `document.cookie`), a write succeeds, a write with the `X-CSRF-Token` header removed answers `403 csrf_failed`, sign-out removes both cookies.
+4. Watch the 403 rate in the metrics for a day (`csrf_failed` is a bug in the client or an attack, not normal traffic).
+
+**Rollback.** Set `AUTH_MODE=token` (or delete the variable) on the API and redeploy, and roll the frontend back to the matching image. No migration, nothing to repair; users sign in again. A browser may keep a stale `__Host-pf_session` cookie until its `Max-Age`; token mode ignores it.
+
+**Local development.** `__Host-` cookies need `Secure`. Chrome and Firefox accept Secure cookies on `http://localhost`; Safari does not. Use one of the first two, or stay on `token`. A command-line client in cookie mode must send an `Origin` header equal to one of `CORS_ORIGINS` when it signs in, and `X-CSRF-Token` (from the sign-in body) on writes.
+
 ## Health
 
 `GET /api/v1/health` → `200 {"status":"ok","database":"ok"}` or `503 {"status":"degraded","database":"unreachable"}`. Provider configuration is never exposed here.
@@ -274,7 +292,7 @@ The GitHub `production` environment only accepts deployments from `main`. Develo
 
 | Where | Name | Purpose |
 |---|---|---|
-| Railway backend service (per environment) | `APP_ENV`, `DATABASE_URL` (`${{Postgres.DATABASE_URL}}`), `JWT_SECRET` (distinct per environment), `JWT_EXPIRES_MINUTES`, `SESSION_IDLE_MINUTES` (optional), `CORS_ORIGINS` (that environment's frontend URL), `UPLOAD_DIR=/data/uploads`, `TRUSTED_PROXIES=*` (the Railway edge is the only peer), `CLIENT_IP_HEADER` (default `X-Real-IP`, the header Railway documents for the client address), `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `LANGSMITH_API_KEY`, `LANGSMITH_ENDPOINT`, `LANGSMITH_PROJECT`, `LANGSMITH_HIDE_INPUTS` (optional, tracing), `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `PORT=8000`; development only: `SITE_VISIT_DAY_GUARD=false` (set 24 Sep 2026, so a walkthrough can record a visit the day it is arranged; production leaves it unset, the rule on) | runtime configuration |
+| Railway backend service (per environment) | `APP_ENV`, `DATABASE_URL` (`${{Postgres.DATABASE_URL}}`), `JWT_SECRET` (distinct per environment), `JWT_EXPIRES_MINUTES`, `SESSION_IDLE_MINUTES` (optional), `CORS_ORIGINS` (that environment's frontend URL), `AUTH_MODE` (optional, `token` by default; see "Session transport rollout"), `UPLOAD_DIR=/data/uploads`, `TRUSTED_PROXIES=*` (the Railway edge is the only peer), `CLIENT_IP_HEADER` (default `X-Real-IP`, the header Railway documents for the client address), `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `LANGSMITH_API_KEY`, `LANGSMITH_ENDPOINT`, `LANGSMITH_PROJECT`, `LANGSMITH_HIDE_INPUTS` (optional, tracing), `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `PORT=8000`; development only: `SITE_VISIT_DAY_GUARD=false` (set 24 Sep 2026, so a walkthrough can record a visit the day it is arranged; production leaves it unset, the rule on) | runtime configuration |
 | Railway frontend service (per environment) | `PORT=8080`, `API_URL` | written into `config.js` at start |
 | GitHub environment secret (`development`, `production`) | `RAILWAY_TOKEN` | a Railway **project token** scoped to that one environment (Project settings, Tokens); created by the owner in the dashboard |
 | GitHub repository variable | `RAILWAY_PROJECT_ID` | which project to redeploy |
@@ -323,6 +341,8 @@ Three layers, one solved, two planned.
 **Configuration.** A wrong variable (a CORS origin, a quota, a model name) is rolled back by setting the previous value in Railway (Variables) and redeploying; Railway keeps the variable history per service, so the previous value is visible there. The values that matter are listed in the Secrets and variables table above; nothing is derived at build time except the frontend's `API_URL`, which is read at container start.
 
 **AI prompt.** The verifier's prompt is versioned in code (`PROMPT_VERSION` in `openai_provider.py`, stamped on every run and trace). A bad prompt is rolled back like any code change: previous pin, deploy job. Runs made under the bad version stay in the database with their version, so they can be listed and re-run (the re-run button, or a script over `verification_runs` where `prompt_version = ...`).
+
+**Session transport (US-104).** The switch is the rollback: set `AUTH_MODE=token` (or remove the variable) on the API and redeploy; no data or schema changes. Everyone is signed out once, because a browser holding only a cookie has no bearer token and the other way round. Roll the frontend image to the version that matches the mode in the same step.
 
 **Secrets.** Rotation, not rollback: a new `JWT_SECRET` signs every user out (8 hour tokens, accepted); `OPENAI_API_KEY` and `LANGSMITH_API_KEY` are replaced in Railway and, for the evaluation workflow, in the GitHub repository secret, then the service restarts. The OpenAI key is due for rotation after the assessment; the LangSmith key expires on its own after three months.
 

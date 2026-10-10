@@ -52,6 +52,13 @@ class StepUpFailed(Forbidden):
     code = "step_up_failed"
 
 
+class CsrfFailed(Forbidden):
+    """Cookie mode (US-104): an unsafe request without a matching CSRF token, or a sign-in from a foreign
+    origin."""
+
+    code = "csrf_failed"
+
+
 class NotFound(AppError):
     status_code = 404
     code = "not_found"
