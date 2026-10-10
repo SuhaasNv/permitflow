@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import String, and_, delete, func, literal_column, or_, select, text, update
 from sqlalchemy.orm import Session
 
-from app.models import Application, Document, VerificationRun
+from app.models import Application, ClarificationAttachment, Document, VerificationRun
 from app.models.enums import DocumentType, VerificationStatus
 
 
@@ -259,9 +259,12 @@ class DocumentRepository:
         signature: str | None,
         active_content: bool,
         new_key: str | None = None,
+        model: type[Document] | type[ClarificationAttachment] = Document,
     ) -> bool:
-        """Write the scan result and, for a clean file, its released key. Fenced on the key the scanner read:
-        false when the document is gone (a deleted draft) or moved on, so the caller removes its copy."""
+        """Write the scan result and the file's new key, if it moved (released when clean, quarantined when a
+        file stored before the scan turns out infected). Fenced on the key the scanner read: false when the
+        row is gone (a deleted draft) or moved on, so the caller removes its copy. `model` is Document or,
+        for the backfill, ClarificationAttachment: both carry the same scan columns."""
         values: dict[str, object] = {
             "scan_state": state,
             "scan_signature": signature,
@@ -271,8 +274,8 @@ class DocumentRepository:
         if new_key is not None:
             values["stored_key"] = new_key
         result = self.db.execute(
-            update(Document)
-            .where(Document.id == document_id, Document.stored_key == stored_key)
+            update(model)
+            .where(model.id == document_id, model.stored_key == stored_key)
             .values(**values)
             .execution_options(synchronize_session=False)
         )

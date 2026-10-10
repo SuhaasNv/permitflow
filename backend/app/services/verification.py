@@ -119,11 +119,11 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
 
         try:
             # US-099: the scan comes first, before any text is read or any model is called. With the scan
-            # enforced, a file that is `scanning` or `infected` is scanned; infected or unanswered means it
-            # goes no further. NULL means the file was never scanned (stored with the scan off, or before
-            # it existed) and it goes on unscanned. With the scan off nothing here runs: a `scanning` row
-            # needs a re-run after the scan is switched on again.
-            if enforcing() and doc.scan_state is not None and doc.scan_state != CLEAN:
+            # enforced, a file that is not `clean` is scanned (a NULL one was stored before the scan, or with
+            # it off: it is scanned now and stays where it is); infected or unanswered means it goes no
+            # further. With the scan off nothing here runs: a `scanning` row needs a re-run after the scan is
+            # switched on again.
+            if enforcing() and doc.scan_state != CLEAN:
                 gate = scan_document(db, doc, app)
                 if gate is ScanOutcome.GONE:
                     return

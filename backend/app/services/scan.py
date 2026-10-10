@@ -29,17 +29,19 @@ from app.domain.scan import (
     INFECTED,
     INFECTED_MESSAGE,
     OFFICER_INFECTED_MESSAGE,
+    QUARANTINE_PREFIX,
     SCANNING,
     SCANNING_MESSAGE,
     blocked_reason,
     pdf_active_content,
+    quarantine_key,
     released_key,
     servable,
 )
 from app.infra import notifier
 from app.infra.clamd import ScannerError, client_from_settings
 from app.infra.storage import FileStorage, get_storage
-from app.models import Application, Document, User
+from app.models import Application, ClarificationAttachment, Document, User
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.services.platform_settings import live
@@ -90,6 +92,16 @@ def release(storage: FileStorage, key: str, data: bytes) -> str:
     return new_key
 
 
+def quarantine(storage: FileStorage, key: str, data: bytes) -> str:
+    """Copy a file stored before the scan to its quarantine key and return it (unchanged when it is already
+    quarantined). The old copy is removed by `drop_quarantined` once the database points at the new one."""
+    if key.startswith(QUARANTINE_PREFIX):
+        return key
+    new_key = quarantine_key(key)
+    storage.put(new_key, iter([data]))
+    return new_key
+
+
 def drop_quarantined(storage: FileStorage, key: str) -> None:
     try:
         storage.delete(key)
@@ -125,9 +137,19 @@ def scan_document(
         return ScanOutcome.HELD
     documents = DocumentRepository(db)
     if verdict.infected:
+        # A file stored before the scan (NULL state) sits at its normal key: it moves to quarantine like a
+        # new upload. A new upload is already there.
+        moved = quarantine(storage, key, verdict.data)
         if not documents.record_scan(
-            doc.id, key, state=INFECTED, signature=verdict.signature, active_content=verdict.active_content
+            doc.id,
+            key,
+            state=INFECTED,
+            signature=verdict.signature,
+            active_content=verdict.active_content,
+            new_key=moved if moved != key else None,
         ):
+            if moved != key:
+                drop_quarantined(storage, moved)
             db.rollback()
             return ScanOutcome.GONE
         AuditRepository(db).record(
@@ -142,7 +164,9 @@ def scan_document(
             },
         )
         db.commit()
-        _remember(doc, INFECTED, verdict, key)
+        if moved != key:
+            drop_quarantined(storage, key)
+        _remember(doc, INFECTED, verdict, moved)
         alert_infected(app.reference_no, verdict.signature)
         return ScanOutcome.INFECTED
     new_key = release(storage, key, verdict.data)
@@ -158,6 +182,52 @@ def scan_document(
         drop_quarantined(storage, key)
     _remember(doc, CLEAN, verdict, new_key)
     return ScanOutcome.CLEAN
+
+
+def scan_attachment(
+    db: Session, row: ClarificationAttachment, app: Application, storage: FileStorage | None = None
+) -> ScanOutcome:
+    """The backfill's scan of a clarification attachment stored before the scan (NULL state): the same
+    verdict, quarantine, audit event and alert as at upload. Commits its own result."""
+    storage = storage or get_storage()
+    key = row.stored_key
+    try:
+        verdict = inspect(storage, key, row.content_type)
+    except ScannerError as exc:
+        logger.warning("scan_unavailable", extra={"extra_fields": {"error": str(exc)[:200]}})
+        return ScanOutcome.HELD
+    state = INFECTED if verdict.infected else CLEAN
+    moved = quarantine(storage, key, verdict.data) if verdict.infected else key
+    if not DocumentRepository(db).record_scan(
+        row.id,
+        key,
+        state=state,
+        signature=verdict.signature if verdict.infected else None,
+        active_content=verdict.active_content,
+        new_key=moved if moved != key else None,
+        model=ClarificationAttachment,
+    ):
+        if moved != key:
+            drop_quarantined(storage, moved)
+        db.rollback()
+        return ScanOutcome.GONE
+    if verdict.infected:
+        AuditRepository(db).record(
+            application_id=app.id,
+            actor_id=None,
+            event_type="clarification.attachment_infected",
+            payload={
+                "response_id": str(row.response_id),
+                "signature": verdict.signature,
+                "sha256": row.sha256[:12],
+            },
+        )
+    db.commit()
+    if moved != key:
+        drop_quarantined(storage, key)
+    if verdict.infected:
+        alert_infected(app.reference_no, verdict.signature)
+    return ScanOutcome.INFECTED if verdict.infected else ScanOutcome.CLEAN
 
 
 def _remember(doc: Document, state: str, verdict: Verdict, key: str) -> None:

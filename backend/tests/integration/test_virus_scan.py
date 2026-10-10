@@ -5,6 +5,7 @@ that the default behaviour is unchanged. The fake scanner replaces only the clam
 tests/unit/test_clamd_client.py); the EICAR test at the bottom talks to a real clamd when CLAMD_HOST is set.
 """
 
+import importlib.util
 import os
 import subprocess
 import sys
@@ -12,9 +13,11 @@ import uuid
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from fastapi.testclient import TestClient
+from prometheus_client import REGISTRY
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
@@ -817,6 +820,203 @@ def test_migration_0018_downgrades_cleanly_and_upgrades_back(client: TestClient,
         dbmod.reset_engine()
     assert columns() == wanted
     assert stored()["scanner_fail_mode"] == "hold"
+
+
+# ---- the backfill of files stored before the scan ----
+
+BACKFILL = BACKEND_DIR / "scripts" / "scan_backfill.py"
+
+
+def _backfill_module() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("scan_backfill_script", BACKFILL)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture
+def enforce_later(monkeypatch: pytest.MonkeyPatch) -> Callable[[], FakeScanner]:
+    """Files are stored with the scan off first (NULL state); the test then switches enforce on."""
+
+    def turn_on() -> FakeScanner:
+        fake = FakeScanner()
+        monkeypatch.setattr(get_settings(), "scan_mode", "enforce")
+        monkeypatch.setattr(scan_module, "client_from_settings", lambda: fake)
+        return fake
+
+    return turn_on
+
+
+def _legacy_case(client: TestClient, db: Session) -> tuple[str, dict[str, str], int]:
+    """A submitted application with four NULL documents and one NULL clarification attachment."""
+    app_id, op, _off = _submitted(client, db)
+    response_id = _response_id(client, op, app_id)
+    assert _attach(client, op, app_id, response_id, "coving.pdf", PDF).status_code == 201
+    docs = db.scalars(select(Document)).all()
+    assert docs and all(d.scan_state is None for d in docs)
+    assert db.scalar(select(ClarificationAttachment.scan_state)) is None
+    return app_id, op, len(docs) + 1
+
+
+def _scan_count(result: str) -> float:
+    return REGISTRY.get_sample_value("permitflow_scans_total", {"result": result}) or 0.0
+
+
+def test_backfill_marks_clean_files_and_leaves_them_where_they_are(
+    client: TestClient, db: Session, enforce_later: Callable[[], FakeScanner]
+) -> None:
+    app_id, op, total = _legacy_case(client, db)
+    keys = {d.id: d.stored_key for d in db.scalars(select(Document))}
+    scanner = enforce_later()
+    summary = _backfill_module().backfill(get_storage())
+    assert (summary.scanned, summary.clean, summary.infected, summary.held) == (total, total, 0, 0)
+    assert not summary.outage and len(scanner.seen) == total
+    db.expire_all()
+    for d in db.scalars(select(Document)):
+        assert d.scan_state == CLEAN and d.scanned_at is not None and d.stored_key == keys[d.id]
+        assert _stored(d.stored_key)
+    att = db.scalar(select(ClarificationAttachment))
+    assert (
+        att is not None and att.scan_state == CLEAN and att.scanned_at is not None and _stored(att.stored_key)
+    )
+    doc = db.scalars(select(Document)).first()
+    assert doc is not None and _download(client, op, app_id, doc.id).status_code == 200  # type: ignore[attr-defined]
+
+
+def test_backfill_quarantines_infected_files_like_a_new_upload(
+    client: TestClient, db: Session, enforce_later: Callable[[], FakeScanner], alerts: list[str]
+) -> None:
+    app_id, op, total = _legacy_case(client, db)
+    old_keys = {d.stored_key for d in db.scalars(select(Document))}
+    old_keys.add(db.scalars(select(ClarificationAttachment.stored_key)).one())
+    scanner = enforce_later()
+    scanner.mode = "infected"
+    before = _scan_count("infected")
+    summary = _backfill_module().backfill(get_storage())
+    assert (summary.scanned, summary.clean, summary.infected, summary.held) == (total, 0, total, 0)
+    assert _scan_count("infected") - before == total
+    db.expire_all()
+    for d in db.scalars(select(Document)):
+        assert (
+            d.scan_state == INFECTED and d.scan_signature == "Test.Signature-1" and d.scanned_at is not None
+        )
+        assert d.stored_key.startswith("quarantine/") and _stored(d.stored_key)
+    att = db.scalar(select(ClarificationAttachment))
+    assert att is not None and att.scan_state == INFECTED and att.stored_key.startswith("quarantine/")
+    assert not any(_stored(k) for k in old_keys)  # the files left their normal keys
+    events = [e.event_type for e in db.scalars(select(AuditEvent))]
+    assert (
+        events.count("document.infected") == total - 1
+        and events.count("clarification.attachment_infected") == 1
+    )
+    assert len(alerts) == total and all("Test.Signature-1" in a for a in alerts)
+    doc = db.scalars(select(Document)).first()
+    assert doc is not None and _download(client, op, app_id, doc.id).status_code == 403  # type: ignore[attr-defined]
+
+
+def test_backfill_stops_at_a_scanner_outage_and_marks_nothing(
+    client: TestClient, db: Session, enforce_later: Callable[[], FakeScanner], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _app_id, _op, _total = _legacy_case(client, db)
+    scanner = enforce_later()
+    scanner.mode = "down"
+    module = _backfill_module()
+    summary = module.backfill(get_storage())
+    assert summary.outage and summary.scanned == 0 and len(scanner.seen) == 1  # it stopped at the first file
+    db.expire_all()
+    assert all(d.scan_state is None for d in db.scalars(select(Document)))
+    monkeypatch.setattr(sys, "argv", ["scan_backfill.py"])
+    assert module.main() == 1
+
+
+def test_backfill_refuses_to_run_with_the_scan_off(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert get_settings().scan_mode == "off"
+    monkeypatch.setattr(sys, "argv", ["scan_backfill.py"])
+    assert _backfill_module().main() == 2
+
+
+def test_backfill_dry_run_counts_and_changes_nothing(
+    client: TestClient, db: Session, enforce_later: Callable[[], FakeScanner]
+) -> None:
+    _app_id, _op, total = _legacy_case(client, db)
+    scanner = enforce_later()
+    summary = _backfill_module().backfill(get_storage(), dry_run=True)
+    assert summary.documents_null + summary.attachments_null == total and summary.scanned == 0
+    assert scanner.seen == []
+    db.expire_all()
+    assert all(d.scan_state is None and d.scanned_at is None for d in db.scalars(select(Document)))
+
+
+def test_backfill_limit_then_a_second_run_finishes_the_rest(
+    client: TestClient, db: Session, enforce_later: Callable[[], FakeScanner]
+) -> None:
+    _app_id, _op, total = _legacy_case(client, db)
+    enforce_later()
+    module = _backfill_module()
+    first = module.backfill(get_storage(), limit=2)
+    assert first.scanned == 2
+    db.expire_all()
+    assert len([d for d in db.scalars(select(Document)) if d.scan_state is None]) >= 1
+    second = module.backfill(get_storage())
+    assert first.scanned + second.scanned == total and second.clean == total - 2
+    db.expire_all()
+    assert all(d.scan_state == CLEAN for d in db.scalars(select(Document)))
+    assert module.backfill(get_storage()).scanned == 0  # nothing left
+
+
+def test_a_rerun_of_a_null_document_under_enforce_scans_it_first(
+    client: TestClient, db: Session, enforce_later: Callable[[], FakeScanner], ai_calls: list[int]
+) -> None:
+    h = _operator(client, db)
+    app_id = draft(client, h)
+    upload(client, h, app_id, "business_profile", "profile.txt", TXT, "text/plain")
+    doc = _doc(db)
+    assert doc.scan_state is None
+    key = doc.stored_key
+    scanner = enforce_later()
+    r = client.post(f"{API}/applications/{app_id}/documents/{doc.id}/verify", headers=h)
+    assert r.status_code == 202
+    doc = _doc(db)
+    assert (
+        scanner.seen == [TXT]
+        and doc.scan_state == CLEAN
+        and doc.scanned_at is not None
+        and doc.stored_key == key
+    )
+    assert ai_calls  # the check went on to the provider after the scan
+
+
+def test_a_rerun_of_an_infected_null_document_never_reaches_extraction_or_the_provider(
+    client: TestClient,
+    db: Session,
+    enforce_later: Callable[[], FakeScanner],
+    ai_calls: list[int],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    h = _operator(client, db)
+    app_id = draft(client, h)
+    upload(client, h, app_id, "floor_plan", "plan.pdf", PDF)
+    doc = _doc(db)
+    key = doc.stored_key
+    scanner = enforce_later()
+    scanner.mode = "infected"
+    extracted: list[int] = []
+    real = verification_module.extract_text
+
+    def spy(content_type: str, data: bytes, *, max_chars: int) -> object:
+        extracted.append(1)
+        return real(content_type, data, max_chars=max_chars)
+
+    monkeypatch.setattr(verification_module, "extract_text", spy)
+    r = client.post(f"{API}/applications/{app_id}/documents/{doc.id}/verify", headers=h)
+    assert r.status_code == 202
+    doc = _doc(db)
+    assert doc.scan_state == INFECTED and doc.stored_key.startswith("quarantine/") and not _stored(key)
+    assert extracted == [] and ai_calls == []
+    assert _run(db).status == VerificationStatus.UNREADABLE and _run(db).error_reason == "file_infected"
 
 
 # ---- the real scanner ----
