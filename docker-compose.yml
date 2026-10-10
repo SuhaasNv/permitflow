@@ -113,6 +113,9 @@ services:
     image: clamav/clamav:1.5.4-debian
     container_name: permitflow-clamav
     profiles: ["scan"]
+    environment:
+      # A file over clamd's MaxFileSize is reported as an error, not silently passed as clean.
+      CLAMD_CONF_AlertExceedsMax: "yes"
     healthcheck:
       test: ["CMD", "clamdcheck.sh"]
       interval: 30s
