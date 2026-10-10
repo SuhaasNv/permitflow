@@ -10,7 +10,9 @@ import pytest
 from app.core import version
 
 # The line scripts/release_guard.py reads; the release ritual bumps it.
-LITERALS = re.findall(r'^APP_VERSION\s*=\s*"([^"]+)"\s*$', Path(version.__file__).read_text(encoding="utf-8"), re.MULTILINE)
+LITERALS = re.findall(
+    r'^APP_VERSION\s*=\s*"([^"]+)"\s*$', Path(version.__file__).read_text(encoding="utf-8"), re.MULTILINE
+)
 
 
 @pytest.fixture(autouse=True)
