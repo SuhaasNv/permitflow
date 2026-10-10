@@ -260,7 +260,11 @@ jobs:
           retention-days: 7
 
   images:
+    # US-111, build once and promote. This job builds, scans and pushes: every pull request, every push to dev
+    # and every release candidate tag (vX.Y.Z-rc.N). It does NOT run for the push to main or for a release tag
+    # vX.Y.Z: those are promoted from the last candidate's images by the `promote` job below, never rebuilt.
     name: Images
+    if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || (github.ref_type == 'tag' && !contains(github.ref_name, '-rc.')))) }}
     runs-on: ubuntu-latest
     needs: [backend, frontend, ai, e2e, secrets, audit, semgrep]
     permissions:
@@ -284,7 +288,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Release guard (v* tags only)
+      - name: Release guard (candidate tags only now; releases are promoted)
         if: github.ref_type == 'tag'
         run: python3 scripts/release_guard.py "$GITHUB_REF_NAME"
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
@@ -379,6 +383,8 @@ jobs:
           BACKEND_TAGS: ${{ steps.tags.outputs.backend }}
           FRONTEND_TAGS: ${{ steps.tags.outputs.frontend }}
         run: |
+          # The registry digest (repo@sha256:...) is what a promotion names; it is recorded in the run summary
+          # and the `image-digests` artifact.
           push_all() {
             local image="$1" tags="$2" t
             echo "$image is $(docker image inspect --format '{{.Id}}' "$image")"
@@ -386,6 +392,7 @@ jobs:
               docker tag "$image" "$t"
               docker push "$t"
             done
+            docker image inspect --format '{{index .RepoDigests 0}}' "$t" >> "$RUNNER_TEMP/digests.txt"
           }
           push_all permitflow-backend:scan "$BACKEND_TAGS"
           push_all permitflow-frontend:scan "$FRONTEND_TAGS"
@@ -398,4 +405,98 @@ jobs:
             echo '`'"${{ steps.tags.outputs.frontend }}"'`'
             echo
             echo "Pushed: ${{ github.event_name == 'push' }} (pull requests only build)"
+            if [ -f "$RUNNER_TEMP/digests.txt" ]; then
+              echo
+              echo "Digests (backend, then frontend):"
+              echo '```'
+              cat "$RUNNER_TEMP/digests.txt"
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: github.event_name == 'push'
+        with:
+          name: image-digests
+          path: ${{ runner.temp }}/digests.txt
+          retention-days: 90
+
+  promote:
+    # US-111. The push to main (the merge of the label commit) and the release tag vX.Y.Z build nothing. The
+    # release guard proves the commit is the last candidate with the label removed (a push to main has no tag
+    # yet, so the guard checks the commit itself with --rev), then the candidate's images are given the new
+    # names with `docker buildx imagetools create`: the same manifest, the same digest. Production therefore
+    # runs the exact image that was tested on dev. The candidate was built and Trivy-scanned by `images`;
+    # nothing new is built, so nothing is scanned again.
+    #   push to main -> :main and sha-<merge>        (what the production services track)
+    #   tag vX.Y.Z   -> :vX.Y.Z and sha-<tagged commit>
+    name: Promote the candidate's images
+    if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || (github.ref_type == 'tag' && !contains(github.ref_name, '-rc.'))) }}
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, ai, e2e, secrets, audit, semgrep]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      OWNER: ${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Release guard and the candidate to promote
+        id: plan
+        run: |
+          version=$(python3 -c 'import json; print(json.load(open("frontend/package.json"))["version"])')
+          # The guard also fails when the five version files do not carry the tag's version, so a tag that
+          # differs from frontend/package.json never gets this far.
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            python3 scripts/release_guard.py "$GITHUB_REF_NAME"
+            names="v$version"
+          else
+            python3 scripts/release_guard.py "v$version" --rev "$GITHUB_SHA"
+            names="main"
+          fi
+          candidate=$(git tag --list "v$version-rc.*" --sort=-version:refname | head -n 1)
+          test -n "$candidate" || { echo "no candidate tag for v$version"; exit 1; }
+          rc_short=$(git rev-parse "refs/tags/$candidate^{commit}" | cut -c1-7)
+          printf 'candidate=%s\nrc_short=%s\nnames=%s\n' "$candidate" "$rc_short" "$names" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Give the candidate's images their release names (same digest, no build)
+        env:
+          CANDIDATE: ${{ steps.plan.outputs.candidate }}
+          RC_SHORT: ${{ steps.plan.outputs.rc_short }}
+          NAMES: ${{ steps.plan.outputs.names }}
+        run: |
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          short=${GITHUB_SHA::7}
+          digest_of() { docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'; }
+          : > "$RUNNER_TEMP/digests.txt"
+          for image in backend frontend; do
+            repo="ghcr.io/$owner/permitflow-$image"
+            digest=$(digest_of "$repo:$CANDIDATE")
+            # The candidate's run wrote :vX.Y.Z-rc.N and sha-<its commit> from one image; they must agree.
+            test "$(digest_of "$repo:sha-$RC_SHORT")" = "$digest" || { echo "$repo: $CANDIDATE and sha-$RC_SHORT differ"; exit 1; }
+            docker buildx imagetools create -t "$repo:$NAMES" -t "$repo:sha-$short" "$repo@$digest"
+            for t in "$NAMES" "sha-$short"; do
+              test "$(digest_of "$repo:$t")" = "$digest" || { echo "$repo:$t is not $digest"; exit 1; }
+            done
+            echo "$repo@$digest" >> "$RUNNER_TEMP/digests.txt"
+          done
+          {
+            echo "## Promoted from $CANDIDATE (no build)"
+            echo "Names: \`$NAMES\`, \`sha-$short\`. The image reports the candidate's commit (\`$RC_SHORT\`), not this one."
+            echo '```'
+            cat "$RUNNER_TEMP/digests.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: promoted-digests
+          path: ${{ runner.temp }}/digests.txt
+          retention-days: 90
