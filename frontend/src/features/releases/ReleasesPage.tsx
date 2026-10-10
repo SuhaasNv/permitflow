@@ -15,6 +15,7 @@ import { orderBlocks, parseReleaseNotes, releaseFor, tokenizeInline, visibleNote
 import type { Audience, NoteBlock, Release, ReleaseNotes } from './notes'
 import { useBuildInfo, useShowCandidates } from './queries'
 import { markReleaseSeen } from './seen'
+import { appVersion } from './version'
 import { VersionChip } from './VersionChip'
 
 /** Parsed once per load; the notes are part of the build (see vite.config.ts). */
@@ -167,7 +168,7 @@ function capitalize(s: string): string {
 /** The page body: the build line, the releases list (the running one marked), Coming next, the selected release. */
 function ReleasesBody({ notes, selected, reader }: { notes: ReleaseNotes; selected: Release; reader: Audience | null }) {
   const build = useBuildInfo()
-  const current = releaseFor(notes, __APP_VERSION__)
+  const current = releaseFor(notes, appVersion())
   const commit = build.data?.commit && build.data.commit !== 'local' ? build.data.commit : null
   const environment = build.data ? (ENVIRONMENT_LABEL[build.data.environment] ?? build.data.environment) : null
   return (
@@ -180,7 +181,7 @@ function ReleasesBody({ notes, selected, reader }: { notes: ReleaseNotes; select
       <p className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]" data-testid="build-line">
         <span className="font-medium text-text-2">This build</span>
         <span className="font-mono text-text">
-          v{__APP_VERSION__}
+          v{appVersion()}
           {commit ? ` (${commit})` : ''}
         </span>
         {environment ? <span className="text-text-3">· {environment}</span> : null}
@@ -255,10 +256,10 @@ export function ReleasesPage() {
   const { version } = useParams()
   const { user, ready } = useAuth()
   const showCandidates = useShowCandidates()
-  const notes = useMemo(() => visibleNotes(RELEASE_NOTES, showCandidates), [showCandidates])
+  const notes = useMemo(() => visibleNotes(RELEASE_NOTES, showCandidates, appVersion()), [showCandidates])
   const selected = (version ? releaseFor(notes, version) : undefined) ?? notes.releases[0]
   useEffect(() => {
-    markReleaseSeen(__APP_VERSION__)
+    markReleaseSeen(appVersion())
   }, [])
   useEffect(() => {
     window.scrollTo(0, 0)

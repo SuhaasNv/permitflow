@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { cn } from '@/lib/cn'
 import { hasSeenRelease, subscribeSeen } from './seen'
+import { appVersion } from './version'
 
 interface VersionChipProps {
   /** `rail`: the side rail footer and the landing footer (light); `strip`: the dark portal strip on phones. */
@@ -13,7 +14,7 @@ interface VersionChipProps {
 /** The version as a link to What's new (US-094): the mono chip plus the link's own words, "New" until the page
  * has been read once for this build, then "What's new" (on the dark strip the chip alone). */
 export function VersionChip({ variant, className }: VersionChipProps) {
-  const seen = useSyncExternalStore(subscribeSeen, () => hasSeenRelease(__APP_VERSION__), () => true)
+  const seen = useSyncExternalStore(subscribeSeen, () => hasSeenRelease(appVersion()), () => true)
   const dark = variant === 'strip'
   return (
     <Link
@@ -31,7 +32,7 @@ export function VersionChip({ variant, className }: VersionChipProps) {
           dark ? 'border-[#6b7684]' : 'border-line group-hover:border-line-strong',
         )}
       >
-        v{__APP_VERSION__}
+        v{appVersion()}
       </span>
       {!seen ? (
         <>

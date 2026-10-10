@@ -7,6 +7,9 @@ import json
 import os
 import sys
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -134,18 +137,41 @@ class VersionProblemTests(unittest.TestCase):
 
 class ShippedFilterTests(unittest.TestCase):
     def test_shipped_paths(self) -> None:
-        for path in ["backend/app/main.py", "frontend/src/App.tsx", "docker/observability/alerts.yml", "docker-compose.yml"]:
+        for path in ["backend/app/main.py", "frontend/src/App.tsx", "docker/observability/alerts.yml", "docker-compose.yml", "RELEASE_NOTES.md"]:
             with self.subTest(path=path):
                 self.assertTrue(rg.is_shipped(path))
 
     def test_not_shipped_paths(self) -> None:
-        for path in ["docs/a.md", "README.md", "RELEASE_NOTES.md", "CHANGELOG.md", ".github/workflows/ci.yml", "scripts/release_guard.py", "backendx/a.py"]:
+        for path in ["docs/a.md", "README.md", "CHANGELOG.md", ".github/workflows/ci.yml", "scripts/release_guard.py", "backendx/a.py"]:
             with self.subTest(path=path):
                 self.assertFalse(rg.is_shipped(path))
 
     def test_version_files_are_exempt(self) -> None:
         changed = list(rg.VERSION_FILES) + ["docs/x.md", "backend/app/api/x.py", "frontend/src/y.ts"]
         self.assertEqual(rg.shipped_changes(changed), ["backend/app/api/x.py", "frontend/src/y.ts"])
+
+    def test_release_notes_cannot_change_after_the_candidate(self) -> None:
+        self.assertEqual(rg.shipped_changes(["RELEASE_NOTES.md", "CHANGELOG.md", "README.md"]), ["RELEASE_NOTES.md"])
+
+
+class ReleaseSectionTests(unittest.TestCase):
+    NOTES = "# Release notes\n\n## v0.5.0, 15 October 2026: safe intake\n\n## v0.5.0-rc.2, 14 October 2026: x\n\n## v0.4.1, 9 October 2026: y\n"
+
+    def test_section_present(self) -> None:
+        self.assertEqual(rg.release_section_problems(self.NOTES, "0.5.0", "v0.5.0-rc.2"), [])
+
+    def test_candidate_heading_alone_is_not_the_release_section(self) -> None:
+        notes = self.NOTES.replace("## v0.5.0, 15 October 2026: safe intake\n\n", "")
+        self.assertEqual(len(rg.release_section_problems(notes, "0.5.0", "v0.5.0-rc.2")), 1)
+
+    def test_other_version_and_missing_file(self) -> None:
+        self.assertEqual(len(rg.release_section_problems(self.NOTES, "0.5.1", "t")), 1)
+        self.assertIn("missing", rg.release_section_problems(None, "0.5.0", "t")[0])
+
+    def test_the_real_version_py_declares_exactly_one_version(self) -> None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend", "app", "core", "version.py")
+        with open(path, encoding="utf-8") as f:
+            self.assertEqual(len(rg.extract_versions("backend/app/core/version.py", f.read())), 1)
 
 
 class LineDiffTests(unittest.TestCase):
@@ -199,6 +225,40 @@ class HighestCandidateTests(unittest.TestCase):
 
     def test_other_versions_and_releases_ignored(self) -> None:
         self.assertIsNone(rg.highest_candidate(["v0.4.0-rc.3", "v0.4.1", "junk"], "0.4.1"))
+
+
+class RevArgumentTests(unittest.TestCase):
+    def run_main(self, argv: list[str]) -> tuple[int, str]:
+        out = StringIO()
+        with redirect_stdout(out), redirect_stderr(out):
+            code = rg.main(["release_guard.py", *argv])
+        return code, out.getvalue()
+
+    def test_rev_is_passed_to_the_check(self) -> None:
+        with mock.patch.object(rg, "check", return_value=([], "PASS")) as check:
+            self.assertEqual(self.run_main(["v0.5.0", "--rev", "abc1234"])[0], 0)
+        check.assert_called_once_with("v0.5.0", "abc1234")
+
+    def test_tag_alone_has_no_rev(self) -> None:
+        with mock.patch.object(rg, "check", return_value=([], "PASS")) as check:
+            self.assertEqual(self.run_main(["v0.5.0"])[0], 0)
+        check.assert_called_once_with("v0.5.0", None)
+
+    def test_bad_argument_shapes_print_usage(self) -> None:
+        for argv in ([], ["v0.5.0", "--rev"], ["v0.5.0", "abc1234"], ["v0.5.0", "--rev", "a", "b"], ["v0.5.0", "--sha", "abc1234"]):
+            with self.subTest(argv=argv), mock.patch.object(rg, "check") as check:
+                code, text = self.run_main(argv)
+                self.assertEqual(code, 2)
+                self.assertIn("usage", text)
+                check.assert_not_called()
+
+    def test_rev_with_a_candidate_tag_is_refused(self) -> None:
+        problems, _ = rg.check("v0.5.0-rc.1", "abc1234")
+        self.assertEqual(len(problems), 1)
+        self.assertIn("--rev", problems[0])
+        code, text = self.run_main(["v0.5.0-rc.1", "--rev", "abc1234"])
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL", text)
 
 
 if __name__ == "__main__":

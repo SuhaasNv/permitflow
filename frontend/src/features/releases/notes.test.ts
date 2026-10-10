@@ -1,6 +1,6 @@
 import raw from 'virtual:release-notes'
 
-import { ReleaseNotesFormatError, audienceOf, orderBlocks, parseReleaseNotes, releaseFor, tokenizeInline, visibleNotes } from './notes'
+import { ReleaseNotesFormatError, audienceOf, compareVersions, orderBlocks, parseReleaseNotes, releaseFor, tokenizeInline, visibleNotes } from './notes'
 
 const SAMPLE = `# Release notes
 
@@ -227,5 +227,34 @@ describe('release candidates (US-110)', () => {
     }
     // What production would show: no candidate anywhere.
     expect(visibleNotes(notes, false).releases.every((r) => !r.candidate)).toBe(true)
+  })
+})
+
+describe('the running version decides which sections show (US-111)', () => {
+  it('orders versions by semver: rc.1 < rc.2 < rc.10 < the release < the next patch', () => {
+    const ascending = ['0.5.0-rc.1', '0.5.0-rc.2', '0.5.0-rc.10', '0.5.0', '0.5.1', '0.10.0', '1.0.0-rc.1']
+    for (let i = 0; i < ascending.length - 1; i++) {
+      expect(compareVersions(ascending[i], ascending[i + 1]), `${ascending[i]} < ${ascending[i + 1]}`).toBeLessThan(0)
+      expect(compareVersions(ascending[i + 1], ascending[i])).toBeGreaterThan(0)
+    }
+    expect(compareVersions('v0.5.0', '0.5.0')).toBe(0)
+    expect(compareVersions('nonsense', '0.5.0')).toBe(0)
+  })
+
+  // Every candidate cut carries the upcoming release's section next to its own (RELEASING.md, section 1).
+  const AT_RC4 = parseReleaseNotes(`## Coming next\n\nLater.\n\n## v0.5.0, 15 October 2026: safe intake\n\n**New**\n- Files are checked.\n\n## v0.5.0-rc.4, 15 October 2026: last fixes\n\n**New**\n- A fix.\n\n## v0.5.0-rc.3, 14 October 2026: more\n\n**New**\n- More.\n\n## v0.4.1, 9 October 2026: before\n\n**New**\n- Before.\n`)
+
+  it('the development build running 0.5.0-rc.4 does not show the 0.5.0 section; production running 0.5.0 does', () => {
+    const dev = visibleNotes(AT_RC4, true, '0.5.0-rc.4')
+    expect(dev.releases.map((r) => r.version)).toEqual(['v0.5.0-rc.4', 'v0.5.0-rc.3', 'v0.4.1'])
+    const production = visibleNotes(AT_RC4, false, '0.5.0')
+    expect(production.releases.map((r) => r.version)).toEqual(['v0.5.0', 'v0.4.1'])
+    expect(production.comingNext).toEqual(['Later.'])
+    expect(releaseFor(dev, '0.5.0-rc.4')?.version).toBe('v0.5.0-rc.4')
+  })
+
+  it('an earlier candidate does not show a later one, and an unreadable running version hides nothing', () => {
+    expect(visibleNotes(AT_RC4, true, '0.5.0-rc.3').releases.map((r) => r.version)).toEqual(['v0.5.0-rc.3', 'v0.4.1'])
+    expect(visibleNotes(AT_RC4, true, 'oops')).toBe(AT_RC4)
   })
 })

@@ -260,7 +260,13 @@ jobs:
           retention-days: 7
 
   images:
+    # US-111, build once and promote. This job builds, scans and pushes for every pull request and every push to
+    # dev, and only for those. A release candidate tag (vX.Y.Z-rc.N) builds nothing: it names the image dev already
+    # built for that commit (`sha-<commit>`, the image the development environment runs) and fails if there is
+    # none. It does NOT run for the push to main or for a release tag vX.Y.Z: those are promoted from the last
+    # candidate's images by the `promote` job below, never rebuilt.
     name: Images
+    if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || (github.ref_type == 'tag' && !contains(github.ref_name, '-rc.')))) }}
     runs-on: ubuntu-latest
     needs: [backend, frontend, ai, e2e, secrets, audit, semgrep]
     permissions:
@@ -284,7 +290,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Release guard (v* tags only)
+      - name: Release guard (candidate tags only now; releases are promoted)
         if: github.ref_type == 'tag'
         run: python3 scripts/release_guard.py "$GITHUB_REF_NAME"
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
@@ -311,6 +317,37 @@ jobs:
           fi
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+      # US-111: a candidate tag names the image dev already built and Trivy-scanned for this commit; nothing is
+      # built on a tag run, so logging in here does not put the `packages: write` token near a scanner. If either
+      # `sha-<commit>` image is missing the job fails: that commit was never built by dev, so it cannot be a
+      # candidate. There is no fallback build.
+      - name: Log in to GHCR (candidate tags)
+        if: github.ref_type == 'tag'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Name the dev image for this candidate (same digest, no build)
+        if: github.ref_type == 'tag'
+        run: |
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          short=${GITHUB_SHA::7}
+          digest_of() { docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r .digest; }
+          : > "$RUNNER_TEMP/digests.txt"
+          for image in backend frontend; do
+            repo="ghcr.io/$owner/permitflow-$image"
+            if ! digest=$(digest_of "$repo:sha-$short"); then
+              echo "no dev image $repo:sha-$short for $GITHUB_REF_NAME: dev never built this commit, so it cannot be a candidate. Wait for the dev push run of $short to finish, then re-run this job." >&2
+              exit 1
+            fi
+            # --prefer-index=false: a single-manifest image is copied as it is, not wrapped in a new index (the digest must not change)
+            docker buildx imagetools create --prefer-index=false -t "$repo:$GITHUB_REF_NAME" "$repo@$digest"
+            now=$(digest_of "$repo:$GITHUB_REF_NAME")
+            test "$now" = "$digest" || { echo "$repo:$GITHUB_REF_NAME is $now, expected $digest" >&2; exit 1; }
+            echo "$repo@$digest" >> "$RUNNER_TEMP/digests.txt"
+          done
+          echo "$GITHUB_REF_NAME names the dev images of sha-$short; nothing built." >> "$GITHUB_STEP_SUMMARY"
       # US-103: each image is built once, loaded into the runner and scanned there; the image that is pushed is
       # that same image (tagged and pushed with `docker push`), not a second build. The GHCR login comes after
       # both scans, so the `packages: write` token is not on disk while the scanner runs. Trivy is the pinned
@@ -319,6 +356,7 @@ jobs:
       # not block, because nothing can be done about it today. An accepted finding goes in `.trivyignore` with
       # its reason and a review date, never as a bare id.
       - name: Install Trivy (pinned, checksum verified)
+        if: github.ref_type != 'tag'
         run: |
           curl -fsSL --retry 3 -o /tmp/trivy.tar.gz \
             "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
@@ -329,6 +367,7 @@ jobs:
       # rate limited like ghcr.io. It is fetched here with retries and the scans run with `--skip-db-update`; if
       # all three attempts fail the job fails: a release is never cleared by a scan that did not run.
       - name: Trivy database (retried)
+        if: github.ref_type != 'tag'
         run: |
           for attempt in 1 2 3; do
             if /tmp/trivy image --download-db-only --no-progress; then exit 0; fi
@@ -336,6 +375,7 @@ jobs:
           done
           echo "Trivy database could not be downloaded; failing the check rather than skipping it"; exit 1
       - name: Backend image (build once, loaded into the runner)
+        if: github.ref_type != 'tag'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./backend
@@ -346,14 +386,17 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
       - name: Trivy, backend image (blocking at HIGH and CRITICAL)
+        if: github.ref_type != 'tag'
         run: |
           /tmp/trivy image --skip-db-update --no-progress --scanners vuln --severity HIGH,CRITICAL \
             --ignore-unfixed --exit-code 1 --ignorefile .trivyignore permitflow-backend:scan
       # The What's new page reads RELEASE_NOTES.md at build time (US-094); the image build's context is the
       # frontend folder alone, so the file is copied in first (ignored by git, see .gitignore).
       - name: Release notes into the frontend build context
+        if: github.ref_type != 'tag'
         run: cp RELEASE_NOTES.md frontend/RELEASE_NOTES.md
       - name: Frontend image (build once, loaded into the runner)
+        if: github.ref_type != 'tag'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./frontend
@@ -363,22 +406,25 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
       - name: Trivy, frontend image (blocking at HIGH and CRITICAL)
+        if: github.ref_type != 'tag'
         run: |
           /tmp/trivy image --skip-db-update --no-progress --scanners vuln --severity HIGH,CRITICAL \
             --ignore-unfixed --exit-code 1 --ignorefile .trivyignore permitflow-frontend:scan
       - name: Log in to GHCR (after the scans)
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref_type != 'tag'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push the scanned images (the same image ids Trivy read)
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref_type != 'tag'
         env:
           BACKEND_TAGS: ${{ steps.tags.outputs.backend }}
           FRONTEND_TAGS: ${{ steps.tags.outputs.frontend }}
         run: |
+          # The registry digest (repo@sha256:...) is what a promotion names; it is recorded in the run summary
+          # and the `image-digests` artifact.
           push_all() {
             local image="$1" tags="$2" t
             echo "$image is $(docker image inspect --format '{{.Id}}' "$image")"
@@ -386,6 +432,7 @@ jobs:
               docker tag "$image" "$t"
               docker push "$t"
             done
+            docker image inspect --format '{{index .RepoDigests 0}}' "$t" >> "$RUNNER_TEMP/digests.txt"
           }
           push_all permitflow-backend:scan "$BACKEND_TAGS"
           push_all permitflow-frontend:scan "$FRONTEND_TAGS"
@@ -397,5 +444,100 @@ jobs:
             echo
             echo '`'"${{ steps.tags.outputs.frontend }}"'`'
             echo
-            echo "Pushed: ${{ github.event_name == 'push' }} (pull requests only build)"
+            echo "Pushed: ${{ github.event_name == 'push' && github.ref_type != 'tag' }} (pull requests only build; a candidate tag names the dev image)"
+            if [ -f "$RUNNER_TEMP/digests.txt" ]; then
+              echo
+              echo "Digests (backend, then frontend):"
+              echo '```'
+              cat "$RUNNER_TEMP/digests.txt"
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: github.event_name == 'push'
+        with:
+          name: image-digests
+          path: ${{ runner.temp }}/digests.txt
+          retention-days: 90
+
+  promote:
+    # US-111. The push to main (the merge of the label commit) and the release tag vX.Y.Z build nothing. The
+    # release guard proves the commit is the last candidate with the label removed (a push to main has no tag
+    # yet, so the guard checks the commit itself with --rev), then the candidate's images are given the new
+    # names with `docker buildx imagetools create`: the same manifest, the same digest. Production therefore
+    # runs the exact image that was tested on dev. The candidate was built and Trivy-scanned by `images`;
+    # nothing new is built, so nothing is scanned again.
+    #   push to main -> :main and sha-<merge>        (what the production services track)
+    #   tag vX.Y.Z   -> :vX.Y.Z and sha-<tagged commit>
+    name: Promote the candidate's images
+    if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || (github.ref_type == 'tag' && !contains(github.ref_name, '-rc.'))) }}
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, ai, e2e, secrets, audit, semgrep]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      OWNER: ${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Release guard and the candidate to promote
+        id: plan
+        run: |
+          version=$(python3 -c 'import json; print(json.load(open("frontend/package.json"))["version"])')
+          # The guard also fails when the five version files do not carry the tag's version, so a tag that
+          # differs from frontend/package.json never gets this far.
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            python3 scripts/release_guard.py "$GITHUB_REF_NAME"
+            names="v$version"
+          else
+            python3 scripts/release_guard.py "v$version" --rev "$GITHUB_SHA"
+            names="main"
+          fi
+          candidate=$(git tag --list "v$version-rc.*" --sort=-version:refname | head -n 1)
+          test -n "$candidate" || { echo "no candidate tag for v$version"; exit 1; }
+          rc_short=$(git rev-parse "refs/tags/$candidate^{commit}" | cut -c1-7)
+          printf 'candidate=%s\nrc_short=%s\nnames=%s\n' "$candidate" "$rc_short" "$names" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Give the candidate's images their release names (same digest, no build)
+        env:
+          CANDIDATE: ${{ steps.plan.outputs.candidate }}
+          RC_SHORT: ${{ steps.plan.outputs.rc_short }}
+          NAMES: ${{ steps.plan.outputs.names }}
+        run: |
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          short=${GITHUB_SHA::7}
+          digest_of() { docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r .digest; }
+          : > "$RUNNER_TEMP/digests.txt"
+          for image in backend frontend; do
+            repo="ghcr.io/$owner/permitflow-$image"
+            digest=$(digest_of "$repo:$CANDIDATE")
+            # The candidate's run wrote :vX.Y.Z-rc.N and sha-<its commit> from one image; they must agree.
+            test "$(digest_of "$repo:sha-$RC_SHORT")" = "$digest" || { echo "$repo: $CANDIDATE and sha-$RC_SHORT differ"; exit 1; }
+            # --prefer-index=false: the manifest is copied as it is, so the digest does not change
+            docker buildx imagetools create --prefer-index=false -t "$repo:$NAMES" -t "$repo:sha-$short" "$repo@$digest"
+            for t in "$NAMES" "sha-$short"; do
+              test "$(digest_of "$repo:$t")" = "$digest" || { echo "$repo:$t is not $digest"; exit 1; }
+            done
+            echo "$repo@$digest" >> "$RUNNER_TEMP/digests.txt"
+          done
+          {
+            echo "## Promoted from $CANDIDATE (no build)"
+            echo "Names: \`$NAMES\`, \`sha-$short\`. The image reports the candidate's commit (\`$RC_SHORT\`), not this one."
+            echo '```'
+            cat "$RUNNER_TEMP/digests.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: promoted-digests
+          path: ${{ runner.temp }}/digests.txt
+          retention-days: 90
