@@ -47,7 +47,34 @@ deletion, N, Q, Z, H notifications, queue, quota, health, SE one live session pe
            run does only the 507 check; otherwise it is marked skipped). Worker mode itself is covered by the
            integration suite and the written scenarios U35 to U40.
 
-The script holds 502 checks (380 for v0.4.1, 5 US103, 58 PS, 11 AI, 17 ST, 31 US098) and takes about four minutes.
+    Wave 3 (v0.5.0), run after US098:
+
+    US111  which build answers (US-111): /health version is X.Y.Z or X.Y.Z-rc.N and the commit is seven hex digits
+           or `local`; the frontend's /config.js appVersion, only with UAT_FRONTEND_URL set (else skipped).
+    US101  the setting PS does not cover: upload_max_bytes lowered to its floor refuses a larger file as
+           too_large within 11 s, and its revert restores the old behaviour. The draft limit, the AI pause and
+           the revert are PS. Restored in a finally.
+    US100  AI usage (US-100): the administrator's page (items, totals with avg_latency_ms, today), one ledger
+           row per check, the filters, 400 on a bad range and on 0001-01-01, 403 for operator and officer, 401
+           anonymous, the CSV header and formula-safe cells (an operator named `=1+1 UAT formula` is created,
+           used for one check and deactivated again) and the admin.ai_usage_exported audit event.
+    US104  cookie session (US-104) in the default AUTH_MODE=token: the sign-in body has access_token and no
+           __Host- cookie. With UAT_AUTH_MODE=cookie against an API started with AUTH_MODE=cookie and
+           CORS_ORIGINS holding UAT_ORIGIN (default http://localhost:3107) the script runs only the 14 US104C
+           cookie checks (Origin on sign-in, cookie flags, no access_token, X-CSRF-Token, sign-out) and exits.
+
+    US099  the virus scan (US-099). In the default SCAN_MODE=off: uploads behave as before, scan_state is null
+           in the operator's and officer's views and downloads are not held. With UAT_SCAN=1 against an API
+           started with SCAN_MODE=enforce and a real clamd (CLAMD_HOST, CLAMD_PORT in this script's
+           environment too; the script then runs only the US099E group): a clean PDF goes scanning to clean
+           and downloads, 409 file_scanning while scanning (the state is written to the database to hold it),
+           an EICAR upload ends infected, its download 403 file_infected for operator and officer, submit 409
+           documents_not_clear with can_submit false and a submit_blocked_reason, an infected clarification
+           attachment 422, and scan_backfill.py --dry-run counts the rows with no scan state.
+
+The script holds 542 checks (380 for v0.4.1, 5 US103, 58 PS, 11 AI, 17 ST, 31 US098, 3 US111, 7 US101, 21 US100,
+4 US104, 5 US099; the 14 US104C and 16 US099E checks are counted apart, each replaces the run in its mode) and
+takes about four minutes.
 Set UPLOAD_DIR to the API's upload directory when the script runs on the same machine, so ST also reads the
 storage backend; without it the file-removal check is marked skipped.
 
@@ -60,9 +87,12 @@ administrator's password is private and differs, its administrator checks are ma
 from __future__ import annotations
 
 import concurrent.futures as cf
+import csv
 import datetime as dt
+import io
 import json
 import os
+import re
 import sys
 import time
 import uuid
@@ -2250,8 +2280,8 @@ def ps_checks(op: dict[str, str], op2: dict[str, str], off: dict[str, str]) -> N
             json.dumps([(s["key"], s["default"], s["maximum"], s["max_source"]) for s in ints]),
         )
         ps(
-            "the scanner failure mode offers closed and open outside production; the pause and the per-check message are switches",
-            next(s for s in listed if s["key"] == "scanner_fail_mode")["choices"] == ["closed", "open"]
+            "the scanner failure mode offers retry and hold (US-099: no mode serves an unscanned file); the pause and the per-check message are switches",
+            next(s for s in listed if s["key"] == "scanner_fail_mode")["choices"] == ["retry", "hold"]
             and next(s for s in listed if s["key"] == "ai_paused")["kind"] == "bool"
             and next(s for s in listed if s["key"] == "telegram_per_check_messages")["kind"] == "bool",
             "",
@@ -2315,7 +2345,7 @@ def ps_checks(op: dict[str, str], op2: dict[str, str], off: dict[str, str]) -> N
         ps(
             "the unknown scanner mode names the choices",
             detail_of(wrong[6]).get("reason") == "not_a_choice"
-            and detail_of(wrong[6]).get("choices") == ["closed", "open"],
+            and detail_of(wrong[6]).get("choices") == ["retry", "hold"],
             wrong[6].text[:200],
         )
 
@@ -2568,27 +2598,27 @@ def ps_checks(op: dict[str, str], op2: dict[str, str], off: dict[str, str]) -> N
         )
         req(op, "DELETE", f"/applications/{a2}")
 
-        # ---- the scanner failure mode (stored now, read by US-099) ----
-        r = put("scanner_fail_mode", "open", reason="UAT wave 1: scanner fail mode outside production")
+        # ---- the scanner failure mode (read by the virus scan, US-099) ----
+        r = put("scanner_fail_mode", "hold", reason="UAT wave 1: scanner fail mode hold")
         ps(
-            "outside production the scanner failure mode accepts open (200, value open, not read by anything yet)",
-            r.status_code == 200 and r.json()["value"] == "open" and r.json()["in_use"] is False,
+            "the scanner failure mode accepts hold (200, value hold)",
+            r.status_code == 200 and r.json()["value"] == "hold",
             r.text[:200],
         )
         try:
             validate(spec_for("scanner_fail_mode"), "open", None, "production")
             refuses_open = False
         except SettingRejected as exc:
-            refuses_open = exc.reason == "production_fail_open"
+            refuses_open = exc.reason == "not_a_choice"
         ps(
-            "the domain rule refuses open when the environment is production (checked on the rule, not on this stack)",
+            "the domain rule has no open mode: a file is never served unscanned, in any environment (checked on the rule, not on this stack)",
             refuses_open,
             "",
         )
-        r = revert(first_event["scanner_fail_mode"], reason="UAT wave 1: scanner fail mode back to closed")
+        r = revert(first_event["scanner_fail_mode"], reason="UAT wave 1: scanner fail mode back to retry")
         ps(
-            "reverting it returns the scanner to closed with no override",
-            r.status_code == 200 and r.json()["value"] == "closed" and r.json()["overridden"] is False,
+            "reverting it returns the scanner to retry with no override",
+            r.status_code == 200 and r.json()["value"] == "retry" and r.json()["overridden"] is False,
             r.text[:200],
         )
         # ---- the confirmation is a password guess: wrong ones are refused, repeated ones stopped ----
@@ -3208,10 +3238,801 @@ def us098_checks(op: dict[str, str], off: dict[str, str]) -> None:
         )
 
 
+# ---------- wave 3 (v0.5.0): US-111, US-101, US-100, US-104 ----------
+
+SEMVER = re.compile(r"\d+\.\d+\.\d+(-rc\.\d+)?")
+FORMULA_NAME = "=1+1 UAT formula"
+FORMULA_EMAIL = "uat-formula@permitflow.example.sg"
+CSV_FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def admin_session() -> dict[str, str] | None:
+    r = client.post("/auth/login", json={"email": ADMIN_EMAIL, "password": PW, "take_over": True})
+    return {"Authorization": "Bearer " + r.json()["access_token"]} if r.status_code == 200 else None
+
+
+def us111_checks() -> None:
+    """US111: which build answers (v0.5.0, US-111, build once and promote). The script cannot see the API's
+    APP_VERSION, so it checks the shape of what /health reports, not a particular number."""
+    v = Numbered("US111-")
+    body = client.get("/health").json()
+    v(
+        "/health carries a version of the form X.Y.Z or X.Y.Z-rc.N",
+        isinstance(body.get("version"), str) and SEMVER.fullmatch(body["version"]) is not None,
+        str(body.get("version")),
+    )
+    commit = body.get("commit")
+    v(
+        "/health carries the build's commit: seven hex digits, or 'local' for a build outside CI",
+        isinstance(commit, str) and (commit == "local" or re.fullmatch(r"[0-9a-f]{7}", commit) is not None),
+        str(commit),
+    )
+    front = os.environ.get("UAT_FRONTEND_URL", "").rstrip("/")
+    if not front:
+        v(
+            "the frontend's /config.js carries appVersion when set (skipped: set UAT_FRONTEND_URL to a stack served "
+            "by the container, `vite preview` does not write config.js)",
+            True,
+        )
+        return
+    r = httpx.get(front + "/config.js", timeout=30)
+    m = re.search(r'appVersion:\s*"([^"]*)"', r.text)
+    v(
+        "the frontend's /config.js is served",
+        r.status_code == 200 and "__PERMITFLOW__" in r.text,
+        str(r.status_code),
+    )
+    v(
+        "and its appVersion, when the frontend was started with APP_VERSION, has the same form (absent otherwise: the app shows the version it was built with)",
+        m is None or SEMVER.fullmatch(m.group(1)) is not None,
+        r.text[:200],
+    )
+
+
+def us101_checks(op: dict[str, str]) -> None:
+    """US101: the settings PS did not cover. PS already shows the draft limit refusing the next draft, the AI
+    pause ending a check unavailable with ai_paused, and a revert restoring both. Here: upload_max_bytes takes
+    effect within 11 s (the cache lives 10 s) as too_large, and its revert restores the old behaviour. The
+    setting is put back in the finally, also when a check fails."""
+    u = Numbered("US101-")
+    admin = admin_session()
+    if admin is None:
+        u("the settings checks need the administrator's sign-in (skipped on this stack)", True)
+        return
+    key = "upload_max_bytes"
+    floor = 1024 * 1024  # the lowest value the panel accepts
+    big = b"%PDF-1.4\n" + b"0" * (floor + 1024)  # a little over the lowest limit
+
+    def current() -> dict:  # type: ignore[type-arg]
+        return next(s for s in req(admin, "GET", SETTINGS).json()["settings"] if s["key"] == key)
+
+    def change(value: int, reason: str) -> httpx.Response:
+        return req(admin, "PUT", f"{SETTINGS}/{key}", json={"value": value, "reason": reason, "password": PW})
+
+    def until(app_id: str, want: str, timeout: float = 11.0) -> tuple[bool, float, httpx.Response]:
+        """Upload `big` every half second until the answer is `want` (too_large or accepted)."""
+        t0 = time.time()
+        while True:
+            r = upload(op, app_id, "floor_plan", "big.pdf", big, "application/pdf")
+            reason = (
+                (r.json().get("error", {}).get("details") or {}).get("reason")
+                if r.status_code >= 400
+                else None
+            )
+            done = reason == "too_large" if want == "too_large" else r.status_code in (200, 201)
+            if done or time.time() - t0 >= timeout:
+                return done, time.time() - t0, r
+            time.sleep(0.5)
+
+    start = current()
+    aid = req(op, "POST", "/applications").json()["id"]
+    reverted = False
+    try:
+        before = upload(op, aid, "floor_plan", "big.pdf", big, "application/pdf")
+        u(
+            "at the default size limit a file just over 1 MB is accepted",
+            before.status_code in (200, 201),
+            before.text[:200],
+        )
+        r = change(floor, "UAT wave 3: lower the upload limit to 1 MB")
+        u(
+            "lowering the upload size to its floor (1,048,576 bytes) is 200 and the list shows it as changed",
+            r.status_code == 200 and r.json()["value"] == floor and current()["overridden"] is True,
+            r.text[:200],
+        )
+        ok, took, last = until(aid, "too_large")
+        err = last.json().get("error", {}) if last.status_code >= 400 else {}
+        u(
+            f"within 11 s the same file is refused 400 too_large with the new size in the message (took {took:.1f} s)",
+            ok
+            and last.status_code == 400
+            and err.get("details", {}).get("reason") == "too_large"
+            and "1 MB" in err.get("message", ""),
+            last.text[:200],
+        )
+        small = upload(op, aid, "business_profile", "small.txt", TXT)
+        u(
+            "a small file is still accepted at the lower limit",
+            small.status_code in (200, 201),
+            small.text[:200],
+        )
+        entry = req(admin, "GET", f"{SETTINGS}/history", params={"key": key, "limit": 1}).json()["entries"][0]
+        back = req(
+            admin,
+            "POST",
+            f"{SETTINGS}/history/{entry['id']}/revert",
+            json={"reason": "UAT wave 3: restore the upload limit", "password": PW},
+        )
+        reverted = back.status_code == 200
+        u(
+            "reverting that history entry is 200 and the setting follows its default again",
+            reverted
+            and back.json()["overridden"] == start["overridden"]
+            and back.json()["value"] == start["value"],
+            back.text[:200],
+        )
+        ok, took, last = until(aid, "accepted")
+        u(
+            f"within 11 s the large file is accepted again: the old behaviour is back (took {took:.1f} s)",
+            ok,
+            last.text[:200],
+        )
+    finally:
+        if not reverted and current()["overridden"] and not start["overridden"]:
+            top = req(admin, "GET", f"{SETTINGS}/history", params={"key": key, "limit": 1}).json()["entries"]
+            if top and top[0]["kind"] == "changed":
+                req(
+                    admin,
+                    "POST",
+                    f"{SETTINGS}/history/{top[0]['id']}/revert",
+                    json={"reason": "UAT wave 3: restore", "password": PW},
+                )
+        req(op, "DELETE", f"/applications/{aid}")
+    end = current()
+    u(
+        "the group left the upload limit as it found it",
+        (end["value"], end["overridden"]) == (start["value"], start["overridden"]),
+        f"{start['value']} -> {end['value']}",
+    )
+
+
+def wait_checks_one(h: dict[str, str], app_id: str, dtype: str, timeout: float = 60) -> None:
+    end = time.time() + timeout
+    while time.time() < end:
+        slot = next(
+            s for s in req(h, "GET", f"/applications/{app_id}").json()["document_slots"] if s["type"] == dtype
+        )
+        if ((slot.get("document") or {}).get("verification") or {}).get("status") in (
+            "verified",
+            "issues_found",
+            "unavailable",
+            "unreadable",
+            "failed",
+            "needs_review",
+        ):
+            return
+        time.sleep(0.5)
+
+
+def us100_checks(op: dict[str, str], off: dict[str, str]) -> None:
+    """US100: AI usage (US-100): the ledger page, its filters, who may read it, the CSV and its audit event.
+    Formula safety is exercised end to end: the group creates an operator whose display name starts with `=`
+    (kept and deactivated at the end, because accounts are never deleted), runs one check as that person and
+    reads the CSV. The cell logic itself is also covered by the unit suite."""
+    from app.domain.ai_usage import CSV_COLUMNS
+
+    u = Numbered("US100-")
+    admin = admin_session()
+    if admin is None:
+        u("the AI usage checks need the administrator's sign-in (skipped on this stack)", True)
+        return
+    me = req(admin, "GET", "/auth/me").json()
+    usage, csv_path = "/admin/ai-usage", "/admin/ai-usage.csv"
+    today = sg_today()
+
+    def day(d: dt.date) -> str:
+        return d.isoformat()
+
+    # ---- the page ----
+    page = req(admin, "GET", usage)
+    j = page.json() if page.status_code == 200 else {}
+    u(
+        "the administrator's page has items, totals (with avg_latency_ms) and today (with the daily cap)",
+        page.status_code == 200
+        and {"items", "next_cursor", "totals", "today"} <= set(j)
+        and {"runs", "input_tokens", "output_tokens", "cost_usd", "avg_latency_ms"} <= set(j["totals"])
+        and {"runs", "cost_usd", "daily_cap"} <= set(j["today"])
+        and isinstance(j["today"]["daily_cap"], int),
+        page.text[:300],
+    )
+    # ---- who may read it ----
+    for label, headers in (("an operator", op), ("an officer", off)):
+        got = [req(headers, "GET", p).status_code for p in (usage, csv_path)]
+        u(f"{label} gets 403 on the page and on the CSV", got == [403, 403], str(got))
+    anon = [client.get(p).status_code for p in (usage, csv_path)]
+    u("no token gets 401 on the page and on the CSV", anon == [401, 401], str(anon))
+
+    # ---- a person whose name is a formula, and one check as that person ----
+    created = req(
+        admin,
+        "POST",
+        "/admin/users",
+        json={
+            "email": FORMULA_EMAIL,
+            "full_name": FORMULA_NAME,
+            "role": "operator",
+            "password": PW,
+            "admin_password": PW,
+        },
+    )
+    fu = {x["email"]: x for x in req(admin, "GET", "/admin/users").json()["users"]}.get(FORMULA_EMAIL)
+    if fu is None:
+        u("the formula-named operator exists (created or found)", False, created.text[:200])
+        return
+    u(
+        "an administrator can create an operator whose display name starts with '='",
+        fu["full_name"] == FORMULA_NAME,
+        fu["full_name"],
+    )
+    if not fu["is_active"]:
+        req(admin, "PATCH", f"/admin/users/{fu['id']}", json={"is_active": True, "admin_password": PW})
+    lg = client.post("/auth/login", json={"email": FORMULA_EMAIL, "password": PW, "take_over": True})
+    if lg.status_code != 200:
+        u("the formula-named operator can sign in", False, lg.text[:200])
+        return
+    fh = {"Authorization": "Bearer " + lg.json()["access_token"]}
+    aid = req(fh, "POST", "/applications").json()["id"]
+    try:
+        ref = req(fh, "GET", f"/applications/{aid}").json()["reference_no"]
+        pre = req(admin, "GET", usage, params={"application_id": aid}).json()
+        u(
+            "before any check the application has no ledger row",
+            pre["items"] == [] and pre["totals"]["runs"] == 0,
+            str(pre["totals"]),
+        )
+        up = upload(fh, aid, "floor_plan", "plan.png", tiny_png(), "image/png")
+        u("the upload is accepted", up.status_code in (200, 201), up.text[:150])
+        wait_checks_one(fh, aid, "floor_plan")
+        one = req(admin, "GET", usage, params={"application_id": aid}).json()
+        u(
+            "one check produces exactly one ledger row",
+            len(one["items"]) == 1 and one["totals"]["runs"] == 1,
+            str(one["totals"]),
+        )
+        row = one["items"][0] if one["items"] else {}
+        u(
+            "the row names the person, the application's reference, the document type and the outcome",
+            row.get("user_id") == fu["id"]
+            and row.get("user_name") == FORMULA_NAME
+            and row.get("reference_no") == ref
+            and row.get("document_type") == "floor_plan"
+            and bool(row.get("outcome")),
+            json.dumps(row)[:300],
+        )
+
+        # ---- filters ----
+        def ids(**params: str) -> list[str]:
+            r = req(admin, "GET", usage, params={"limit": 100, **params})
+            return (
+                [x["id"] for x in r.json()["items"]] if r.status_code == 200 else ["!" + str(r.status_code)]
+            )
+
+        mine = req(admin, "GET", usage, params={"user_id": fu["id"], "limit": 100}).json()
+        u(
+            "user_id keeps only that person's rows, this check among them",
+            mine["items"] != []
+            and all(x["user_id"] == fu["id"] for x in mine["items"])
+            and row.get("id") in [x["id"] for x in mine["items"]],
+            str(mine["totals"]),
+        )
+        u(
+            "reference keeps only that application's row",
+            ids(reference=ref) == [row.get("id")],
+            str(ids(reference=ref)),
+        )
+        u("an unknown reference matches nothing", ids(reference="PF-0000-000000") == [], "")
+        u(
+            "from and to both set to today keep today's check",
+            row.get("id") in ids(**{"from": day(today), "to": day(today), "user_id": fu["id"]}),
+            "",
+        )
+        u(
+            "from tomorrow leaves it out",
+            row.get("id") not in ids(**{"from": day(today + dt.timedelta(days=1)), "user_id": fu["id"]}),
+            "",
+        )
+        u(
+            "to yesterday leaves it out",
+            row.get("id") not in ids(**{"to": day(today - dt.timedelta(days=1)), "user_id": fu["id"]}),
+            "",
+        )
+        for label, params in (
+            ("a start day after the end day", {"from": day(today), "to": day(today - dt.timedelta(days=2))}),
+            ("from 0001-01-01", {"from": "0001-01-01"}),
+        ):
+            got = [req(admin, "GET", p, params=params).status_code for p in (usage, csv_path)]
+            u(f"{label} is 400 on the page and on the CSV, never a 500", got == [400, 400], str(got))
+
+        # ---- the CSV ----
+        feed0 = {
+            e["id"] for e in req(admin, "GET", "/admin/audit-feed", params={"limit": 100}).json()["events"]
+        }
+        c = req(admin, "GET", csv_path, params={"user_id": fu["id"]})
+        rows = list(csv.reader(io.StringIO(c.text))) if c.status_code == 200 else []
+        u(
+            "the CSV is text/csv, an attachment, with the header as its first line",
+            c.status_code == 200
+            and c.headers.get("content-type", "").startswith("text/csv")
+            and "attachment" in c.headers.get("content-disposition", "")
+            and rows[:1] == [list(CSV_COLUMNS)],
+            f"{c.status_code} {c.headers.get('content-type')} {c.text[:120]}",
+        )
+        u(
+            "and has one data row per ledger row of that person",
+            len(rows) - 1 == mine["totals"]["runs"],
+            f"{len(rows) - 1} vs {mine['totals']['runs']}",
+        )
+        name_col = list(CSV_COLUMNS).index("user_name")
+        u(
+            "no cell begins with = + - @ tab or CR, and the formula-named person's cell is written with a leading single quote",
+            len(rows) > 1
+            and not any(x.startswith(CSV_FORMULA_STARTS) for r_ in rows for x in r_)
+            and all(r_[name_col] == "'" + FORMULA_NAME for r_ in rows[1:]),
+            json.dumps(rows[1:2])[:300],
+        )
+        end = time.time() + 5
+        new: list[dict] = []  # type: ignore[type-arg]
+        while time.time() < end and not new:
+            events = req(admin, "GET", "/admin/audit-feed", params={"limit": 100}).json()["events"]
+            new = [e for e in events if e["id"] not in feed0 and e["event_type"] == "admin.ai_usage_exported"]
+            time.sleep(0.5)
+        u(
+            "the export wrote one admin.ai_usage_exported event, attributed to the administrator and saying how many rows",
+            len(new) == 1
+            and new[0]["actor_name"] == me["full_name"]
+            and f"({len(rows) - 1} row" in new[0]["summary"],
+            json.dumps(new)[:300],
+        )
+    finally:
+        req(fh, "DELETE", f"/applications/{aid}")
+        req(fh, "POST", "/auth/logout")
+        req(admin, "PATCH", f"/admin/users/{fu['id']}", json={"is_active": False, "admin_password": PW})
+
+
+def us099_off_checks(op: dict[str, str], off: dict[str, str]) -> None:
+    """US099 in the default SCAN_MODE=off (v0.5.0, US-099): uploads behave as before and no file carries a scan
+    state. The scan itself needs a real clamd: see us099_enforce_checks (UAT_SCAN=1)."""
+    u = Numbered("US099-")
+    aid = submitted_case(op)
+    mine = req(op, "GET", f"/applications/{aid}").json()
+    docs = [s["document"] for s in mine["document_slots"] if s["document"]]
+    u(
+        "with the scan off the four uploads were accepted and the case submitted as before",
+        len(docs) == 4,
+        str(len(docs)),
+    )
+    u(
+        "scan_state is null on every document in the operator's view",
+        all("scan_state" in d and d["scan_state"] is None for d in docs),
+        json.dumps([d.get("scan_state", "missing") for d in docs]),
+    )
+    theirs = officer_view(off, aid)["documents"]
+    u(
+        "and in the officer's view",
+        len(theirs) == 4 and all("scan_state" in d and d["scan_state"] is None for d in theirs),
+        json.dumps([d.get("scan_state", "missing") for d in theirs]),
+    )
+    first = docs[0]["id"] if docs else ""
+    codes = [req(h, "GET", f"/applications/{aid}/documents/{first}/download").status_code for h in (op, off)]
+    u(
+        "the operator and the officer download a file at once, no scanning wait",
+        codes == [200, 200],
+        str(codes),
+    )
+    draft = req(op, "POST", "/applications").json()["id"]
+    fill_all(op, draft)
+    upload_all(op, draft)
+    view = wait_checks(op, draft)
+    u(
+        "a filled draft with its uploads has no submit_blocked_reason and can be submitted",
+        view.get("submit_blocked_reason") is None and view["can_submit"] is True,
+        json.dumps({k: view.get(k) for k in ("can_submit", "submit_blocked_reason")}),
+    )
+    req(op, "DELETE", f"/applications/{draft}")
+
+
+EICAR = rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+
+
+def set_scan_state(document_id: str, state: str | None) -> None:
+    """Write a scan state straight to the database, the way a verdict would land (the run is the only
+    writer that makes a file `scanning` for long enough to be seen)."""
+    from app.infra.db import session_factory
+    from app.models import Document
+
+    with session_factory()() as db:
+        row = db.get(Document, uuid.UUID(document_id))
+        assert row is not None
+        row.scan_state = state
+        db.commit()
+
+
+def clamd_answers(host: str, port: int) -> bool:
+    import socket
+
+    try:
+        with socket.create_connection((host, port), timeout=10) as s:
+            s.sendall(b"zPING\0")
+            return s.recv(16).startswith(b"PONG")
+    except OSError:
+        return False
+
+
+def us099_enforce_checks() -> None:
+    """US099 with the scan enforced: only with UAT_SCAN=1, against an API started with SCAN_MODE=enforce and
+    CLAMD_HOST/CLAMD_PORT pointing at a real clamd (UAT_SCAN also needs the same CLAMD_* in this script's
+    environment). Nothing else runs in this mode: the other groups assume files are served at once."""
+    import subprocess
+
+    u = Numbered("US099E-")
+    host, port = os.environ.get("CLAMD_HOST", ""), int(os.environ.get("CLAMD_PORT", "3310"))
+    print("US099E scan enforced: UAT_SCAN=1 is set, running the virus scan checks only")
+    if not host or not clamd_answers(host, port):
+        u(
+            f"the scan checks need a clamd at CLAMD_HOST/CLAMD_PORT (skipped: nothing answers at {host or '(unset)'}:{port})",
+            True,
+        )
+        return
+    op, off = login(OPERATOR), login(OFFICER)
+    terminal = {"clean", "infected"}
+
+    def slot(h: dict[str, str], aid: str, dtype: str) -> dict:  # type: ignore[type-arg]
+        s = next(
+            x for x in req(h, "GET", f"/applications/{aid}").json()["document_slots"] if x["type"] == dtype
+        )
+        return s["document"] or {}
+
+    def settle(h: dict[str, str], aid: str, dtype: str, timeout: float = 120) -> dict:  # type: ignore[type-arg]
+        end, doc = time.time() + timeout, {}
+        while time.time() < end:
+            doc = slot(h, aid, dtype)
+            if doc.get("scan_state") in terminal:
+                break
+            time.sleep(0.5)
+        return doc
+
+    def download(h: dict[str, str], aid: str, doc_id: str) -> httpx.Response:
+        return req(h, "GET", f"/applications/{aid}/documents/{doc_id}/download")
+
+    def code_of(r: httpx.Response) -> str | None:
+        return r.json().get("error", {}).get("code") if r.status_code >= 400 else None
+
+    # ---- a clean PDF: scanning, then clean, then served ----
+    aid = req(op, "POST", "/applications").json()["id"]
+    fill_all(op, aid)
+    pdf = text_pdf(TXT.decode())
+    up = upload(op, aid, "business_profile", "profile.pdf", pdf, "application/pdf")
+    first = (up.json().get("document") or {}).get("scan_state") if up.status_code in (200, 201) else None
+    u(
+        "a clean PDF is accepted and starts scanning (or is already clean)",
+        up.status_code in (200, 201) and first in ("scanning", "clean"),
+        f"{up.status_code} {first} {up.text[:150]}",
+    )
+    doc = settle(op, aid, "business_profile")
+    u(
+        "and ends clean with the time of the verdict",
+        doc.get("scan_state") == "clean" and bool(doc.get("scanned_at")),
+        json.dumps(doc)[:300],
+    )
+    wait_checks_one(op, aid, "business_profile")
+    r = download(op, aid, doc["id"])
+    u(
+        "its download works after the verdict and returns the same bytes",
+        r.status_code == 200 and r.content == pdf,
+        f"{r.status_code} {len(r.content)}",
+    )
+    set_scan_state(doc["id"], "scanning")
+    r = download(op, aid, doc["id"])
+    u(
+        "while it is scanning the download is 409 file_scanning",
+        r.status_code == 409 and code_of(r) == "file_scanning",
+        r.text[:200],
+    )
+    set_scan_state(doc["id"], "clean")
+
+    # ---- EICAR ----
+    up = upload(op, aid, "floor_plan", "eicar.txt", EICAR, "text/plain")
+    bad = settle(op, aid, "floor_plan")
+    u(
+        "an EICAR upload is accepted for scanning and ends infected",
+        up.status_code in (200, 201) and bad.get("scan_state") == "infected",
+        f"{up.status_code} {json.dumps(bad)[:200]}",
+    )
+    wait_checks_one(op, aid, "floor_plan")
+    ver = slot(op, aid, "floor_plan").get("verification") or {}
+    u(
+        "its check ends with the reason file_infected",
+        ver.get("error_reason") == "file_infected",
+        json.dumps(ver)[:200],
+    )
+    r = download(op, aid, bad["id"])
+    u(
+        "the operator's download is 403 file_infected",
+        r.status_code == 403 and code_of(r) == "file_infected",
+        r.text[:200],
+    )
+    for t in ("tenancy_agreement", "food_hygiene_certificate"):
+        upload(op, aid, t, f"{t}.txt", TXT)
+        settle(op, aid, t)
+        wait_checks_one(op, aid, t)
+    view = req(op, "GET", f"/applications/{aid}").json()
+    u(
+        "with a blocked document can_submit is false and submit_blocked_reason names it",
+        view["can_submit"] is False and "blocked" in (view.get("submit_blocked_reason") or ""),
+        json.dumps({k: view.get(k) for k in ("can_submit", "submit_blocked_reason")}),
+    )
+    r = req(op, "POST", f"/applications/{aid}/submit")
+    u(
+        "and a submit is 409 documents_not_clear",
+        r.status_code == 409 and code_of(r) == "documents_not_clear",
+        r.text[:200],
+    )
+    req(op, "DELETE", f"/applications/{aid}")
+
+    # ---- the officer cannot open a blocked file ----
+    case = submitted_case(op)
+    target = next(
+        d for d in officer_view(off, case)["documents"] if d["document_type"] == "tenancy_agreement"
+    )
+    set_scan_state(target["id"], "infected")
+    try:
+        r = download(off, case, target["id"])
+        u(
+            "the officer's download of a blocked file is 403 file_infected",
+            r.status_code == 403 and code_of(r) == "file_infected" and "cannot be opened" in r.text,
+            r.text[:200],
+        )
+        again = next(d for d in officer_view(off, case)["documents"] if d["id"] == target["id"])
+        u(
+            "and the officer's case view shows it as infected",
+            again["scan_state"] == "infected",
+            json.dumps(again)[:200],
+        )
+    finally:
+        set_scan_state(target["id"], "clean")
+
+    # ---- clarification attachments ----
+    cid = fresh_case_to_site_visit_done(op, off)
+    cl = req(off, "POST", CHECKLIST.format(cid)).json()
+    items = clean_items()
+    items[2] = {
+        "key": "coved_edges",
+        "result": "satisfactory",
+        "comment": "Confirm the coving.",
+        "needs_clarification": True,
+    }
+    assert (
+        req(off, "PUT", CHECKLIST.format(cid), json={"items": items, "version": cl["version"]}).status_code
+        == 200
+    )
+    assert req(off, "POST", CHECKLIST.format(cid) + "/submit").status_code == 200
+    item = req(op, "GET", f"/applications/{cid}/clarifications").json()["items"][0]
+    said = req(
+        op,
+        "POST",
+        f"/applications/{cid}/clarifications/{item['item_id']}/responses",
+        json={"message": "Coving is done."},
+    )
+    rid = said.json()["items"][0]["responses"][0]["id"]
+    path = f"/applications/{cid}/clarifications/responses/{rid}/attachments"
+    r = req(op, "POST", path, files={"file": ("ok.txt", TXT, "text/plain")})
+    u("a clean clarification attachment is 201", r.status_code == 201, r.text[:200])
+    r = req(op, "POST", path, files={"file": ("eicar.txt", EICAR, "text/plain")})
+    u(
+        "an infected clarification attachment is 422 file_infected",
+        r.status_code == 422 and code_of(r) == "file_infected",
+        r.text[:200],
+    )
+    after = req(op, "GET", f"/applications/{cid}/clarifications").json()["items"][0]["responses"][0][
+        "attachments"
+    ]
+    u(
+        "and the answer lists it as infected, kept blocked in quarantine, next to the clean file",
+        sorted(a["scan_state"] for a in after) == ["clean", "infected"],
+        json.dumps([a["scan_state"] for a in after]),
+    )
+
+    # ---- the backfill's dry run counts the rows with no scan state ----
+    set_scan_state(target["id"], None)
+    try:
+        run = subprocess.run(
+            [sys.executable, "scripts/scan_backfill.py", "--dry-run"],
+            cwd=Path(__file__).resolve().parents[1],
+            env={**os.environ, "SCAN_MODE": "enforce", "CLAMD_HOST": host, "CLAMD_PORT": str(port)},
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        counted = re.search(r"documents with no scan state: (\d+)", run.stdout)
+        u(
+            "scan_backfill.py --dry-run exits 0, says DRY RUN and counts at least the row left with no scan state",
+            run.returncode == 0
+            and "DRY RUN" in run.stdout
+            and counted is not None
+            and int(counted.group(1)) >= 1,
+            (run.stdout + run.stderr)[-300:],
+        )
+        from app.infra.db import session_factory
+        from app.models import Document
+
+        with session_factory()() as db:
+            row = db.get(Document, uuid.UUID(target["id"]))
+            u(
+                "and the dry run changed nothing: the row still has no scan state",
+                row is not None and row.scan_state is None,
+                "",
+            )
+    finally:
+        set_scan_state(target["id"], "clean")
+
+
+def us104_token_checks() -> None:
+    """US104 in the default AUTH_MODE=token: nothing changed. The cookie-mode checks are us104_cookie_checks."""
+    u = Numbered("US104-")
+    r = client.post("/auth/login", json={"email": OPERATOR2, "password": PW, "take_over": True})
+    body = r.json() if r.status_code == 200 else {}
+    u(
+        "token mode: the sign-in body carries access_token and no csrf_token",
+        bool(body.get("access_token")) and "csrf_token" not in body,
+        r.text[:150],
+    )
+    u(
+        "and sets no __Host- cookie",
+        not any("__Host-" in c for c in r.headers.get_list("set-cookie")),
+        str(r.headers.get_list("set-cookie")),
+    )
+    h = {"Authorization": "Bearer " + body.get("access_token", "")}
+    made = req(h, "POST", "/applications")
+    u("and a write with the bearer token alone needs no CSRF token", made.status_code == 201, made.text[:150])
+    if made.status_code == 201:
+        req(h, "DELETE", f"/applications/{made.json()['id']}")
+    req(h, "POST", "/auth/logout")
+    u(
+        "the cookie-mode checks run only with UAT_AUTH_MODE=cookie against an API started with AUTH_MODE=cookie (not run here)",
+        True,
+    )
+
+
+def cookies_of(r: httpx.Response) -> dict[str, str]:
+    """name -> value of each Set-Cookie line. Built by hand: the __Host- cookies are Secure, so a client on
+    plain http would not store or send them, and the checks send them back explicitly."""
+    out: dict[str, str] = {}
+    for line in r.headers.get_list("set-cookie"):
+        name, _, rest = line.partition("=")
+        out[name.strip()] = rest.split(";", 1)[0]
+    return out
+
+
+def us104_cookie_checks() -> None:
+    """US104 in AUTH_MODE=cookie, run only when UAT_AUTH_MODE=cookie (the API must be started that way, with
+    CORS_ORIGINS holding UAT_ORIGIN). Nothing else runs in this mode: every other group signs in with a bearer
+    token. Cookies are sent as explicit Cookie headers, so plain http works."""
+    u = Numbered("US104C-")
+    origin = os.environ.get("UAT_ORIGIN", "http://localhost:3107")
+    cc = httpx.Client(base_url=API, timeout=60)
+
+    def call(
+        method: str,
+        path: str,
+        cookie: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+        **kw,
+    ) -> httpx.Response:  # type: ignore[no-untyped-def]
+        cc.cookies.clear()
+        h = dict(headers or {})
+        if cookie:
+            h["Cookie"] = "; ".join(f"{k}={v}" for k, v in cookie.items())
+        return cc.request(method, path, headers=h, **kw)
+
+    print("US104C cookie mode: UAT_AUTH_MODE=cookie is set, running the cookie-session checks only")
+    login_body = {"email": OPERATOR, "password": PW, "take_over": True}
+    r = call("POST", "/auth/login", json=login_body)
+    u(
+        "cookie mode: a sign-in without an Origin is 403 csrf_failed",
+        r.status_code == 403 and r.json()["error"]["code"] == "csrf_failed",
+        r.text[:150],
+    )
+    r = call("POST", "/auth/login", json=login_body, headers={"Origin": "http://evil.example"})
+    u(
+        "and from a foreign Origin as well",
+        r.status_code == 403 and r.json()["error"]["code"] == "csrf_failed",
+        r.text[:150],
+    )
+    r = call("POST", "/auth/login", json=login_body, headers={"Origin": origin})
+    u("from the frontend's Origin it is 200", r.status_code == 200, r.text[:150])
+    if r.status_code != 200:
+        return
+    lines = {ln.split("=", 1)[0]: ln.lower() for ln in r.headers.get_list("set-cookie")}
+    sess = lines.get("__Host-pf_session", "")
+    u(
+        "Set-Cookie has __Host-pf_session with HttpOnly, Secure, SameSite=Strict, Path=/ and no Domain",
+        bool(sess)
+        and all(x in sess for x in ("httponly", "secure", "samesite=strict", "path=/"))
+        and "domain" not in sess,
+        sess,
+    )
+    csrf = lines.get("__Host-pf_csrf", "")
+    u(
+        "and a __Host-pf_csrf cookie that a script may read (no HttpOnly), also Secure and Strict",
+        bool(csrf) and "httponly" not in csrf and "secure" in csrf and "samesite=strict" in csrf,
+        csrf,
+    )
+    body = r.json()
+    u(
+        "the body has no access_token, and hands over the csrf_token and the user",
+        "access_token" not in body
+        and bool(body.get("csrf_token"))
+        and body.get("user", {}).get("email") == OPERATOR,
+        json.dumps(body)[:200],
+    )
+    jar = cookies_of(r)
+    token = body.get("csrf_token", "")
+    u("the cookie copy of the CSRF value is the one in the body", jar.get("__Host-pf_csrf") == token, "")
+    me = call("GET", "/auth/me", cookie=jar)
+    u(
+        "a read with the cookie alone is 200",
+        me.status_code == 200 and me.json().get("csrf_token") == token,
+        me.text[:150],
+    )
+    w = call("POST", "/applications", cookie=jar)
+    u(
+        "a write without X-CSRF-Token is 403 csrf_failed",
+        w.status_code == 403 and w.json()["error"]["code"] == "csrf_failed",
+        w.text[:150],
+    )
+    w = call("POST", "/applications", cookie=jar, headers={"X-CSRF-Token": "0" * 64})
+    u(
+        "a write with a wrong X-CSRF-Token is 403 csrf_failed",
+        w.status_code == 403 and w.json()["error"]["code"] == "csrf_failed",
+        w.text[:150],
+    )
+    w = call("POST", "/applications", cookie=jar, headers={"X-CSRF-Token": token})
+    u("a write with the right X-CSRF-Token is 2xx", 200 <= w.status_code < 300, w.text[:150])
+    if w.status_code == 201:
+        call("DELETE", f"/applications/{w.json()['id']}", cookie=jar, headers={"X-CSRF-Token": token})
+    out = call("POST", "/auth/logout", cookie=jar)
+    u(
+        "sign-out without the CSRF token is refused 403 and the session survives",
+        out.status_code == 403 and call("GET", "/auth/me", cookie=jar).status_code == 200,
+        out.text[:150],
+    )
+    out = call("POST", "/auth/logout", cookie=jar, headers={"X-CSRF-Token": token})
+    cleared = {ln.split("=", 1)[0]: ln.lower() for ln in out.headers.get_list("set-cookie")}
+    u(
+        "sign-out is 204 and clears both cookies (Max-Age=0 or a past expiry)",
+        out.status_code == 204
+        and all(
+            n in cleared and ("max-age=0" in cleared[n] or "expires=thu, 01 jan 1970" in cleared[n])
+            for n in ("__Host-pf_session", "__Host-pf_csrf")
+        ),
+        str(cleared),
+    )
+    after = call("GET", "/auth/me", cookie=jar)
+    u("the old cookie no longer works: 401", after.status_code == 401, after.text[:150])
+
+
 def main() -> None:
     if os.environ.get("UAT_STORAGE_FULL") == "1":
         # A platform that is full refuses every upload, so the full run cannot go on against it: only the 507 check.
         us098_storage_full(login(OPERATOR))
+        summary()
+    if os.environ.get("UAT_SCAN") == "1":
+        # A scan-enforcing API holds every new file until clamd answers, so the full run cannot go on against it.
+        us099_enforce_checks()
+        summary()
+    if os.environ.get("UAT_AUTH_MODE") == "cookie":
+        # An API in cookie mode takes no bearer token, so the full run cannot go on against it: only the cookie checks.
+        us104_cookie_checks()
         summary()
     ensure_second_operator()
     try:
@@ -4721,6 +5542,11 @@ def run_checks() -> None:
     ai_checks(op, off)
     st_checks(op, op2, off)
     us098_checks(op, off)
+    us111_checks()
+    us101_checks(op)
+    us100_checks(op, off)
+    us099_off_checks(op, off)
+    us104_token_checks()  # last: it signs the second operator in again, which no later group may rely on
 
     summary()
 
