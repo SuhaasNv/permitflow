@@ -21,7 +21,9 @@ def test_only_unscanned_legacy_and_clean_files_are_served() -> None:
 
 def test_quarantine_key_round_trip() -> None:
     assert quarantine_key("abc/d.pdf") == "quarantine/abc/d.pdf"
-    assert released_key("quarantine/abc/d.pdf") == "abc/d.pdf"
+    first, second = released_key("quarantine/abc/d.pdf"), released_key("quarantine/abc/d.pdf")
+    assert first != second and first.startswith("abc/") and first.endswith(".pdf")  # unique on every call
+    assert not first.startswith("quarantine/")
     assert released_key("abc/d.pdf") == "abc/d.pdf"  # never quarantined: unchanged
 
 

@@ -125,9 +125,11 @@ def scan_document(
         return ScanOutcome.HELD
     documents = DocumentRepository(db)
     if verdict.infected:
-        documents.record_scan(
+        if not documents.record_scan(
             doc.id, key, state=INFECTED, signature=verdict.signature, active_content=verdict.active_content
-        )
+        ):
+            db.rollback()
+            return ScanOutcome.GONE
         AuditRepository(db).record(
             application_id=app.id,
             actor_id=None,
@@ -171,19 +173,20 @@ def will_retry(attempts: int) -> bool:
     attempts left. In `hold` mode the file is held until a person re-runs the check."""
     from app.services.verification import MAX_ATTEMPTS  # noqa: PLC0415 - verification imports this module
 
-    return live().value("scanner_fail_mode") == "closed" and 0 < attempts < MAX_ATTEMPTS
+    return live().value("scanner_fail_mode") == "retry" and 0 < attempts < MAX_ATTEMPTS
 
 
 def ensure_submittable(docs: Iterable[Document]) -> None:
-    """Refuse a submission while a current document is `scanning` or `infected`. Only with the scan enforced:
-    with it off, `scan_state` is null for every new file and nothing changes."""
-    if enforcing() and any(d.scan_state in (SCANNING, INFECTED) for d in docs):
+    """Refuse a submission while a current document is `scanning` or `infected`, whatever the mode: with the
+    scan off every new file has a null state, so normal use is unchanged, and a rollback to `off` cannot push
+    files that were never cleared on to the officers."""
+    if any(d.scan_state in (SCANNING, INFECTED) for d in docs):
         raise DocumentsNotClear(DOCUMENTS_NOT_CLEAR_MESSAGE, details={"reason": "documents_not_clear"})
 
 
 def submit_blocked_reason(docs: Iterable[Document], lead: str = DOCUMENTS_NOT_CLEAR_MESSAGE) -> str | None:
-    """Why the scan stops a submission or resubmission, for the operator view; None with the scan off."""
-    return blocked_reason([d.scan_state for d in docs], lead) if enforcing() else None
+    """Why the scan stops a submission or resubmission, for the operator view (see `ensure_submittable`)."""
+    return blocked_reason([d.scan_state for d in docs], lead)
 
 
 def ensure_servable(scan_state: str | None, user: User) -> None:

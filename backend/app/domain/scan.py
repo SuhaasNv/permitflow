@@ -6,7 +6,9 @@ With `SCAN_MODE=enforce` it is `scanning` from the upload until the scanner answ
 """
 
 import re
+import uuid
 from collections.abc import Iterable
+from pathlib import PurePosixPath
 
 SCANNING = "scanning"
 CLEAN = "clean"
@@ -49,8 +51,13 @@ def quarantine_key(key: str) -> str:
 
 
 def released_key(key: str) -> str:
-    """The normal key of a quarantined file (unchanged for one that was never quarantined)."""
-    return key.removeprefix(QUARANTINE_PREFIX)
+    """A new normal key for a quarantined file (unchanged for one that was never quarantined). It is unique
+    on every call, so two scans of one document never share a final key and the loser of a race deletes only
+    its own copy."""
+    if not key.startswith(QUARANTINE_PREFIX):
+        return key
+    path = PurePosixPath(key.removeprefix(QUARANTINE_PREFIX))
+    return str(path.with_name(uuid.uuid4().hex + path.suffix))
 
 
 _NAME_ESCAPE = re.compile(rb"#([0-9A-Fa-f]{2})")

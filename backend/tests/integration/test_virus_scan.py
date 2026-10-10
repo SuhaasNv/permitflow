@@ -22,7 +22,16 @@ from app.core.settings import get_settings
 from app.domain.scan import CLEAN, INFECTED, SCANNING
 from app.infra import db as dbmod
 from app.infra.clamd import ScannerError, ScanResult
-from app.models import AuditEvent, ClarificationAttachment, Document, PlatformSetting, User, VerificationRun
+from app.infra.storage import get_storage
+from app.models import (
+    Application,
+    AuditEvent,
+    ClarificationAttachment,
+    Document,
+    PlatformSetting,
+    User,
+    VerificationRun,
+)
 from app.models.enums import Role, VerificationStatus
 from app.services import scan as scan_module
 from app.services import verification as verification_module
@@ -302,7 +311,12 @@ def test_scanner_down_holds_the_file_and_never_marks_it_clean(
 
 
 def test_worker_retries_a_held_file_later_then_gives_up_after_the_attempts(
-    client: TestClient, db: Session, scanner: FakeScanner, worker_mode: None, ai_calls: list[int]
+    client: TestClient,
+    db: Session,
+    scanner: FakeScanner,
+    worker_mode: None,
+    ai_calls: list[int],
+    alerts: list[str],
 ) -> None:
     scanner.mode = "down"
     h = _operator(client, db)
@@ -313,6 +327,7 @@ def test_worker_retries_a_held_file_later_then_gives_up_after_the_attempts(
     execute_run(first, "w1")
     run = _run(db)
     assert run.status == VerificationStatus.UNAVAILABLE and run.attempts == 1
+    assert alerts == []  # retry mode: a worker will try again by itself, so nobody is told yet
     assert reap_expired_runs() == (0, 0)  # too soon: the retry waits
 
     def age() -> None:
@@ -379,6 +394,89 @@ def test_a_draft_deleted_during_the_scan_leaves_nothing_behind(
     assert db.scalar(select(Document)) is None
     root = Path(get_settings().upload_dir)
     assert not any(p.is_file() for p in root.rglob("*"))  # neither the quarantine copy nor a released one
+
+
+def test_infected_verdict_for_a_deleted_draft_records_and_alerts_nothing(
+    client: TestClient, db: Session, scanner: FakeScanner, alerts: list[str]
+) -> None:
+    scanner.mode = "infected"
+    h = _operator(client, db)
+    app_id = draft(client, h)
+    operator = db.scalar(select(User).where(User.email == "op@example.sg"))
+    assert operator is not None
+
+    def delete_the_draft() -> None:
+        with dbmod.session_factory()() as other:
+            DraftDeletionService(other).delete(operator, uuid.UUID(app_id))
+
+    scanner.before_reply = delete_the_draft
+    upload(client, h, app_id, "floor_plan", "plan.pdf", PDF)
+    assert db.scalar(select(Document)) is None
+    assert (
+        alerts == []
+        and db.scalar(select(AuditEvent).where(AuditEvent.event_type == "document.infected")) is None
+    )
+
+
+class _FailingPut:
+    """The real storage, except that writing a new file fails."""
+
+    def __init__(self, inner: object) -> None:
+        self._inner = inner
+
+    def put(self, key: str, chunks: object) -> None:
+        raise OSError("disk full")
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._inner, name)
+
+
+def test_a_failed_release_leaves_the_document_scanning_and_nothing_at_a_final_key(
+    client: TestClient, db: Session, scanner: FakeScanner, worker_mode: None
+) -> None:
+    h = _operator(client, db)
+    app_id = draft(client, h)
+    upload(client, h, app_id, "floor_plan", "plan.pdf", PDF)
+    doc = _doc(db)
+    app = db.get(Application, doc.application_id)
+    assert app is not None
+    with pytest.raises(OSError):
+        scan_module.scan_document(db, doc, app, _FailingPut(get_storage()))  # type: ignore[arg-type]
+    doc = _doc(db)
+    assert doc.scan_state == SCANNING and doc.scanned_at is None and doc.stored_key.startswith("quarantine/")
+    root = Path(get_settings().upload_dir)
+    assert [p for p in root.rglob("*") if p.is_file()] == [root / doc.stored_key]  # only the quarantine copy
+
+
+def test_two_scans_of_one_document_leave_the_live_file_in_place(
+    client: TestClient, db: Session, scanner: FakeScanner, worker_mode: None
+) -> None:
+    h = _operator(client, db)
+    app_id = draft(client, h)
+    upload(client, h, app_id, "floor_plan", "plan.pdf", PDF)
+    doc = _doc(db)
+    app = db.get(Application, doc.application_id)
+    assert app is not None
+    outcomes: list[scan_module.ScanOutcome] = []
+
+    def other_scan_finishes_first() -> None:
+        scanner.before_reply = None
+        with dbmod.session_factory()() as other:
+            other_doc, other_app = other.get(Document, doc.id), other.get(Application, app.id)
+            assert other_doc is not None and other_app is not None
+            outcomes.append(scan_module.scan_document(other, other_doc, other_app))
+
+    scanner.before_reply = other_scan_finishes_first
+    assert scan_module.scan_document(db, doc, app) is scan_module.ScanOutcome.GONE  # it lost the race
+    assert outcomes == [scan_module.ScanOutcome.CLEAN]
+    final = _doc(db)
+    assert final.scan_state == CLEAN and not final.stored_key.startswith("quarantine/")
+    root = Path(get_settings().upload_dir)
+    assert [p for p in root.rglob("*") if p.is_file()] == [
+        root / final.stored_key
+    ]  # the loser removed only its own
+    got = _download(client, h, app_id, final.id)
+    assert got.status_code == 200 and got.content == PDF  # type: ignore[attr-defined]
 
 
 def test_pdf_active_content_is_flagged_but_not_blocked(
@@ -502,9 +600,25 @@ def test_submission_is_refused_while_a_document_is_scanning_or_blocked(
 def test_submission_is_unchanged_with_the_scan_off(client: TestClient, db: Session) -> None:
     app_id, h = _ready(client, db)
     assert get_settings().scan_mode == "off"
-    db.execute(update(Document).values(scan_state=SCANNING))  # nothing reads it with the scan off
-    db.commit()
+    assert db.scalar(select(Document.scan_state)) is None  # nothing was scanned: normal use is unchanged
     assert _submit(client, h, app_id).status_code == 200  # type: ignore[attr-defined]
+
+
+def test_a_file_left_scanning_still_blocks_submission_after_enforce_is_switched_off(
+    client: TestClient, db: Session, scanner: FakeScanner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app_id, h = _ready(client, db)
+    doc = db.scalars(select(Document).order_by(Document.uploaded_at)).first()
+    assert doc is not None
+    db.execute(update(Document).where(Document.id == doc.id).values(scan_state=SCANNING))
+    db.commit()
+    monkeypatch.setattr(get_settings(), "scan_mode", "off")  # a rollback with a file never cleared
+    view = _view(client, h, app_id)
+    assert view["can_submit"] is False and "1 being scanned" in str(view["submit_blocked_reason"])
+    r = _submit(client, h, app_id)
+    assert r.status_code == 409 and r.json()["error"]["code"] == "documents_not_clear"  # type: ignore[attr-defined]
+    got = _download(client, h, app_id, doc.id)
+    assert got.status_code == 409 and got.json()["error"]["code"] == "file_scanning"  # type: ignore[attr-defined]
 
 
 def _view(client: TestClient, h: dict[str, str], app_id: str) -> dict[str, object]:
@@ -538,12 +652,16 @@ def test_can_submit_follows_the_scan_and_explains_why(
     assert view["can_submit"] is True and view["submit_blocked_reason"] is None
 
 
-def test_can_submit_ignores_scan_states_with_the_scan_off(client: TestClient, db: Session) -> None:
+def test_can_submit_is_unchanged_with_the_scan_off_and_no_scan_states(
+    client: TestClient, db: Session
+) -> None:
     app_id, h = _ready(client, db)
-    db.execute(update(Document).values(scan_state=INFECTED))
-    db.commit()
     view = _view(client, h, app_id)
     assert view["can_submit"] is True and view["submit_blocked_reason"] is None
+    db.execute(update(Document).values(scan_state=INFECTED))  # the mode does not matter: a blocked row blocks
+    db.commit()
+    view = _view(client, h, app_id)
+    assert view["can_submit"] is False and "blocked" in str(view["submit_blocked_reason"])
 
 
 def test_resubmit_readiness_explains_a_blocked_or_scanning_document(
