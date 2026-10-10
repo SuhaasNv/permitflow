@@ -84,6 +84,8 @@ class OpenAIProvider:
 
     def __init__(self, *, api_key: str, model: str, timeout: int, tracer: Tracer | None = None) -> None:
         self.model: str | None = model
+        self.input_tokens = 0
+        self.output_tokens = 0
         self._api_key = api_key
         self._timeout = timeout
         self._tracer = tracer or Tracer(api_key="", project="", hide_inputs=True)
@@ -127,7 +129,10 @@ class OpenAIProvider:
             raise ProviderUnavailable(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - any other API failure is a provider error
             raise ProviderError(str(exc)) from exc
-        _count_tokens(self.model or "gpt-4.1-mini", getattr(completion, "usage", None))
+        # Recorded before the answer is parsed: a refused or malformed answer was billed all the same.
+        self.input_tokens, self.output_tokens = _count_tokens(
+            self.model or "gpt-4.1-mini", getattr(completion, "usage", None)
+        )
         content = completion.choices[0].message.content if completion.choices else None
         if not content:
             raise ProviderError("empty response")
@@ -138,10 +143,11 @@ class OpenAIProvider:
             raise ProviderError(f"schema validation failed: {exc}") from exc
 
 
-def _count_tokens(model: str, usage: Any) -> None:
-    """Billing counters for the dashboard (US-077): prompt tokens, their cached part, completion tokens."""
+def _count_tokens(model: str, usage: Any) -> tuple[int, int]:
+    """Billing counters for the dashboard (US-077): prompt tokens, their cached part, completion tokens.
+    Returns (prompt, completion) for the usage record (US-100)."""
     if usage is None:
-        return
+        return 0, 0
     prompt = int(getattr(usage, "prompt_tokens", 0) or 0)
     completion = int(getattr(usage, "completion_tokens", 0) or 0)
     details = getattr(usage, "prompt_tokens_details", None)
@@ -149,6 +155,7 @@ def _count_tokens(model: str, usage: Any) -> None:
     metrics.OPENAI_TOKENS.labels(model, "prompt").inc(prompt)
     metrics.OPENAI_TOKENS.labels(model, "cached").inc(cached)
     metrics.OPENAI_TOKENS.labels(model, "completion").inc(completion)
+    return prompt, completion
 
 
 def _bounded(data: dict[str, Any]) -> dict[str, Any]:

@@ -151,10 +151,7 @@ def test_an_empty_table_lists_every_setting_at_its_environment_default(
         "open",
     ]
     # Stored for later stories, and honest about it.
-    assert {k for k, v in s.items() if not v["in_use"]} == {
-        "telegram_per_check_messages",
-        "scanner_fail_mode",
-    }
+    assert {k for k, v in s.items() if not v["in_use"]} == {"scanner_fail_mode"}
     assert s["upload_max_bytes"]["maximum"] == 10 * 1024 * 1024
     assert "password" not in str(body).lower()
 

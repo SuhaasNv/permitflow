@@ -146,12 +146,14 @@ SPECS: tuple[SettingSpec, ...] = (
     SettingSpec(
         key="telegram_per_check_messages",
         label="Telegram message per check",
-        description="Send one Telegram message for every document check. Stored now; read by US-100.",
+        description=(
+            "Send one Telegram message for every document check: the document type, the outcome, the cost "
+            "and the time, with no names or personal data."
+        ),
         group="system",
         kind="bool",
         env_field=None,
         fallback=False,
-        in_use=False,
     ),
     SettingSpec(
         key="scanner_fail_mode",

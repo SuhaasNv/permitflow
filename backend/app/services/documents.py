@@ -16,6 +16,7 @@ from app.models import Application, Document, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
+from app.services.ai_usage import record_refused
 from app.services.applications import ApplicationService
 from app.services.quotas import new_run
 from app.services.uploads import platform_remaining, receive, storage_usage
@@ -94,8 +95,9 @@ class DocumentService:
             previous.is_current = False
         self.documents.add(doc)
         self.db.flush()
-        run = new_run(self.db, doc.id, app.operator_id)
+        run = new_run(self.db, doc.id, app.operator_id, operator.id)
         self.documents.add_run(run)
+        record_refused(self.db, run, doc)
         self.audit.record(
             application_id=app.id,
             actor_id=operator.id,
