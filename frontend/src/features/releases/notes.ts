@@ -117,11 +117,29 @@ export function parseReleaseNotes(raw: string): ReleaseNotes {
   return { comingNext, releases }
 }
 
+/** Semver order for `vX.Y.Z[-rc.N]` (the v is optional): a candidate sorts before its release, rc.2 before rc.10.
+ * Negative when `a` is older than `b`; 0 when either is not a version (a mistyped APP_VERSION hides nothing). */
+export function compareVersions(a: string, b: string): number {
+  const parse = (v: string) => {
+    const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?$/.exec(v)
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4] === undefined ? Infinity : Number(m[4])] : null
+  }
+  const pa = parse(a)
+  const pb = parse(b)
+  if (!pa || !pb) return 0
+  for (let i = 0; i < 4; i++) if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1
+  return 0
+}
+
 /** What a reader may see: every release, plus the candidates only where `showCandidates` is true (the development
- * environment). Order is the file's. Coming next is never touched: candidates are not part of the plan. */
-export function visibleNotes(notes: ReleaseNotes, showCandidates: boolean): ReleaseNotes {
-  if (showCandidates) return notes
-  return { comingNext: notes.comingNext, releases: notes.releases.filter((r) => !r.candidate) }
+ * environment), and never a section newer than `running` (US-111: the notes are bundled in the image, and every
+ * candidate carries the upcoming release's section, which only the release version itself may show). Order is the
+ * file's. Coming next is never touched: candidates are not part of the plan. */
+export function visibleNotes(notes: ReleaseNotes, showCandidates: boolean, running?: string): ReleaseNotes {
+  const releases = notes.releases.filter(
+    (r) => (showCandidates || !r.candidate) && (running === undefined || compareVersions(r.version, running) <= 0),
+  )
+  return releases.length === notes.releases.length ? notes : { comingNext: notes.comingNext, releases }
 }
 
 /** The notes for one version: the exact version, or the release an rc belongs to (`v0.4.0-rc.2` reads `v0.4.0`). */

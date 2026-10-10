@@ -4,8 +4,11 @@ set -eu
 : "${PORT:=8080}"
 : "${API_URL:?API_URL must be set (for example https://api.example.com/api/v1)}"
 export PORT
-escaped=$(printf '%s' "$API_URL" | sed 's/[\\"]/\\&/g')
-printf 'window.__PERMITFLOW__ = { apiUrl: "%s" };\n' "$escaped" > /usr/share/nginx/html/config.js
+escape() { printf '%s' "$1" | sed 's/[\\"]/\\&/g'; }
+# US-111: APP_VERSION (optional) relabels a promoted image; without it the app shows the version it was built with.
+config="apiUrl: \"$(escape "$API_URL")\""
+if [ -n "${APP_VERSION:-}" ]; then config="$config, appVersion: \"$(escape "$APP_VERSION")\""; fi
+printf 'window.__PERMITFLOW__ = { %s };\n' "$config" > /usr/share/nginx/html/config.js
 # The CSP admits one API origin: the scheme and host of API_URL (US-058).
 API_ORIGIN=$(printf '%s' "$API_URL" | sed -E 's#^(https?://[^/]+).*#\1#')
 export API_ORIGIN
