@@ -170,7 +170,12 @@ def trace_ids(user_id: uuid.UUID | None, application_id: uuid.UUID) -> dict[str,
 
 
 def filters_for(
-    *, user_id: uuid.UUID | None, application_id: uuid.UUID | None, day_from: date | None, day_to: date | None
+    *,
+    user_id: uuid.UUID | None,
+    application_id: uuid.UUID | None,
+    day_from: date | None,
+    day_to: date | None,
+    reference: str | None = None,
 ) -> UsageFilters:
     """Days are Singapore calendar days, both ends included (the same day as the admin overview)."""
     if day_from and day_to and day_from > day_to:
@@ -178,6 +183,7 @@ def filters_for(
     return UsageFilters(
         user_id=user_id,
         application_id=application_id,
+        reference=reference or None,
         since=singapore_day_window(day_from)[0] if day_from else None,
         until=singapore_day_window(day_to)[1] if day_to else None,
     )
@@ -192,6 +198,7 @@ def _row_out(r: UsageRow) -> AiUsageRowOut:
         document_id=u.document_id,
         application_id=u.application_id,
         reference_no=r.reference_no,
+        business_name=r.business_name or None,
         user_id=u.user_id,
         user_name=r.user_name,
         document_type=u.document_type,
@@ -207,7 +214,11 @@ def _row_out(r: UsageRow) -> AiUsageRowOut:
 
 def _totals_out(t: UsageTotals) -> AiUsageTotalsOut:
     return AiUsageTotalsOut(
-        runs=t.runs, input_tokens=t.input_tokens, output_tokens=t.output_tokens, cost_usd=t.cost_usd
+        runs=t.runs,
+        input_tokens=t.input_tokens,
+        output_tokens=t.output_tokens,
+        cost_usd=t.cost_usd,
+        avg_latency_ms=t.avg_latency_ms,
     )
 
 
@@ -268,6 +279,7 @@ def csv_stream(f: UsageFilters) -> Iterator[str]:
                     for c in (
                         u.created_at.astimezone(UTC).isoformat(),
                         r.reference_no,
+                        r.business_name,
                         u.application_id,
                         u.document_id,
                         u.run_id,

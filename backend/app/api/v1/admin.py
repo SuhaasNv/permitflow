@@ -194,6 +194,9 @@ def revert_platform_setting(
 
 UsageUser = Annotated[uuid.UUID | None, Query(description="Only checks started by this person.")]
 UsageApplication = Annotated[uuid.UUID | None, Query(description="Only checks on this application.")]
+UsageReference = Annotated[
+    str | None, Query(max_length=20, description="Only checks on the application with this exact reference.")
+]
 UsageFrom = Annotated[date | None, Query(alias="from", description="First Singapore day, inclusive.")]
 UsageTo = Annotated[date | None, Query(alias="to", description="Last Singapore day, inclusive.")]
 
@@ -204,6 +207,7 @@ def ai_usage(
     db: DbSession,
     user_id: UsageUser = None,
     application_id: UsageApplication = None,
+    reference: UsageReference = None,
     day_from: UsageFrom = None,
     day_to: UsageTo = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -211,7 +215,13 @@ def ai_usage(
 ) -> AiUsageOut:
     """What each automatic check cost and who ran it (US-100): a keyset-paged list (newest first), the
     totals over everything the filters match, and today's numbers against the daily AI cap."""
-    f = filters_for(user_id=user_id, application_id=application_id, day_from=day_from, day_to=day_to)
+    f = filters_for(
+        user_id=user_id,
+        application_id=application_id,
+        reference=reference,
+        day_from=day_from,
+        day_to=day_to,
+    )
     return AiUsageService(db).page(f, limit=limit, before=before)
 
 
@@ -220,12 +230,19 @@ def ai_usage_csv(
     user: AdminUser,
     user_id: UsageUser = None,
     application_id: UsageApplication = None,
+    reference: UsageReference = None,
     day_from: UsageFrom = None,
     day_to: UsageTo = None,
 ) -> StreamingResponse:
     """The same rows as a CSV file, streamed (US-100). A cell that begins with = + - @ tab or CR is
     prefixed with a single quote so a spreadsheet shows it as text."""
-    f = filters_for(user_id=user_id, application_id=application_id, day_from=day_from, day_to=day_to)
+    f = filters_for(
+        user_id=user_id,
+        application_id=application_id,
+        reference=reference,
+        day_from=day_from,
+        day_to=day_to,
+    )
     return StreamingResponse(
         csv_stream(f),
         media_type="text/csv; charset=utf-8",

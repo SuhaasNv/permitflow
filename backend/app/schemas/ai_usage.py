@@ -14,6 +14,7 @@ class AiUsageRowOut(BaseModel):
     document_id: uuid.UUID
     application_id: uuid.UUID | None
     reference_no: str | None  # None once a deleted draft's application is gone
+    business_name: str | None  # read from the application's form at query time; None for a deleted draft
     user_id: uuid.UUID | None
     user_name: str | None
     document_type: str
@@ -31,6 +32,7 @@ class AiUsageTotalsOut(BaseModel):
     input_tokens: int
     output_tokens: int
     cost_usd: Decimal
+    avg_latency_ms: int | None  # over the checks that reached a provider; null when none did
 
 
 class AiUsageTodayOut(BaseModel):

@@ -360,7 +360,14 @@ def test_the_page_lists_filters_and_totals(client: TestClient, db: Session, bill
     adm = _admin(client, db)
     body = client.get(f"{API}/admin/ai-usage", headers=adm).json()
     assert len(body["items"]) == 3 and body["next_cursor"] is None
-    assert body["totals"] == {"runs": 3, "input_tokens": 3600, "output_tokens": 240, "cost_usd": "0.00182400"}
+    totals = body["totals"]
+    assert "avg_latency_ms" in totals  # its own tests below
+    assert {k: v for k, v in totals.items() if k != "avg_latency_ms"} == {
+        "runs": 3,
+        "input_tokens": 3600,
+        "output_tokens": 240,
+        "cost_usd": "0.00182400",
+    }
     first = body["items"][0]
     assert first["user_name"] == "B" and first["reference_no"].startswith("PF-")
     assert first["document_type"] == "business_profile" and first["cost_usd"] == "0.00060800"
@@ -448,6 +455,95 @@ def test_only_administrators_may_read_it(client: TestClient, db: Session, path: 
     assert client.get(f"{API}{path}", headers=_admin(client, db)).status_code == 200
 
 
+# ---- the fields the admin screen needs ----
+
+
+def _ledger_row(db: Session, **fields: object) -> AiUsage:
+    values: dict[str, object] = {
+        "run_id": uuid.uuid4(),
+        "document_id": uuid.uuid4(),
+        "document_type": "floor_plan",
+        "provider": "openai",
+        "outcome": "verified",
+        **fields,
+    }
+    row = AiUsage(**values)
+    db.add(row)
+    db.commit()
+    return row
+
+
+def test_average_latency_counts_only_checks_that_reached_a_provider(client: TestClient, db: Session) -> None:
+    adm = _admin(client, db)
+    empty = client.get(f"{API}/admin/ai-usage", headers=adm).json()["totals"]
+    assert empty["avg_latency_ms"] is None  # no rows at all
+    _ledger_row(db, latency_ms=1000)
+    _ledger_row(db, latency_ms=3000, provider="mock")
+    _ledger_row(db, latency_ms=0, provider="none", outcome="unavailable")  # quota refusal or pause
+    _ledger_row(db, latency_ms=0, provider="openai", outcome="dead")  # a dead run has no latency
+    _ledger_row(db, latency_ms=450, provider="none", outcome="unreadable")  # never reached a provider
+    body = client.get(f"{API}/admin/ai-usage", headers=adm).json()
+    assert body["totals"]["runs"] == 5 and body["totals"]["avg_latency_ms"] == 2000
+
+
+def test_average_latency_is_null_when_nothing_reached_a_provider(client: TestClient, db: Session) -> None:
+    adm = _admin(client, db)
+    _ledger_row(db, latency_ms=0, provider="none", outcome="unavailable")
+    totals = client.get(f"{API}/admin/ai-usage", headers=adm).json()["totals"]
+    assert totals["runs"] == 1 and totals["avg_latency_ms"] is None
+
+
+def test_each_row_names_the_business_from_the_application_and_a_deleted_draft_has_none(
+    client: TestClient, db: Session, billing: Billing
+) -> None:
+    _, kept_app, _ = _operator_upload(client, db, "a@example.sg")
+    _, gone_app, h = _operator_upload(client, db, "b@example.sg")
+    adm = _admin(client, db)
+    items = {i["application_id"]: i for i in client.get(f"{API}/admin/ai-usage", headers=adm).json()["items"]}
+    assert items[kept_app]["business_name"] == VALID_BUSINESS["business_name"]
+    assert "business_name" not in {c.name for c in AiUsage.__table__.columns}  # display only, not stored
+    assert client.delete(f"{API}/applications/{gone_app}", headers=h).status_code in (200, 204)
+    after = {i["application_id"]: i for i in client.get(f"{API}/admin/ai-usage", headers=adm).json()["items"]}
+    assert after[gone_app]["business_name"] is None and after[gone_app]["reference_no"] is None
+    assert after[kept_app]["business_name"] == VALID_BUSINESS["business_name"]
+    import csv
+    import io
+
+    rows = list(
+        csv.reader(io.StringIO(client.get(f"{API}/admin/ai-usage.csv", headers=adm).text, newline=""))
+    )
+    col = rows[0].index("business_name")
+    assert rows[0][1:3] == ["reference_no", "business_name"]
+    assert {r[col] for r in rows[1:]} == {VALID_BUSINESS["business_name"], ""}
+
+
+def test_the_reference_filter_is_exact_on_both_routes_and_unknown_means_empty(
+    client: TestClient, db: Session, billing: Billing
+) -> None:
+    a, b_app = _seed_rows(client, db)
+    adm = _admin(client, db)
+    b_row = db.get(Application, uuid.UUID(b_app))
+    other_row = db.scalar(select(Application).where(Application.operator_id == a.id))
+    assert b_row is not None and other_row is not None
+    ref, other = b_row.reference_no, str(other_row.id)
+    body = client.get(f"{API}/admin/ai-usage", headers=adm, params={"reference": ref}).json()
+    assert body["items"] and {i["reference_no"] for i in body["items"]} == {ref}
+    assert body["totals"]["runs"] == len(body["items"])
+    csv_lines = client.get(f"{API}/admin/ai-usage.csv", headers=adm, params={"reference": ref}).text.strip()
+    assert len(csv_lines.split("\r\n")) == 1 + len(body["items"]) and ref in csv_lines
+    for unknown in ("PF-1999-000001", ref[:-1], ref.lower(), "%"):  # no prefix, case or wildcard match
+        r = client.get(f"{API}/admin/ai-usage", headers=adm, params={"reference": unknown})
+        assert r.status_code == 200 and r.json()["items"] == [] and r.json()["totals"]["runs"] == 0
+        c = client.get(f"{API}/admin/ai-usage.csv", headers=adm, params={"reference": unknown})
+        assert c.status_code == 200 and len(c.text.strip().split("\r\n")) == 1  # the header only
+    # alongside application_id: both must hold
+    both = client.get(
+        f"{API}/admin/ai-usage", headers=adm, params={"reference": ref, "application_id": other}
+    )
+    assert both.json()["items"] == []
+    assert client.get(f"{API}/admin/ai-usage", headers=adm, params={"reference": "x" * 21}).status_code == 422
+
+
 # ---- the CSV ----
 
 
@@ -462,7 +558,7 @@ def test_csv_is_streamed_with_every_column_and_the_filters(
     assert 'attachment; filename="ai-usage.csv"' in r.headers["content-disposition"]
     assert r.headers["cache-control"] == "no-store"
     lines = r.text.strip().split("\r\n")
-    assert lines[0].split(",")[:3] == ["created_at", "reference_no", "application_id"]
+    assert lines[0].split(",")[:4] == ["created_at", "reference_no", "business_name", "application_id"]
     assert len(lines) == 4 and "0.00060800" in lines[1] and "1200,80" in lines[1]
     one = client.get(f"{API}/admin/ai-usage.csv", headers=adm, params={"application_id": b_app})
     assert len(one.text.strip().split("\r\n")) == 2

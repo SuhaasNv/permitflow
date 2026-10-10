@@ -104,7 +104,7 @@ def test_csv_cells_that_are_safe_are_left_alone() -> None:
 
 
 def test_the_csv_has_one_column_per_field_of_the_page() -> None:
-    assert len(CSV_COLUMNS) == len(set(CSV_COLUMNS)) == 15
+    assert len(CSV_COLUMNS) == len(set(CSV_COLUMNS)) == 16
     assert {"user_id", "application_id", "cost_usd", "outcome", "input_tokens", "output_tokens"} <= set(
         CSV_COLUMNS
     )

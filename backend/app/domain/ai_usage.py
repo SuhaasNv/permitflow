@@ -61,6 +61,7 @@ def check_message(
 CSV_COLUMNS = (
     "created_at",
     "reference_no",
+    "business_name",
     "application_id",
     "document_id",
     "run_id",

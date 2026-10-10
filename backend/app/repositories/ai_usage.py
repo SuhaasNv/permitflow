@@ -14,6 +14,7 @@ from app.models import AiPrice, AiUsage, Application, User
 class UsageFilters:
     user_id: uuid.UUID | None = None
     application_id: uuid.UUID | None = None
+    reference: str | None = None  # exact application reference; an unknown one matches nothing
     since: datetime | None = None  # inclusive
     until: datetime | None = None  # exclusive
 
@@ -23,6 +24,7 @@ class UsageRow:
     usage: AiUsage
     user_name: str | None
     reference_no: str | None
+    business_name: str | None
 
 
 @dataclass(frozen=True)
@@ -31,6 +33,7 @@ class UsageTotals:
     input_tokens: int
     output_tokens: int
     cost_usd: Decimal
+    avg_latency_ms: int | None  # over runs that reached a provider; None when there are none
 
 
 class AiUsageRepository:
@@ -63,15 +66,29 @@ class AiUsageRepository:
             stmt = stmt.where(AiUsage.user_id == f.user_id)
         if f.application_id is not None:
             stmt = stmt.where(AiUsage.application_id == f.application_id)
+        if f.reference is not None:
+            stmt = stmt.where(
+                AiUsage.application_id.in_(
+                    select(Application.id).where(Application.reference_no == f.reference)
+                )
+            )
         if f.since is not None:
             stmt = stmt.where(AiUsage.created_at >= f.since)
         if f.until is not None:
             stmt = stmt.where(AiUsage.created_at < f.until)
         return stmt
 
-    def _rows(self, f: UsageFilters) -> Select[tuple[AiUsage, str, str]]:  # outer joins: None at run time
+    def _rows(
+        self, f: UsageFilters
+    ) -> Select[tuple[AiUsage, str, str, str]]:  # outer joins: None at run time
+        # The business name is read from the application's form when asked for, never stored in the ledger.
         stmt = (
-            select(AiUsage, User.full_name, Application.reference_no)
+            select(
+                AiUsage,
+                User.full_name,
+                Application.reference_no,
+                Application.draft_data["business"]["business_name"].as_string(),
+            )
             .outerjoin(User, User.id == AiUsage.user_id)
             .outerjoin(Application, Application.id == AiUsage.application_id)
         )
@@ -90,13 +107,13 @@ class AiUsageRepository:
                     and_(AiUsage.created_at == created_at, AiUsage.id < row_id),
                 )
             )
-        return [UsageRow(u, name, ref) for u, name, ref in self.db.execute(stmt.limit(limit))]
+        return [UsageRow(u, name, ref, biz) for u, name, ref, biz in self.db.execute(stmt.limit(limit))]
 
     def stream(self, f: UsageFilters, *, batch: int = 500) -> Iterator[UsageRow]:
         """Every matching row, newest first, fetched in batches (the CSV export)."""
         result = self.db.execute(self._rows(f).execution_options(yield_per=batch))
-        for u, name, ref in result:
-            yield UsageRow(u, name, ref)
+        for u, name, ref, biz in result:
+            yield UsageRow(u, name, ref, biz)
 
     def totals(self, f: UsageFilters) -> UsageTotals:
         stmt = self._where(
@@ -105,8 +122,16 @@ class AiUsageRepository:
                 func.coalesce(func.sum(AiUsage.input_tokens), 0),
                 func.coalesce(func.sum(AiUsage.output_tokens), 0),
                 func.coalesce(func.sum(AiUsage.cost_usd), 0),
+                # A refusal, a pause, an unreadable file and a dead run never reached a provider.
+                func.avg(AiUsage.latency_ms).filter(AiUsage.provider != "none", AiUsage.latency_ms > 0),
             ).select_from(AiUsage),
             f,
         )
-        runs, tokens_in, tokens_out, cost = self.db.execute(stmt).one()
-        return UsageTotals(int(runs), int(tokens_in), int(tokens_out), Decimal(cost))
+        runs, tokens_in, tokens_out, cost, avg_ms = self.db.execute(stmt).one()
+        return UsageTotals(
+            int(runs),
+            int(tokens_in),
+            int(tokens_out),
+            Decimal(cost),
+            None if avg_ms is None else round(avg_ms),
+        )
