@@ -69,6 +69,7 @@ const NAV: Record<Role, NavItem[]> = {
         'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
       ),
     },
+    { label: 'AI usage', short: 'AI usage', to: '/admin/ai-usage', icon: icon('M3 3v18h18M8 17v-5M13 17V8M18 17v-9') },
   ],
 }
 

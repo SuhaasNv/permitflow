@@ -96,6 +96,12 @@ export const router = createBrowserRouter([
               { path: '/admin/overview', element: <AdminOverviewPage />, handle: titled('Operations overview') },
               { path: '/admin/activity', element: <AdminActivityPage />, handle: titled('Activity') },
               { path: '/admin/users', element: <AdminUsersPage />, handle: titled('Users') },
+              // Loaded on first visit: the page stays out of the first bundle.
+              {
+                path: '/admin/ai-usage',
+                lazy: () => import('@/features/admin/AiUsagePage').then((m) => ({ Component: m.AiUsagePage })),
+                handle: titled('AI usage'),
+              },
               // The officer screens, read-only (US-072): the server sends no actions, the components render no controls.
               {
                 element: (
