@@ -809,7 +809,7 @@ def test_migration_0018_downgrades_cleanly_and_upgrades_back(client: TestClient,
         with dbmod.get_engine().connect() as conn:
             return {r[0]: r[1] for r in conn.execute(text("select key, value from platform_settings"))}
 
-    alembic("downgrade", "0016")
+    alembic("downgrade", "0017")
     try:
         dbmod.reset_engine()
         assert columns() == set()

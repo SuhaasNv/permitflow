@@ -1,7 +1,7 @@
 """The virus scan state on documents and clarification attachments (US-099, ADR-017)
 
 Revision ID: 0018
-Revises: 0016
+Revises: 0017
 
 `scan_state` is NULL for every existing row and for every upload made with SCAN_MODE=off: those are served
 as before. With SCAN_MODE=enforce it is `scanning`, `clean` or `infected` (a VARCHAR without a CHECK, like
@@ -23,8 +23,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0018"
-# lead: rebase down_revision onto 0017 at merge
-down_revision: str | None = "0016"
+down_revision: str | None = "0017"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
