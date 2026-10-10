@@ -24,6 +24,7 @@ class Token:
     access_token: str
     expires_at: datetime
     user: User
+    session_id: uuid.UUID
 
 
 # Verified against when the email is unknown so both outcomes cost one argon2 check (timing oracle, T4).
@@ -94,7 +95,7 @@ class AuthService:
         token, expires_at = create_access_token(user.id, user.role.value, session.id)
         session.expires_at = expires_at
         self.db.commit()
-        return Token(access_token=token, expires_at=expires_at, user=user)
+        return Token(access_token=token, expires_at=expires_at, user=user, session_id=session.id)
 
     def current_user(self, user_id: uuid.UUID, session_id: uuid.UUID) -> User:
         """The per-request check: the user row (role, active flag) and the session row (revoked, idle).

@@ -6,6 +6,16 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 
 - The version is read at run time (backend `APP_VERSION`, frontend `appVersion` in `config.js`); CI builds once per commit, a candidate tag names that commit's dev image by digest, and the push to `main` and the release tag promote the last candidate's images instead of rebuilding (ADR-019); the release guard counts `RELEASE_NOTES.md` as shipped and checks the candidate carries the release section; What's new hides sections newer than the running version; `deploy.yml` takes the release version for production. `RELEASING.md` and `OPERATIONS.md` describe the flow.
 
+## US-104, the session in an HttpOnly cookie (10 Oct 2026, `feat/us-104-cookie-session`, on dev after the next release candidate)
+
+Backend only; the frontend follows in wave 3b. Nothing changes until `AUTH_MODE=cookie` is set: the default `token` is today's behaviour and every earlier test passes unchanged.
+
+- **Cookie mode.** Sign-in sets `__Host-pf_session` (the JWT; `Secure; HttpOnly; SameSite=Strict; Path=/`, no `Domain`, `Max-Age` = the token lifetime) and `__Host-pf_csrf` (same attributes, readable by script). The sign-in body is `{expires_at, user, csrf_token}`: no bearer token. `GET /auth/me` also returns `csrf_token`. The bearer header is refused in cookie mode and the cookie is ignored in token mode.
+- **CSRF.** Every unsafe method on an authenticated route needs `X-CSRF-Token`, equal to the CSRF cookie and to an HMAC of the session id under a sub-key derived from `JWT_SECRET`, compared in constant time; otherwise `403 csrf_failed` (and one structured `csrf_failed` log event, never a token value). Sign-in needs an `Origin` header from `CORS_ORIGINS` (login CSRF). Sign-out clears both cookies, even when it is refused as 401 (revoked or expired session). One session per account and the take-over work as before; a taken-over cookie answers `401 session_revoked`.
+- **CORS.** In cookie mode credentials are allowed for the listed origins only and `X-CSRF-Token` is an allowed header; token mode is unchanged. The app refuses to start in cookie mode with an empty or `*` `CORS_ORIGINS`, an origin that is `null` or has a path or trailing slash, or, in production, a non-https origin.
+- **Docs.** ADR-018, threat model T12 and T14, `OPERATIONS.md` (variable, rollout, rollback), `ARCHITECTURE.md`, `.env.example`, `README.md`.
+- **Handover.** Wave 3b (frontend): `credentials: "include"`, no token in `sessionStorage`, keep `csrf_token` in memory and send it as `X-CSRF-Token` on writes, call `GET /auth/me` on load, treat `403 csrf_failed` as "reload and retry once". The XMLHttpRequest upload paths (`frontend/src/api/documents.ts` and `frontend/src/api/clarification.ts`) need `xhr.withCredentials = true` plus `X-CSRF-Token` and no `Authorization` header. Then switch `AUTH_MODE=cookie` on development and run the UAT. Not merged into dev from this branch yet; Notion not moved.
+
 ## v0.5.0-rc.3: release candidate on the development environment (10 Oct 2026)
 
 - The officer's check result explains `ai_paused` ("Automatic checks are paused by the administrator; re-run once they resume.") instead of showing the raw code; a vitest covers it. The operator side already shows its own wording.

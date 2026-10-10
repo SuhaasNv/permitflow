@@ -149,9 +149,9 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 
 | Method | Path | Role | Purpose |
 |--------|------|------|---------|
-| POST | /auth/login | any | JWT carrying the session id (`sid`); `409 session_active` (details: `device`, `last_seen_at`) while another device holds the account, unless `take_over: true` (US-093) |
-| GET | /auth/me | any | current user |
-| POST | /auth/logout | any | ends this sign-in on the server; the token answers `401 session_revoked` from then on (US-093) |
+| POST | /auth/login | any | JWT carrying the session id (`sid`); `409 session_active` (details: `device`, `last_seen_at`) while another device holds the account, unless `take_over: true` (US-093). With `AUTH_MODE=cookie` (US-104, ADR-018): needs an allowed `Origin` header (else `403 csrf_failed`), sets the `__Host-pf_session` (HttpOnly) and `__Host-pf_csrf` cookies, and answers `{expires_at, user, csrf_token}` with no bearer token |
+| GET | /auth/me | any | current user; in cookie mode also `csrf_token`, so a reload learns who is signed in and gets the CSRF value without reading a cookie |
+| POST | /auth/logout | any | ends this sign-in on the server; the token answers `401 session_revoked` from then on (US-093). In cookie mode it needs `X-CSRF-Token` and clears both cookies |
 | GET | /form-schema | any | sections/fields definition |
 | GET | /officer/feedback-templates | officer | comment templates from `domain/feedback_templates.py` (key, title, suggested target, message); the officer edits before sending (built, US-024) |
 | GET | /applications | operator | own applications |

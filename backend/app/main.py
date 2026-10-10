@@ -19,6 +19,7 @@ from app.core.errors import AppError
 from app.core.logging import configure_logging, request_logging_middleware
 from app.core.metrics import RATE_LIMITED, metrics_middleware
 from app.core.rate_limit import RequestLimiter
+from app.core.session_cookie import CSRF_HEADER, clear_session_cookies
 from app.core.settings import get_settings
 from app.core.version import APP_VERSION
 from app.domain.uploads import too_large_message
@@ -140,12 +141,20 @@ def create_app() -> FastAPI:
         upload_message=lambda: too_large_message(live().int_value("upload_max_bytes")),
     )
 
+    # Cookie mode (US-104): credentials are allowed for the listed frontend origins only (startup refuses
+    # `*`) and the CSRF header may be sent; token mode is unchanged.
+    cookie_mode = settings.auth_mode == "cookie"
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
-        allow_credentials=False,
+        allow_credentials=cookie_mode,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+            *([CSRF_HEADER] if cookie_mode else []),
+        ],
         expose_headers=["X-Request-ID"],
     )
 
@@ -172,7 +181,12 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content=exc.to_body())
+        response = JSONResponse(status_code=exc.status_code, content=exc.to_body())
+        # Sign-out always ends with no cookies in the browser, even when the session was already revoked
+        # or expired and the request is refused as 401 (US-104).
+        if exc.status_code == 401 and request.url.path == "/api/v1/auth/logout" and cookie_mode:
+            clear_session_cookies(response)
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

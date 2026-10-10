@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,6 +32,11 @@ class Settings(BaseSettings):
     session_idle_minutes: int = 60
 
     cors_origins: str = "http://localhost:3000"
+
+    # US-104 (ADR-018): how the signed-in session travels. `token` (default) is the bearer token in the
+    # Authorization header, as before. `cookie` is a `__Host-` HttpOnly cookie plus a double-submit CSRF
+    # token; the sign-in body then carries no bearer token. The frontend origins are CORS_ORIGINS.
+    auth_mode: Literal["token", "cookie"] = "token"
 
     upload_dir: str = "./data/uploads"
     upload_max_bytes: int = 10 * 1024 * 1024
@@ -144,6 +150,25 @@ class Settings(BaseSettings):
         ):
             # A separate worker service cannot read the API's volume (ADR-015): every check would fail.
             raise RuntimeError("VERIFICATION_MODE=worker needs STORAGE_BACKEND=s3 in production")
+        if self.auth_mode == "cookie":
+            # Credentialed CORS is never open (US-104): a wildcard or an empty list would let any site
+            # read the session's answers; in production the cookie is Secure, so the origin must be https.
+            origins = self.cors_origin_list
+            if not origins or "*" in origins:
+                raise RuntimeError("AUTH_MODE=cookie needs CORS_ORIGINS to list the frontend origins, not *")
+            for origin in origins:
+                # An Origin header is scheme://host[:port] and nothing else; `null` is what a sandboxed or
+                # file page sends, so listing it would let any such page sign in.
+                parts = urlsplit(origin)
+                bare = f"{parts.scheme}://{parts.netloc}"
+                if parts.scheme not in ("http", "https") or origin != bare:
+                    raise RuntimeError(
+                        f"AUTH_MODE=cookie needs CORS_ORIGINS like https://host[:port]: not {origin!r}"
+                    )
+            if self.app_env == "production" and not all(o.startswith("https://") for o in origins):
+                raise RuntimeError(
+                    "AUTH_MODE=cookie in production needs every CORS_ORIGINS entry to be https"
+                )
         if self.worker_lease_seconds <= self.pdf_extract_timeout_seconds + 2 * self.ai_timeout_seconds:
             # A lease shorter than the longest check lets the reaper take back a run that is still working.
             raise RuntimeError(
