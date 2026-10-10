@@ -50,6 +50,7 @@ All names carry the `permitflow_` prefix. Labels are route templates and enum va
 | `permitflow_verification_queue_oldest_seconds` | gauge | none | age of the oldest waiting check, 0 when none; same refresh |
 | `permitflow_verification_active_leases` | gauge | none | checks a worker is running with a lease still valid; same refresh |
 | `permitflow_verification_dead_runs` | gauge | none | checks given up after three claims (status `dead`), all time; same refresh |
+| `permitflow_scans_total` | counter | `result` (clean, infected, error: clamd gave no verdict) | `services/scan.py` `inspect` (US-099), in the API and the worker; no dashboard row or alert yet: `error` above zero for several minutes means the scanner is down |
 | `permitflow_verification_reaped_total` | counter | `outcome` (requeued, dead, interrupted: a lease-less run stranded by the switch to worker mode) | `services/verification.py` `reap_expired_runs`, in the worker |
 | `permitflow_openai_tokens_total` | counter | `model`, `kind` (prompt, cached, completion) | `infra/ai/openai_provider.py` from the `usage` OpenAI returns on every call |
 

@@ -44,6 +44,9 @@ class DocumentView(BaseModel):
     uploaded_at: datetime
     replaces_filename: str | None
     verification: VerificationView | None
+    # US-099: null (stored with the scan off), scanning, clean or infected. Only null and clean can be opened;
+    # for infected, the verification's error_reason is `file_infected`.
+    scan_state: str | None = None
 
 
 class DocumentSlotView(BaseModel):

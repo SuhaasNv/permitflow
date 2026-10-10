@@ -156,6 +156,7 @@ def document_view(
         uploaded_at=doc.uploaded_at,
         replaces_filename=replaces.original_filename if replaces else None,
         verification=verification,
+        scan_state=doc.scan_state,
     )
 
 

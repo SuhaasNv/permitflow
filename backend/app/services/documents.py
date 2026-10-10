@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import BadRequest, Forbidden, NotFound
 from app.domain.enums import ApplicationStatus, DocumentType
+from app.domain.scan import SCANNING, quarantine_key
 from app.domain.uploads import UploadRejected, canonical_content_type, check_name_and_type
 from app.infra.storage import FileStorage, get_storage, new_storage_key
 from app.models import Application, Document, User, VerificationRun
@@ -18,6 +19,7 @@ from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
 from app.services.applications import ApplicationService
 from app.services.quotas import new_run
+from app.services.scan import enforcing, ensure_servable
 from app.services.uploads import platform_remaining, receive, storage_usage
 
 
@@ -60,7 +62,11 @@ class DocumentService:
 
         # One pipeline for every upload (US-085): size cap, magic bytes, images without metadata, the
         # application's storage budget; the digest is that of the stored bytes.
+        # US-099: with the scan enforced, the file is stored under quarantine/ until the scanner clears it.
+        scan = enforcing()
         key = new_storage_key(app.id, ext)
+        if scan:
+            key = quarantine_key(key)
         received = receive(
             self.storage,
             key,
@@ -89,6 +95,7 @@ class DocumentService:
             supersedes_id=previous.id if previous else None,
             is_current=True,
             uploaded_by=operator.id,
+            scan_state=SCANNING if scan else None,
         )
         if previous is not None:
             previous.is_current = False
@@ -146,6 +153,7 @@ class DocumentService:
         doc = self.documents.get_in_application(app.id, document_id)
         if doc is None:
             raise NotFound("Document not found.")
+        ensure_servable(doc.scan_state, user)
         if not self.storage.exists(doc.stored_key):
             raise NotFound("This file is no longer available.")
         return doc, self.storage.open(doc.stored_key)

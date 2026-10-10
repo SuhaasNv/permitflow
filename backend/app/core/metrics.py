@@ -83,6 +83,8 @@ CLARIFICATION_ROUNDS = Counter(
     "Clarification rounds by event: released to the operator, answered by the operator.",
     ["event"],
 )
+# The virus scan (US-099): one count per scanner verdict, `error` when clamd could not give one.
+SCANS = Counter("permitflow_scans_total", "Virus scans by result (clean, infected, error).", ["result"])
 ATTACHMENT_BYTES = Counter(
     "permitflow_attachment_bytes_total", "Bytes stored as clarification evidence (US-065)."
 )

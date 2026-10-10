@@ -157,15 +157,15 @@ SPECS: tuple[SettingSpec, ...] = (
         key="scanner_fail_mode",
         label="Virus scanner failure mode",
         description=(
-            "What happens to an upload when the scanner is down: closed refuses it, open lets it through. "
-            "Open is refused in production. Stored now; read by US-099."
+            "What happens to an upload when the scanner is down. No choice ever opens an unscanned file: "
+            "closed holds it and retries by itself, open holds it until a person re-runs the check. "
+            "Open is refused in production."
         ),
         group="uploads",
         kind="choice",
         env_field=None,
         fallback="closed",
         choices=("closed", "open"),
-        in_use=False,
     ),
 )
 

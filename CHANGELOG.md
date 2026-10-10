@@ -2,6 +2,17 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## US-099, the virus scan (10 Oct 2026, on `feat/us-099-virus-scan`, not merged)
+
+Every upload can now be scanned by ClamAV before anyone can open it, behind `SCAN_MODE=off|enforce`. The default is `off`, which is exactly the old behaviour; no environment has it on yet.
+
+- **Quarantine.** With `enforce`, a document is stored under `quarantine/<key>` as `scanning`. The scan is the first step of its check (in the worker in `worker` mode, in the API otherwise), before any text is read or any model is called. Clean: moved to its normal key, `clean`. Infected: stays quarantined, `infected`, the check ends `unreadable: file_infected`. A clarification attachment is scanned inside its upload request. Downloads (operator, officer, administrator) are refused unless the file is `clean` or was stored before the scan existed (null): 403 `file_infected`, 409 `file_scanning`; an upload with an infected attachment answers 422 `file_infected`, and the answers cannot be sent with a blocked file on them.
+- **Fail closed.** If clamd is unreachable, times out or errors, nothing is marked clean, served or sent to the AI. The stored US-101 setting `scanner_fail_mode` now has a meaning: `closed` retries by itself (the reaper, up to three claims), `open` (never in production) only holds the file. Its description and the settings API (`in_use` is now true) say so.
+- **Flags and alerts.** A PDF with an automatic action plus a script, a launch action or an embedded file is flagged `active_content` (served to officers, not blocking). An infected file writes an audit event (`document.infected`, `clarification.attachment_infected`), `permitflow_scans_total{result}` and one Telegram message with the case reference and signature only.
+- **Schema.** Migration 0018 adds `scan_state`, `scan_signature` and `active_content` to `documents` and `clarification_attachments`. API: `scan_state` on the operator document view and attachments; `scan_state` and `active_content` on the officer document view.
+- **Compose and tests.** A `clamav` service (`clamav/clamav:1.5.4-debian`, health check, no published port) behind the `scan` profile. Tests: a fake clamd socket for clean, infected, error, timeout and refused; integration tests for quarantine, release, retry and its limit, a draft deleted mid-scan, attachments and the officer wording; the EICAR test against a real clamd runs when `CLAMD_HOST` is set. ADR-017.
+- **Handover.** Migration 0018 has `down_revision = "0016"` on this branch; rebase it onto 0017 at merge. CI needs a ClamAV service container and `CLAMD_HOST` for the EICAR test (not added here). Not built: the screens that show the blocked state (the API exposes it), blocking submission on an infected document, an alert on a stale signature database.
+
 ## v0.5.0-rc.3: release candidate on the development environment (10 Oct 2026)
 
 - The officer's check result explains `ai_paused` ("Automatic checks are paused by the administrator; re-run once they resume.") instead of showing the raw code; a vitest covers it. The operator side already shows its own wording.

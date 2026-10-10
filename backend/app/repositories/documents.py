@@ -242,6 +242,60 @@ class DocumentRepository:
             return "removed"
         return "ok" if current else "replaced"
 
+    # ---- the virus scan (US-099) ----
+
+    def record_scan(
+        self,
+        document_id: uuid.UUID,
+        stored_key: str,
+        *,
+        state: str,
+        signature: str | None,
+        active_content: bool,
+        new_key: str | None = None,
+    ) -> bool:
+        """Write the scan result and, for a clean file, its released key. Fenced on the key the scanner read:
+        false when the document is gone (a deleted draft) or moved on, so the caller removes its copy."""
+        values: dict[str, object] = {
+            "scan_state": state,
+            "scan_signature": signature,
+            "active_content": active_content,
+        }
+        if new_key is not None:
+            values["stored_key"] = new_key
+        result = self.db.execute(
+            update(Document)
+            .where(Document.id == document_id, Document.stored_key == stored_key)
+            .values(**values)
+            .execution_options(synchronize_session=False)
+        )
+        return int(getattr(result, "rowcount", 0) or 0) == 1
+
+    def requeue_scanner_held(self, finished_before: datetime, max_attempts: int) -> int:
+        """Checks that ended `scanner_unavailable` on a file still waiting for its scan go back to the queue
+        (retry later), up to `max_attempts` claims; returns how many."""
+        waiting = select(Document.id).where(Document.scan_state == "scanning", Document.is_current.is_(True))
+        result = self.db.execute(
+            update(VerificationRun)
+            .where(
+                VerificationRun.status == VerificationStatus.UNAVAILABLE,
+                VerificationRun.error_reason == "scanner_unavailable",
+                VerificationRun.finished_at < finished_before,
+                VerificationRun.attempts < max_attempts,
+                VerificationRun.document_id.in_(waiting),
+            )
+            .values(
+                status=VerificationStatus.PENDING,
+                error_reason=None,
+                started_at=None,
+                finished_at=None,
+                latency_ms=None,
+                provider="none",
+            )
+            .execution_options(synchronize_session=False)
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
+
     def notify_queue(self) -> None:
         """Wake the workers (`LISTEN verification_runs`). Polling covers a missed notification."""
         self.db.execute(text("SELECT pg_notify('verification_runs', '')"))

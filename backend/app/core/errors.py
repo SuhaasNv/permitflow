@@ -99,3 +99,28 @@ class InsufficientStorage(AppError):
 
     status_code = 507
     code = "storage_full"
+
+
+class FileInfected(ValidationFailed):
+    """The upload was blocked by the virus scan (US-099). The code is what the screens map to the operator
+    message; the file stays quarantined."""
+
+    code = "file_infected"
+
+
+class FileBlocked(Forbidden):
+    """A download of a file the scan blocked (US-099); same code as `FileInfected`."""
+
+    code = "file_infected"
+
+
+class FileScanning(Conflict):
+    """A download of a file the virus scan has not cleared yet (US-099). Try again in a moment."""
+
+    code = "file_scanning"
+
+
+class ScannerUnavailable(Unavailable):
+    """The virus scanner could not be reached; nothing was stored as clean (US-099)."""
+
+    code = "scanner_unavailable"

@@ -83,6 +83,10 @@ class OfficerDocumentOut(BaseModel):
     # uploaded since (a replacement during resubmission that has not been resubmitted yet).
     in_current_revision: bool
     verification: OfficerVerificationOut | None
+    # US-099: scan_state is null, scanning, clean or infected (only null and clean can be opened);
+    # active_content flags a PDF with an automatic action plus a script, a launch action or an embedded file.
+    scan_state: str | None = None
+    active_content: bool = False
 
 
 class RevisionOut(BaseModel):

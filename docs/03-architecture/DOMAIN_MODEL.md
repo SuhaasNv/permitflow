@@ -121,6 +121,8 @@ One AI verification attempt for a document. The latest run is the document's dis
 | lease_until | datetime, nullable | US-098: until when the claim of a `running` run is good; cleared when the run finishes or is requeued. Null in `inline` mode |
 | worker_id | str(64), nullable | US-098: the worker holding the run; the result is written only while it matches |
 
+Virus scan columns (US-099, migration 0018), on `documents` and on `clarification_attachments`: `scan_state` (varchar 16, nullable: null when stored with `SCAN_MODE=off` or before the scan existed, else `scanning`, `clean` or `infected`; only null and `clean` are served), `scan_signature` (varchar 120, nullable: the scanner's name for what it found, infected only) and `active_content` (boolean, default false: a PDF with an automatic action plus a script, a launch action or an embedded file; a flag, not a block). A file in `scanning` or `infected` lives under the key prefix `quarantine/`; a clean one is moved to its normal key and `stored_key` follows.
+
 Indexes (migration 0016): `ix_verification_runs_queued (created_at) WHERE status = 'pending'` serves the worker's claim; `ix_verification_runs_lease (lease_until) WHERE status = 'running'` serves the reaper.
 
 Rules: results are advisory. No service reads verification status to decide workflow state (ADR-006).

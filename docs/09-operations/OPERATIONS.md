@@ -64,6 +64,9 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `PDF_EXTRACT_TIMEOUT_SECONDS` | `25` | backend, worker | Both modes. The PDF text is extracted in a child process killed at this wall-clock deadline; a kill is stored as `unreadable: pdf_parse_error`. |
 | `PDF_EXTRACT_MEMORY_MB`, `PDF_EXTRACT_CPU_SECONDS` | `512`, `20` | backend, worker | Both modes. `RLIMIT_AS` and `RLIMIT_CPU` of that child. `RLIMIT_AS` is enforced on Linux (the containers), not on macOS. |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | empty | backend (also Grafana and the bot) | US-101: the API posts one Telegram message for each platform settings change to this chat. Both empty: no message, no network call. The same bot and chat the monitoring layer uses (`OBSERVABILITY.md`, 5a); set them on the backend service as well. |
+| `SCAN_MODE` | `off` | backend, worker | US-099: `off` stores and serves files as before; `enforce` quarantines every upload and serves it only after ClamAV cleared it. See "Virus scan" below. |
+| `CLAMD_HOST`, `CLAMD_PORT` | `localhost`, `3310` | backend, worker | Where clamd listens (Compose: `clamav`, 3310). The EICAR test runs only when `CLAMD_HOST` is set in the environment. |
+| `CLAMD_TIMEOUT_SECONDS` | `30` | backend, worker | Connect and read timeout for one scan; a timeout is "no verdict" (the file stays held). |
 | `VITE_API_URL` | `http://localhost:8000/api/v1` | frontend | Build-time, read from `frontend/.env` (not the repo root). In the container the runtime `API_URL` wins. |
 
 ### Platform settings: the limits above are now ceilings (v0.5.0, US-101)
@@ -201,6 +204,35 @@ Document checks run in one of two places, chosen by `VERIFICATION_MODE`. The cod
 5. Watch the dashboard row for an hour: waiting stays near 0, no dead checks.
 
 **Rollback.** Set `VERIFICATION_MODE=inline` on the API and redeploy (the worker can stay up or be stopped). At the API's start the sweep marks every `pending` and long-`running` run `failed: interrupted`, which is the old behaviour: let the queue drain first when that matters (the panel "Checks waiting" at 0), otherwise applicants re-run the checks that were queued. The schema change (migration 0016: `attempts`, `lease_until`, `worker_id`, two partial indexes) is additive and stays; the previous release reads the table as before. A `dead` run is read by older code as an unknown status, so before rolling back past this release run `alembic downgrade 0015` (it turns `dead` into `failed: interrupted`).
+
+## Virus scan (US-099, ADR-017)
+
+The scan is shipped dormant: the default is `SCAN_MODE=off`, which is how every environment ran before.
+
+| | `off` (default) | `enforce` |
+|---|---|---|
+| Where a new upload is stored | its normal key | `quarantine/<key>`, with `scan_state = scanning` |
+| Who scans it | nobody | a document: the first step of its check (the API process in `inline` mode, the worker in `worker` mode), before any text is read or any model is called. A clarification attachment: inside its own upload request |
+| After a clean verdict | n/a | copied to the normal key, `scan_state = clean`, the quarantine copy removed |
+| After an infected verdict | n/a | stays under `quarantine/`, `scan_state = infected`; downloads answer 403 `file_infected`; audit `document.infected` and one Telegram message (case reference and signature, no file name or person) |
+| A download | served | served only when `clean` or when `scan_state` is null (stored before the scan, or with it off); 409 `file_scanning` while waiting |
+
+**Run it locally.** `docker compose --profile scan up -d clamav` (the image is `clamav/clamav:1.5.4-debian`; the first start downloads signatures and takes a few minutes: `docker compose logs -f clamav` until the health check is green; it wants about 1.5 GB of memory). The service publishes no port, so from the host use a one-off mapping (`docker run -d -p 3311:3310 clamav/clamav:1.5.4-debian`) or run the backend in Compose (`--profile full`, which resolves the name `clamav`). Then `SCAN_MODE=enforce` with `CLAMD_HOST=clamav` (or `localhost` and the mapped port) and upload a file. `printf 'zPING\0' | nc localhost 3311` answers `PONG` when clamd is ready.
+
+**The EICAR test.** `CLAMD_HOST=localhost CLAMD_PORT=3311 uv run pytest tests/integration/test_virus_scan.py -k eicar` uploads the EICAR test string as a document and as clarification evidence against a real clamd; it is skipped when `CLAMD_HOST` is not set, so a plain `pytest` run needs no ClamAV.
+
+**If the scanner is down (fail mode).** The administrator's setting "Virus scanner failure mode" (`scanner_fail_mode`) decides what waits and how it recovers. No value ever serves, or sends to the AI, a file that was not scanned.
+
+| `scanner_fail_mode` | A document | A clarification attachment |
+|---|---|---|
+| `closed` (default) | stays `scanning` and its check ends `unavailable: scanner_unavailable`; in `worker` mode the reaper queues it again after 60 s, up to three claims; after that it waits for a person to re-run the check, and Telegram says the scanner could not be reached | the upload is refused (503 `scanner_unavailable`) and nothing is kept; the operator tries again |
+| `open` (not allowed in production) | stays `scanning`, check `unavailable: scanner_unavailable`, no automatic retry; Telegram says so | as above |
+
+In `inline` mode nothing retries by itself (there is no reaper): the applicant or the officer re-runs the check once the scanner is back. Look for `scan_unavailable` in the logs and `permitflow_scans_total{result="error"}` in Prometheus. While the administrator has paused the AI the worker claims nothing, so scans wait too.
+
+**Held documents.** `SELECT d.id, d.original_filename, d.scan_state, r.status, r.error_reason FROM documents d JOIN verification_runs r ON r.document_id = d.id WHERE d.scan_state = 'scanning' AND d.is_current ORDER BY d.uploaded_at;` A re-run from the UI (or the reaper) scans it again. An infected file cannot be released: ask for a different copy.
+
+**Switching an environment to `enforce`.** Development first. (1) Create the `clamav` service (the same image, 1.5 GB of memory, a health check, private networking only, no domain). (2) Set `CLAMD_HOST` to its private host name on the API and, in worker mode, the worker; set `SCAN_MODE=enforce`; redeploy. (3) Upload a clean file and the EICAR string and see both outcomes. Existing documents keep a null `scan_state` and stay open. **Rollback.** Set `SCAN_MODE=off` and redeploy: files already `clean` or null stay open; a file still `scanning` or `infected` stays refused until it is replaced, and files still under `quarantine/` are not moved back. Migration 0018 only adds nullable columns and is safe to leave.
 
 ## Health
 

@@ -35,6 +35,8 @@ class ClarificationAttachmentOut(BaseModel):
     content_type: str
     size_bytes: int
     uploaded_at: datetime
+    # US-099: null (stored with the scan off), scanning, clean or infected. A blocked file cannot be opened.
+    scan_state: str | None = None
 
 
 class ClarificationItemOut(BaseModel):

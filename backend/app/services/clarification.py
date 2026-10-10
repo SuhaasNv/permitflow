@@ -11,16 +11,26 @@ from typing import BinaryIO
 from sqlalchemy.orm import Session
 
 from app.core import metrics
-from app.core.errors import BadRequest, Conflict, InvalidTransition, NotFound, ValidationFailed
+from app.core.errors import (
+    BadRequest,
+    Conflict,
+    FileInfected,
+    InvalidTransition,
+    NotFound,
+    ScannerUnavailable,
+    ValidationFailed,
+)
 from app.domain.checklist_schema import ITEM_BY_KEY, item_title
 from app.domain.enums import ApplicationStatus, ClarificationStatus, NotificationKind
 from app.domain.operator_errors import refusal
+from app.domain.scan import CLEAN, INFECTED, INFECTED_MESSAGE, quarantine_key, servable
 from app.domain.uploads import (
     UploadRejected,
     canonical_content_type,
     check_name_and_type,
 )
 from app.domain.workflow import Actor
+from app.infra.clamd import ScannerError
 from app.infra.storage import FileStorage, get_storage, new_storage_key
 from app.models import (
     Application,
@@ -47,6 +57,7 @@ from app.schemas.clarification import (
 )
 from app.services.documents import _display_name
 from app.services.notifications import NotificationService
+from app.services.scan import alert_infected, drop_quarantined, enforcing, ensure_servable, inspect, release
 from app.services.uploads import platform_remaining, receive, storage_usage, storage_view
 
 MAX_MESSAGE = 2000
@@ -201,6 +212,7 @@ class ClarificationService:
                             content_type=a.content_type,
                             size_bytes=a.size_bytes,
                             uploaded_at=a.uploaded_at,
+                            scan_state=a.scan_state,
                         )
                         for a in attachments.get(r.id, [])
                     ],
@@ -281,7 +293,10 @@ class ClarificationService:
             raise ValidationFailed(
                 f"Up to {ATTACHMENT_CAP} files per answer.", details={"reason": "attachment_cap"}
             )
+        scan = enforcing()  # US-099: stored under quarantine/ until the scanner clears it
         key = new_storage_key(app.id, ext)
+        if scan:
+            key = quarantine_key(key)
         received = receive(
             self.storage,
             key,
@@ -295,15 +310,40 @@ class ClarificationService:
             self.storage.delete(key)
             self.db.rollback()
             return self.build(self.applications.get_for(operator, application_id)), True
+        content_type = canonical_content_type(ext)
+        scan_state: str | None = None
+        signature: str | None = None
+        active_content = False
+        quarantined_key = key
+        if scan:
+            # A small file, scanned inside the request. No verdict means nothing is kept (fail closed):
+            # the upload is refused and the operator tries again.
+            try:
+                verdict = inspect(self.storage, key, content_type)
+            except ScannerError as exc:
+                self.storage.delete(key)
+                self.db.rollback()
+                raise ScannerUnavailable(
+                    "The security check is not available right now. Try again in a moment."
+                ) from exc
+            signature, active_content = verdict.signature, verdict.active_content
+            if verdict.infected:
+                scan_state = INFECTED  # stays under quarantine/ until the operator removes it
+            else:
+                scan_state = CLEAN
+                key = release(self.storage, key, verdict.data)
         row = ClarificationAttachment(
             response_id=response.id,
             original_filename=_display_name(filename),
             stored_key=key,
-            content_type=canonical_content_type(ext),
+            content_type=content_type,
             size_bytes=size,
             sha256=sha,
             uploaded_by=operator.id,
             uploaded_at=datetime.now(UTC),
+            scan_state=scan_state,
+            scan_signature=signature if scan_state == INFECTED else None,
+            active_content=active_content,
         )
         self.checklists.add(row)
         self.audit.record(
@@ -312,12 +352,26 @@ class ClarificationService:
             event_type="clarification.attachment_added",
             payload={"response_id": str(response.id), "filename": row.original_filename, "sha256": sha[:12]},
         )
+        if scan_state == INFECTED:
+            self.audit.record(
+                application_id=app.id,
+                actor_id=None,
+                event_type="clarification.attachment_infected",
+                payload={"response_id": str(response.id), "signature": signature, "sha256": sha[:12]},
+            )
         try:
             self.db.commit()
         except Exception:
             self.storage.delete(key)
+            if key != quarantined_key:
+                self.storage.delete(quarantined_key)
             raise
+        if key != quarantined_key:
+            drop_quarantined(self.storage, quarantined_key)
         metrics.ATTACHMENT_BYTES.inc(size)
+        if scan_state == INFECTED:
+            alert_infected(app.reference_no, signature)
+            raise FileInfected(INFECTED_MESSAGE, details={"reason": "file_infected"})
         return self.build(app), False
 
     def remove_attachment(
@@ -376,6 +430,15 @@ class ClarificationService:
                 unanswered.append(item.item_key)
             else:
                 to_send.append((item, latest, r))
+        if any(
+            not servable(a.scan_state)
+            for rows in self.checklists.attachments_for_responses([r.id for _, _, r in to_send]).values()
+            for a in rows
+        ):
+            raise FileInfected(
+                "Remove the file the security check blocked, then send your answers.",
+                details={"reason": "blocked_attachment"},
+            )
         if unanswered:
             word = "item still needs" if len(unanswered) == 1 else "items still need"
             raise ValidationFailed(f"{len(unanswered)} {word} an answer.", details={"items": unanswered})
@@ -430,6 +493,7 @@ class ClarificationService:
         checklist = self.checklists.checklist(item.checklist_id) if item else None
         if checklist is None or checklist.application_id != app.id:
             raise NotFound("Attachment not found.")
+        ensure_servable(row.scan_state, user)
         if not self.storage.exists(row.stored_key):
             raise NotFound("The file is no longer available.")
         return row, self.storage.open(row.stored_key)
@@ -714,6 +778,7 @@ class ClarificationService:
                                     content_type=a.content_type,
                                     size_bytes=a.size_bytes,
                                     uploaded_at=a.uploaded_at,
+                                    scan_state=a.scan_state,
                                 )
                                 for a in attachments.get(r.id, [])
                             ],

@@ -18,6 +18,7 @@ from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.settings import get_settings
 from app.domain.ai_input import prepare_text, redact_form_section
 from app.domain.enums import Role, VerificationStatus
+from app.domain.scan import CLEAN, REASON_INFECTED, REASON_SCANNER_UNAVAILABLE
 from app.domain.verification_rules import (
     DOCUMENT_TYPE_DESCRIPTIONS,
     SECTION_FOR_DOCUMENT,
@@ -38,6 +39,7 @@ from app.repositories.documents import DocumentRepository
 from app.services.applications import ApplicationService
 from app.services.platform_settings import live
 from app.services.quotas import AI_PAUSED_REASON, new_run
+from app.services.scan import ScanOutcome, alert_scanner_down, scan_document, will_retry
 
 logger = logging.getLogger("permitflow.verification")
 
@@ -52,6 +54,8 @@ TERMINAL = {
 }
 MAX_ATTEMPTS = 3
 REPLACED_REASON = "document_replaced"
+# US-099: how long a check held for a scanner outage waits before the reaper queues it again.
+SCANNER_RETRY_SECONDS = 60
 
 
 def start_run(run_id: uuid.UUID) -> None:
@@ -97,6 +101,28 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
         started = time.perf_counter()
 
         try:
+            # US-099: the scan comes first, before any text is read or any model is called. A file that is
+            # not `clean` (NULL is a file stored with the scan off) is scanned; infected or unanswered
+            # means it goes no further.
+            if doc.scan_state is not None and doc.scan_state != CLEAN:
+                gate = scan_document(db, doc, app)
+                if gate is ScanOutcome.GONE:
+                    return
+                if gate is ScanOutcome.INFECTED:
+                    _finish(
+                        db, run, app, VerificationStatus.UNREADABLE,
+                        provider="none", error_reason=REASON_INFECTED, started=started,
+                    )  # fmt: skip
+                    return
+                if gate is ScanOutcome.HELD:
+                    if not will_retry(run.attempts):
+                        alert_scanner_down()
+                    _finish(
+                        db, run, app, VerificationStatus.UNAVAILABLE,
+                        provider="none", error_reason=REASON_SCANNER_UNAVAILABLE, started=started,
+                    )  # fmt: skip
+                    return
+
             data = b"".join(get_storage().open(doc.stored_key))
             max_chars = live().int_value("ai_max_text_chars")
             extracted = extract_text(doc.content_type, data, max_chars=max_chars)
@@ -345,6 +371,11 @@ def reap_expired_runs() -> tuple[int, int]:
     with session_factory()() as db:
         requeued, dead_ids = DocumentRepository(db).reap_expired(now, MAX_ATTEMPTS)
         stranded = DocumentRepository(db).fail_stranded_inline(now - _interrupted_after(), now)
+        if live().value("scanner_fail_mode") == "closed":
+            # US-099: checks held because the scanner was down are retried (up to MAX_ATTEMPTS claims).
+            requeued += DocumentRepository(db).requeue_scanner_held(
+                now - timedelta(seconds=SCANNER_RETRY_SECONDS), MAX_ATTEMPTS
+            )
         for run_id in dead_ids:
             run = db.get(VerificationRun, run_id)
             doc = db.get(Document, run.document_id) if run else None

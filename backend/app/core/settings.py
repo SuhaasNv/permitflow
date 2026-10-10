@@ -118,6 +118,15 @@ class Settings(BaseSettings):
     pdf_extract_memory_mb: int = Field(default=512, ge=64)
     pdf_extract_cpu_seconds: int = Field(default=20, ge=2)
 
+    # US-099 (ADR-017): the virus scan. `off` (the default) is today's behaviour: files are served as soon as
+    # they are stored. `enforce` quarantines every upload, scans it with ClamAV (clamd, INSTREAM over TCP)
+    # before any extraction or AI call, and serves it only when clean. What a scanner outage does is the
+    # administrator's `scanner_fail_mode`; no mode ever serves an unscanned file.
+    scan_mode: Literal["off", "enforce"] = "off"
+    clamd_host: str = "localhost"
+    clamd_port: int = Field(default=3310, ge=1, le=65535)
+    clamd_timeout_seconds: float = Field(default=30.0, gt=0)
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -151,6 +160,8 @@ class Settings(BaseSettings):
             )
         if self.storage_backend == "s3" and self.s3_missing():
             raise RuntimeError(f"STORAGE_BACKEND=s3 needs {', '.join(self.s3_missing())} to be set")
+        if self.scan_mode == "enforce" and not self.clamd_host.strip():
+            raise RuntimeError("SCAN_MODE=enforce needs CLAMD_HOST to be set")
 
     def s3_missing(self) -> list[str]:
         """The required bucket settings that are empty (US-097)."""
