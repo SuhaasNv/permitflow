@@ -17,7 +17,7 @@ import { CompletionCard } from './CompletionCard'
 import { FeedbackNotice, targetHref } from './FeedbackNotice'
 import { ClarificationNotice } from './ClarificationNotice'
 import { SiteVisitCard } from './SiteVisitCard'
-import { applicationKeys, useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
+import { applicationKeys, isScanHeld, useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
 
 const ArrowIcon = (
   <svg
@@ -83,14 +83,15 @@ export function ApplicationPage() {
   }
   const view = app.data
   const nextSection = view.sections.find((s) => !s.complete)
-  const docsDone = view.completeness.documents_present === view.completeness.documents_total
+  const heldCount = view.document_slots.filter(isScanHeld).length
+  const docsDone = view.completeness.documents_present - heldCount === view.completeness.documents_total
   const responding = view.resubmit !== null
   const firstOpen = view.feedback.find((f) => f.resolution === 'open')
   // Readiness counts flagged targets (sections and document types), never feedback items.
   const changedTargets = view.resubmit ? view.resubmit.changed_sections.length + view.resubmit.changed_document_types.length : 0
   const flaggedTargets = view.resubmit ? changedTargets + view.resubmit.untouched_targets.length : 0
   // The backend words the reason; this only picks the title when a file that is blocked or being scanned holds Resubmit.
-  const scanHold = view.document_slots.some((sl) => sl.document?.scan_state === 'infected' || sl.document?.scan_state === 'scanning')
+  const scanHold = heldCount > 0
   const doResubmit = () => {
     if (resubmit.isPending) return
     resubmit.mutate(undefined, {
@@ -323,7 +324,7 @@ export function ApplicationPage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold">Documents</div>
                     <div className="text-[13px] text-text-3">
-                      {view.completeness.documents_present} of {view.completeness.documents_total} required documents uploaded
+                      {view.completeness.documents_present - heldCount} of {view.completeness.documents_total} required documents uploaded
                     </div>
                   </div>
                   <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium', docsDone ? 'text-success' : 'text-text-3')}>
@@ -341,7 +342,7 @@ export function ApplicationPage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold">Documents</div>
                     <div className="text-[13px] text-text-3">
-                      {view.completeness.documents_present} of {view.completeness.documents_total} required documents uploaded
+                      {view.completeness.documents_present - heldCount} of {view.completeness.documents_total} required documents uploaded
                     </div>
                   </div>
                 </div>

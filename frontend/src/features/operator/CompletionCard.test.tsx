@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 import type { ApplicationView } from '@/api/applications'
+import { slotView } from '@/test/fixtures'
 import { CompletionCard } from './CompletionCard'
 
 const view: ApplicationView = {
@@ -65,5 +66,24 @@ describe('CompletionCard', () => {
     expect(screen.getByText('Needs attention')).toBeInTheDocument()
     expect(screen.getByText('Fix')).toHaveAttribute('href', '/app/applications/a1/form/premises')
     expect(screen.getByText('Upload')).toHaveAttribute('href', '/app/applications/a1/documents')
+  })
+
+  it('shows Blocked and Scanning chips and does not count those files as uploaded', () => {
+    const held = (type: string, scan_state: 'infected' | 'scanning') => {
+      const s = slotView(type)
+      return { ...s, document: { ...s.document!, scan_state } }
+    }
+    const slots = [held('floor_plan', 'infected'), held('business_profile', 'scanning'), slotView('id_proof')]
+    render(
+      <MemoryRouter>
+        <CompletionCard
+          view={{ ...view, document_slots: slots, completeness: { ...view.completeness, documents_present: 3, documents_total: 3 } }}
+        />
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('Blocked')).toHaveAttribute('data-tone', 'error')
+    expect(screen.getByText('Scanning')).toBeInTheDocument()
+    expect(screen.getAllByText('Uploaded')).toHaveLength(1)
+    expect(screen.getByText(/1 of 3 documents/)).toBeInTheDocument()
   })
 })

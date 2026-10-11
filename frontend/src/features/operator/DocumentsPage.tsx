@@ -11,7 +11,7 @@ import { ApplicationHeader } from './ApplicationHeader'
 import { DocumentSlot } from './documents/DocumentSlot'
 import { FeedbackNotice } from './FeedbackNotice'
 import { StorageRoom } from '@/features/shared/StorageRoom'
-import { applicationKeys, useApplication } from './queries'
+import { applicationKeys, isScanHeld, useApplication } from './queries'
 
 export function DocumentsPage() {
   const { id = '' } = useParams()
@@ -46,7 +46,7 @@ export function DocumentsPage() {
   const c = view.completeness
   const canDelete = view.revision_count === 0 && view.can_edit
   const base = `/app/applications/${id}`
-  const blockedOrScanning = view.document_slots.filter((sl) => sl.document?.scan_state === 'infected' || sl.document?.scan_state === 'scanning')
+  const blockedOrScanning = view.document_slots.filter(isScanHeld)
   // The backend decides (and words) it: a draft's submit_blocked_reason, or the resubmit reason while a file holds it.
   const gate = view.submit_blocked_reason ?? (view.resubmit && blockedOrScanning.length > 0 ? view.resubmit.reason : null)
 
