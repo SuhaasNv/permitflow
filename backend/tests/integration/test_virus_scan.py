@@ -213,6 +213,33 @@ def test_a_file_is_quarantined_while_it_waits_for_its_scan(
     assert _download(client, h, app_id, doc.id).status_code == 200  # type: ignore[attr-defined]
 
 
+def test_completion_counts_only_files_the_scan_has_cleared(client: TestClient, db: Session) -> None:
+    h = _operator(client, db)
+    app_id = draft(client, h)
+    for dtype in ("business_profile", "floor_plan"):
+        assert upload(client, h, app_id, dtype, f"{dtype}.txt", TXT, "text/plain").status_code == 201
+
+    def seen() -> tuple[int, int]:
+        detail = client.get(f"{API}/applications/{app_id}", headers=h).json()
+        listed = next(a for a in client.get(f"{API}/applications", headers=h).json() if a["id"] == app_id)
+        assert listed["percent"] == detail["completeness"]["percent"]
+        return detail["completeness"]["documents_present"], listed["percent"]
+
+    both = seen()
+    assert both[0] == 2
+    for held in (SCANNING, INFECTED):
+        db.execute(update(Document).where(Document.document_type == "floor_plan").values(scan_state=held))
+        db.commit()
+        present, percent = seen()
+        assert present == 1 and percent < both[1]
+        detail = client.get(f"{API}/applications/{app_id}", headers=h).json()
+        slot = next(s for s in detail["document_slots"] if s["type"] == "floor_plan")
+        assert slot["present"] is True and slot["document"]["scan_state"] == held  # the slot still shows it
+    db.execute(update(Document).where(Document.document_type == "floor_plan").values(scan_state=CLEAN))
+    db.commit()
+    assert seen() == both
+
+
 # ---- enforce: infected ----
 
 

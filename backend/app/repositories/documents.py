@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import String, and_, delete, func, literal_column, or_, select, text, update
 from sqlalchemy.orm import Session
 
+from app.domain.scan import CLEAN
 from app.models import Application, ClarificationAttachment, Document, VerificationRun
 from app.models.enums import DocumentType, VerificationStatus
 
@@ -372,11 +373,13 @@ class DocumentRepository:
         return run
 
     def present_types_for(self, application_ids: list[uuid.UUID]) -> dict[uuid.UUID, set[DocumentType]]:
-        """Current document types per application, one query."""
+        """Current, servable (not scanning or infected) document types per application, one query."""
         if not application_ids:
             return {}
         stmt = select(Document.application_id, Document.document_type).where(
-            Document.application_id.in_(application_ids), Document.is_current.is_(True)
+            Document.application_id.in_(application_ids),
+            Document.is_current.is_(True),
+            or_(Document.scan_state.is_(None), Document.scan_state == CLEAN),
         )
         out: dict[uuid.UUID, set[DocumentType]] = {}
         for app_id, dtype in self.db.execute(stmt):
