@@ -56,6 +56,9 @@ class AiUsageRepository:
             return set()
         return set(self.db.scalars(select(AiUsage.run_id).where(AiUsage.run_id.in_(run_ids))))
 
+    def for_run(self, run_id: uuid.UUID) -> AiUsage | None:
+        return self.db.scalar(select(AiUsage).where(AiUsage.run_id == run_id))
+
     def add(self, row: AiUsage) -> AiUsage:
         self.db.add(row)
         return row

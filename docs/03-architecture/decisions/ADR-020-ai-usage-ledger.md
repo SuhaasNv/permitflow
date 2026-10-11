@@ -70,7 +70,7 @@ The pseudonyms are the first 16 hex characters of HMAC-SHA256 over a label (`use
 
 ## Consequences
 
-- One more row per check (a few hundred bytes) and a one-row price lookup per result. Negligible at this volume.
+- One more row per check (a few hundred bytes) and a one-row price lookup per result. Negligible at this volume. A run has one row even when it is queued again (a scan hold, then a retry): the later attempt updates the row with its outcome, provider, model and latency and adds its tokens and cost to what is there, and the counters count each attempt's own tokens once.
 - With `VERIFICATION_MODE=worker` the Prometheus counters are incremented in the worker process, so the worker's `/metrics` must be scraped for the dashboard and `/cost` to see them (the local Prometheus does; the Railway job exists for development). The page and the CSV read the database and are right in both modes.
 - **The ledger can undercount; it never overcounts.** Tokens the provider billed are missing from every row in these cases:
   1. A result dropped because the lease changed hands (a slow worker whose run was taken back): the first attempt's tokens are lost, the row holds the second holder's. `permitflow_ai_unrecorded_tokens_total{kind}` counts them.
