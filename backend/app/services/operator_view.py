@@ -5,6 +5,7 @@ from app.domain.enums import ApplicationStatus, DocumentType, SiteVisitStatus, V
 from app.domain.form_schema import SECTIONS
 from app.domain.labels import operator_label, tone_for
 from app.domain.officer_actions import next_action
+from app.domain.scan import servable
 from app.domain.workflow import can_withdraw
 from app.models import Application, Document, VerificationRun
 from app.schemas.applications import (
@@ -213,7 +214,9 @@ def operator_view(
     documents = documents or []
     docs_by_type = {d.document_type: (d, r) for d, r in documents}
     comp = completeness_rules.compute(
-        app.draft_data, set(docs_by_type), snapshot=app.status != ApplicationStatus.DRAFT
+        app.draft_data,
+        {t for t, (d, _) in docs_by_type.items() if servable(d.scan_state)},
+        snapshot=app.status != ApplicationStatus.DRAFT,
     )
     blocked = (
         submit_blocked_reason(d for d, _ in documents) if app.status == ApplicationStatus.DRAFT else None
@@ -240,7 +243,7 @@ def operator_view(
             DocumentSlotView(
                 type=d.type.value,
                 label=d.label,
-                present=d.present,
+                present=pair is not None,  # a file exists; completeness alone ignores one the scan holds
                 editable=d.type in editable_document_types,
                 document=document_view(pair[0], pair[1]) if pair else None,
             )
