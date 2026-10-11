@@ -38,6 +38,16 @@ Every uploaded file can now be checked for viruses before anyone opens it, the a
 - The version you use in production is exactly the build that was tested before the release.
 - Demonstration accounts are switched on per environment; production keeps them, so anyone can still try the service.
 
+## v0.5.0-rc.5, 12 October 2026: the virus check, live
+
+**New for operators**
+- A file being checked for viruses updates on its own when the check finishes, without reloading the page.
+- The completion bar and the document count leave out a file that is blocked or still being checked, so they match what you can submit.
+
+**Also**
+- The development environment now runs the virus check on every upload, and every file stored before it has been scanned once: all clean.
+- Sign-in on the development environment is now held in a secure cookie that page scripts cannot read.
+
 ## v0.5.0-rc.4, 11 October 2026: settings, AI costs and the virus check
 
 **New for operators**

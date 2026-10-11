@@ -2,6 +2,13 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## v0.5.0-rc.5: release candidate on the development environment (12 Oct 2026)
+
+- Version `0.5.0-rc.5` in the five version files; `RELEASE_NOTES.md` gains the rc.5 section.
+- `fix/scan-state-polling`: the operator's queries poll every 2 s while a file is `scanning` (capped at 3 minutes) and the officer's live-check poll includes scanning; the completion rail, the application page and the documents page count a held file (scanning or infected) as not done.
+- `fix/completion-excludes-held`: the server's completion (`percent`, `documents_present`, the list summary) counts a document only when its `scan_state` is NULL or `clean`; the document slot still reports the held file as present, so it shows as uploaded with its scan state. Submission is unchanged (its `409 documents_not_clear` guard).
+- Development environment switches since rc.4: `SCAN_MODE=enforce` with the ClamAV service and the backfill (281 files, all clean), then `AUTH_MODE=cookie` (Chrome check passed: reload, draft, upload, sign-out; no token in storage or headers).
+
 ## v0.5.0-rc.4: release candidate on the development environment (11 Oct 2026)
 
 - Version `0.5.0-rc.4` in the five version files; `RELEASE_NOTES.md` gains the rc.4 section and, per US-111, the upcoming `## v0.5.0, ` release section, which What's new hides until 0.5.0 runs.
