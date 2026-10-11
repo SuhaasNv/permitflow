@@ -9,6 +9,7 @@ import {
   withdrawApplication,
   submitApplication,
 } from '@/api/applications'
+import type { DocumentSlotView } from '@/api/applications'
 import type { ClarificationView } from '@/api/clarification'
 import { attachToResponse, getClarifications, removeAttachment, respondToClarification, sendClarifications } from '@/api/clarification'
 import { getFormSchema } from '@/api/formSchema'
@@ -29,11 +30,21 @@ export function isCheckStale(requestedAt: string, now: number = Date.now()): boo
   return now - new Date(requestedAt).getTime() > CHECK_STALE_MS
 }
 
+/** True while a file is still being scanned and young enough that the verdict can plausibly still land. */
+export function isScanLive(scanState: string | null | undefined, uploadedAt: string, now: number = Date.now()): boolean {
+  return scanState === 'scanning' && !isCheckStale(uploadedAt, now)
+}
+
+/** A slot whose file is blocked or still being scanned does not count as uploaded (Documents, Application and Completion agree). */
+export function isScanHeld(slot: DocumentSlotView): boolean {
+  return slot.document?.scan_state === 'infected' || slot.document?.scan_state === 'scanning'
+}
+
 export function useApplications() {
   return useQuery({ queryKey: applicationKeys.all, queryFn: listApplications })
 }
 
-/** Polls every 2 s while any document is still being checked (FR-005), only in the visible tab, and stops
+/** Polls every 2 s while any document is still being scanned or checked (FR-005), only in the visible tab, and stops
  * after CHECK_STALE_MS so a stuck check cannot poll forever. Refetches on focus so another tab's change shows. */
 export function useApplication(id: string) {
   return useQuery({
@@ -45,9 +56,10 @@ export function useApplication(id: string) {
       if (!view) return false
       const active = view.document_slots.some(
         (s) =>
-          s.document?.verification &&
-          ACTIVE_VERIFICATION.has(s.document.verification.status) &&
-          !isCheckStale(s.document.verification.requested_at),
+          (s.document?.verification &&
+            ACTIVE_VERIFICATION.has(s.document.verification.status) &&
+            !isCheckStale(s.document.verification.requested_at)) ||
+          (s.document && isScanLive(s.document.scan_state, s.document.uploaded_at)),
       )
       return active ? 2000 : false
     },
@@ -151,6 +163,11 @@ export function useRescheduleSiteVisit(id: string) {
   })
 }
 
+/** True while any response attachment is still being scanned (same window as a document scan). */
+export function hasLiveScan(view: ClarificationView): boolean {
+  return view.items.some((i) => i.responses.some((r) => r.attachments.some((a) => isScanLive(a.scan_state, a.uploaded_at))))
+}
+
 /** The flagged items with the officer's questions (US-064); refetches on focus so a new round shows. */
 export function useClarifications(id: string, enabled = true) {
   return useQuery({
@@ -158,6 +175,7 @@ export function useClarifications(id: string, enabled = true) {
     queryFn: () => getClarifications(id),
     enabled,
     refetchOnWindowFocus: true,
+    refetchInterval: (query) => (query.state.data && hasLiveScan(query.state.data) ? 2000 : false),
   })
 }
 

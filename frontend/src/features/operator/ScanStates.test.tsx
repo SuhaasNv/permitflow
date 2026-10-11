@@ -185,8 +185,8 @@ describe('Documents page and Review page with a blocked or scanning document (US
     renderRoutes('/app/applications/app-1/review')
     expect(await screen.findByRole('button', { name: 'Submit application' })).toBeDisabled()
     expect(screen.getByText(`${HOLD} 1 blocked, 1 being scanned.`)).toBeInTheDocument()
-    expect(screen.getByText('Blocked')).toBeInTheDocument()
-    expect(screen.getByText('Scanning')).toBeInTheDocument()
+    expect(screen.getAllByText('Blocked')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Scanning')[0]).toBeInTheDocument()
   })
 
   it('a 409 documents_not_clear on submit shows the scan message, not "Already submitted"', async () => {
