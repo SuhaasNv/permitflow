@@ -4,15 +4,56 @@ What each version of PermitFlow brings, written for the people who use it. Newes
 
 Version numbers: `v0.<sprint>.0` for the three assessment sprints, `v0.x.y` for fixes on a release, `v0.4.0` for the two epics below, `v0.4.0-rc.N` for a release candidate tagged on `dev` for the development environment before the release.
 
-Format: the product reads this file at build time for its What's new page (the version number in the corner opens it; `frontend/src/features/releases/notes.ts`), so the lines keep four shapes. A release heading is `## vX.Y.Z, D Month YYYY (optional note): title`; a release candidate has the same heading with `-rc.N` after the version (`## vX.Y.Z-rc.N, D Month YYYY: title`) and the same blocks and bullets below it, written for what that candidate changed. Candidates sit among the releases in date order, newest first; the development environment lists them with a Release candidate label, and production hides them completely (while the build information is still loading they stay hidden). A released version's own notes never mention candidates. A bold line such as `**New for operators**` opens an audience block and the bullets under it belong to it; text before the first block is the release's introduction; `## Coming next` holds the plan. Inline, only backticks, bold and bare links are rendered. A heading of another shape fails the frontend tests.
+Format: the product reads this file at build time for its What's new page (the version number in the corner opens it; `frontend/src/features/releases/notes.ts`), so the lines keep four shapes. A release heading is `## vX.Y.Z, D Month YYYY (optional note): title`; a release candidate has the same heading with `-rc.N` after the version (`## vX.Y.Z-rc.N, D Month YYYY: title`) and the same blocks and bullets below it, written for what that candidate changed. Candidates sit among the releases in date order, newest first; the development environment lists them with a Release candidate label, and production hides them completely (while the build information is still loading they stay hidden). A released version's own notes never mention candidates. Each candidate also writes or updates the upcoming release's own section; What's new hides any section newer than the running version, so it appears only once that release runs (`docs/09-operations/RELEASING.md`). A bold line such as `**New for operators**` opens an audience block and the bullets under it belong to it; text before the first block is the release's introduction; `## Coming next` holds the plan. Inline, only backticks, bold and bare links are rendered. A heading of another shape fails the frontend tests.
 
 ---
 
 ## Coming next
 
-**v0.5.0, planned: safe intake.** Every uploaded file is checked for viruses before an officer can open it, and a file that fails is blocked with a clear message. The automatic document check runs on its own worker, so a slow file never slows the rest of the service. The licensing office sees what each check cost and can tune the limits (requests, daily checks, upload size) from the overview, with every change recorded. Sign-in moves to a more secure cookie.
+**After v0.5.0:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
 
-**After that:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
+## v0.5.0, 11 October 2026: safe intake
+
+Every uploaded file can now be checked for viruses before anyone opens it, the automatic document check runs on its own worker, and the licensing office can see what each check cost and tune the service's limits without a redeploy.
+
+**New for operators**
+- A file that fails the security check is blocked with a clear message, "This file was blocked by the security check. Upload a different copy.", and the application waits to be submitted until every file has passed.
+- Text hidden inside an uploaded document (invisible characters, look-alike letters, hidden instructions) is caught and sent to a licensing officer to look at, and identity and phone numbers are masked before a document is checked automatically.
+- A document whose text takes too long to read is stopped after a short time instead of holding up the check, and an upload when the service has no room left says so plainly.
+- The hours picker, the save buttons and the error summary keep your place when you use a keyboard, and the focus ring is clearly visible on every button.
+
+**New for licensing officers**
+- A blocked file cannot be opened, a file still being checked opens once it has passed, and a PDF that tries to run something when opened carries a note.
+- A check that could not finish, or that was paused by the administrator, says why in plain words.
+- Comparing two revisions is a proper table that screen readers can follow, and "Add feedback" puts you straight in the message box.
+
+**New for administrators**
+- A Settings page to lower the request, sign-in, draft, upload and automatic-check limits, or pause the automatic checks: every change needs a reason and your password, is recorded and can be undone, and no change can go above the limits set for the environment.
+- An AI usage page: what each automatic check cost in US$, who started it and on which application, with filters, totals against the daily limit and a CSV download.
+- The overview shows how many automatic checks gave up after three tries in the last day, and creating an account or changing a role asks for your password again.
+
+**Also**
+- The automatic checks run on their own worker and uploads are kept in object storage, so a slow file never slows the rest of the service.
+- Sign-in can move to a more secure cookie that a script in the page cannot read.
+- The version you use in production is exactly the build that was tested before the release.
+- Demonstration accounts are switched on per environment; production keeps them, so anyone can still try the service.
+
+## v0.5.0-rc.4, 11 October 2026: settings, AI costs and the virus check
+
+**New for operators**
+- When the virus check is on, a file that fails it is blocked with a clear message, "This file was blocked by the security check. Upload a different copy.", and "Review and submit" waits, with its reason, until every file has passed.
+
+**New for licensing officers**
+- When the virus check is on, a blocked file cannot be opened, a file still being checked opens once it has passed and shows when it was scanned, and a PDF that tries to run something when opened carries a note.
+
+**New for administrators**
+- A Settings page for the limits and the pause switch, grouped as traffic, AI and uploads, with the default, the allowed range, who changed it last and the full history with undo.
+- An AI usage page: what each automatic check cost in US$, who started it and on which application, with filters, totals against the daily limit and a CSV download.
+
+**Also**
+- The virus check is built and stays switched off until the development environment turns it on; files stored before it are scanned once by a one-off backfill.
+- Sign-in in a secure cookie is built and stays switched off for now.
+- Each build is made once and the tested build is the one that ships, relabelled with its version instead of rebuilt.
 
 ## v0.5.0-rc.3, 10 October 2026: clearer paused checks and a development worker
 
