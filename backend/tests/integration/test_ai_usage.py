@@ -965,6 +965,40 @@ def test_a_price_change_after_the_check_started_does_not_reprice_it(db: Session)
     assert later.cost_usd == Decimal("0.00100000")  # no start: priced when it was created
 
 
+def test_a_run_held_then_retried_keeps_one_row_with_the_final_outcome_and_summed_tokens(db: Session) -> None:
+    _price(db, datetime(2025, 1, 1, tzinfo=UTC), "0.40", "1.60")
+    user = make_user(db, "op@example.sg", Role.OPERATOR)
+    app = Application(operator_id=user.id, reference_no="PF-2026-009998")
+    db.add(app)
+    db.flush()
+    doc = Document(
+        application_id=app.id,
+        document_type=DocumentType.FLOOR_PLAN,
+        original_filename="p.txt",
+        stored_key="k-us100-retry",
+        content_type="text/plain",
+        size_bytes=1,
+        sha256="0" * 64,
+        uploaded_by=user.id,
+    )
+    db.add(doc)
+    db.flush()
+    run = VerificationRun(id=uuid.uuid4(), document_id=doc.id, started_at=datetime(2025, 6, 1, tzinfo=UTC))
+    first = (VerificationStatus.UNAVAILABLE, 100, 10, 0)
+    final = (VerificationStatus.VERIFIED, 1200, 80, 5)
+    for outcome, tin, tout, ms in (first, final):
+        last = record_usage(
+            db, run=run, doc=doc, outcome=outcome, provider="openai", model=MODEL,
+            input_tokens=tin, output_tokens=tout, latency_ms=ms,
+        )  # fmt: skip
+        db.commit()
+    db.commit()
+    (row,) = db.scalars(select(AiUsage).where(AiUsage.run_id == run.id))
+    assert (row.outcome, row.input_tokens, row.output_tokens, row.latency_ms) == ("verified", 1300, 90, 5)
+    assert row.cost_usd == Decimal("0.00066400")  # 0.000056 (held) + 0.000608 (final)
+    assert (last.input_tokens, last.output_tokens) == (1200, 80)  # what publish counts: this attempt only
+
+
 def test_extreme_and_invalid_ranges_are_400_not_500(client: TestClient, db: Session) -> None:
     adm = _admin(client, db)
     for path in ("ai-usage", "ai-usage.csv"):

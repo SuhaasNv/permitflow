@@ -73,7 +73,11 @@ def record_usage(
     output_tokens: int = 0,
     latency_ms: int = 0,
 ) -> AiUsage:
-    """Add the usage row of a run to `db`; the caller commits it with the run's result."""
+    """Add the usage row of a run to `db`; the caller commits it with the run's result. A run has one row:
+    when an earlier attempt (a scan hold that was queued again) already wrote it, that row takes the latest
+    outcome, provider, model, latency and price, and the tokens and cost of this attempt are added to what
+    it holds, so nothing billed earlier is lost. The value returned is always this attempt's own numbers
+    (for `publish`, so the counters never count earlier tokens twice); on a repeat it is not stored."""
     repo = AiUsageRepository(db)
     now = datetime.now(UTC)
     # The price in force when the check ran: when it started, or when it was created if it never started.
@@ -87,24 +91,31 @@ def record_usage(
         else:
             cost = cost_usd(input_tokens, output_tokens, price.input_per_million, price.output_per_million)
             price_id = price.id
-    return repo.add(
-        AiUsage(
-            run_id=run.id,
-            document_id=run.document_id,
-            application_id=doc.application_id,
-            user_id=run.requested_by,
-            document_type=doc.document_type.value,
-            provider=provider,
-            model=model,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            cost_usd=cost,
-            price_id=price_id,
-            latency_ms=latency_ms,
-            outcome=outcome.value,
-            created_at=now,
-        )
+    attempt = AiUsage(
+        run_id=run.id,
+        document_id=run.document_id,
+        application_id=doc.application_id,
+        user_id=run.requested_by,
+        document_type=doc.document_type.value,
+        provider=provider,
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=cost,
+        price_id=price_id,
+        latency_ms=latency_ms,
+        outcome=outcome.value,
+        created_at=now,
     )
+    row = repo.for_run(run.id)
+    if row is None:
+        return repo.add(attempt)
+    row.provider, row.model, row.latency_ms, row.outcome = provider, model, latency_ms, outcome.value
+    row.price_id = price_id or row.price_id
+    row.input_tokens += input_tokens
+    row.output_tokens += output_tokens
+    row.cost_usd += cost
+    return attempt
 
 
 def record_refused(db: Session, run: VerificationRun, doc: Document) -> AiUsage | None:
