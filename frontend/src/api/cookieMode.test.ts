@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { downloadAiUsageCsv } from './aiUsage'
 import { login, logout } from './auth'
+import { attachToResponse } from './clarification'
 import { API_URL, request, setCsrfToken, setTokenProvider, setUnauthorizedHandler } from './client'
 import { downloadDocument, setUploadTokenProvider, uploadDocument } from './documents'
 
@@ -21,7 +22,7 @@ describe('cookie mode: the client', () => {
     setTokenProvider(() => null)
     setUploadTokenProvider(() => null)
     setUnauthorizedHandler(() => undefined)
-    setCsrfToken('csrf-1')
+    setCsrfToken('csrf-1', 'u1')
   })
   afterEach(() => {
     setCsrfToken(null)
@@ -74,6 +75,42 @@ describe('cookie mode: the client', () => {
       .mockResolvedValueOnce(csrfFailed())
     await expect(request('/things', { method: 'POST' })).rejects.toMatchObject({ status: 403, code: 'csrf_failed' })
     expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('never retries as another account: /auth/me answering for a different user ends the session', async () => {
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    fetchMock
+      .mockResolvedValueOnce(csrfFailed())
+      .mockResolvedValueOnce(reply(200, { ...user, id: 'u2', csrf_token: 'csrf-of-u2' }))
+    await expect(request('/things', { method: 'POST', body: { a: 1 } })).rejects.toMatchObject({ status: 403, code: 'csrf_failed' })
+    expect(fetchMock).toHaveBeenCalledTimes(2) // the write was not sent again
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ code: 'session_changed' }))
+    // The other account's CSRF value was not adopted.
+    fetchMock.mockImplementation(async () => reply(200, {}))
+    await request('/after', { method: 'POST' })
+    expect(headers(2)['X-CSRF-Token']).toBe('csrf-1')
+  })
+
+  it('a 401 on the refresh ends the session once and the write is not retried', async () => {
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    fetchMock
+      .mockResolvedValueOnce(csrfFailed())
+      .mockResolvedValueOnce(reply(401, { error: { code: 'session_revoked', message: 'x', details: { reason: 'taken_over' } } }))
+    await expect(request('/things', { method: 'POST' })).rejects.toMatchObject({ status: 403, code: 'csrf_failed' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ code: 'session_revoked' }))
+  })
+
+  it('a silent request leaves a 401 to the caller and does not end the session', async () => {
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    fetchMock.mockResolvedValue(reply(401, { error: { code: 'unauthorized', message: 'Sign in.' } }))
+    await expect(request('/auth/me', { silent: true })).rejects.toMatchObject({ status: 401 })
+    expect(handler).not.toHaveBeenCalled()
   })
 
   it('still hands 401 session_revoked to the unauthorized handler', async () => {
@@ -136,7 +173,7 @@ describe('cookie mode: uploads over XMLHttpRequest', () => {
     vi.stubGlobal('XMLHttpRequest', FakeXhr)
     vi.stubGlobal('fetch', fetchMock)
     setUploadTokenProvider(() => null)
-    setCsrfToken('csrf-1')
+    setCsrfToken('csrf-1', 'u1')
   })
   afterEach(() => {
     setCsrfToken(null)
@@ -167,6 +204,36 @@ describe('cookie mode: uploads over XMLHttpRequest', () => {
     second.responseText = '{"unchanged":false}'
     second.onload?.()
     await expect(done).resolves.toEqual({ unchanged: false })
+  })
+
+  it('the clarification evidence upload takes the same retry: refreshed value, sent once more', async () => {
+    fetchMock.mockImplementation(async () => reply(200, { ...user, csrf_token: 'csrf-2' }))
+    const done = attachToResponse('app', 'resp', pdf(), () => undefined)
+    const first = FakeXhr.instances[0]
+    expect(first.withCredentials).toBe(true)
+    expect(first.headers['X-CSRF-Token']).toBe('csrf-1')
+    first.status = 403
+    first.responseText = JSON.stringify({ error: { code: 'csrf_failed', message: 'Reload.' } })
+    first.onload?.()
+    await vi.waitFor(() => expect(FakeXhr.instances).toHaveLength(2))
+    const second = FakeXhr.instances[1]
+    expect(second.withCredentials).toBe(true)
+    expect(second.headers['X-CSRF-Token']).toBe('csrf-2')
+    second.status = 200
+    second.responseText = '{"unchanged":false}'
+    second.onload?.()
+    await expect(done).resolves.toEqual({ unchanged: false })
+  })
+
+  it('an upload retry never goes out as another account, and a second csrf_failed is surfaced', async () => {
+    fetchMock.mockImplementation(async () => reply(200, { ...user, id: 'u2', csrf_token: 'csrf-of-u2' }))
+    const done = uploadDocument('app', 'floor_plan', pdf(), () => undefined)
+    const first = FakeXhr.instances[0]
+    first.status = 403
+    first.responseText = JSON.stringify({ error: { code: 'csrf_failed', message: 'Reload.' } })
+    first.onload?.()
+    await expect(done).rejects.toMatchObject({ status: 403, code: 'csrf_failed' })
+    expect(FakeXhr.instances).toHaveLength(1)
   })
 })
 

@@ -2,6 +2,7 @@
 
 import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -47,6 +48,7 @@ def get_current_user(
     user = AuthService(db).current_user(user_id, session_id)
     request.state.user_id = str(user.id)  # before the CSRF check, so a refusal is logged with the user
     request.state.session_id = session_id
+    request.state.token_expires_at = datetime.fromtimestamp(int(payload["exp"]), tz=UTC)
     # A cookie is sent by the browser on any request to this host, so unsafe methods need the CSRF token.
     # After the session check, so a revoked session still answers 401 session_revoked.
     if cookie_mode and request.method not in SAFE_METHODS:

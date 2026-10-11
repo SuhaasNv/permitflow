@@ -86,6 +86,8 @@ def test_body_has_no_bearer_token_and_hands_over_the_csrf_value(cookie_app: Test
     assert body["user"]["email"] == "op@example.sg"
     me = cookie_app.get(ME).json()
     assert me["csrf_token"] == body["csrf_token"] and me["email"] == "op@example.sg"
+    # A reload has no sign-in answer, so /me carries the session's end for the page's expiry timer (L5).
+    assert me["expires_at"][:19] == body["expires_at"][:19]  # to the second
 
 
 def test_session_cookie_is_the_only_transport_in_cookie_mode(cookie_app: TestClient, db: Session) -> None:
@@ -211,16 +213,6 @@ def test_cors_allows_credentials_for_listed_origins_only(cookie_app: TestClient)
 
     simple = cookie_app.get("/api/v1/health", headers={"Origin": "https://evil.example"})
     assert "access-control-allow-origin" not in simple.headers
-
-
-def test_token_mode_wildcard_origin_never_gets_credentials(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(get_settings(), "cors_origins", "*")
-    with TestClient(create_app()) as c:
-        r = c.get("/api/v1/health", headers={"Origin": "https://any.example"})
-    assert r.headers["access-control-allow-origin"] == "*"
-    assert "access-control-allow-credentials" not in r.headers
 
 
 def test_token_mode_cors_and_responses_are_unchanged(client: TestClient, db: Session) -> None:

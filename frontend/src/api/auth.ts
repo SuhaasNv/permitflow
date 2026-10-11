@@ -27,8 +27,9 @@ export interface SessionResponse {
 export type LoginResponse = TokenResponse | SessionResponse
 
 export interface MeResponse extends User {
-  /** Cookie mode only. */
+  /** Cookie mode only: the CSRF value, and when the session ends (so a reload can run the expiry timer). */
   csrf_token?: string
+  expires_at?: string
 }
 
 /** `takeOver` signs out the device that holds this account's session and continues here (US-093). */
@@ -40,12 +41,12 @@ export function login(email: string, password: string, takeOver = false): Promis
   })
 }
 
-/** Ends this sign-in on the server; the token stops working on its next use. */
+/** Ends this sign-in on the server; the token stops working on its next use. In cookie mode the caller waits for it. */
 export function logout(): Promise<void> {
   return request<void>('/auth/logout', { method: 'POST', keepalive: true })
 }
 
-/** `first`: no session is known yet (the load-time check for a cookie session), so send credentials. */
+/** `first`: no session is known yet (the load-time check for a cookie session): send credentials; a 401 is silent. */
 export function me(first = false): Promise<MeResponse> {
-  return request<MeResponse>('/auth/me', first ? { credentials: 'include' } : {})
+  return request<MeResponse>('/auth/me', first ? { credentials: 'include', silent: true } : {})
 }

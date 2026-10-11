@@ -150,12 +150,15 @@ class Settings(BaseSettings):
         ):
             # A separate worker service cannot read the API's volume (ADR-015): every check would fail.
             raise RuntimeError("VERIFICATION_MODE=worker needs STORAGE_BACKEND=s3 in production")
+        # Credentialed CORS is never open (US-104): the browser frontend always sends credentials, in both
+        # modes, so a wildcard would let any site read the session's answers (and could not sign in anyway).
+        if "*" in self.cors_origin_list:
+            raise RuntimeError("CORS_ORIGINS must list the frontend origins, not *")
         if self.auth_mode == "cookie":
-            # Credentialed CORS is never open (US-104): a wildcard or an empty list would let any site
-            # read the session's answers; in production the cookie is Secure, so the origin must be https.
+            # An empty list would refuse every sign-in; in production the cookie is Secure, so https only.
             origins = self.cors_origin_list
-            if not origins or "*" in origins:
-                raise RuntimeError("AUTH_MODE=cookie needs CORS_ORIGINS to list the frontend origins, not *")
+            if not origins:
+                raise RuntimeError("AUTH_MODE=cookie needs CORS_ORIGINS to list the frontend origins")
             for origin in origins:
                 # An Origin header is scheme://host[:port] and nothing else; `null` is what a sandboxed or
                 # file page sends, so listing it would let any such page sign in.

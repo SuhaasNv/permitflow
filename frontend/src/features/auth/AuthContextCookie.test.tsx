@@ -14,14 +14,15 @@ const user = { id: 'u1', email: 'operator@permitflow.example.sg', full_name: 'Ta
 const json = (status: number, body?: unknown) => new Response(body === undefined ? null : JSON.stringify(body), { status })
 
 function Probe() {
-  const { user, token, ready, signIn, signOut } = useAuth()
+  const { user, token, ready, endedReason, signIn, signOut } = useAuth()
   return (
     <div>
       <div data-testid="ready">{String(ready)}</div>
       <div data-testid="user">{user?.email ?? 'none'}</div>
       <div data-testid="token">{token ?? 'none'}</div>
+      <div data-testid="ended">{endedReason ?? 'none'}</div>
       <button onClick={() => void login('a@b.sg', 'pw').then(signIn)}>sign in</button>
-      <button onClick={() => signOut()}>sign out</button>
+      <button onClick={() => void signOut()}>sign out</button>
     </div>
   )
 }
@@ -101,5 +102,97 @@ describe('AuthProvider in cookie mode', () => {
     await request('/x', { method: 'POST' })
     const last = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][1]!
     expect((last.headers as Record<string, string>)['X-CSRF-Token']).toBeUndefined()
+  })
+
+  const signedInBody = () =>
+    json(200, { expires_at: new Date(Date.now() + 3_600_000).toISOString(), user, csrf_token: 'csrf-1' })
+  const unauthorized = () => json(401, { error: { code: 'unauthorized', message: 'Sign in.' } })
+
+  async function signInThroughTheForm() {
+    fetchMock.mockImplementationOnce(async () => unauthorized())
+    renderAuth()
+    await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'))
+    fetchMock.mockImplementationOnce(async () => signedInBody())
+    await userEvent.click(screen.getByText('sign in'))
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent(user.email))
+  }
+
+  it('stays signed in with an error when the sign-out does not reach the server (offline)', async () => {
+    await signInThroughTheForm()
+    fetchMock.mockImplementation(async () => {
+      throw new TypeError('Failed to fetch')
+    })
+    await userEvent.click(screen.getByText('sign out'))
+    expect(await screen.findByText('Sign-out did not reach the server. Try again.')).toBeInTheDocument()
+    expect(screen.getByTestId('user')).toHaveTextContent(user.email)
+
+    // Still a live cookie session: the CSRF value was kept, and the next try goes through.
+    fetchMock.mockImplementation(async () => json(204))
+    await userEvent.click(screen.getByText('sign out'))
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('none'))
+    const lastLogout = [...fetchMock.mock.calls].reverse().find(([url]) => url === `${API_URL}/auth/logout`)!
+    expect((lastLogout[1]!.headers as Record<string, string>)['X-CSRF-Token']).toBe('csrf-1')
+  })
+
+  it('stays signed in with an error when the sign-out is refused (403 csrf_failed twice)', async () => {
+    await signInThroughTheForm()
+    fetchMock.mockImplementation(async (url) =>
+      url === `${API_URL}/auth/me`
+        ? json(200, { ...user, csrf_token: 'csrf-2' })
+        : json(403, { error: { code: 'csrf_failed', message: 'Reload.' } }),
+    )
+    await userEvent.click(screen.getByText('sign out'))
+    expect(await screen.findByText('Sign-out did not reach the server. Try again.')).toBeInTheDocument()
+    expect(screen.getByTestId('user')).toHaveTextContent(user.email)
+  })
+
+  it('a slow cold /auth/me that answers 401 does not undo a sign-in made meanwhile', async () => {
+    let answerMe: (r: Response) => void = () => undefined
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => (answerMe = resolve)))
+    renderAuth()
+    fetchMock.mockImplementationOnce(async () => signedInBody())
+    await userEvent.click(screen.getByText('sign in'))
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent(user.email))
+    answerMe(unauthorized())
+    await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'))
+    expect(screen.getByTestId('user')).toHaveTextContent(user.email)
+    expect(screen.getByTestId('ended')).toHaveTextContent('none')
+    // The write still carries the CSRF value of the sign-in.
+    fetchMock.mockImplementation(async () => json(200, {}))
+    await request('/x', { method: 'POST' })
+    const last = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][1]!
+    expect((last.headers as Record<string, string>)['X-CSRF-Token']).toBe('csrf-1')
+  })
+
+  it('a slow cold /auth/me that answers 200 does not replace the sign-in made meanwhile', async () => {
+    let answerMe: (r: Response) => void = () => undefined
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => (answerMe = resolve)))
+    renderAuth()
+    fetchMock.mockImplementationOnce(async () => signedInBody())
+    await userEvent.click(screen.getByText('sign in'))
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent(user.email))
+    answerMe(json(200, { ...user, id: 'u9', email: 'someone.else@permitflow.example.sg', csrf_token: 'csrf-9' }))
+    await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'))
+    expect(screen.getByTestId('user')).toHaveTextContent(user.email)
+  })
+
+  it('restores the expiry timer from /auth/me: an already-ended cookie session shows "expired"', async () => {
+    fetchMock.mockImplementation(async () =>
+      json(200, { ...user, csrf_token: 'csrf-1', expires_at: new Date(Date.now() - 1000).toISOString() }),
+    )
+    renderAuth()
+    await waitFor(() => expect(screen.getByTestId('ended')).toHaveTextContent('expired'))
+    expect(screen.getByTestId('user')).toHaveTextContent('none')
+  })
+
+  it('token mode cold load: one /auth/me 401, no ended reason, no error, nothing stored', async () => {
+    fetchMock.mockImplementation(async () => unauthorized())
+    renderAuth()
+    await waitFor(() => expect(screen.getByTestId('ready')).toHaveTextContent('true'))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(call(0).url).toBe(`${API_URL}/auth/me`)
+    expect(screen.getByTestId('user')).toHaveTextContent('none')
+    expect(screen.getByTestId('ended')).toHaveTextContent('none')
+    expect(sessionStorage.length).toBe(0)
   })
 })

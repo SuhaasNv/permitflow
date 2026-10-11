@@ -63,6 +63,7 @@ def me(request: Request, user: CurrentUser) -> MeOut:
     out = MeOut.model_validate(user)
     if get_settings().auth_mode == "cookie":
         out.csrf_token = csrf_token(request.state.session_id)
+        out.expires_at = request.state.token_expires_at
     return out
 
 

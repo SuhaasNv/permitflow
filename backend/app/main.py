@@ -144,13 +144,13 @@ def create_app() -> FastAPI:
     # Credentials are allowed for the listed frontend origins in BOTH modes (US-104): the frontend sends
     # them on sign-in and on its load-time /auth/me before it knows which mode this is, and a browser
     # refuses the answer to a credentialed request without Allow-Credentials. Token mode ignores cookies,
-    # so this opens nothing. Never with a wildcard (a token-mode `*` keeps working for non-browser
-    # clients, without credentials). The CSRF header is only allowed in cookie mode.
+    # so this opens nothing. A wildcard is refused at startup in both modes. The CSRF header is only allowed
+    # in cookie mode.
     cookie_mode = settings.auth_mode == "cookie"
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
-        allow_credentials="*" not in settings.cors_origin_list,
+        allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=[
             "Authorization",

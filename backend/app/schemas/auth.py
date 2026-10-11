@@ -42,4 +42,7 @@ class SessionOut(BaseModel):
 
 
 class MeOut(UserOut):
-    csrf_token: str | None = None  # cookie mode only; absent in token mode
+    # Cookie mode only; absent in token mode. `expires_at` is the session's end, so a reloaded page can run
+    # its expiry timer (the sign-in answer carries it, but a reload has no sign-in answer).
+    csrf_token: str | None = None
+    expires_at: datetime | None = None

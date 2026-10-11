@@ -38,8 +38,14 @@ export function setTokenProvider(fn: () => string | null): void {
  * held here in memory and never stored. A non-null value IS the mode; the sign-in answer decides it.
  */
 let csrfToken: string | null = null
-export function setCsrfToken(value: string | null): void {
+/** Whose CSRF value it is, so a refresh can tell that another account signed in meanwhile (another tab). */
+let csrfUserId: string | null = null
+export function setCsrfToken(value: string | null, userId: string | null = null): void {
   csrfToken = value
+  csrfUserId = value === null ? null : userId
+}
+export function isCookieMode(): boolean {
+  return csrfToken !== null
 }
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
@@ -56,11 +62,20 @@ export function authXhr(xhr: XMLHttpRequest, token: string | null): void {
   for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value)
 }
 
-/** One re-read of /auth/me for a fresh CSRF value; false when it gave none (not a cookie session any more). */
+/**
+ * One re-read of /auth/me for a fresh CSRF value; false when it gave none (not a cookie session any more) or when
+ * the cookie now belongs to another account (a sign-in in another tab): that session ends here, and the write is
+ * not retried, so it can never be done as someone else.
+ */
 export async function refreshCsrf(): Promise<boolean> {
-  const out = await request<{ csrf_token?: string }>('/auth/me')
-  if (out.csrf_token) csrfToken = out.csrf_token
-  return Boolean(out.csrf_token)
+  const out = await request<{ id: string; csrf_token?: string }>('/auth/me')
+  if (!out.csrf_token) return false
+  if (csrfUserId !== null && out.id !== csrfUserId) {
+    notifyUnauthorized({ code: 'session_changed', message: 'Another account signed in on this browser. Sign in again.' })
+    return false
+  }
+  csrfToken = out.csrf_token
+  return true
 }
 
 /** What a 401 said, so the sign-in page can explain why the session ended (US-093). */
@@ -95,6 +110,9 @@ export interface RequestOptions {
   /** Before any session is known (sign-in, the load-time /auth/me): send credentials, so a cookie server's
    * Set-Cookie sticks and its cookie is read. Both server modes allow credentials for the listed origins. */
   credentials?: 'include'
+  /** The load-time /auth/me before any sign-in: a 401 only means "nobody is signed in", and must not end a session
+   * that a fast sign-in created meanwhile. */
+  silent?: boolean
   /** Set by `request` itself on the one retry after a refreshed CSRF value. */
   retried?: boolean
 }
@@ -148,7 +166,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       // The CSRF value went stale (a new sign-in elsewhere in this browser): read it again and retry once.
       if (await refreshCsrf().catch(() => false)) return request<T>(path, { ...options, retried: true })
     }
-    if (response.status === 401) {
+    if (response.status === 401 && !options.silent) {
       notifyUnauthorized(
         isApiErrorBody(parsed)
           ? { code: parsed.error.code, message: parsed.error.message, details: parsed.error.details }

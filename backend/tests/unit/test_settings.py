@@ -98,6 +98,10 @@ def test_cookie_mode_startup_rules() -> None:
         with pytest.raises(RuntimeError, match="CORS_ORIGINS"):
             check(app_env="development", cors_origins=f"https://ok.example,{bad}")
     check(app_env="development", cors_origins="https://a.example:8443")
+    # The browser frontend sends credentials in both modes, so a wildcard is refused in token mode too.
+    for origins in ("*", "http://a.example,*"):
+        with pytest.raises(RuntimeError, match="CORS_ORIGINS"):
+            base.model_copy(update={"auth_mode": "token", "cors_origins": origins}).validate_for_startup()
     # Token mode keeps accepting what it always did.
     token = {"auth_mode": "token", "app_env": "production", "cors_origins": "http://x"}
     base.model_copy(update=token).validate_for_startup()
