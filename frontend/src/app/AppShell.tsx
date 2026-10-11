@@ -122,9 +122,13 @@ export function AppShell({ children }: { children?: ReactNode }) {
   // Idle warning (US-095, WCAG 2.2.1): any signed-in request keeps the session, so Stay signed in is one call.
   const idle = idleWarning(lastActivity(), now)
   const staySignedIn = () => void me().then(() => setNow(Date.now()), () => undefined)
-  const doSignOut = () => {
+  const doSignOut = async () => {
     setUnsaved(false)
-    signOut()
+    // Cookie mode waits for the server; false means it did not arrive and the person is still signed in.
+    if ((await signOut()) === false) {
+      setConfirmSignOut(false)
+      return
+    }
     navigate('/login', { replace: true })
   }
 
@@ -218,7 +222,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
             className="h-8 rounded-md px-3 text-[13px] font-semibold text-text-2 transition-colors hover:bg-neutral-soft hover:text-text"
             onClick={() => {
               if (hasUnsaved()) setConfirmSignOut(true)
-              else doSignOut()
+              else void doSignOut()
             }}
           >
             Sign out
@@ -324,7 +328,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
         confirmLabel="Sign out"
         cancelLabel="Stay"
         danger
-        onConfirm={doSignOut}
+        onConfirm={() => void doSignOut()}
         onCancel={() => setConfirmSignOut(false)}
       >
         <p>You have unsaved changes in the section you are editing. Sign out now and they will be lost.</p>

@@ -1,5 +1,5 @@
 import type { ApplicationView } from './applications'
-import { API_URL, AppError, notifyUnauthorized, request } from './client'
+import { API_URL, AppError, authInit, authXhr, notifyUnauthorized, refreshCsrf, request } from './client'
 import type { ApiErrorBody } from './client'
 
 export interface VerificationView {
@@ -84,7 +84,7 @@ let tokenGetter: () => string | null = () => null
 export function setUploadTokenProvider(fn: () => string | null): void {
   tokenGetter = fn
 }
-/** The bearer for direct fetches outside the JSON client (downloads, US-065 attachments). */
+/** The bearer for direct fetches outside the JSON client (downloads, US-065 attachments); null in cookie mode. */
 export function uploadToken(): string | null {
   return tokenGetter()
 }
@@ -103,12 +103,16 @@ export function uploadDocument(
 }
 
 /** One multipart upload over XMLHttpRequest with a progress callback (documents and evidence, US-087). */
-export function uploadWithProgress<T>(path: string, form: FormData, onProgress: (fraction: number) => void): Promise<T> {
+export function uploadWithProgress<T>(
+  path: string,
+  form: FormData,
+  onProgress: (fraction: number) => void,
+  retried = false,
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `${API_URL}${path}`)
-    const token = tokenGetter()
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    authXhr(xhr, tokenGetter()) // bearer, or in cookie mode withCredentials plus the CSRF header (US-104)
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(e.loaded / e.total)
     }
@@ -130,19 +134,25 @@ export function uploadWithProgress<T>(path: string, form: FormData, onProgress: 
         resolve(parsed as T)
         return
       }
-      if (xhr.status === 401) notifyUnauthorized()
       const body = parsed as ApiErrorBody | null
       const requestId = xhr.getResponseHeader('X-Request-ID') ?? undefined
-      reject(
-        new AppError(
-          xhr.status,
-          body?.error ?? {
-            code: 'http_error',
-            message: `Upload failed (${xhr.status})`,
-          },
-          requestId,
-        ),
+      const failure = new AppError(
+        xhr.status,
+        body?.error ?? {
+          code: 'http_error',
+          message: `Upload failed (${xhr.status})`,
+        },
+        requestId,
       )
+      if (xhr.status === 403 && !retried && failure.code === 'csrf_failed') {
+        // A stale CSRF value (US-104): read it again and send the upload once more.
+        refreshCsrf()
+          .then((fresh) => (fresh ? uploadWithProgress<T>(path, form, onProgress, true).then(resolve, reject) : reject(failure)))
+          .catch(() => reject(failure))
+        return
+      }
+      if (xhr.status === 401) notifyUnauthorized()
+      reject(failure)
     }
     xhr.send(form)
   })
@@ -153,10 +163,7 @@ export function deleteDocument(applicationId: string, documentId: string): Promi
 }
 
 export async function downloadDocument(applicationId: string, documentId: string, filename: string): Promise<void> {
-  const token = tokenGetter()
-  const res = await fetch(`${API_URL}/applications/${applicationId}/documents/${documentId}/download`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
+  const res = await fetch(`${API_URL}/applications/${applicationId}/documents/${documentId}/download`, authInit(tokenGetter()))
   if (!res.ok) {
     if (res.status === 401) notifyUnauthorized()
     throw await downloadError(res, res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.')
@@ -172,8 +179,7 @@ export async function downloadDocument(applicationId: string, documentId: string
 }
 
 async function fetchPdf(path: string): Promise<Blob> {
-  const token = tokenGetter()
-  const res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  const res = await fetch(`${API_URL}${path}`, authInit(tokenGetter()))
   if (!res.ok) {
     if (res.status === 401) notifyUnauthorized()
     throw new AppError(res.status, {

@@ -86,6 +86,8 @@ def test_body_has_no_bearer_token_and_hands_over_the_csrf_value(cookie_app: Test
     assert body["user"]["email"] == "op@example.sg"
     me = cookie_app.get(ME).json()
     assert me["csrf_token"] == body["csrf_token"] and me["email"] == "op@example.sg"
+    # A reload has no sign-in answer, so /me carries the session's end for the page's expiry timer (L5).
+    assert me["expires_at"][:19] == body["expires_at"][:19]  # to the second
 
 
 def test_session_cookie_is_the_only_transport_in_cookie_mode(cookie_app: TestClient, db: Session) -> None:
@@ -221,11 +223,28 @@ def test_token_mode_cors_and_responses_are_unchanged(client: TestClient, db: Ses
         headers={
             "Origin": origin,
             "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "authorization,x-csrf-token",
+            "Access-Control-Request-Headers": "authorization",
         },
     )
-    assert "access-control-allow-credentials" not in pre.headers
+    # The frontend sends credentials on sign-in before it knows the mode: a listed origin gets them here too.
+    assert pre.headers["access-control-allow-origin"] == origin
+    assert pre.headers["access-control-allow-credentials"] == "true"
     assert "x-csrf-token" not in pre.headers.get("access-control-allow-headers", "").lower()
+    csrf = client.options(
+        LOGIN,
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "x-csrf-token",
+        },
+    )
+    assert csrf.status_code == 400  # the CSRF header is a cookie-mode header only
+    unlisted = client.options(
+        LOGIN,
+        headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"},
+    )
+    assert unlisted.status_code == 400
+    assert "access-control-allow-origin" not in unlisted.headers  # no origin granted: the browser blocks it
 
     r = client.post(LOGIN, json={"email": "op@example.sg", "password": DEFAULT_PASSWORD})  # no Origin needed
     assert r.status_code == 200

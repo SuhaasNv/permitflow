@@ -141,13 +141,16 @@ def create_app() -> FastAPI:
         upload_message=lambda: too_large_message(live().int_value("upload_max_bytes")),
     )
 
-    # Cookie mode (US-104): credentials are allowed for the listed frontend origins only (startup refuses
-    # `*`) and the CSRF header may be sent; token mode is unchanged.
+    # Credentials are allowed for the listed frontend origins in BOTH modes (US-104): the frontend sends
+    # them on sign-in and on its load-time /auth/me before it knows which mode this is, and a browser
+    # refuses the answer to a credentialed request without Allow-Credentials. Token mode ignores cookies,
+    # so this opens nothing. A wildcard is refused at startup in both modes. The CSRF header is only allowed
+    # in cookie mode.
     cookie_mode = settings.auth_mode == "cookie"
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
-        allow_credentials=cookie_mode,
+        allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=[
             "Authorization",

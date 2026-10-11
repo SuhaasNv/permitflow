@@ -1,5 +1,5 @@
 import { uploadToken } from './documents'
-import { API_URL, AppError, notifyUnauthorized, request } from './client'
+import { API_URL, AppError, authInit, notifyUnauthorized, request } from './client'
 
 // ---- US-100: AI usage and cost ----
 
@@ -69,12 +69,9 @@ export function getAiUsage(q: AiUsageQuery, before: string | null, limit = 50): 
   return request<AiUsagePage>(`/admin/ai-usage?${p.toString()}`)
 }
 
-/** The same rows as a file, fetched with the bearer header (no token in the URL) and saved as ai-usage.csv. */
+/** The same rows as a file, fetched with the session (bearer header or cookie; no token in the URL) and saved as ai-usage.csv. */
 export async function downloadAiUsageCsv(q: AiUsageQuery): Promise<void> {
-  const token = uploadToken()
-  const res = await fetch(`${API_URL}/admin/ai-usage.csv?${filterParams(q).toString()}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
+  const res = await fetch(`${API_URL}/admin/ai-usage.csv?${filterParams(q).toString()}`, authInit(uploadToken()))
   if (!res.ok) {
     if (res.status === 401) notifyUnauthorized()
     throw new AppError(res.status, {

@@ -1,5 +1,5 @@
 import type { StorageView } from './applications'
-import { API_URL, notifyUnauthorized, request } from './client'
+import { API_URL, authInit, notifyUnauthorized, request } from './client'
 import type { ScanState } from './documents'
 import { downloadError, uploadToken, uploadWithProgress } from './documents'
 
@@ -105,10 +105,10 @@ export function sendClarifications(id: string): Promise<ClarificationView> {
 
 /** Downloads an attachment for the owner, an officer or an admin (same path for every role). */
 export async function downloadAttachment(applicationId: string, attachmentId: string, filename: string): Promise<void> {
-  const token = uploadToken()
-  const res = await fetch(`${API_URL}/applications/${applicationId}/clarifications/attachments/${attachmentId}/download`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
+  const res = await fetch(
+    `${API_URL}/applications/${applicationId}/clarifications/attachments/${attachmentId}/download`,
+    authInit(uploadToken()),
+  )
   if (!res.ok) {
     if (res.status === 401) notifyUnauthorized()
     throw await downloadError(res, res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.')

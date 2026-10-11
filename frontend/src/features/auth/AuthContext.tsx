@@ -1,20 +1,22 @@
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
-import { AppError, setTokenProvider, setUnauthorizedHandler } from '@/api/client'
+import { AppError, isCookieMode, setCsrfToken, setTokenProvider, setUnauthorizedHandler } from '@/api/client'
 import type { UnauthorizedInfo } from '@/api/client'
 import { setUploadTokenProvider } from '@/api/documents'
-import type { Role, TokenResponse, User } from '@/api/auth'
+import type { LoginResponse, Role, User } from '@/api/auth'
 import { logout, me } from '@/api/auth'
+import { useToast } from '@/features/shared/Toast'
 import { clearAllLocalDrafts } from '@/lib/localDraft'
 
 const STORAGE_KEY = 'permitflow.session'
 
+/** `token` is null in cookie mode (US-104): the session is an HttpOnly cookie and nothing is stored. */
 interface StoredSession {
-  token: string
+  token: string | null
   user: User
-  expiresAt: string
+  expiresAt: string | null
 }
 
 /**
@@ -55,8 +57,10 @@ export interface AuthState {
   /** When the server ended it (ISO instant) and its own sentence, when it said so. */
   endedAt: string | null
   endedMessage: string | null
-  signIn: (response: TokenResponse) => void
-  signOut: () => void
+  signIn: (response: LoginResponse) => void
+  /** Resolves true once signed out. In cookie mode it waits for the server and resolves false (still signed in,
+   * with an error shown) when the sign-out did not reach it. */
+  signOut: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -98,10 +102,13 @@ function writeStored(session: StoredSession | null): void {
   }
 }
 
-/** Token kept in memory and mirrored to sessionStorage so a reload keeps the session (UC0-A). */
+/** Token mode: the token is kept in memory and mirrored to sessionStorage so a reload keeps the session (UC0-A).
+ * Cookie mode (US-104): nothing is stored; a reload restores through /auth/me. */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<StoredSession | null>(() => readStored())
   const [ready, setReady] = useState(false)
+  // A sign-in that happens while the cold /auth/me is still in flight wins over that answer.
+  const signedInRef = useRef(false)
   const [ended, setEnded] = useState<Ended>(() => (storedExpired() ? { reason: 'expired', at: null, message: null } : NOT_ENDED))
 
   useEffect(() => {
@@ -113,18 +120,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const clearSession = useCallback(() => {
     setSession(null)
+    setCsrfToken(null)
     writeStored(null)
     queryClient.clear()
   }, [queryClient])
 
   // The user's own Sign out: end the session on the server too (US-093), so the token dies with it.
-  // The request is fired and forgotten; the local state clears at once either way.
-  const signOut = useCallback(() => {
-    if (session) logout().catch(() => undefined)
+  // Token mode: the request is fired and forgotten; the local state clears at once either way. Cookie mode: the
+  // cookie only goes when the server says so, so wait for it; if it did not arrive the session is still live,
+  // so stay signed in and say so (the CSRF value is cleared only after the answer, so the logout's own
+  // refresh-and-retry can use it).
+  const toast = useToast()
+  const signOut = useCallback(async (): Promise<boolean> => {
+    if (session) {
+      if (isCookieMode()) {
+        try {
+          await logout()
+        } catch (error) {
+          // A 401 means the session was already gone (the handler has ended it): that is signed out too.
+          const gone = error instanceof AppError && error.status === 401
+          if (!gone && isCookieMode()) {
+            toast.push({ title: 'Sign-out did not reach the server. Try again.', tone: 'error' })
+            return false
+          }
+        }
+      } else {
+        logout().catch(() => undefined)
+      }
+    }
     // Unsaved entries kept on the device go with the user's own sign-out (UAT run 5, F11, F13).
     clearAllLocalDrafts()
     clearSession()
-  }, [session, clearSession])
+    return true
+  }, [session, clearSession, toast])
 
   // A 401 from any request ends the session in one place; the sign-in page explains and keeps the return path.
   useEffect(() => {
@@ -133,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (current) setEnded(endedFrom(info))
         return null
       })
+      setCsrfToken(null)
       writeStored(null)
       queryClient.clear()
     })
@@ -141,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Sign out proactively when the token expires, so the user is never left with a dead session.
   useEffect(() => {
-    if (!session) return
+    if (!session?.expiresAt) return
     const ms = new Date(session.expiresAt).getTime() - Date.now()
     if (ms <= 0) {
       setEnded({ reason: 'expired', at: null, message: null })
@@ -162,13 +191,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     if (!session) {
-      setReady(true)
-      return
+      // An expired stored token means this browser used a token server: nothing to ask. Otherwise, with no stored
+      // token: a cookie session (US-104) restores through /auth/me, which also hands back the CSRF value.
+      if (storedExpired()) {
+        setReady(true)
+        return
+      }
+      me(true)
+        .then(({ csrf_token, expires_at, ...user }) => {
+          if (cancelled || signedInRef.current || !csrf_token) return
+          setCsrfToken(csrf_token, user.id)
+          setSession({ token: null, user, expiresAt: expires_at ?? null })
+        })
+        .catch(() => undefined) // not signed in (or not reachable): the sign-in page is the answer
+        .finally(() => {
+          if (!cancelled) setReady(true)
+        })
+      return () => {
+        cancelled = true
+      }
     }
     setTokenProvider(() => session.token)
     me()
-      .then((user) => {
+      .then(({ csrf_token, expires_at: _expiresAt, ...user }) => {
         if (cancelled) return
+        if (csrf_token) setCsrfToken(csrf_token, user.id)
         setSession((current) => (current ? { ...current, user } : current))
       })
       .catch((error: unknown) => {
@@ -188,14 +235,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const signIn = useCallback((response: TokenResponse) => {
-    const next = {
-      token: response.access_token,
-      user: response.user,
-      expiresAt: response.expires_at,
-    }
+  // The answer decides the mode: only a token server sends `access_token`. A cookie server sends the CSRF value
+  // instead, kept in memory only; nothing at all is written to storage.
+  const signIn = useCallback((response: LoginResponse) => {
+    const token = 'access_token' in response ? response.access_token : null
+    const next = { token, user: response.user, expiresAt: response.expires_at }
+    signedInRef.current = true
+    setCsrfToken('csrf_token' in response ? response.csrf_token : null, response.user.id)
     setSession(next)
-    writeStored(next)
+    writeStored(token ? next : null)
     setEnded(NOT_ENDED)
   }, [])
 
