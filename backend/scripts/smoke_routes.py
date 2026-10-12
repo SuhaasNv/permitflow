@@ -877,7 +877,10 @@ def main() -> None:
     call(adm, "POST", "/auth/logout", "/auth/logout", (200, 204))
 
     # ---- coverage against the OpenAPI document ----
-    spec = httpx.get(API.replace("/api/v1", "") + "/api/openapi.json", timeout=30).json()
+    # In process: the served document is off by default (EXPOSE_API_DOCS, red-team R-2); same routes.
+    from app.main import create_app
+
+    spec = create_app().openapi()
     missing = []
     for path, ops in spec["paths"].items():
         t = path.replace("/api/v1", "")

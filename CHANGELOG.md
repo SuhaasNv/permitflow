@@ -16,6 +16,7 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 
 - Version `0.5.0-rc.6` in the five version files; `RELEASE_NOTES.md` gains the rc.6 section.
 - Wave 4 merged (`integrate/wave-4`): US-105 abuse-case pack and its CI job; US-106 AI red team (harness, nightly mock workflow, `RED_TEAM.md`) and its fix (invisible PDF text and NFKC-rewritten digits raise `possible_prompt_injection`; text state reset per page); US-107 application red team (`RED_TEAM_REPORT.md`).
+- US-107 R-2 and R-4 (low) fixed: `/api/docs` and `/api/openapi.json` are served only with `EXPOSE_API_DOCS=true` (default off, never in production; `.env.example` and the CI end-to-end job set it, `smoke_routes.py` reads the routes in process); a re-run over the AI quota is refused with 429 before any run or audit row is written.
 - US-107 R-1 (medium) fixed: uvicorn runs with `--no-proxy-headers`, so a forged `X-Forwarded-For` can no longer rewrite `request.client` and dodge the per-client limiters; `client_key` alone resolves the client from `TRUSTED_PROXIES` and `CLIENT_IP_HEADER`. Its reproducing test is now a regular test.
 
 ## v0.5.0-rc.5: release candidate on the development environment (12 Oct 2026)

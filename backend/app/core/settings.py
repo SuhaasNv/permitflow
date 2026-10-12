@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     )
 
     app_env: Literal["development", "test", "production"] = "development"
+    # US-107 R-2: the interactive docs and the OpenAPI document are off unless this is true, and never
+    # served in production. Local work and the e2e job set it; the internet-facing development one does not.
+    expose_api_docs: bool = False
     database_url: str = "postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow"
     # Connection pool (US-044): sized for one uvicorn worker serving the demo load; exhaustion is a fast 503.
     db_pool_size: int = 10

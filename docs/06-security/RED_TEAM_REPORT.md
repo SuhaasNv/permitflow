@@ -23,9 +23,9 @@ held under empirical probing. One confirmed weakness was found in the rate-limit
 | id | persona | class | severity | one line |
 |----|---------|-------|----------|----------|
 | R-1 | Outsider / corrupt officer | Broken rate limiting (SEC-010 / T4) | medium | uvicorn's default proxy-header handling rewrites `request.client` from a forged `X-Forwarded-For`, so the per-client login/request limiters can be bypassed one bucket per spoofed IP |
-| R-2 | Outsider | Information disclosure | low | `/api/openapi.json` and `/api/docs` serve the full API schema unauthenticated in non-production, incl. the internet-facing `dev` environment |
+| R-2 | Outsider | Information disclosure | low (fixed) | `/api/openapi.json` and `/api/docs` serve the full API schema unauthenticated in non-production, incl. the internet-facing `dev` environment |
 | R-3 | Outsider | Information disclosure | info | `/api/v1/health` returns version, commit and environment unauthenticated |
-| R-4 | Malicious operator | Resource exhaustion | low | re-running verification once over the AI quota still writes a `verification_run` + audit row per request; unbounded except by the (bypassable, see R-1) request limiter |
+| R-4 | Malicious operator | Resource exhaustion | low (fixed) | re-running verification once over the AI quota still writes a `verification_run` + audit row per request; unbounded except by the (bypassable, see R-1) request limiter |
 
 ### R-1 (medium) — X-Forwarded-For rate-limit bypass via uvicorn proxy headers
 
@@ -67,6 +67,11 @@ Place: `backend/app/main.py:create_app` (`expose_docs = settings.app_env != "pro
 whole API surface is public there. Consider gating docs behind auth or an allowlist even in non-prod, or
 documenting the accepted exposure. No reproducing test (accepted-by-design; low).
 
+**Fixed** (`fix: close red-team low findings R-2 and R-4`, branch `fix/red-team-lows`): the new setting
+`EXPOSE_API_DOCS` (default false) gates both URLs, and production never serves them even when it is set. The
+route-coverage smoke script reads the routes in process; the CI end-to-end job and `.env.example` set the flag.
+Tests: `test_api_docs_are_off_by_default_and_never_in_production`.
+
 ### R-3 (info) — health detail unauthenticated
 
 Place: `backend/app/api/v1/health.py`. `version`, `commit` and `environment` are returned without auth,
@@ -79,6 +84,12 @@ AI daily quota, re-runs are stored as `unavailable` with no model call (good, no
 still inserts a `verification_run` and a `verification.requested` audit row. The only ceiling is the
 per-client request limiter, which R-1 can bypass. Low: no AI spend, bounded storage per request, owner-only
 on their own editable document. Fixing R-1 removes the practical lever. No separate reproducing test.
+
+**Fixed** (`fix: close red-team low findings R-2 and R-4`, branch `fix/red-team-lows`): `VerificationService.rerun`
+asks `verification_over_quota` (the rule the upload path uses) before it writes anything and answers 429
+`rate_limited` with `details.code = daily_limit_reached`; no run and no audit row is inserted. The upload path
+keeps storing its refused run, because the file itself is stored. Test:
+`test_a_rerun_over_the_quota_is_refused_without_writing_a_run_or_an_audit_row`.
 
 ## Coverage table
 

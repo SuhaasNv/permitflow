@@ -28,7 +28,7 @@ cd backend
 uv sync
 uv run alembic upgrade head
 uv run python scripts/seed.py           # demo accounts, see below
-uv run uvicorn app.main:app --reload   # http://localhost:8000/api/v1/health, docs at /api/docs
+uv run uvicorn app.main:app --reload   # http://localhost:8000/api/v1/health, docs at /api/docs when EXPOSE_API_DOCS=true (set in .env.example)
 
 cd ../frontend
 npm install
