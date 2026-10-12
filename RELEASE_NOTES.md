@@ -38,6 +38,16 @@ Every uploaded file can now be checked for viruses before anyone opens it, the a
 - The version you use in production is exactly the build that was tested before the release.
 - Demonstration accounts are switched on per environment; production keeps them, so anyone can still try the service.
 
+## v0.5.0-rc.6, 12 October 2026: attacks tried and stopped
+
+**New for licensing officers**
+- A document with text a reader cannot see (invisible, white or very small) or with look-alike digits is sent to you flagged, instead of being marked as matching the form.
+
+**Also**
+- A test pack now tries known attacks on every release: other people's records, forged headers, sign-in tricks, harmful files and out-of-range settings. All of them are refused.
+- The automatic document check was attacked with instructions hidden inside real PDFs and images; the four weaknesses found are closed.
+- A day of attacking the service as five kinds of attacker found one weakness in how sign-in attempts are counted; it is closed.
+
 ## v0.5.0-rc.5, 12 October 2026: the virus check, live
 
 **New for operators**
