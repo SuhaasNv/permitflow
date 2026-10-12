@@ -1,0 +1,12 @@
+{
+  "name": "permitflow-redteam",
+  "version": "0.0.0",
+  "private": true,
+  "description": "promptfoo config for a later, owner-approved live red-team run of the PermitFlow document check (US-106). Not run in CI.",
+  "scripts": {
+    "redteam": "promptfoo redteam run -c promptfooconfig.yaml --max-concurrency 1"
+  },
+  "devDependencies": {
+    "promptfoo": "0.123.1"
+  }
+}
