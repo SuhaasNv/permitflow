@@ -14,6 +14,7 @@ See `README.md` (Docker for PostgreSQL, uv for the backend, npm for the frontend
 | `DATABASE_URL` | local Postgres | backend | Postgres only (`postgresql+psycopg://`). |
 | `TEST_DATABASE_URL` | local `permitflow_test` | pytest, CI | Truncated between tests. |
 | `JWT_SECRET` | empty | backend | Required (at least 16 random characters) in every environment, tests included; the `.env.example` placeholder is refused; the app does not start without it. |
+| `EXPOSE_API_DOCS` | `false` | backend | Red-team R-2: serves `/api/docs` and `/api/openapi.json` only when `true` and `APP_ENV` is not `production` (production never serves them, even when set). `true` in `.env.example` and the CI end-to-end job for local work; leave it unset on the deployed environments. `scripts/smoke_routes.py` reads the route list in process, so it needs no served document. |
 | `JWT_EXPIRES_MINUTES` | `480` | backend | 8 hours. |
 | `SESSION_IDLE_MINUTES` | `60` | backend | US-093: one live session per account; a session with no request for this long ends by itself, so a device left signed in never locks the account. The sign-in page quotes the number from the server's message. |
 | `CORS_ORIGINS` | `http://localhost:3000` | backend | Comma separated allowlist of the frontend origins. Listed origins receive credentialed responses in both modes (the frontend sends credentials on sign-in before it knows the mode). `*` is refused at startup in both modes. In `cookie` mode it is also the list of origins that may sign in (the `Origin` check). |

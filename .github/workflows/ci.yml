@@ -252,6 +252,7 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       APP_ENV: development
+      EXPOSE_API_DOCS: "true"
       DATABASE_URL: postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow
       JWT_SECRET: ci-only-secret-that-is-long-enough
       CORS_ORIGINS: http://localhost:3000

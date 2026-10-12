@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.core import settings as settings_module
 from app.core.rate_limit import RequestLimiter
 from app.infra import db as dbmod
+from app.main import create_app
 from app.models import User
 from app.models.enums import Role
 from app.services.quotas import ensure_draft_capacity
@@ -136,16 +137,20 @@ def test_verification_runs_over_the_daily_quota_are_stored_unavailable(
     next(gen, None)
 
 
-def test_api_answers_carry_the_hardening_headers(client: TestClient) -> None:
+def test_api_answers_carry_the_hardening_headers(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     r = client.get("/api/v1/health")
     assert r.headers["Content-Security-Policy"] == "default-src 'none'; frame-ancestors 'none'"
     assert r.headers["Strict-Transport-Security"].startswith("max-age=31536000")
     assert "camera=()" in r.headers["Permissions-Policy"]
     assert r.headers["Cross-Origin-Opener-Policy"] == "same-origin"
     assert r.headers["X-Frame-Options"] == "DENY"
-    # The interactive docs (non-production only) load Swagger from a CDN and are exempt from the CSP.
-    docs = client.get("/api/docs")
+    # The interactive docs (EXPOSE_API_DOCS only) load Swagger from a CDN and are exempt from the CSP.
+    gen = _settings(monkeypatch, EXPOSE_API_DOCS="true")
+    next(gen)
+    with TestClient(create_app()) as docs_client:
+        docs = docs_client.get("/api/docs")
     assert docs.status_code == 200 and "Content-Security-Policy" not in docs.headers
+    next(gen, None)
 
 
 def test_quota_refusals_do_not_count_toward_the_quota(
@@ -172,6 +177,33 @@ def test_quota_refusals_do_not_count_toward_the_quota(
     repo = DocumentRepository(db)
     assert repo.count_runs_since(since, operator_id=user.id) == 3
     assert repo.count_runs_since(since, operator_id=user.id, exclude_reasons=(DAILY_LIMIT_REASON,)) == 1
+    next(gen, None)
+
+
+def test_a_rerun_over_the_quota_is_refused_without_writing_a_run_or_an_audit_row(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Red-team R-4: a 429 before anything is inserted, so repeating it cannot grow the tables."""
+    from sqlalchemy import func
+
+    from app.models import AuditEvent, VerificationRun
+
+    gen = _settings(monkeypatch, AI_RUNS_PER_USER_PER_DAY="1")
+    next(gen)
+    make_user(db, "op@example.sg", Role.OPERATOR)
+    db.commit()
+    h = login(client, "op@example.sg")
+    app_id = draft(client, h)
+    doc_id = upload(client, h, app_id, "business_profile", "a.pdf", PDF).json()["document"]["id"]
+    db.expire_all()
+    runs = db.scalar(select(func.count()).select_from(VerificationRun))
+    audits = db.scalar(select(func.count()).select_from(AuditEvent))
+    for _ in range(3):
+        r = client.post(f"/api/v1/applications/{app_id}/documents/{doc_id}/verify", headers=h)
+        assert r.status_code == 429 and r.json()["error"]["details"] == {"code": "daily_limit_reached"}
+    db.expire_all()
+    assert db.scalar(select(func.count()).select_from(VerificationRun)) == runs
+    assert db.scalar(select(func.count()).select_from(AuditEvent)) == audits
     next(gen, None)
 
 

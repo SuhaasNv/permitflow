@@ -14,7 +14,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core import metrics
-from app.core.errors import Conflict, Forbidden, NotFound
+from app.core.errors import Conflict, Forbidden, NotFound, RateLimited
 from app.core.settings import get_settings
 from app.domain.ai_input import prepare_text, redact_form_section
 from app.domain.enums import Role, VerificationStatus
@@ -47,7 +47,7 @@ from app.services.ai_usage import (
 )
 from app.services.applications import ApplicationService
 from app.services.platform_settings import live
-from app.services.quotas import AI_PAUSED_REASON, new_run
+from app.services.quotas import AI_PAUSED_REASON, DAILY_LIMIT_REASON, new_run, verification_over_quota
 from app.services.scan import ScanOutcome, alert_scanner_down, enforcing, scan_document, will_retry
 
 logger = logging.getLogger("permitflow.verification")
@@ -516,6 +516,13 @@ class VerificationService:
         latest = self.documents.latest_run(doc.id)
         if latest is not None and latest.status not in TERMINAL:
             raise Conflict("A check is already in progress for this document.")
+        # US-107 R-4: over the quota, refuse before anything is written (a refused re-run used to leave a run
+        # row and an audit row per request). The upload path still stores its refused run: the file is stored.
+        if verification_over_quota(self.db, app.operator_id) == DAILY_LIMIT_REASON:
+            raise RateLimited(
+                "The daily limit on automatic checks was reached. Try again tomorrow.",
+                details={"code": DAILY_LIMIT_REASON},
+            )
         run = new_run(self.db, doc.id, app.operator_id, user.id)
         self.documents.add_run(run)
         refused = record_refused(self.db, run, doc)

@@ -90,8 +90,8 @@ def build_request_limiter(*, enabled: bool = True) -> RequestLimiter:
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    # Interactive docs stay available outside production (THREAT_MODEL: no public schema in production).
-    expose_docs = settings.app_env != "production"
+    # US-107 R-2: the schema is public only when EXPOSE_API_DOCS is set, and never in production.
+    expose_docs = settings.expose_api_docs and settings.app_env != "production"
     app = FastAPI(
         title="PermitFlow API",
         version=APP_VERSION,
@@ -171,7 +171,7 @@ def create_app() -> FastAPI:
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cache-Control"] = "no-store"
         # US-058: the API serves JSON and files, never a page, so nothing may run or be embedded. The
-        # interactive docs (non-production only) load Swagger from a CDN and are exempted.
+        # interactive docs (only with EXPOSE_API_DOCS) load Swagger from a CDN and are exempted.
         if not request.url.path.startswith("/api/docs") and not request.url.path.startswith("/api/openapi"):
             response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

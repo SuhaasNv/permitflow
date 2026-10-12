@@ -20,6 +20,28 @@ def test_health_ok(client: TestClient) -> None:
     assert r.headers["X-Request-ID"]
 
 
+def test_api_docs_are_off_by_default_and_never_in_production(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Red-team R-2: 404 by default, 200 with EXPOSE_API_DOCS outside production, 404 in production anyway."""
+    from app.core import settings as settings_module
+    from app.main import create_app
+
+    def codes(**env: str) -> tuple[int, int]:
+        for key, value in env.items():
+            monkeypatch.setenv(key, value)
+        settings_module.get_settings.cache_clear()
+        try:
+            c = TestClient(create_app())  # no lifespan: production's startup rules are not under test
+            return c.get("/api/docs").status_code, c.get("/api/openapi.json").status_code
+        finally:
+            settings_module.get_settings.cache_clear()
+
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.delenv("EXPOSE_API_DOCS", raising=False)
+    assert codes() == (404, 404)
+    assert codes(EXPOSE_API_DOCS="true") == (200, 200)
+    assert codes(EXPOSE_API_DOCS="true", APP_ENV="production") == (404, 404)
+
+
 def test_health_503_when_database_down(client: TestClient, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setattr(health_module, "database_is_reachable", lambda: False)
     monkeypatch.setattr(health_module, "_probe", None)  # the 2 s cache would hand back the last answer
