@@ -26,8 +26,6 @@ import asyncio
 import re
 from pathlib import Path
 
-import pytest
-
 from app.core.rate_limit import FailedLoginLimiter, client_key
 
 _DOCKERFILE = Path(__file__).resolve().parents[2] / "Dockerfile"
@@ -81,7 +79,6 @@ class _Req:
         self.headers: dict[str, str] = {}
 
 
-@pytest.mark.xfail(strict=True, reason="US-107 R-1")
 def test_forged_x_forwarded_for_cannot_bypass_the_login_limiter() -> None:
     peer = "127.0.0.1"  # the immediate peer uvicorn sees (the local socket / the edge)
     trusted = _uvicorn_trusted_hosts_from_entrypoint()
