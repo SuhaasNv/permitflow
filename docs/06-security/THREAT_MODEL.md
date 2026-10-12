@@ -223,5 +223,26 @@ Scope: the MVP as designed (written before implementation on 17 Sep 2026, re-che
 - **Validation:** `tests/unit/test_ai_usage_domain.py` (label bounding with hostile values, pseudonyms, the CSV rule for each leading character, the Telegram line), `tests/integration/test_ai_usage.py` (authorisation on both routes, a user name starting with each dangerous character exported with a quote, counter labels limited to the enums, the message without name, email, filename, UEN or phone number, the trace metadata without any id).
 - **Gap:** The quote prefix protects spreadsheets, not other consumers of the CSV. The pseudonym key is a sub-key derived from `JWT_SECRET` (`HMAC-SHA256(JWT_SECRET, "permitflow-pseudonym-v1")`), so anyone holding the secret can recompute pseudonyms from user ids. The page shows the person's name to every administrator, as the users page does. Telegram is a third-party chat: the case reference is a number, but it ties a check to a case for anyone in the chat.
 
+## Abuse-case pack (US-105)
+
+`backend/tests/abuse/` proves known attacks fail. It runs in CI as the job `Abuse cases` (`pytest tests/abuse`), in process against the app and Postgres, with no live traffic. Payloads are built at test time and never committed. A case already asserted elsewhere is referenced, not repeated.
+
+| # | Case | Threat | Tests |
+|---|------|--------|-------|
+| 1 | Every route as anonymous, operator A, operator B (A's ids), officer and admin; refused calls change no row; a route missing from the allow-table fails | T1, T2, T3, T15, T19 | `tests/abuse/test_access_matrix.py` with the table in `access_table.py`; also `tests/unit/test_routes_locked.py` |
+| 2 | Rotating or multi-hop `X-Forwarded-For` / `X-Real-IP` does not reset the request, sign-in or failed-sign-in limits; naming a victim's address does not spend the victim's bucket | T13 | `tests/abuse/test_forged_forwarding.py`; `tests/unit/test_rate_limit.py` pins `client_key` |
+| 3 | CSRF in `AUTH_MODE=cookie`: wrong or empty token on every unsafe route, cross-site form content types, a token from an earlier session, look-alike Origins on sign-in | T12 | `tests/abuse/test_csrf.py`; missing token on every route and foreign Origin: `tests/integration/test_cookie_session.py` |
+| 4 | Session replay after sign-out, take-over and deactivation, both modes, every role; forged, unknown-session, alg `none`, promoted-role and swapped-subject tokens | T14, T27 | `tests/abuse/test_session_replay.py`; reasons: `tests/integration/test_sessions.py` |
+| 5a | EICAR blocked and never served (skips without `CLAMD_HOST`; the Backend job runs the real-clamd EICAR check) | T4 | `tests/abuse/test_uploads.py::test_eicar_is_blocked_and_never_served`; `tests/integration/test_virus_scan.py` |
+| 5b | PDF+HTML polyglot served as an attachment with a fixed type, `nosniff` and a CSP; image with an appended ZIP, script or text chunk stored without it; wrong magic bytes, extensions and declared types refused; hostile file names | T4, T11 | `tests/abuse/test_uploads.py` |
+| 5c | Oversized file (1 byte, 4 KiB and 64 KiB over) on documents and attachments | T4 | `tests/abuse/test_uploads.py`; header and chunked cases: `tests/integration/test_edge_cases.py` |
+| 5d | Decompression bombs (forged PNG header, 49 MP PNG and JPEG) refused before decoding | T4 | `tests/abuse/test_uploads.py`; 45 MP PNG: `tests/integration/test_storage_budget.py`; PDF bomb: `tests/integration/test_verification_worker.py` |
+| 5e | PDF with `/OpenAction` JavaScript, hex-escaped names and `/Launch` flagged `active_content` in the officer view | T4 | `tests/abuse/test_uploads.py`; rule: `tests/unit/test_scan_domain.py` |
+| 6 | Hidden characters in a TXT upload (Tag block, zero-width, bidi, variation selectors, look-alikes, delimiter breakout) are flagged and never `verified` on the mock provider; the clean control is `verified` | T5 | `tests/abuse/test_hidden_characters.py`; `tests/unit/test_ai_input.py`; `tests/integration/test_verification_input.py` |
+| 7 | An operator-typed business name starting `= + - @ tab CR` reaches the AI usage CSV as text or is cleaned by the form | T34 | `tests/abuse/test_csv_export.py`; administrator-name cell: `tests/integration/test_ai_usage.py` |
+| 8 | Every setting swept: out-of-bounds and non-whole values 422, the cap holds when the environment asks for more, no change without the step-up password, non-admins 403 | T31 | `tests/abuse/test_settings_bounds.py`; `tests/integration/test_platform_settings.py` |
+
+Known limits, not failures: `pdf_active_content` is a byte scan, so a script inside a compressed object stream is not flagged (ClamAV remains the control, T4 gap); the forwarded-header cases assume the edge writes `X-Real-IP` itself (T13).
+
 ## Production gaps summary
 Antivirus scanning switched on in the deployed environments (built behind `SCAN_MODE`, US-099), httpOnly cookie sessions (built behind `AUTH_MODE=cookie`, US-104; switched on per environment when the frontend of wave 3b ships), edge rate limiting and WAF (the in-process limiter and the database quotas are the MVP answer, US-058), tamper-evident audit storage, encryption and retention policies, SSO/MFA. All listed with recommendations in `docs/11-reviews/PRODUCTION_READINESS_REVIEW.md`.

@@ -9,6 +9,10 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 - `fix/completion-excludes-held`: the server's completion (`percent`, `documents_present`, the list summary) counts a document only when its `scan_state` is NULL or `clean`; the document slot still reports the held file as present, so it shows as uploaded with its scan state. Submission is unchanged (its `409 documents_not_clear` guard).
 - Development environment switches since rc.4: `SCAN_MODE=enforce` with the ClamAV service and the backfill (281 files, all clean), then `AUTH_MODE=cookie` (Chrome check passed: reload, draft, upload, sign-out; no token in storage or headers).
 
+## US-105, abuse-case pack (12 Oct 2026, `feat/us-105-abuse-cases`)
+
+- `backend/tests/abuse/`: every route as every role and as another tenant (with an allow-table that fails on a new route), forged forwarding headers, CSRF in cookie mode, session replay in both modes, hostile uploads, hidden-character injection, CSV formula cells, settings out of bounds. New CI job `Abuse cases`; the threat model gains a table mapping each test to its threat. No app code changed, no finding.
+
 ## v0.5.0-rc.4: release candidate on the development environment (11 Oct 2026)
 
 - Version `0.5.0-rc.4` in the five version files; `RELEASE_NOTES.md` gains the rc.4 section and, per US-111, the upcoming `## v0.5.0, ` release section, which What's new hides until 0.5.0 runs.

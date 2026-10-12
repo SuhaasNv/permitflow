@@ -78,6 +78,37 @@ jobs:
           echo '### Backend coverage' >> "$GITHUB_STEP_SUMMARY"
           uv run coverage report --format=total 2>/dev/null | sed 's/^/Total: /; s/$/ %/' >> "$GITHUB_STEP_SUMMARY" || true
 
+  abuse:
+    # US-105: known attacks must keep failing. In-process against the app and Postgres; no clamd here (the
+    # Backend job runs the EICAR check against a real one), so that one case skips with its reason.
+    name: Abuse cases
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: permitflow
+          POSTGRES_PASSWORD: permitflow
+          POSTGRES_DB: permitflow_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U permitflow -d permitflow_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      APP_ENV: test
+      TEST_DATABASE_URL: postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow_test
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run pytest tests/abuse -rs
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
