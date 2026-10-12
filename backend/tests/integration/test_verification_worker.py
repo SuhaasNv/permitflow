@@ -542,7 +542,7 @@ def test_pdf_child_never_prints_more_than_the_cap() -> None:
         capture_output=True,
         check=True,
     )
-    assert json.loads(done.stdout) == {"encrypted": False, "text": "h"}
+    assert json.loads(done.stdout) == {"encrypted": False, "text": "h", "hidden": ""}
 
 
 def test_pdf_child_survives_when_the_child_cannot_start(monkeypatch: pytest.MonkeyPatch) -> None:
