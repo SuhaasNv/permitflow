@@ -47,6 +47,7 @@ Every uploaded file can now be checked for viruses before anyone opens it, the a
 - A test pack now tries known attacks on every release: other people's records, forged headers, sign-in tricks, harmful files and out-of-range settings. All of them are refused.
 - The automatic document check was attacked with instructions hidden inside real PDFs and images; the four weaknesses found are closed.
 - A day of attacking the service as five kinds of attacker found one weakness in how sign-in attempts are counted; it is closed.
+- The technical API pages are no longer public on the development site, and a re-run asked for after the daily limit is refused straight away.
 
 ## v0.5.0-rc.5, 12 October 2026: the virus check, live
 
