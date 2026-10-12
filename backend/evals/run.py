@@ -80,7 +80,9 @@ def run_case(case: dict[str, Any], form: dict[str, Any], provider: VerificationP
         actual = "unreadable"
         note = f"extraction: {extracted.reason}"
     else:
-        prepared = prepare_text(extracted.text, max_chars=settings.ai_max_text_chars)
+        prepared = prepare_text(
+            extracted.text, max_chars=settings.ai_max_text_chars, invisible=extracted.hidden
+        )
         doc_type = case["document_type"]
         request = VerificationRequest(
             document_type=doc_type,

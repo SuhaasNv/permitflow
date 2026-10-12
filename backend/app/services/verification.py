@@ -221,7 +221,7 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
 
             # Clean, check and redact before anything reaches the provider (US-102).
             # The cap is applied again after NFKC, which can expand a character many times over.
-            prepared = prepare_text(extracted.text, max_chars=max_chars)
+            prepared = prepare_text(extracted.text, max_chars=max_chars, invisible=extracted.hidden)
             section_key = SECTION_FOR_DOCUMENT[doc.document_type.value]
             request = VerificationRequest(
                 document_type=doc.document_type.value,

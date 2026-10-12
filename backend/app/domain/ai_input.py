@@ -19,6 +19,10 @@ Three steps run before the injection check and before any text reaches a provide
    like the text), so a number in the document and the same number on the form still read identically to
    the model.
 
+Fullwidth and mathematical digits (decimal digits that NFKC rewrites) raise the flag too: they read as the
+ordinary digit once folded, so a value planted in them would match the form unseen. Text the PDF extractor
+reports as invisible (render mode 3, white fill, under 3 pt) is flagged the same way and kept in the text.
+
 A few hidden characters are ordinary writing and are not flagged: a byte-order mark at the very start, a
 joiner inside an emoji sequence or between letters of a joining script (Tamil, Devanagari, Arabic and the
 like), a single zero-width space between letters of Thai, Lao or Khmer (word breaking), a variation
@@ -95,12 +99,13 @@ class PreparedText:
     redactions: int  # numbers masked
 
 
-def prepare_text(raw: str, *, max_chars: int | None = None) -> PreparedText:
+def prepare_text(raw: str, *, max_chars: int | None = None, invisible: str = "") -> PreparedText:
     """Clean, check and redact one document's extracted text.
 
     `max_chars` caps what the provider receives, counted after cleaning: NFKC can expand a character (U+FDFA
     becomes 18), so a cap applied only to the extracted text does not bound the prompt. The checks above run
-    on the whole text first; only the returned `text` is cut."""
+    on the whole text first; only the returned `text` is cut. `invisible` is the part of the text the PDF
+    extractor found a reader cannot see (invisible, white or tiny): it stays in the text and is flagged."""
     unflagged = _without_ordinary_flags(raw)
     suspicious = _suspicious_hidden(unflagged)
     decoded = " ".join(
@@ -109,10 +114,15 @@ def prepare_text(raw: str, *, max_chars: int | None = None) -> PreparedText:
 
     stripped = _QUIET_CHARS.sub("", _strip_hidden(unflagged))
     cleaned = clean_text(unicodedata.normalize("NFKC", stripped), multiline=True)
+    lookalike_digits = sum(1 for c in stripped if unicodedata.category(c) == "Nd" and _nfkc_changes(c))
     delimiters = len(_DOCUMENT_TAG.findall(cleaned)) or len(_DOCUMENT_TAG.findall(skeleton(cleaned)))
     cleaned = _DOCUMENT_TAG.sub(_neutralise_document_tag, cleaned)
 
     signals: list[str] = []
+    if invisible.strip():
+        signals.append(f"invisible text: {invisible.strip()[:_EVIDENCE_MAX]}")
+    if lookalike_digits:
+        signals.append(f"look-alike digits ({lookalike_digits})")
     if decoded:
         signals.append(f"hidden text: {decoded[:_EVIDENCE_MAX]}")
     elif suspicious:
@@ -129,6 +139,11 @@ def prepare_text(raw: str, *, max_chars: int | None = None) -> PreparedText:
     if max_chars is not None:
         text = text[:max_chars]
     return PreparedText(text=text, injection=signals, hidden_count=len(suspicious), redactions=redactions)
+
+
+def _nfkc_changes(char: str) -> bool:
+    """A character NFKC rewrites (fullwidth or mathematical digits): drawn as one, compared as another."""
+    return unicodedata.normalize("NFKC", char) != char
 
 
 def _neutralise_document_tag(match: re.Match[str]) -> str:

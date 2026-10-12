@@ -2,6 +2,10 @@
 
 All notable milestones. Format: one section per sprint close plus in-sprint milestones. Story IDs refer to `docs/05-planning/USER_STORIES.md`.
 
+## fix/us-106-invisible-text (12 Oct 2026)
+
+- Invisible text (render mode 3, white fill, under 3 pt) found by the PDF child extractor, and fullwidth or mathematical digits that NFKC rewrites, now raise `possible_prompt_injection` (needs_review); the text is flagged, not dropped. The four planted-value `rt_*` cases join the counted gate (28 of 28 on the mock) and the red team reports 69 of 69 runs held.
+
 ## US-106, AI red team harness (12 Oct 2026, `feat/us-106-ai-red-team`)
 
 - `backend/evals/redteam/` renders 36 attacks (hidden text, white on white, tiny font, zero-width, Tag-block, look-alike letters, contradicting metadata, confidence padding) into real PDFs and PNGs and runs them through the golden pipeline on the mock; the nightly workflow `redteam-nightly.yml` fails on a break that is not yet a golden case. 62 of 69 runs held.
