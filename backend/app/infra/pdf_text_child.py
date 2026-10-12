@@ -80,6 +80,7 @@ def main() -> None:
     for i, page in enumerate(reader.pages):
         if i >= max_pages or time.monotonic() - started > budget_seconds:
             break
+        hidden.mode, hidden.white, hidden.stack = 0, False, []  # each page starts in the default state
         parts.append(
             page.extract_text(
                 visitor_operand_before=lambda op, args, cm, tm: hidden.operand(op, args, cm, tm),
