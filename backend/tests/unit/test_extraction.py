@@ -1,4 +1,5 @@
 from app.infra.extraction import extract_text
+from evals.redteam.render import Span, render_pdf
 
 
 def test_text_and_caps() -> None:
@@ -26,3 +27,20 @@ def test_real_pdf_text() -> None:
     w.write(buf)
     out = extract_text("application/pdf", buf.getvalue(), max_chars=100)
     assert out.reason == "no_text"
+
+
+def _hidden(*spans: Span) -> str:
+    out = extract_text("application/pdf", render_pdf([Span("Visible line"), *spans]), max_chars=1000)
+    assert out.reason is None and "Visible line" in out.text
+    return out.hidden
+
+
+def test_invisible_white_and_tiny_text_is_reported_and_kept() -> None:
+    for span in (Span("planted", invisible=True), Span("planted", gray=1.0), Span("planted", size=1.0)):
+        assert _hidden(span) == "planted"
+    out = extract_text("application/pdf", render_pdf([Span("planted", invisible=True)]), max_chars=1000)
+    assert "planted" in out.text
+
+
+def test_ordinary_text_reports_nothing_hidden() -> None:
+    assert _hidden(Span("small but legible", size=8.0), Span("dark grey", gray=0.4)) == ""

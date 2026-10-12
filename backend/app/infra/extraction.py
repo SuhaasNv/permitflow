@@ -19,6 +19,7 @@ _CHILD = Path(__file__).with_name("pdf_text_child.py")
 class Extracted:
     text: str
     reason: str | None  # set when nothing usable could be extracted
+    hidden: str = ""  # text a reader cannot see (invisible, white or tiny); still part of `text`
 
 
 def extract_text(
@@ -49,13 +50,13 @@ def _pdf_in_child(data: bytes, *, max_chars: int, max_pages: int, budget_seconds
         out = json.loads(done.stdout)
         if out["encrypted"]:
             return Extracted("", "encrypted_pdf")
-        return _finish(str(out["text"]), max_chars)
+        return _finish(str(out["text"]), max_chars, str(out["hidden"]))
     except (subprocess.SubprocessError, OSError, ValueError, KeyError):
         return Extracted("", "pdf_parse_error")
 
 
-def _finish(text: str, max_chars: int) -> Extracted:
+def _finish(text: str, max_chars: int, hidden: str = "") -> Extracted:
     cleaned = text.strip()
     if not cleaned:
         return Extracted("", "no_text")
-    return Extracted(cleaned[:max_chars], None)
+    return Extracted(cleaned[:max_chars], None, hidden)

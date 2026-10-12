@@ -48,6 +48,7 @@ Status legend: **written** (solutioning phase, before code) · **to be written**
 | Document | Status | Purpose |
 |----------|--------|---------|
 | `07-ai/AI_VERIFICATION_DESIGN.md` | written | Pipeline, prompt contract, output schema, rules, failure handling |
+| `07-ai/RED_TEAM.md` | written (12 Oct) | Red team of the document check: attacks, breaks found, fixes, how to run it |
 | `07-ai/AI_EVALUATION.md` | written (19 Sep) | Evaluation set and results against mock and OpenAI |
 | `07-ai/AI_ASSURANCE.md` | written (19 Sep) | One page: the four layers, the AI gate and the live evaluation, fairness, tools chosen and not |
 | `../AI_USAGE.md` | written (19 Sep) | How AI tools were used: tools and models, the workflow they worked inside, the standing instructions, the prompts grouped by the decision they carry, verification, what was discarded |

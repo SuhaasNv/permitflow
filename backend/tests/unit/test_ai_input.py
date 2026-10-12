@@ -550,3 +550,18 @@ def test_the_cap_holds_after_nfkc_expands_the_text() -> None:
 def test_an_arabic_sentence_with_marks_reaches_the_provider_unchanged_apart_from_the_marks() -> None:
     sentence = f"{ARABIC_NAME}{RLM} {HEBREW_NAME}{RLM}"
     assert prepare_text(sentence).text == f"{ARABIC_NAME} {HEBREW_NAME}"
+
+
+def test_fullwidth_digits_raise_the_flag_but_superscripts_do_not() -> None:
+    fullwidth = u(0xFF12, 0xFF10, 0xFF12, 0xFF17, 0xFF0D, 0xFF11, 0xFF10)  # 2027-10 in fullwidth
+    prepared = prepare_text(f"Expiry {fullwidth}")
+    assert prepared.text == "Expiry 2027-10"
+    assert prepared.injection == ["look-alike digits (6)"]
+    assert prepare_text("Area 20 m\u00b2, 2027-10-31").injection == []
+
+
+def test_invisible_text_from_the_extractor_is_flagged_and_kept() -> None:
+    prepared = prepare_text("Expiry 2028-03-31 2027-10-31", invisible="2027-10-31")
+    assert prepared.injection == ["invisible text: 2027-10-31"]
+    assert "2027-10-31" in prepared.text
+    assert prepare_text("Expiry 2028-03-31", invisible="  ").injection == []

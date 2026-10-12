@@ -8,9 +8,9 @@ uv run python -m evals.run --provider mock                      # hermetic, what
 uv run python -m evals.run --provider openai --json out.json    # needs OPENAI_API_KEY, run by hand, recorded below
 ```
 
-## The golden set (26 cases, plus 3 red-team cases outside the gate)
+## The golden set (30 cases, plus 6 red-team cases outside the gate)
 
-`cases.json` holds 29 cases: 26 in the gate set (24 are counted on the mock, because 2 are known mock gaps that are reported, not counted) and 3 red-team cases outside the gate. Live, all 26 count.
+`cases.json` holds 36 cases: 30 in the gate set (28 are counted on the mock, because 2 are known mock gaps that are reported, not counted) and 6 red-team cases outside the gate. Live, all 30 count. The four planted-value red-team cases (`rt_hidden_text_plant`, `rt_white_on_white_plant`, `rt_tiny_font_plant`, `rt_lookalike_plant`) joined the gate set in US-106 once the extractor and `prepare_text` flagged them (see `RED_TEAM.md`); mock result 28 of 28 counted.
 
 | Group | Case | Document | Expected |
 |-------|------|----------|----------|
