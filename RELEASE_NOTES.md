@@ -38,6 +38,20 @@ Every uploaded file can now be checked for viruses before anyone opens it, the a
 - The version you use in production is exactly the build that was tested before the release.
 - Demonstration accounts are switched on per environment; production keeps them, so anyone can still try the service.
 
+## v0.5.0-rc.7, 13 October 2026: tighter limits
+
+**New for licensing officers**
+- A file an operator attaches to a clarification answer now carries the same active-content warning as other documents.
+
+**New for operators**
+- A question a licensing officer has reopened but not yet sent no longer changes what you see.
+- Each account has its own storage allowance across all its applications.
+
+**Also**
+- Deleting a draft no longer resets the daily limit on automatic checks.
+- Sign-in and request limits can no longer be dodged by switching between addresses on the same home network.
+- Many uploads at once can no longer slow the service down while their PDFs are read.
+
 ## v0.5.0-rc.6, 12 October 2026: attacks tried and stopped
 
 **New for licensing officers**
