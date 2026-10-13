@@ -13,6 +13,7 @@ same windows in Redis, or a limit at the edge). The client key honours `X-Forwar
 trusted proxy, so a caller cannot pick a fresh bucket per request (T4).
 """
 
+import ipaddress
 import math
 import threading
 import time
@@ -23,7 +24,24 @@ from fastapi import Request
 
 
 def client_key(request: Request, trusted_proxies: str, client_ip_header: str = "") -> str:
-    """The address every per-client limiter keys on.
+    """The address every per-client limiter keys on. An IPv6 client is keyed by its /64, the smallest
+    block one subscriber routes, so rotating addresses inside it does not buy a fresh bucket; IPv4 and
+    anything that is not an address stay as they are.
+    """
+    key = _client_address(request, trusted_proxies, client_ip_header)
+    try:
+        ip = ipaddress.ip_address(key)
+    except ValueError:
+        return key
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped:
+            return str(ip.ipv4_mapped)
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False))
+    return key
+
+
+def _client_address(request: Request, trusted_proxies: str, client_ip_header: str) -> str:
+    """The client address before any grouping.
 
     Without a trusted proxy it is the socket address, whatever headers the caller sends (T4). Behind one,
     the platform's own client header wins when it is configured and present (`CLIENT_IP_HEADER`, Railway's

@@ -15,6 +15,7 @@ from app.core.settings import get_settings
 from app.domain.uploads import UploadRejected, check_magic_bytes, too_large_message
 from app.infra.images import ImageBusyError, ImageUnreadableError, is_image, strip_metadata
 from app.infra.storage import FileStorage, get_storage
+from app.models import Application
 from app.repositories.checklists import ChecklistRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.licences import LicenceRepository
@@ -34,10 +35,24 @@ class Received:
 class StorageUsage:
     used_bytes: int
     budget_bytes: int
+    operator_used_bytes: int = 0
+    operator_budget_bytes: int | None = None  # None: no per-operator bound
+
+    @property
+    def app_remaining_bytes(self) -> int:
+        return max(self.budget_bytes - self.used_bytes, 0)
+
+    @property
+    def operator_remaining_bytes(self) -> int | None:
+        if self.operator_budget_bytes is None:
+            return None
+        return max(self.operator_budget_bytes - self.operator_used_bytes, 0)
 
     @property
     def remaining_bytes(self) -> int:
-        return max(self.budget_bytes - self.used_bytes, 0)
+        """Room under the tighter of the application's budget and its operator's."""
+        room = self.operator_remaining_bytes
+        return self.app_remaining_bytes if room is None else min(self.app_remaining_bytes, room)
 
 
 def format_bytes(n: int) -> str:
@@ -58,7 +73,23 @@ def storage_usage(db: Session, application_id: uuid.UUID, storage: FileStorage |
     licence = LicenceRepository(db).for_application(application_id)
     if licence is not None:
         used += storage.size(licence.stored_key)
-    return StorageUsage(used_bytes=used, budget_bytes=get_settings().storage_budget_bytes)
+    settings = get_settings()
+    app = db.get(Application, application_id)
+    if app is None:
+        return StorageUsage(used_bytes=used, budget_bytes=settings.storage_budget_bytes)
+    # The same three sums across all of the operator's applications: one account cannot drain the
+    # platform ceiling through many applications (audit run 4).
+    operator_used = DocumentRepository(db).total_bytes(operator_id=app.operator_id)
+    operator_used += ChecklistRepository(db).attachment_bytes(operator_id=app.operator_id)
+    operator_used += sum(
+        storage.size(k) for k in LicenceRepository(db).stored_keys_for_operator(app.operator_id)
+    )
+    return StorageUsage(
+        used_bytes=used,
+        budget_bytes=settings.storage_budget_bytes,
+        operator_used_bytes=operator_used,
+        operator_budget_bytes=settings.storage_per_operator_bytes,
+    )
 
 
 def storage_view(usage: StorageUsage) -> StorageView:
@@ -68,6 +99,19 @@ def storage_view(usage: StorageUsage) -> StorageView:
 
 
 def budget_error(usage: StorageUsage) -> ValidationFailed:
+    operator_room = usage.operator_remaining_bytes
+    if operator_room is not None and operator_room < usage.app_remaining_bytes:
+        total = format_bytes(usage.operator_budget_bytes or 0)
+        return ValidationFailed(
+            f"Your account has {format_bytes(operator_room)} of its {total} "
+            "storage room left across all your applications. "
+            "Remove a file or a draft you no longer need, or send a smaller one.",
+            details={
+                "reason": "storage_operator_budget",
+                "remaining_bytes": operator_room,
+                "budget_bytes": usage.operator_budget_bytes,
+            },
+        )
     room = format_bytes(usage.remaining_bytes)
     return ValidationFailed(
         f"This application has {room} of its {format_bytes(usage.budget_bytes)} storage room left. "

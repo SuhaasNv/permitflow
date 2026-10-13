@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
+    Application,
     Checklist,
     ChecklistItem,
     ClarificationAttachment,
@@ -112,11 +113,20 @@ class ChecklistRepository:
             out.setdefault(a.response_id, []).append(a)
         return out
 
-    def attachment_bytes(self, application_id: uuid.UUID | None = None) -> int:
-        """Clarification evidence on disk, across every visit and round (US-085); one application, or
-        all of them for the storage gauge (US-089)."""
+    def attachment_bytes(
+        self, application_id: uuid.UUID | None = None, operator_id: uuid.UUID | None = None
+    ) -> int:
+        """Clarification evidence on disk, across every visit and round (US-085); one application, one
+        operator's applications, or all of them for the storage gauge (US-089)."""
         stmt = select(func.coalesce(func.sum(ClarificationAttachment.size_bytes), 0))
-        if application_id is not None:
+        if application_id is not None or operator_id is not None:
+            owned = (
+                Checklist.application_id == application_id
+                if application_id is not None
+                else Checklist.application_id.in_(
+                    select(Application.id).where(Application.operator_id == operator_id)
+                )
+            )
             stmt = (
                 stmt.join(
                     ClarificationResponse, ClarificationResponse.id == ClarificationAttachment.response_id
@@ -124,7 +134,7 @@ class ChecklistRepository:
                 .join(ClarificationRequest, ClarificationRequest.id == ClarificationResponse.request_id)
                 .join(ChecklistItem, ChecklistItem.id == ClarificationRequest.item_id)
                 .join(Checklist, Checklist.id == ChecklistItem.checklist_id)
-                .where(Checklist.application_id == application_id)
+                .where(owned)
             )
         return int(self.db.scalar(stmt) or 0)
 

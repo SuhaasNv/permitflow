@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     # production (the gauge `permitflow_storage_bytes{kind="limit"}` and the 80 % alert read it).
     image_decode_concurrency: int = Field(default=2, ge=1)
     storage_total_max_bytes: int = Field(default=5 * 1024**3, ge=0)
+    # Everything one operator holds across all their applications (the per-application sums, added
+    # up), so one account cannot fill the platform ceiling above.
+    storage_per_operator_bytes: int = Field(default=1024**3, ge=1)
 
     # Mark site visit done and the checklist submit wait for the visit day (Singapore date; UAT run 5, F12).
     # Off only where a whole appointment must run in one sitting: the automated suites and a demonstration.
@@ -126,6 +129,7 @@ class Settings(BaseSettings):
     pdf_extract_timeout_seconds: float = Field(default=25.0, ge=2.0)
     pdf_extract_memory_mb: int = Field(default=512, ge=64)
     pdf_extract_cpu_seconds: int = Field(default=20, ge=2)
+    pdf_extract_concurrency: int = Field(default=2, ge=1)
 
     # US-099 (ADR-017): the virus scan. `off` (the default) is today's behaviour: files are served as soon as
     # they are stored. `enforce` quarantines every upload, scans it with ClamAV (clamd, INSTREAM over TCP)

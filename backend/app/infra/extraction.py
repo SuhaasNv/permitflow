@@ -7,12 +7,17 @@ and CPU time, so a hostile or pathological file costs one failed check, never th
 import json
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
 from app.core.settings import get_settings
 
 _CHILD = Path(__file__).with_name("pdf_text_child.py")
+
+# At most this many PDF children at once in this process (inline mode runs checks in the API threadpool).
+# A caller past the limit waits for a slot, so the wait counts against nothing but its own background run.
+_SLOTS = threading.BoundedSemaphore(get_settings().pdf_extract_concurrency)
 
 
 @dataclass(frozen=True)
@@ -44,9 +49,14 @@ def _pdf_in_child(data: bytes, *, max_chars: int, max_pages: int, budget_seconds
     command = [sys.executable, "-I", str(_CHILD), *map(str, limits), str(settings.pdf_extract_cpu_seconds)]
     try:
         # `run` kills the child when the deadline passes. Every failure is "unreadable", never a crash.
-        done = subprocess.run(
-            command, input=data, capture_output=True, timeout=settings.pdf_extract_timeout_seconds, check=True
-        )
+        with _SLOTS:
+            done = subprocess.run(
+                command,
+                input=data,
+                capture_output=True,
+                timeout=settings.pdf_extract_timeout_seconds,
+                check=True,
+            )
         out = json.loads(done.stdout)
         if out["encrypted"]:
             return Extracted("", "encrypted_pdf")
