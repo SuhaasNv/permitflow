@@ -1,3 +1,6 @@
+import pytest
+
+from app.infra import extraction
 from app.infra.extraction import extract_text
 from evals.redteam.render import Span, render_pdf
 
@@ -44,3 +47,34 @@ def test_invisible_white_and_tiny_text_is_reported_and_kept() -> None:
 
 def test_ordinary_text_reports_nothing_hidden() -> None:
     assert _hidden(Span("small but legible", size=8.0), Span("dark grey", gray=0.4)) == ""
+
+
+def test_pdf_children_are_bounded_by_the_process_wide_semaphore(monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess
+    import threading
+    import time
+
+    monkeypatch.setattr(extraction, "_SLOTS", threading.BoundedSemaphore(1))
+    live = peak = 0
+    lock = threading.Lock()
+
+    def fake_run(*_a: object, **_k: object) -> subprocess.CompletedProcess[bytes]:
+        nonlocal live, peak
+        with lock:
+            live += 1
+            peak = max(peak, live)
+        time.sleep(0.05)
+        with lock:
+            live -= 1
+        return subprocess.CompletedProcess([], 0, b'{"encrypted": false, "text": "x", "hidden": ""}')
+
+    monkeypatch.setattr(extraction.subprocess, "run", fake_run)
+    threads = [
+        threading.Thread(target=extract_text, args=("application/pdf", b"%PDF"), kwargs={"max_chars": 10})
+        for _ in range(4)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert peak == 1

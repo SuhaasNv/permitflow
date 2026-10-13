@@ -565,3 +565,36 @@ def test_invisible_text_from_the_extractor_is_flagged_and_kept() -> None:
     assert prepared.injection == ["invisible text: 2027-10-31"]
     assert "2027-10-31" in prepared.text
     assert prepare_text("Expiry 2028-03-31", invisible="  ").injection == []
+
+
+def _old_phone_word_near(text: str, start: int, end: int) -> bool:
+    """The whole-text split this replaced, kept as the reference for the bounded window."""
+    from app.domain.ai_input import _PHONE_WORD
+
+    before = " ".join(text[:start].split()[-4:])
+    after = " ".join(text[end:].split()[:1])
+    return bool(_PHONE_WORD.search(before) or _PHONE_WORD.search(after))
+
+
+def test_phone_redaction_is_linear_and_the_window_matches_the_whole_text_split() -> None:
+    import time
+
+    from app.domain.ai_input import _PHONE, _phone_word_near
+
+    sample = (
+        "Tel 9123 4567 and area 3000 2500 sqft.\n\n   Contact the owner on 6123 4567 today. "
+        + "word " * 300
+        + " hp\t8123 4567  then   rent 8000 9500 per month "
+        + "x" * 700
+        + " call 9234 5678"
+    )
+    matches = list(_PHONE.finditer(sample))
+    assert len(matches) >= 5
+    for m in matches:
+        assert _phone_word_near(sample, m.start(), m.end()) == _old_phone_word_near(
+            sample, m.start(), m.end()
+        )
+    long_text = "3000 2500 " * 30_000
+    began = time.monotonic()
+    assert redact(long_text) == (long_text, 0)
+    assert time.monotonic() - began < 5

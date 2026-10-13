@@ -306,8 +306,22 @@ def redact(text: str, *, phone_context: bool = False) -> tuple[str, int]:
 
 def _phone_word_near(text: str, start: int, end: int) -> bool:
     """A phone word (tel, phone, mobile, hp, contact, call) within a few words of the number."""
-    before = " ".join(text[:start].split()[-_PHONE_WORDS_BEFORE:])
-    after = " ".join(text[end:].split()[:_PHONE_WORDS_AFTER])
+    # A window that doubles until it holds one word more than needed (the cut word may be partial) or
+    # reaches the text's edge: the same words as splitting the whole text, without a split per match.
+    width = 256
+    while True:
+        words = text[max(0, start - width) : start].split()
+        if len(words) > _PHONE_WORDS_BEFORE or start - width <= 0:
+            break
+        width *= 2
+    before = " ".join(words[-_PHONE_WORDS_BEFORE:])
+    width = 256
+    while True:
+        words = text[end : end + width].split()
+        if len(words) > _PHONE_WORDS_AFTER or end + width >= len(text):
+            break
+        width *= 2
+    after = " ".join(words[:_PHONE_WORDS_AFTER])
     return bool(_PHONE_WORD.search(before) or _PHONE_WORD.search(after))
 
 

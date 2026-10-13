@@ -22,12 +22,20 @@ class DocumentRepository:
         )
         return list(self.db.scalars(stmt))
 
-    def total_bytes(self, application_id: uuid.UUID | None = None) -> int:
-        """Every version still on disk, superseded ones included (US-085); one application, or all of
-        them for the storage gauge (US-089)."""
+    def total_bytes(
+        self, application_id: uuid.UUID | None = None, operator_id: uuid.UUID | None = None
+    ) -> int:
+        """Every version still on disk, superseded ones included (US-085); one application, one operator's
+        applications, or all of them for the storage gauge (US-089)."""
         stmt = select(func.coalesce(func.sum(Document.size_bytes), 0))
         if application_id is not None:
             stmt = stmt.where(Document.application_id == application_id)
+        if operator_id is not None:
+            stmt = stmt.where(
+                Document.application_id.in_(
+                    select(Application.id).where(Application.operator_id == operator_id)
+                )
+            )
         return int(self.db.scalar(stmt) or 0)
 
     def current_of_type(self, application_id: uuid.UUID, document_type: DocumentType) -> Document | None:

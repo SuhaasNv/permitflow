@@ -12,6 +12,14 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 - Seven breaks found and added to `cases.json` as `outside_gate` fixtures (`rt_*`; the three confidence ones also `mock_gap`): invisible, white and tiny text that plants the form's expiry date, the same in fullwidth digits, and padding that lifts the mock's confidence. The counted gate stays 24 of 24. App fixes are recommended in `docs/07-ai/RED_TEAM.md`, not made.
 - `redteam/` holds the promptfoo config for a later live run (promptfoo pinned to 0.123.1, MIT, not installed, not run). A live run needs the owner's yes and a 200-call cap.
 
+## v0.5.0-rc.7 (unreleased)
+
+- Fixes from security audit run 4. IPv6 clients are keyed by their /64 in `client_key`, so rotating addresses no longer gives a fresh bucket at sign-in, the general limiter or the admin step-up.
+- New `STORAGE_PER_OPERATOR_BYTES` (1 GiB): one operator's uploads across all their applications are bounded, so one account cannot fill `STORAGE_TOTAL_MAX_BYTES` for everyone (422 `storage_operator_budget`).
+- New `PDF_EXTRACT_CONCURRENCY` (2): a process-wide semaphore around the PDF child, so inline mode cannot start a child per pool thread.
+- Phone redaction looks at a bounded window around each match instead of splitting the whole text (linear, same output).
+- `OPERATIONS.md`: `CLAMD_CONF_AlertExceedsMax=yes` is required on the production clamav service before `SCAN_MODE=enforce`.
+
 ## v0.5.0-rc.6: release candidate on the development environment (12 Oct 2026)
 
 - Version `0.5.0-rc.6` in the five version files; `RELEASE_NOTES.md` gains the rc.6 section.
