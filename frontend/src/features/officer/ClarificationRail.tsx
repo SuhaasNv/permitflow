@@ -94,6 +94,14 @@ function Thread({ view, thread, n }: { view: OfficerApplication; thread: Clarifi
                       {a.scan_state === 'infected' ? <StatusBadge label="Blocked, cannot be opened" tone="error" /> : null}
                       {a.scan_state === 'scanning' ? <StatusBadge label="Scanning" tone="info" live /> : null}
                     </button>
+                    {a.active_content && a.scan_state !== 'infected' ? (
+                      <div className="mt-2">
+                        <Alert tone="warning" title="This PDF contains active content">
+                          It passed the virus scan, but it can run things when it is opened: an automatic action with a script, a launch
+                          action or an embedded file. Open it only in a viewer that blocks scripts, or ask the operator for a flattened copy.
+                        </Alert>
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>

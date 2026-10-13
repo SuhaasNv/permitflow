@@ -1079,3 +1079,41 @@ def test_eicar_is_rejected_end_to_end_against_a_real_clamd(
     clar_app, op, _ = _submitted(client, db)
     r = _attach(client, op, clar_app, _response_id(client, op, clar_app), "eicar.txt", EICAR, "text/plain")
     assert r.status_code == 422 and r.json()["error"]["code"] == "file_infected"
+
+
+def test_the_officer_clarification_thread_serves_the_active_content_flag(
+    client: TestClient, db: Session, scanner: FakeScanner
+) -> None:
+    app_id, op, off = _submitted(client, db)
+    response_id = _response_id(client, op, app_id)
+    risky = PDF + b"<< /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >>\n"
+    assert _attach(client, op, app_id, response_id, "risky.pdf", risky).status_code == 201
+    assert _attach(client, op, app_id, response_id, "plain.pdf", PDF).status_code == 201
+    for item in client.get(f"{API}/applications/{app_id}/clarifications", headers=op).json()["items"]:
+        if item["key"] != "coved_edges":
+            _respond(client, op, app_id, item["item_id"], "Done.")
+    assert client.post(f"{API}/applications/{app_id}/clarifications/send", headers=op).status_code == 200
+    case = client.get(f"{API}/officer/applications/{app_id}", headers=off).json()
+    thread = next(t for t in case["clarification"]["items"] if t["key"] == "coved_edges")
+    flags = {
+        a["original_filename"]: a["active_content"] for a in thread["requests"][0]["response"]["attachments"]
+    }
+    assert flags == {"risky.pdf": True, "plain.pdf": False}
+
+
+def test_scan_unqueued_gives_its_connection_back_before_the_scan(
+    client: TestClient, db: Session, scanner: FakeScanner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _pause(db, True)  # the run is stored finished, so scan_unqueued (not the worker) scans the file
+    open_during_scan: list[bool] = []
+    real = verification_module.scan_document
+
+    def spy(session: Session, doc: Document, app: Application):  # type: ignore[no-untyped-def]
+        open_during_scan.append(session.in_transaction())  # a transaction holds a pooled connection
+        return real(session, doc, app)
+
+    monkeypatch.setattr(verification_module, "scan_document", spy)
+    h = _operator(client, db)
+    upload(client, h, draft(client, h), "business_profile", "profile.txt", TXT, "text/plain")
+    assert open_during_scan == [False]
+    assert _doc(db).scan_state == CLEAN

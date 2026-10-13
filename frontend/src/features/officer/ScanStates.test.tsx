@@ -94,13 +94,14 @@ describe('officer clarification rail attachments (US-099)', () => {
   })
 
   it('a blocked attachment cannot be opened and says so', async () => {
-    const attachment = (id: string, name: string, scan_state: ScanState) => ({
+    const attachment = (id: string, name: string, scan_state: ScanState, active_content = false) => ({
       id,
       original_filename: name,
       content_type: 'image/jpeg',
       size_bytes: 1000,
       uploaded_at: '2026-09-25T01:05:00Z',
       scan_state,
+      active_content,
     })
     const clarification: ClarificationOfficerView = {
       visit_no: 1,
@@ -135,7 +136,11 @@ describe('officer clarification rail attachments (US-099)', () => {
                 message: 'Regraded.',
                 created_at: '',
                 sent_at: '2026-09-25T01:12:00Z',
-                attachments: [attachment('a1', 'bad.jpg', 'infected'), attachment('a2', 'ok.jpg', null)],
+                attachments: [
+                  attachment('a1', 'bad.jpg', 'infected'),
+                  attachment('a2', 'ok.jpg', null),
+                  attachment('a3', 'script.pdf', 'clean', true),
+                ],
               },
             },
           ],
@@ -161,5 +166,8 @@ describe('officer clarification rail attachments (US-099)', () => {
     expect(await screen.findByRole('button', { name: /bad\.jpg/ })).toBeDisabled()
     expect(screen.getByText('Blocked, cannot be opened')).toHaveAttribute('data-tone', 'error')
     expect(screen.getByRole('button', { name: /ok\.jpg/ })).toBeEnabled()
+    // The active-content note shows once, for the clean PDF that carries it, and Open stays available.
+    expect(screen.getAllByText('This PDF contains active content')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /script\.pdf/ })).toBeEnabled()
   })
 })

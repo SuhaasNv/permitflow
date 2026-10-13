@@ -93,6 +93,9 @@ def scan_unqueued(run_id: uuid.UUID) -> None:
             doc = db.get(Document, run.document_id) if run else None
             app = db.get(Application, doc.application_id) if doc else None
             if run and doc and app and run.status in TERMINAL and doc.scan_state == SCANNING:
+                # As in execute_run: end the read transaction so the pooled connection is returned while
+                # clamd is called (the loaded rows stay usable); scan_document opens a new one to write.
+                db.commit()
                 scan_document(db, doc, app)
     except Exception:  # noqa: BLE001 - a background task; the file stays held and a re-run scans it
         logger.exception("scan_unqueued_failed", extra={"extra_fields": {"run_id": str(run_id)}})

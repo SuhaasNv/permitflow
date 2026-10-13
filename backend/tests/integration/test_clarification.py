@@ -627,3 +627,34 @@ def test_no_evidence_on_a_withdrawn_or_decided_item(client: TestClient, db: Sess
         headers=op,
     )
     assert r.status_code == 409
+
+
+def test_an_unreleased_reopen_does_not_change_what_the_operator_sees(client: TestClient, db: Session) -> None:
+    """Security audit run 5: until Request another round, the reopened item still reads as sent (status and
+    counts on the clarification page)."""
+    from tests.journeys import transition
+
+    app_id, op, off = _submitted(client, db)
+    _answer_all(client, op, app_id)
+    case = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    trap = next(t for t in case["clarification"]["items"] if t["key"] == "floor_trap_graded")
+    r = client.post(
+        OFF_URL.format(app_id, trap["item_id"], "reopen"), headers=off, json={"message": "Send a photo."}
+    )
+    assert r.status_code == 200, r.text
+    mine = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    assert next(i for i in mine["items"] if i["key"] == "floor_trap_graded")["status"] == "Sent"
+    assert (mine["open_count"], mine["answered_count"], mine["can_respond"]) == (0, 3, False)
+    # Withdrawing the unreleased question is just as invisible.
+    assert client.post(OFF_URL.format(app_id, trap["item_id"], "withdraw"), headers=off).status_code == 200
+    mine = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    assert next(i for i in mine["items"] if i["key"] == "floor_trap_graded")["status"] == "Sent"
+    # Restored and released, it is the operator's turn again.
+    assert client.post(OFF_URL.format(app_id, trap["item_id"], "restore"), headers=off).status_code == 200
+    transition(client, off, app_id, "pending_post_site_resubmission")
+    mine = client.get(f"/api/v1/applications/{app_id}/clarifications", headers=op).json()
+    assert (
+        next(i for i in mine["items"] if i["key"] == "floor_trap_graded")["status"]
+        == "Waiting for your response"
+    )
+    assert mine["open_count"] == 1

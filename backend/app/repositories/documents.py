@@ -2,11 +2,11 @@ import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime
 
-from sqlalchemy import String, and_, delete, func, literal_column, or_, select, text, update
+from sqlalchemy import String, and_, delete, exists, func, literal_column, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from app.domain.scan import CLEAN
-from app.models import Application, ClarificationAttachment, Document, VerificationRun
+from app.models import AiUsage, Application, ClarificationAttachment, Document, VerificationRun
 from app.models.enums import DocumentType, VerificationStatus
 
 
@@ -375,6 +375,42 @@ class DocumentRepository:
                 .where(Application.operator_id == operator_id)
             )
         return int(self.db.execute(stmt).scalar_one())
+
+    def count_quota_runs_since(
+        self,
+        since: datetime,
+        operator_id: uuid.UUID | None = None,
+        *,
+        exclude_reasons: Iterable[str] = (),
+    ) -> int:
+        """The runs that count toward the daily AI quota (US-058), for one applicant or for everyone: the
+        `ai_usage` ledger, which outlives a deleted draft, plus the live runs that have no ledger row yet
+        (pending or running) and do not carry one of `exclude_reasons` (refused runs never count)."""
+        ledger = select(func.count()).select_from(AiUsage).where(AiUsage.created_at >= since)
+        ledger = ledger.where(
+            AiUsage.quota_operator_id == operator_id
+            if operator_id is not None
+            else AiUsage.quota_operator_id.is_not(None)
+        )
+        unrecorded = (
+            select(func.count())
+            .select_from(VerificationRun)
+            .where(
+                VerificationRun.created_at >= since,
+                ~exists().where(AiUsage.run_id == VerificationRun.id),
+                or_(
+                    VerificationRun.error_reason.is_(None),
+                    VerificationRun.error_reason.not_in(list(exclude_reasons)),
+                ),
+            )
+        )
+        if operator_id is not None:
+            unrecorded = (
+                unrecorded.join(Document, Document.id == VerificationRun.document_id)
+                .join(Application, Application.id == Document.application_id)
+                .where(Application.operator_id == operator_id)
+            )
+        return int(self.db.execute(ledger).scalar_one()) + int(self.db.execute(unrecorded).scalar_one())
 
     def add_run(self, run: VerificationRun) -> VerificationRun:
         self.db.add(run)

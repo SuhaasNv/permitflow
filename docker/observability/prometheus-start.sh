@@ -10,4 +10,4 @@ sed -e "s|__TARGET__|${METRICS_TARGET:-host.docker.internal:8000}|" \
     /etc/prometheus/prometheus.tpl.yml > /prometheus/prometheus.yml
 cp /etc/prometheus/alerts.yml /prometheus/alerts.yml
 exec prometheus --config.file=/prometheus/prometheus.yml --storage.tsdb.path=/prometheus \
-    --storage.tsdb.retention.time=30d --web.enable-lifecycle
+    --storage.tsdb.retention.time=30d
