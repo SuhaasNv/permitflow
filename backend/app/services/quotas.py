@@ -58,12 +58,12 @@ def verification_over_quota(db: Session, operator_id: uuid.UUID) -> str | None:
     since = datetime.now(UTC) - timedelta(days=1)
     repo = DocumentRepository(db)
     if per_user > 0:
-        used = repo.count_runs_since(since, operator_id=operator_id, exclude_reasons=NOT_COUNTED_REASONS)
+        used = repo.count_quota_runs_since(since, operator_id, exclude_reasons=NOT_COUNTED_REASONS)
         if used >= per_user:
             metrics.QUOTA_REFUSALS.labels("ai_runs_per_user").inc()
             return DAILY_LIMIT_REASON
     if per_day > 0:
-        if repo.count_runs_since(since, exclude_reasons=NOT_COUNTED_REASONS) >= per_day:
+        if repo.count_quota_runs_since(since, exclude_reasons=NOT_COUNTED_REASONS) >= per_day:
             metrics.QUOTA_REFUSALS.labels("ai_runs_per_day").inc()
             return DAILY_LIMIT_REASON
     return None

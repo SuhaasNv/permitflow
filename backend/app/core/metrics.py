@@ -138,6 +138,10 @@ def route_template(request: Request) -> str:
     return str(template)
 
 
+# A client chooses the method, so only the standard ones become label values (the series stay bounded).
+HTTP_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
+
+
 async def metrics_middleware(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
@@ -146,8 +150,9 @@ async def metrics_middleware(
     route = route_template(request)
     if route.endswith("/metrics"):
         return response  # the scraper does not count itself
-    HTTP_REQUESTS.labels(request.method, route, str(response.status_code)).inc()
-    HTTP_SECONDS.labels(request.method, route).observe(time.perf_counter() - started)
+    method = request.method if request.method in HTTP_METHODS else "OTHER"
+    HTTP_REQUESTS.labels(method, route, str(response.status_code)).inc()
+    HTTP_SECONDS.labels(method, route).observe(time.perf_counter() - started)
     return response
 
 

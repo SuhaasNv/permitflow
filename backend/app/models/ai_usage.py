@@ -33,6 +33,7 @@ class AiUsage(Base):
         Index("ix_ai_usage_created_at", "created_at"),
         Index("ix_ai_usage_user_created", "user_id", "created_at"),
         Index("ix_ai_usage_application_created", "application_id", "created_at"),
+        Index("ix_ai_usage_quota_operator_created", "quota_operator_id", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_id)
@@ -49,4 +50,7 @@ class AiUsage(Base):
     price_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ai_prices.id"), nullable=True)
     latency_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     outcome: Mapped[str] = mapped_column(String(16), nullable=False)
+    # The owner of the application whose daily quota this run counts toward (US-058); NULL for a run refused
+    # by a quota or the AI pause. The quota reads the ledger so that deleting a draft cannot reset it.
+    quota_operator_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)

@@ -133,3 +133,10 @@ def test_use_case_3_counters_and_the_storage_gauge(client: TestClient, db: Sessi
     assert (_sample(body, "permitflow_storage_bytes", kind="volume_total") or 0) > 0
     assert (_sample(body, "permitflow_storage_bytes", kind="volume_used") or 0) > 0
     assert _sample(body, "permitflow_sessions_active") is not None
+
+
+def test_an_unusual_request_method_is_one_bounded_label(client: TestClient, token: str) -> None:
+    client.request("BREW", "/api/v1/health")
+    body = client.get("/api/v1/metrics", headers={"Authorization": f"Bearer {token}"}).text
+    assert (_sample(body, "permitflow_http_requests_total", method="OTHER") or 0) >= 1
+    assert 'method="BREW"' not in body

@@ -229,3 +229,40 @@ def test_oversized_upload_is_refused_by_the_middleware_with_cors_headers(
     assert r.json()["error"]["details"]["reason"] == "too_large"
     assert r.json()["error"]["details"]["request_id"]
     assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_deleting_a_draft_does_not_reset_the_daily_quota(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Security audit run 5: the quota counts the ai_usage ledger, which outlives the draft's runs. Both the
+    per-user and the platform ceiling hold after the draft is deleted."""
+    gen = _settings(monkeypatch, AI_RUNS_PER_USER_PER_DAY="1", AI_RUNS_PER_DAY="2")
+    next(gen)
+    make_user(db, "op@example.sg", Role.OPERATOR)
+    make_user(db, "other@example.sg", Role.OPERATOR)
+    db.commit()
+    h = login(client, "op@example.sg")
+    first = draft(client, h)
+    assert (
+        upload(client, h, first, "business_profile", "a.pdf", PDF).json()["document"]["verification"][
+            "error_reason"
+        ]
+        is None
+    )
+    assert client.delete(f"/api/v1/applications/{first}", headers=h).status_code == 204
+    second = draft(client, h)
+    refused = upload(client, h, second, "business_profile", "b.pdf", PDF).json()
+    assert refused["document"]["verification"]["error_reason"] == "daily_limit_reached"
+    # The refusal is not counted: the platform has seen one real run, so another operator may still run.
+    h2 = login(client, "other@example.sg")
+    third = draft(client, h2)
+    ok = upload(client, h2, third, "business_profile", "c.pdf", PDF).json()
+    assert ok["document"]["verification"]["error_reason"] is None
+    assert client.delete(f"/api/v1/applications/{third}", headers=h2).status_code == 204
+    # Two real runs now: the platform ceiling (2) holds although both drafts are gone.
+    make_user(db, "third@example.sg", Role.OPERATOR)
+    db.commit()
+    h3 = login(client, "third@example.sg")
+    last = upload(client, h3, draft(client, h3), "business_profile", "d.pdf", PDF).json()
+    assert last["document"]["verification"]["error_reason"] == "daily_limit_reached"
+    next(gen, None)

@@ -39,7 +39,7 @@ from app.domain.ai_usage import (
 from app.domain.site_visit import today_in_singapore
 from app.infra import notifier
 from app.infra.db import session_factory
-from app.models import AiUsage, Document, VerificationRun
+from app.models import AiUsage, Application, Document, VerificationRun
 from app.models.enums import VerificationStatus
 from app.repositories.ai_usage import AiUsageRepository, UsageFilters, UsageRow, UsageTotals
 from app.repositories.audit import AuditRepository
@@ -91,7 +91,10 @@ def record_usage(
         else:
             cost = cost_usd(input_tokens, output_tokens, price.input_per_million, price.output_per_million)
             price_id = price.id
+    app = db.get(Application, doc.application_id)
+    quota_operator_id = app.operator_id if app and run.error_reason not in NOT_COUNTED_REASONS else None
     attempt = AiUsage(
+        quota_operator_id=quota_operator_id,
         run_id=run.id,
         document_id=run.document_id,
         application_id=doc.application_id,
@@ -112,6 +115,7 @@ def record_usage(
         return repo.add(attempt)
     row.provider, row.model, row.latency_ms, row.outcome = provider, model, latency_ms, outcome.value
     row.price_id = price_id or row.price_id
+    row.quota_operator_id = quota_operator_id
     row.input_tokens += input_tokens
     row.output_tokens += output_tokens
     row.cost_usd += cost
@@ -281,7 +285,9 @@ class AiUsageService:
         which the quota itself counts over a rolling 24 hours)."""
         start, end = singapore_day_window(today_in_singapore())
         totals = self.repo.totals(UsageFilters(since=start, until=end))
-        counted = DocumentRepository(self.db).count_runs_since(start, exclude_reasons=NOT_COUNTED_REASONS)
+        counted = DocumentRepository(self.db).count_quota_runs_since(
+            start, exclude_reasons=NOT_COUNTED_REASONS
+        )
         return AiUsageTodayOut(
             runs=counted,
             input_tokens=totals.input_tokens,

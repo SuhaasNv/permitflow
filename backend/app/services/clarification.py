@@ -77,6 +77,24 @@ OPERATOR_WORDS: dict[ClarificationStatus, str] = {
 }
 
 
+def operator_status(
+    item: ChecklistItem, rounds: list[ClarificationRequest], responses: dict[uuid.UUID, ClarificationResponse]
+) -> ClarificationStatus:
+    """The item's status as the operator may see it: an officer's reopen (or its withdrawal) stays
+    invisible until released, so the item keeps the state of its latest released, non-withdrawn request."""
+    status = item.clarification_status
+    if (
+        status in (ClarificationStatus.OPEN, ClarificationStatus.WITHDRAWN)
+        and rounds
+        and rounds[-1].released_at is None
+    ):
+        released = [q for q in rounds if q.released_at is not None and q.withdrawn_at is None]
+        answer = responses.get(released[-1].id) if released else None
+        if answer is not None and answer.sent_at is not None:
+            return ClarificationStatus.ANSWERED
+    return status
+
+
 class ClarificationService:
     def __init__(self, db: Session, storage: FileStorage | None = None) -> None:
         self.db = db
@@ -131,8 +149,9 @@ class ClarificationService:
             ]
             if not released:
                 continue  # unflagged, or only unreleased questions: not the operator's business yet
-            out.append(self._item_out(app, item, released, responses, attachments, current=current))
-            if item.clarification_status == ClarificationStatus.OPEN:
+            status = operator_status(item, by_item[item.id], responses)
+            out.append(self._item_out(app, item, released, responses, attachments, status, current=current))
+            if status == ClarificationStatus.OPEN:
                 drafted = responses.get(released[-1].id)
                 if drafted is None or not drafted.message.strip():
                     drafted_every_open = False
@@ -183,6 +202,7 @@ class ClarificationService:
         released: list[ClarificationRequest],
         responses: dict[uuid.UUID, ClarificationResponse],
         attachments: dict[uuid.UUID, list[ClarificationAttachment]],
+        status: ClarificationStatus,
         *,
         current: bool = True,
     ) -> ClarificationItemOut:
@@ -192,7 +212,6 @@ class ClarificationService:
         title = item_title(item.item_key, item.custom_title)
         if item.is_extra and parent is not None:
             title = f"{parent.title}: {title}"
-        status = item.clarification_status
         answers: list[ClarificationResponseOut] = []
         for q in released:
             r = responses.get(q.id)
@@ -782,6 +801,7 @@ class ClarificationService:
                                     uploaded_at=a.uploaded_at,
                                     scan_state=a.scan_state,
                                     scanned_at=a.scanned_at,
+                                    active_content=a.active_content,
                                 )
                                 for a in attachments.get(r.id, [])
                             ],
