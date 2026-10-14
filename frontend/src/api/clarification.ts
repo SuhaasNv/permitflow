@@ -1,7 +1,7 @@
 import type { StorageView } from './applications'
 import { API_URL, authInit, notifyUnauthorized, request } from './client'
 import type { ScanState } from './documents'
-import { downloadError, uploadToken, uploadWithProgress } from './documents'
+import { downloadError, openBlobInTab, saveBlob, uploadToken, uploadWithProgress } from './documents'
 
 export interface ClarificationRequest {
   id: string
@@ -105,8 +105,7 @@ export function sendClarifications(id: string): Promise<ClarificationView> {
   return request<ClarificationView>(`/applications/${id}/clarifications/send`, { method: 'POST' })
 }
 
-/** Downloads an attachment for the owner, an officer or an admin (same path for every role). */
-export async function downloadAttachment(applicationId: string, attachmentId: string, filename: string): Promise<void> {
+async function fetchAttachmentBlob(applicationId: string, attachmentId: string): Promise<Blob> {
   const res = await fetch(
     `${API_URL}/applications/${applicationId}/clarifications/attachments/${attachmentId}/download`,
     authInit(uploadToken()),
@@ -115,13 +114,17 @@ export async function downloadAttachment(applicationId: string, attachmentId: st
     if (res.status === 401) notifyUnauthorized()
     throw await downloadError(res, res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.')
   }
-  const blob = await res.blob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1500)
+  return res.blob()
+}
+
+/** Downloads an attachment for the owner, an officer or an admin (same path for every role). */
+export async function downloadAttachment(applicationId: string, attachmentId: string, filename: string): Promise<void> {
+  saveBlob(await fetchAttachmentBlob(applicationId, attachmentId), filename)
+}
+
+/** Opens an attachment in a new tab. */
+export function openAttachment(applicationId: string, attachmentId: string, filename: string): Promise<void> {
+  return openBlobInTab(() => fetchAttachmentBlob(applicationId, attachmentId), filename)
 }
 
 // Officer side (US-066) ------------------------------------------------------------------------------

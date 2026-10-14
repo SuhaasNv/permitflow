@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import type { ClarificationOfficerView, ClarificationThread } from '@/api/clarification'
-import { downloadAttachment } from '@/api/clarification'
+import { downloadAttachment, openAttachment } from '@/api/clarification'
 import type { OfficerApplication } from '@/api/officer'
 import { Alert } from '@/features/shared/Alert'
 import { Button } from '@/features/shared/Button'
@@ -77,33 +77,63 @@ function Thread({ view, thread, n }: { view: OfficerApplication; thread: Clarifi
             </span>
             {q.response.attachments.length > 0 ? (
               <ul className="mt-1 flex flex-col gap-1">
-                {q.response.attachments.map((a) => (
-                  <li key={a.id}>
-                    <button
-                      type="button"
-                      disabled={a.scan_state === 'infected' || a.scan_state === 'scanning'}
-                      className="inline-flex max-w-full items-center gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-1.5 text-[13px] font-medium enabled:hover:border-text-3"
-                      onClick={() =>
-                        void downloadAttachment(view.id, a.id, a.original_filename).catch((e: unknown) =>
-                          toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
-                        )
-                      }
-                    >
+                {q.response.attachments.map((a) => {
+                  const unavailable = a.scan_state === 'infected' || a.scan_state === 'scanning'
+                  const chip = (
+                    <>
                       <span className="truncate">{a.original_filename}</span>
                       <span className="text-xs text-text-3">{formatBytes(a.size_bytes)}</span>
                       {a.scan_state === 'infected' ? <StatusBadge label="Blocked, cannot be opened" tone="error" /> : null}
                       {a.scan_state === 'scanning' ? <StatusBadge label="Scanning" tone="info" live /> : null}
-                    </button>
-                    {a.active_content && a.scan_state !== 'infected' ? (
-                      <div className="mt-2">
-                        <Alert tone="warning" title="This PDF contains active content">
-                          It passed the virus scan, but it can run things when it is opened: an automatic action with a script, a launch
-                          action or an embedded file. Open it only in a viewer that blocks scripts, or ask the operator for a flattened copy.
-                        </Alert>
+                    </>
+                  )
+                  const chipClass = 'inline-flex max-w-full items-center gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-1.5 text-[13px] font-medium'
+                  return (
+                    <li key={a.id}>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {a.active_content ? (
+                          <span className={chipClass}>{chip}</span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={unavailable}
+                            aria-label={`Open ${a.original_filename} in a new tab`}
+                            className={cn(chipClass, 'enabled:hover:border-text-3')}
+                            onClick={() =>
+                              void openAttachment(view.id, a.id, a.original_filename).catch((e: unknown) =>
+                                toast.push({ title: 'Could not open the file', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                              )
+                            }
+                          >
+                            {chip}
+                          </button>
+                        )}
+                        {unavailable ? null : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Download ${a.original_filename}`}
+                            onClick={() =>
+                              void downloadAttachment(view.id, a.id, a.original_filename).catch((e: unknown) =>
+                                toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                              )
+                            }
+                          >
+                            Download
+                          </Button>
+                        )}
                       </div>
-                    ) : null}
-                  </li>
-                ))}
+                      {a.active_content && a.scan_state !== 'infected' ? (
+                        <div className="mt-2">
+                          <Alert tone="warning" title="This PDF contains active content">
+                            It passed the virus scan, but it can run things when it is opened: a script, a launch action or an embedded
+                            file. Open it only in a viewer that blocks scripts, or ask the operator for a flattened copy.
+                          </Alert>
+                        </div>
+                      ) : null}
+                    </li>
+                  )
+                })}
               </ul>
             ) : null}
           </div>

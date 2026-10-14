@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 
 import type { StorageView } from '@/api/applications'
 import type { ClarificationItem } from '@/api/clarification'
-import { downloadAttachment } from '@/api/clarification'
+import { downloadAttachment, openAttachment } from '@/api/clarification'
 import { AppError } from '@/api/client'
 import { BLOCKED_MESSAGE, scanMessage, validateFile } from '@/api/documents'
 import { Alert } from '@/features/shared/Alert'
@@ -294,19 +294,38 @@ function ItemAnswer({
                     a.scan_state === 'infected' ? 'border-error-line bg-error-soft' : 'border-line bg-surface-2',
                   )}
                 >
-                  <button
-                    type="button"
-                    disabled={a.scan_state === 'infected' || a.scan_state === 'scanning'}
-                    className="min-w-0 flex-1 truncate text-left font-medium enabled:hover:underline"
-                    onClick={() =>
-                      void downloadAttachment(appId, a.id, a.original_filename).catch((e: unknown) =>
-                        toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
-                      )
-                    }
-                  >
-                    {a.original_filename}
-                  </button>
+                  {a.active_content ? (
+                    <span className="min-w-0 flex-1 truncate text-left font-medium">{a.original_filename}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={a.scan_state === 'infected' || a.scan_state === 'scanning'}
+                      aria-label={`Open ${a.original_filename} in a new tab`}
+                      className="min-w-0 flex-1 truncate text-left font-medium enabled:hover:underline"
+                      onClick={() =>
+                        void openAttachment(appId, a.id, a.original_filename).catch((e: unknown) =>
+                          toast.push({ title: 'Could not open the file', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                        )
+                      }
+                    >
+                      {a.original_filename}
+                    </button>
+                  )}
                   <span className="text-xs text-text-3">{formatBytes(a.size_bytes)}</span>
+                  {a.scan_state === 'infected' || a.scan_state === 'scanning' ? null : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Download ${a.original_filename}`}
+                      onClick={() =>
+                        void downloadAttachment(appId, a.id, a.original_filename).catch((e: unknown) =>
+                          toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                        )
+                      }
+                    >
+                      Download
+                    </Button>
+                  )}
                   {a.scan_state === 'infected' ? <StatusBadge label="Blocked" tone="error" /> : null}
                   {a.scan_state === 'scanning' ? <StatusBadge label="Scanning" tone="info" live /> : null}
                   {canEdit ? (

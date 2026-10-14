@@ -119,7 +119,7 @@ describe('clarification rail (US-066)', () => {
     expect(within(rail).getByText('Result: Unsatisfactory')).toBeInTheDocument()
     expect(within(rail).getByText('Tan Wei Ling answered')).toBeInTheDocument()
     expect(within(rail).getByText('Regraded on 24 Sep; water now runs to the trap.')).toBeInTheDocument()
-    expect(within(rail).getByRole('button', { name: /floor-trap.jpg/ })).toBeInTheDocument()
+    expect(within(rail).getByRole('button', { name: /^Open floor-trap.jpg/ })).toBeInTheDocument()
     expect(within(rail).getByRole('button', { name: 'Mark clarified' })).toBeInTheDocument()
     expect(within(rail).getByRole('button', { name: 'Still needs clarification' })).toBeInTheDocument()
     expect(within(rail).queryByRole('button', { name: 'Withdraw' })).not.toBeInTheDocument()

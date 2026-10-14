@@ -162,20 +162,65 @@ export function deleteDocument(applicationId: string, documentId: string): Promi
   return request<ApplicationView>(`/applications/${applicationId}/documents/${documentId}`, { method: 'DELETE' })
 }
 
-export async function downloadDocument(applicationId: string, documentId: string, filename: string): Promise<void> {
-  const res = await fetch(`${API_URL}/applications/${applicationId}/documents/${documentId}/download`, authInit(tokenGetter()))
-  if (!res.ok) {
-    if (res.status === 401) notifyUnauthorized()
-    throw await downloadError(res, res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.')
-  }
-  const blob = await res.blob()
+/** Saves a blob under its filename. Some browsers start the download after click() returns, so revoke once it has begun. */
+export function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = filename
   a.click()
-  // Some browsers start the download after click() returns; revoke once it has had time to begin.
   setTimeout(() => URL.revokeObjectURL(url), 1500)
+}
+
+/** Only inert types open in a tab: a blob URL shares the app's origin, so anything that could run script stays a download. */
+const OPENABLE_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'text/plain']
+const BLOB_URL_LIFETIME_MS = 60_000
+
+/**
+ * Opens a file in a new tab. The tab is opened first, in the click's own turn, so popup blockers allow it; `load`
+ * fetches the file with the session; a failure closes the tab and rethrows. A blocked popup or a type outside the
+ * allowlist falls back to a download. The blob is rebuilt with the allowlisted type, never the server's raw header.
+ */
+export async function openBlobInTab(load: () => Promise<Blob>, filename: string): Promise<void> {
+  const tab = window.open('', '_blank')
+  if (!tab) {
+    saveBlob(await load(), filename)
+    return
+  }
+  tab.opener = null
+  let blob: Blob
+  try {
+    blob = await load()
+  } catch (error) {
+    tab.close()
+    throw error
+  }
+  const type = blob.type.split(';')[0]?.trim().toLowerCase() ?? ''
+  if (!OPENABLE_TYPES.includes(type)) {
+    tab.close()
+    saveBlob(blob, filename)
+    return
+  }
+  const url = URL.createObjectURL(new Blob([blob], { type: type === 'text/plain' ? 'text/plain;charset=utf-8' : type }))
+  tab.location.href = url
+  setTimeout(() => URL.revokeObjectURL(url), BLOB_URL_LIFETIME_MS)
+}
+
+async function fetchDocumentBlob(applicationId: string, documentId: string): Promise<Blob> {
+  const res = await fetch(`${API_URL}/applications/${applicationId}/documents/${documentId}/download`, authInit(tokenGetter()))
+  if (!res.ok) {
+    if (res.status === 401) notifyUnauthorized()
+    throw await downloadError(res, res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.')
+  }
+  return res.blob()
+}
+
+export async function downloadDocument(applicationId: string, documentId: string, filename: string): Promise<void> {
+  saveBlob(await fetchDocumentBlob(applicationId, documentId), filename)
+}
+
+export function openDocument(applicationId: string, documentId: string, filename: string): Promise<void> {
+  return openBlobInTab(() => fetchDocumentBlob(applicationId, documentId), filename)
 }
 
 async function fetchPdf(path: string): Promise<Blob> {
@@ -197,13 +242,12 @@ async function fetchPdf(path: string): Promise<Blob> {
 
 /** The issued licence certificate (US-051), saved as <licence_no>.pdf. */
 export async function downloadLicence(applicationId: string, licenceNo: string): Promise<void> {
-  const blob = await fetchPdf(`/applications/${applicationId}/licence`)
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${licenceNo}.pdf`
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1500)
+  saveBlob(await fetchPdf(`/applications/${applicationId}/licence`), `${licenceNo}.pdf`)
+}
+
+/** The issued licence certificate in a new tab. */
+export function openLicence(applicationId: string, licenceNo: string): Promise<void> {
+  return openBlobInTab(() => fetchPdf(`/applications/${applicationId}/licence`), `${licenceNo}.pdf`)
 }
 
 /** Officer preview of the certificate before approving (US-051): the watermarked PDF as a blob, nothing stored. */

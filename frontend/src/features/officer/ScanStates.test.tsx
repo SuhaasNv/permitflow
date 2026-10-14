@@ -42,18 +42,18 @@ describe('officer documents by scan state (US-099, artboard 2b)', () => {
     renderWith([docOf('Clean', 'clean'), docOf('Held', 'scanning'), docOf('Bad', 'infected')])
     const clean = await rowOf('Clean')
     expect(within(clean).getByText('Scan clean')).toHaveAttribute('data-tone', 'success')
-    expect(within(clean).getByRole('button', { name: 'Open' })).toBeEnabled()
+    expect(within(clean).getByRole('button', { name: /^Open / })).toBeEnabled()
     expect(within(clean).getByText('Verified')).toBeInTheDocument()
 
     const held = await rowOf('Held')
     expect(within(held).getByText('Scanning')).toHaveAttribute('data-tone', 'info')
-    expect(within(held).getByRole('button', { name: 'Open' })).toBeDisabled()
+    expect(within(held).getByRole('button', { name: /^Open / })).toBeDisabled()
     expect(within(held).getByText(/Not available to open yet. It opens when the security scan finishes/)).toBeInTheDocument()
     expect(within(held).queryByText('Verified')).not.toBeInTheDocument()
 
     const bad = await rowOf('Bad')
     expect(within(bad).getByText('Blocked')).toHaveAttribute('data-tone', 'error')
-    expect(within(bad).queryByRole('button', { name: 'Open' })).not.toBeInTheDocument()
+    expect(within(bad).queryByRole('button', { name: /^Open / })).not.toBeInTheDocument()
     expect(within(bad).getByText('Blocked, no download')).toBeInTheDocument()
     expect(within(bad).getByText(/cannot be opened or downloaded/)).toBeInTheDocument()
     expect(within(bad).getByText(/found a virus\.|found a virus on/)).toBeInTheDocument()
@@ -66,18 +66,20 @@ describe('officer documents by scan state (US-099, artboard 2b)', () => {
     expect(within(row).getByText(/The security scan found a virus on 10 Oct, 15:12\. The file is quarantined/)).toBeInTheDocument()
   })
 
-  it('active content shows the note to the officer and Open stays available', async () => {
+  it('active content shows the note to the officer with Download only: no Open in a tab', async () => {
     renderWith([docOf('Tenancy', 'clean', { active_content: true })])
     const row = await rowOf('Tenancy')
     expect(within(row).getByText('This PDF contains active content')).toBeInTheDocument()
+    expect(within(row).getByText(/passed the virus scan, but it can run things when it is opened: a script, a launch action/)).toBeInTheDocument()
     expect(within(row).getByText(/Open it only in a viewer that blocks scripts/)).toBeInTheDocument()
-    expect(within(row).getByRole('button', { name: 'Open' })).toBeEnabled()
+    expect(within(row).queryByRole('button', { name: /^Open / })).not.toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: /^Download / })).toBeEnabled()
   })
 
   it('a null scan state looks as before: Open enabled, no chip, no note', async () => {
     renderWith([docOf('Plain', null), docOf('Old', undefined)])
     const row = await rowOf('Plain')
-    expect(within(row).getByRole('button', { name: 'Open' })).toBeEnabled()
+    expect(within(row).getByRole('button', { name: /^Open / })).toBeEnabled()
     expect(screen.queryByText('Scan clean')).not.toBeInTheDocument()
     expect(screen.queryByText('Scanning')).not.toBeInTheDocument()
     expect(screen.queryByText('Blocked')).not.toBeInTheDocument()
@@ -163,11 +165,14 @@ describe('officer clarification rail attachments (US-099)', () => {
         </MemoryRouter>
       </AppProviders>,
     )
-    expect(await screen.findByRole('button', { name: /bad\.jpg/ })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: /^Open bad\.jpg/ })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /^Download bad\.jpg/ })).not.toBeInTheDocument()
     expect(screen.getByText('Blocked, cannot be opened')).toHaveAttribute('data-tone', 'error')
-    expect(screen.getByRole('button', { name: /ok\.jpg/ })).toBeEnabled()
-    // The active-content note shows once, for the clean PDF that carries it, and Open stays available.
+    expect(screen.getByRole('button', { name: /^Open ok\.jpg/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /^Download ok\.jpg/ })).toBeEnabled()
+    // The active-content note shows once, for the clean PDF that carries it; that file offers Download only.
     expect(screen.getAllByText('This PDF contains active content')).toHaveLength(1)
-    expect(screen.getByRole('button', { name: /script\.pdf/ })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: /^Open script\.pdf/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Download script\.pdf/ })).toBeEnabled()
   })
 })

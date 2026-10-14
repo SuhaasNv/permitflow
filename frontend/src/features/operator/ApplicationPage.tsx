@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
-import { downloadLicence, scanMessage } from '@/api/documents'
+import { downloadLicence, openLicence, scanMessage } from '@/api/documents'
 import { Alert } from '@/features/shared/Alert'
 import { Button, buttonClasses } from '@/features/shared/Button'
 import { TextAreaField } from '@/features/shared/Controls'
@@ -208,6 +208,17 @@ export function ApplicationPage() {
           {view.licence ? (
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Button
+                size="sm"
+                onClick={() =>
+                  void openLicence(id, view.licence?.licence_no ?? 'licence').catch((e: unknown) =>
+                    toast.push({ title: 'Could not open the file', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                  )
+                }
+              >
+                Open licence (PDF) in a new tab
+              </Button>
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() =>
                   void downloadLicence(id, view.licence?.licence_no ?? 'licence').catch((e: unknown) =>

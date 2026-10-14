@@ -185,7 +185,7 @@ describe('clarification after the site visit, operator side (US-064)', () => {
     const input = document.querySelector('input[type=file][multiple]') as HTMLInputElement
     await userEvent.upload(input, new File(['x'], 'floor.jpg', { type: 'image/jpeg' }))
     await waitFor(() => expect(attach).toHaveBeenCalledTimes(1))
-    expect(await screen.findByRole('button', { name: 'floor.jpg' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^Open floor.jpg/ })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
     await waitFor(() => expect(remove).toHaveBeenCalledWith('a1', 'r1', 'att1'))
     await userEvent.click(screen.getByRole('button', { name: 'Send responses' }))
