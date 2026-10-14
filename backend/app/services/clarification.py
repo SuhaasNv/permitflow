@@ -304,15 +304,7 @@ class ClarificationService:
             ext = check_name_and_type(filename, content_type)
         except UploadRejected as exc:
             raise BadRequest(exc.message, details={"reason": exc.reason}) from exc
-        app = self.applications.get_for(operator, application_id, for_update=True)
-        response = self._own_response(app, response_id)
-        if response.sent_at is not None:
-            raise Conflict("This answer was sent; files can no longer be added.")
-        existing = self.checklists.attachments_for_responses([response.id]).get(response.id, [])
-        if len(existing) >= ATTACHMENT_CAP:
-            raise ValidationFailed(
-                f"Up to {ATTACHMENT_CAP} files per answer.", details={"reason": "attachment_cap"}
-            )
+        app, response, existing = self._attachable(operator, application_id, response_id)
         scan = enforcing()  # US-099: stored under quarantine/ until the scanner clears it
         key = new_storage_key(app.id, ext)
         if scan:
@@ -337,15 +329,26 @@ class ClarificationService:
         quarantined_key = key
         if scan:
             # A small file, scanned inside the request. No verdict means nothing is kept (fail closed):
-            # the upload is refused and the operator tries again.
+            # the upload is refused and the operator tries again. The scan waits on clamd, so the
+            # transaction ends first (no pooled connection, no application row lock held), and every check
+            # runs again under a fresh lock before the insert.
+            self.db.rollback()
             try:
                 verdict = inspect(self.storage, key, content_type)
             except ScannerError as exc:
                 self.storage.delete(key)
-                self.db.rollback()
                 raise ScannerUnavailable(
                     "The security check is not available right now. Try again in a moment."
                 ) from exc
+            try:
+                app, response, existing = self._attachable(operator, application_id, response_id)
+            except Exception:
+                self.storage.delete(key)
+                raise
+            if any(a.sha256 == sha for a in existing):  # the same file landed while this one was scanned
+                self.storage.delete(key)
+                self.db.rollback()
+                return self.build(self.applications.get_for(operator, application_id)), True
             signature, active_content = verdict.signature, verdict.active_content
             if verdict.infected:
                 scan_state = INFECTED  # stays under quarantine/ until the operator removes it
@@ -394,6 +397,21 @@ class ClarificationService:
             alert_infected(app.reference_no, signature)
             raise FileInfected(INFECTED_MESSAGE, details={"reason": "file_infected"})
         return self.build(app), False
+
+    def _attachable(
+        self, operator: User, application_id: uuid.UUID, response_id: uuid.UUID
+    ) -> tuple[Application, ClarificationResponse, list[ClarificationAttachment]]:
+        """Lock the application and check that the answer can take one more file."""
+        app = self.applications.get_for(operator, application_id, for_update=True)
+        response = self._own_response(app, response_id)
+        if response.sent_at is not None:
+            raise Conflict("This answer was sent; files can no longer be added.")
+        existing = self.checklists.attachments_for_responses([response.id]).get(response.id, [])
+        if len(existing) >= ATTACHMENT_CAP:
+            raise ValidationFailed(
+                f"Up to {ATTACHMENT_CAP} files per answer.", details={"reason": "attachment_cap"}
+            )
+        return app, response, existing
 
     def remove_attachment(
         self, operator: User, application_id: uuid.UUID, response_id: uuid.UUID, attachment_id: uuid.UUID
@@ -713,6 +731,9 @@ class ClarificationService:
             or latest is None
             or latest.withdrawn_at is None
             or now - latest.withdrawn_at > UNDO_WINDOW
+            # An unreleased draft withdrawn before Request another round was skipped by the release: the
+            # round has moved on and restoring it would leave a stale question open.
+            or (latest.released_at is None and app.status == ApplicationStatus.PENDING_POST_SITE_RESUBMISSION)
         ):
             raise Conflict("This question can no longer be restored.")
         latest.withdrawn_at = None

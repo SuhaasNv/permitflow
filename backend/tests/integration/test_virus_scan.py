@@ -30,12 +30,14 @@ from app.models import (
     Application,
     AuditEvent,
     ClarificationAttachment,
+    ClarificationResponse,
     Document,
     PlatformSetting,
     User,
     VerificationRun,
 )
 from app.models.enums import Role, VerificationStatus
+from app.services import clarification as clarification_module
 from app.services import scan as scan_module
 from app.services import verification as verification_module
 from app.services.draft_deletion import DraftDeletionService
@@ -789,6 +791,41 @@ def test_attachment_with_the_scanner_down_is_refused_and_nothing_is_kept(
     assert db.scalar(select(ClarificationAttachment)) is None
     root = Path(get_settings().upload_dir)
     assert not any("quarantine" in str(p) for p in root.rglob("*") if p.is_file())
+
+
+def test_attachment_scan_holds_no_transaction_and_rechecks_afterwards(
+    client: TestClient, db: Session, scanner: FakeScanner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The scan waits on clamd: no pooled connection or application row lock may be held meanwhile, and
+    the answer is checked again afterwards (here it is sent while the file is being scanned)."""
+    app_id, op, _ = _submitted(client, db)
+    response_id = _response_id(client, op, app_id)
+    sessions: list[Session] = []
+    real_init = clarification_module.ClarificationService.__init__
+
+    def init(self, session, storage=None):  # type: ignore[no-untyped-def]
+        real_init(self, session, storage)
+        sessions.append(session)
+
+    monkeypatch.setattr(clarification_module.ClarificationService, "__init__", init)
+    open_during_scan: list[bool] = []
+
+    def during_scan() -> None:
+        open_during_scan.append(sessions[-1].in_transaction())
+        db.execute(
+            update(ClarificationResponse)
+            .where(ClarificationResponse.id == uuid.UUID(response_id))
+            .values(sent_at=datetime.now(UTC))
+        )
+        db.commit()
+
+    scanner.before_reply = during_scan
+    r = _attach(client, op, app_id, response_id, "coving.pdf", PDF)
+    assert open_during_scan == [False]
+    assert r.status_code == 409, r.text
+    assert db.scalar(select(ClarificationAttachment)) is None
+    root = Path(get_settings().upload_dir)
+    assert not any(p.suffix == ".pdf" for p in root.rglob("*"))  # the case's other files are .txt
 
 
 # ---- the migration ----

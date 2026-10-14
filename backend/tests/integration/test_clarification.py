@@ -658,3 +658,28 @@ def test_an_unreleased_reopen_does_not_change_what_the_operator_sees(client: Tes
         == "Waiting for your response"
     )
     assert mine["open_count"] == 1
+
+
+def test_a_withdrawn_draft_cannot_be_restored_after_the_round_was_released(
+    client: TestClient, db: Session
+) -> None:
+    """Request another round skips a withdrawn draft; restoring it afterwards would leave a stale question
+    open (security audit run 7). The route documents 409 once the round moved on."""
+    from tests.journeys import transition
+
+    app_id, op, off = _submitted(client, db)
+    _answer_all(client, op, app_id)
+    case = client.get(f"/api/v1/officer/applications/{app_id}", headers=off).json()
+    threads = {t["key"]: t for t in case["clarification"]["items"]}
+    for key in ("floor_trap_graded", "coved_edges"):  # two follow-ups, so the round can still be requested
+        r = client.post(
+            OFF_URL.format(app_id, threads[key]["item_id"], "reopen"),
+            headers=off,
+            json={"message": "Send a photo."},
+        )
+        assert r.status_code == 200, r.text
+    trap = threads["floor_trap_graded"]
+    assert client.post(OFF_URL.format(app_id, trap["item_id"], "withdraw"), headers=off).status_code == 200
+    transition(client, off, app_id, "pending_post_site_resubmission")
+    r = client.post(OFF_URL.format(app_id, trap["item_id"], "restore"), headers=off)
+    assert r.status_code == 409 and r.json()["error"]["message"] == "This question can no longer be restored."

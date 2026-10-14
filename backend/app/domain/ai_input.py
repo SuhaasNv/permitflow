@@ -72,8 +72,9 @@ _SELECTOR_BASES = frozenset(
 _WORD_BREAK_SCRIPTS = frozenset({"THAI", "LAO", "KHMER"})
 # Unicode names that start the characters of the right-to-left scripts, Arabic-Indic digits included.
 _RTL_NAMES = ("ARABIC", "HEBREW", "SYRIAC", "THAANA", "EXTENDED ARABIC-INDIC")
-# A `<document>` tag in any case, with white space inside or attributes: the provider's data delimiter.
-_DOCUMENT_TAG = re.compile(r"<\s*(/?)\s*document\b[^>]*>", re.IGNORECASE)
+# A `<document>` tag in any case, with white space inside or attributes: the provider's data delimiter. The
+# tail is bounded: an unterminated `<document` must not rescan the rest of the text (quadratic).
+_DOCUMENT_TAG = re.compile(r"<\s*(/?)\s*document\b[^<>]{0,200}>", re.IGNORECASE)
 _JOINING_SCRIPTS = frozenset(
     {
         "TAMIL",

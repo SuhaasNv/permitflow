@@ -18,6 +18,14 @@ Format: the product reads this file at build time for its What's new page (the v
 - A document that tries to make the automatic check reveal its own instructions, or that hides instructions in look-alike letters from another alphabet, is sent to a licensing officer, and the check's summary never repeats its own instructions.
 - A date in a document that differs from the date on your form, for example a tenancy that ends later than the form says, is now reported as a mismatch.
 
+## v0.5.1-rc.3, 15 October 2026: harder to overload
+
+**Also**
+- Every automatic check is counted against the daily limit the moment it starts, even if the draft is deleted while it runs.
+- Uploads and document checks can no longer tie up the service while files are scanned or read.
+- More kinds of scripts inside PDFs now carry the active-content warning.
+- A withdrawn question can no longer be brought back after its round was sent.
+
 ## v0.5.1-rc.2, 14 October 2026: look-alike letters
 
 **Also**

@@ -68,14 +68,23 @@ def _name(token: bytes) -> re.Pattern[bytes]:
     return re.compile(rb"/" + token + rb"(?![A-Za-z0-9_.\-])")
 
 
-_ACTIVE = (_name(b"JavaScript"), _name(b"JS"), _name(b"Launch"), _name(b"EmbeddedFiles?"))
+_ACTIVE = (
+    _name(b"JavaScript"),
+    _name(b"JS"),
+    _name(b"Launch"),
+    _name(b"EmbeddedFiles?"),
+    _name(b"XFA"),  # XFA forms carry their own scripts
+    _name(b"OnInstantiate"),  # 3D annotation script
+    _name(b"RichMedia"),  # the rich media annotation subtype (Flash/3D with scripts)
+)
 
 
 def pdf_active_content(data: bytes) -> bool:
-    """True when the PDF carries anything that can act on its own: any script (`/JavaScript`, `/JS`), a
-    `/Launch` action, or an embedded file. A script counts with or without a trigger: a document-level
-    script in the catalog's `/Names` tree runs on open in Acrobat with no `/OpenAction`. Names written with
-    `#xx` escapes are decoded first, so `/Java#53cript` does not slip past.
+    """True when the PDF carries anything that can act on its own: any script (`/JavaScript`, `/JS`, an XFA
+    form, a 3D `/OnInstantiate`), a `/Launch` action, rich media, or an embedded file. A script counts with
+    or without a trigger: a document-level script in the catalog's `/Names` tree runs on open in Acrobat
+    with no `/OpenAction`. Names written with `#xx` escapes are decoded
+    first, so `/Java#53cript` does not slip past.
     ponytail: a byte scan, not a parser. Objects packed in compressed object streams are not visible to it;
     ClamAV remains the control for those. Upgrade path: walk the objects with pypdf."""
     text = _NAME_ESCAPE.sub(lambda m: bytes([int(m.group(1), 16)]), data)
