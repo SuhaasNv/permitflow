@@ -12,6 +12,12 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 - Seven breaks found and added to `cases.json` as `outside_gate` fixtures (`rt_*`; the three confidence ones also `mock_gap`): invisible, white and tiny text that plants the form's expiry date, the same in fullwidth digits, and padding that lifts the mock's confidence. The counted gate stays 24 of 24. App fixes are recommended in `docs/07-ai/RED_TEAM.md`, not made.
 - `redteam/` holds the promptfoo config for a later live run (promptfoo pinned to 0.123.1, MIT, not installed, not run). A live run needs the owner's yes and a 200-call cap.
 
+## v0.5.1-rc.3 (unreleased)
+
+- Security audit run 7, quota and slots. The AI usage row is now written and committed before `provider.verify` (outcome `running`, keyed on `quota_operator_id`) and filled in by `_finish`, so deleting a draft while its check is in flight no longer hides the billed call from the per-operator and platform daily ceilings; refused and paused runs stay uncounted. A reserved row left by a run that died mid-call is settled by the reaper and the startup sweep. A run deleted mid-call keeps a zero-token `running` row; its tokens are in `permitflow_ai_unrecorded_tokens_total` (ADR-020).
+- Before the provider call the run's row is locked and the claim re-checked (status `running`, same `worker_id`): a run whose lease was lost while it waited for a PDF slot, or whose draft is gone, stops without a paid call.
+- The wait for a PDF extraction slot is bounded by `PDF_EXTRACT_TIMEOUT_SECONDS`; past it the check ends `unreadable` (`pdf_parse_error`), like a child timeout, so queued inline checks no longer hold API threads without limit. No new setting, no migration.
+
 ## v0.5.1-rc.2: release candidate on the development environment (14 Oct 2026)
 
 - Version `0.5.1-rc.2` in the five version files; `RELEASE_NOTES.md` gains the rc.2 section.

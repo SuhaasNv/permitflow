@@ -78,3 +78,27 @@ def test_pdf_children_are_bounded_by_the_process_wide_semaphore(monkeypatch: pyt
     for t in threads:
         t.join()
     assert peak == 1
+
+
+def test_a_pdf_waiting_for_a_slot_gives_up_as_unreadable_instead_of_blocking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Security audit run 7: the wait for a slot is bounded by the extraction timeout, so queued checks cannot
+    hold a threadpool thread (or a worker lease) for ever."""
+    import threading
+
+    slots = threading.BoundedSemaphore(1)
+    slots.acquire()  # every slot is taken
+    monkeypatch.setattr(extraction, "_SLOTS", slots)
+    monkeypatch.setattr(extraction.get_settings(), "pdf_extract_timeout_seconds", 0.2)
+    monkeypatch.setattr(extraction.subprocess, "run", lambda *a, **k: pytest.fail("no slot, no child"))
+    out: list[extraction.Extracted] = []
+    t = threading.Thread(
+        target=lambda: out.append(extract_text("application/pdf", b"%PDF", max_chars=10)), daemon=True
+    )
+    t.start()
+    t.join(5)
+    assert out and out[0].reason == "pdf_parse_error"
+    slots.release()  # the failed waiter must not have released a slot it never held
+    with pytest.raises(ValueError):
+        slots.release()

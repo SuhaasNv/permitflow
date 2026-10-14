@@ -16,7 +16,8 @@ from app.core.settings import get_settings
 _CHILD = Path(__file__).with_name("pdf_text_child.py")
 
 # At most this many PDF children at once in this process (inline mode runs checks in the API threadpool).
-# A caller past the limit waits for a slot, so the wait counts against nothing but its own background run.
+# A caller past the limit waits for a slot, at most pdf_extract_timeout_seconds (the wait holds a threadpool
+# thread inline, the lease clock in a worker); past that the check ends "unreadable", as on a child timeout.
 _SLOTS = threading.BoundedSemaphore(get_settings().pdf_extract_concurrency)
 
 
@@ -49,7 +50,9 @@ def _pdf_in_child(data: bytes, *, max_chars: int, max_pages: int, budget_seconds
     command = [sys.executable, "-I", str(_CHILD), *map(str, limits), str(settings.pdf_extract_cpu_seconds)]
     try:
         # `run` kills the child when the deadline passes. Every failure is "unreadable", never a crash.
-        with _SLOTS:
+        if not _SLOTS.acquire(timeout=settings.pdf_extract_timeout_seconds):
+            return Extracted("", "pdf_parse_error")
+        try:
             done = subprocess.run(
                 command,
                 input=data,
@@ -57,6 +60,8 @@ def _pdf_in_child(data: bytes, *, max_chars: int, max_pages: int, budget_seconds
                 timeout=settings.pdf_extract_timeout_seconds,
                 check=True,
             )
+        finally:
+            _SLOTS.release()
         out = json.loads(done.stdout)
         if out["encrypted"]:
             return Extracted("", "encrypted_pdf")

@@ -51,10 +51,15 @@ class AiUsageRepository:
         )
 
     def recorded(self, run_ids: list[uuid.UUID]) -> set[uuid.UUID]:
-        """Which of these runs already have a usage row."""
+        """Which of these runs already have a finished usage row. A `running` row is the reservation made
+        before the provider call: a run ended without its result still has to settle it."""
         if not run_ids:
             return set()
-        return set(self.db.scalars(select(AiUsage.run_id).where(AiUsage.run_id.in_(run_ids))))
+        return set(
+            self.db.scalars(
+                select(AiUsage.run_id).where(AiUsage.run_id.in_(run_ids), AiUsage.outcome != "running")
+            )
+        )
 
     def for_run(self, run_id: uuid.UUID) -> AiUsage | None:
         return self.db.scalar(select(AiUsage).where(AiUsage.run_id == run_id))

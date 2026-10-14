@@ -300,24 +300,6 @@ def test_worker_mode_writes_the_row_with_the_result(
     assert row.run_id == run_id and row.user_id == user.id and row.cost_usd == Decimal("0.00060800")
 
 
-def test_a_result_dropped_for_a_deleted_draft_leaves_no_row(
-    client: TestClient, db: Session, worker_mode: None, billing: Billing, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _, app_id, h = _operator_upload(client, db)
-    real = billing.verify
-
-    def verify_then_delete(request: VerificationRequest) -> VerificationResult:
-        out = real(request)
-        client.delete(f"{API}/applications/{app_id}", headers=h)
-        return out
-
-    monkeypatch.setattr(billing, "verify", verify_then_delete)
-    run_id = claim_next_run("w")
-    assert run_id is not None
-    execute_run(run_id, "w")
-    assert _usage(db) == []
-
-
 def test_a_run_the_workers_gave_up_on_is_recorded_as_dead(
     client: TestClient, db: Session, worker_mode: None
 ) -> None:
@@ -831,12 +813,67 @@ def test_a_lost_lease_leaves_one_row_with_the_new_holders_tokens_and_counts_the_
     _TwoAttempts.between = staticmethod(lose_the_lease)  # type: ignore[assignment]
     before = (_unrecorded("input"), _unrecorded("output"))
     execute_run(run_id, "a")  # finishes after losing the lease: dropped
-    assert _usage(db) == []
+    (reserved,) = _usage(db)  # only the reservation: it holds no tokens until the new holder finishes
+    assert reserved.input_tokens == 0
     assert (_unrecorded("input") - before[0], _unrecorded("output") - before[1]) == (1200, 80)
     execute_run(run_id, "b")
     (row,) = _usage(db)
     assert (row.input_tokens, row.output_tokens) == (900, 50)
     assert row.cost_usd == Decimal("0.00044000")  # (900 x 0.40 + 50 x 1.60) / 1e6
+
+
+def test_a_draft_deleted_during_the_call_still_counts_toward_the_daily_quota(
+    client: TestClient, db: Session, worker_mode: None, billing: Billing, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Security audit run 7: the usage row exists before the provider is called, so deleting the draft while
+    the call is in flight cannot hand the operator a free run (per-operator and platform count alike)."""
+    adm = _admin(client, db)
+    for key in ("ai_runs_per_user_per_day", "ai_runs_per_day"):
+        r = client.put(
+            f"{API}/admin/settings/{key}",
+            headers=adm,
+            json={"value": 1, "reason": "Quota test", "password": DEFAULT_PASSWORD},
+        )
+        assert r.status_code == 200, r.text
+    user, app_id, h = _operator_upload(client, db)
+    real = billing.verify
+
+    def delete_while_in_flight(request: VerificationRequest) -> VerificationResult:
+        assert client.delete(f"{API}/applications/{app_id}", headers=h).status_code == 204
+        return real(request)
+
+    monkeypatch.setattr(billing, "verify", delete_while_in_flight)
+    run_id = claim_next_run("w")
+    assert run_id is not None
+    execute_run(run_id, "w")
+    (row,) = _usage(db)
+    assert row.run_id == run_id and row.quota_operator_id == user.id
+    again = client.post(f"{API}/applications", headers=h).json()["id"]
+    refused = upload(client, h, again, "business_profile", "again.txt", PROFILE_TXT, "text/plain").json()
+    assert refused["document"]["verification"]["error_reason"] == "daily_limit_reached"
+
+
+def test_a_run_ended_by_the_reaper_settles_its_reserved_usage_row(
+    client: TestClient, db: Session, worker_mode: None, billing: Billing, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, _, _ = _operator_upload(client, db)
+    run_id = claim_next_run("w")
+    assert run_id is not None
+    monkeypatch.setattr(billing, "verify", lambda request: (_ for _ in ()).throw(SystemExit()))
+    with pytest.raises(SystemExit):
+        execute_run(run_id, "w")  # the process dies in the call: only the reservation is left
+    (row,) = _usage(db)
+    assert row.outcome == "running"
+    db.execute(update(VerificationRun).where(VerificationRun.id == run_id).values(attempts=MAX_ATTEMPTS))
+    db.execute(
+        update(VerificationRun)
+        .where(VerificationRun.id == run_id)
+        .values(lease_until=datetime.now(UTC) - timedelta(seconds=1))
+    )
+    db.commit()
+    assert reap_expired_runs() == (0, 1)
+    (row,) = _usage(db)
+    assert row.outcome == "dead"
 
 
 def test_a_draft_deleted_after_the_call_counts_its_billed_tokens_as_unrecorded(
@@ -855,7 +892,8 @@ def test_a_draft_deleted_after_the_call_counts_its_billed_tokens_as_unrecorded(
     run_id = claim_next_run("w")
     assert run_id is not None
     execute_run(run_id, "w")
-    assert _usage(db) == [] and _unrecorded("input") - before == 1200
+    (reserved,) = _usage(db)  # the reservation made before the call; the dropped result adds no tokens to it
+    assert reserved.input_tokens == 0 and _unrecorded("input") - before == 1200
 
 
 class _BilledThenRefused(MockProvider):
