@@ -19,6 +19,10 @@ Three steps run before the injection check and before any text reaches a provide
    like the text), so a number in the document and the same number on the form still read identically to
    the model.
 
+A word that mixes plain Latin letters with look-alike letters of another script (Cyrillic or Greek inside
+the same word) raises the flag too, whatever the sentence says. Whole words in one script, accented Latin and
+digits are not flagged.
+
 Fullwidth and mathematical digits (decimal digits that NFKC rewrites) raise the flag too: they read as the
 ordinary digit once folded, so a value planted in them would match the form unseen. Text the PDF extractor
 reports as invisible (render mode 3, white fill, under 3 pt) is flagged the same way and kept in the text.
@@ -88,6 +92,7 @@ _JOINING_SCRIPTS = frozenset(
     }
 )
 _WHITESPACE = re.compile(r"\s+")
+_LETTER_RUN = re.compile(r"[^\W\d_]+")
 _EVIDENCE_MAX = 200
 
 
@@ -115,6 +120,7 @@ def prepare_text(raw: str, *, max_chars: int | None = None, invisible: str = "")
     stripped = _QUIET_CHARS.sub("", _strip_hidden(unflagged))
     cleaned = clean_text(unicodedata.normalize("NFKC", stripped), multiline=True)
     lookalike_digits = sum(1 for c in stripped if unicodedata.category(c) == "Nd" and _nfkc_changes(c))
+    mixed_words = sum(1 for word in _LETTER_RUN.findall(stripped) if _mixes_lookalike_letters(word))
     delimiters = len(_DOCUMENT_TAG.findall(cleaned)) or len(_DOCUMENT_TAG.findall(skeleton(cleaned)))
     cleaned = _DOCUMENT_TAG.sub(_neutralise_document_tag, cleaned)
 
@@ -123,6 +129,8 @@ def prepare_text(raw: str, *, max_chars: int | None = None, invisible: str = "")
         signals.append(f"invisible text: {invisible.strip()[:_EVIDENCE_MAX]}")
     if lookalike_digits:
         signals.append(f"look-alike digits ({lookalike_digits})")
+    if mixed_words:
+        signals.append(f"look-alike letters ({mixed_words})")
     if decoded:
         signals.append(f"hidden text: {decoded[:_EVIDENCE_MAX]}")
     elif suspicious:
@@ -144,6 +152,18 @@ def prepare_text(raw: str, *, max_chars: int | None = None, invisible: str = "")
 def _nfkc_changes(char: str) -> bool:
     """A character NFKC rewrites (fullwidth or mathematical digits): drawn as one, compared as another."""
     return unicodedata.normalize("NFKC", char) != char
+
+
+def _mixes_lookalike_letters(word: str) -> bool:
+    """A word with a plain Latin letter and a letter of another script that is drawn as a Latin one (Cyrillic
+    'о' inside 'tenancy'). Whole words in one script, accented Latin and digits do not match."""
+    return any(c.isascii() for c in word) and any(
+        not c.isascii()
+        and CONFUSABLES.get(ord(c), "").isascii()
+        and CONFUSABLES.get(ord(c), "").isalpha()
+        and not _script_name(c).startswith("LATIN")
+        for c in word
+    )
 
 
 def _neutralise_document_tag(match: re.Match[str]) -> str:
