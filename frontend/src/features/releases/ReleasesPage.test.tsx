@@ -182,7 +182,8 @@ describe('ReleasesPage release candidates (US-110)', () => {
     const list = screen.getByRole('navigation', { name: 'Releases' })
     await vi.waitFor(() => expect(listHrefs()).toEqual(SHOWN.releases.map((r) => `/releases/${r.version}`)))
     for (const c of candidates) {
-      const link = within(list).getByRole('link', { name: new RegExp(`${c.version.replace(/\./g, '\\.')}.*Release candidate`) })
+      // by href: jsdom joins the link's parts without spaces, so a name pattern for rc.1 also matches rc.10
+      const link = within(list).getAllByRole('link').find((l) => l.getAttribute('href') === `/releases/${c.version}`)!
       const badge = within(link).getByText('Release candidate')
       expect(badge).toHaveAttribute('data-tone', 'warning')
       // a dot plus the words, never colour alone
