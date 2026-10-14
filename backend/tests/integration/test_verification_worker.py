@@ -414,6 +414,28 @@ def test_draft_deleted_before_the_run_starts_is_skipped(
     assert provider.calls == 0
 
 
+def test_a_run_whose_lease_was_lost_during_extraction_never_reaches_the_provider(
+    client: TestClient, db: Session, worker_mode: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Security audit run 7: a run that waited for a PDF slot past its lease was requeued and is held by
+    another claim; the old thread must stop before the paid call, not after it."""
+    run_id, _, _ = _queued(client, db)
+    provider = _spy(monkeypatch)
+    assert claim_next_run("slow") == run_id
+    _during_extraction(
+        monkeypatch,
+        lambda: (
+            _expire(db, run_id),
+            reap_expired_runs(),
+            claim_next_run("fast"),
+        ),
+    )
+    execute_run(run_id, "slow")
+    assert provider.calls == 0
+    run = _run(db, run_id)
+    assert run.status == VerificationStatus.RUNNING and run.worker_id == "fast"
+
+
 def test_document_replaced_during_the_run_is_finished_without_the_provider(
     client: TestClient, db: Session, worker_mode: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:

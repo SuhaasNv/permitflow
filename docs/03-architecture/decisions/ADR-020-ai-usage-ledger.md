@@ -74,7 +74,7 @@ The pseudonyms are the first 16 hex characters of HMAC-SHA256 over a label (`use
 - With `VERIFICATION_MODE=worker` the Prometheus counters are incremented in the worker process, so the worker's `/metrics` must be scraped for the dashboard and `/cost` to see them (the local Prometheus does; the Railway job exists for development). The page and the CSV read the database and are right in both modes.
 - **The ledger can undercount; it never overcounts.** Tokens the provider billed are missing from every row in these cases:
   1. A result dropped because the lease changed hands (a slow worker whose run was taken back): the first attempt's tokens are lost, the row holds the second holder's. `permitflow_ai_unrecorded_tokens_total{kind}` counts them.
-  2. A result dropped because the draft was deleted after the provider answered: counted the same way.
+  2. A result dropped because the draft was deleted after the provider answered: counted the same way. The run itself is still counted by the daily quota: its row is written (zero tokens, outcome `running`) and committed just before the provider is called, so deleting the draft mid-call cannot erase it.
   3. A run the reaper marks `dead` after hung attempts that were billed: the row has zero tokens; if a hung attempt ever finishes it is dropped and counted as in case 1, if it never does nothing records it.
   4. A run ended by the system without a result (`failed: interrupted`): zero tokens.
   5. A crash after the provider answered is not an undercount: the crash handler keeps the billed tokens on the `failed` row. A crash inside the provider call before it reports usage is.

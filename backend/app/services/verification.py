@@ -222,6 +222,29 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
                 )
                 return
 
+            # Last trusted decision before the paid call, under the run's row lock: still the holder (the
+            # lease may have run out while the PDF waited for a slot) and the draft still exists. The usage
+            # row is written first and committed, so deleting the draft during the call cannot erase the
+            # count that the daily ceilings read; `_finish` then fills the same row in.
+            with db.no_autoflush:
+                held = DocumentRepository(db).lock_state(run.id, app.id) == (
+                    VerificationStatus.RUNNING,
+                    worker_id,
+                )
+            if not held:
+                logger.warning("verification_not_held", extra={"extra_fields": {"run_id": str(run.id)}})
+                db.rollback()
+                return
+            record_usage(
+                db,
+                run=run,
+                doc=doc,
+                outcome=VerificationStatus.RUNNING,
+                provider=provider.name,
+                model=provider.model,
+            )
+            db.commit()
+
             # Clean, check and redact before anything reaches the provider (US-102).
             # The cap is applied again after NFKC, which can expand a character many times over.
             prepared = prepare_text(extracted.text, max_chars=max_chars, invisible=extracted.hidden)
