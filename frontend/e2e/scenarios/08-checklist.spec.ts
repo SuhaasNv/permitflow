@@ -104,7 +104,7 @@ test('checklist: open from the case, assess items, save the draft, see the summa
     mimeType: 'text/plain',
     buffer: Buffer.from('Photo description: floor regraded, water runs to the trap.'),
   })
-  await expect(page.getByRole('button', { name: 'floor-trap.txt' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open floor-trap.txt in a new tab' })).toBeVisible()
   await expect(page.getByText('1 of 3 files attached.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Send responses' })).toBeEnabled()
   await page.getByRole('button', { name: 'Send responses' }).click()
@@ -129,7 +129,7 @@ test('checklist: open from the case, assess items, save the draft, see the summa
   const rail = page.locator('section:has(#clarification-title)')
   await expect(rail).toContainText('Round 1, your turn')
   await expect(rail).toContainText('Regraded on 23 Sep; water now runs to the trap. Photo attached.')
-  await expect(rail.getByRole('button', { name: /floor-trap.txt/ })).toBeVisible()
+  await expect(rail.getByRole('button', { name: 'Open floor-trap.txt in a new tab' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Route to approval' })).toBeDisabled()
   await rail.getByRole('button', { name: 'Still needs clarification' }).click()
   await rail.getByLabel(/What is still unclear/).fill('Please attach a photo of the drainage test.')
