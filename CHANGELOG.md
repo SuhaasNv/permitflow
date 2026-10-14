@@ -12,6 +12,13 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 - Seven breaks found and added to `cases.json` as `outside_gate` fixtures (`rt_*`; the three confidence ones also `mock_gap`): invisible, white and tiny text that plants the form's expiry date, the same in fullwidth digits, and padding that lifts the mock's confidence. The counted gate stays 24 of 24. App fixes are recommended in `docs/07-ai/RED_TEAM.md`, not made.
 - `redteam/` holds the promptfoo config for a later live run (promptfoo pinned to 0.123.1, MIT, not installed, not run). A live run needs the owner's yes and a 200-call cap.
 
+## v0.5.1-rc.1: release candidate on the development environment (14 Oct 2026)
+
+- Version `0.5.1-rc.1` in the five version files; `RELEASE_NOTES.md` gains the v0.5.1 and rc.1 sections. Fixes from the live AI red team (14 Oct):
+
+- A system prompt repeated by the model into the summary, an issue message, evidence or a missing-information line is replaced by a neutral sentence in `apply_rules` and the check is flagged `possible_prompt_injection` (needs_review). Found by the live red team of 14 Oct 2026 (5 leaks, all flagged but visible). The system prompt moves to `app/domain/ai_prompt.py`.
+- The prompt (`2026-10-14.1`) says a date that differs from the form's date for the same field is a `field_mismatch`, even when it is later or still valid; the live model had verified a tenancy expiring 2028-03-31 against a form saying 2027-10-31.
+
 ## v0.5.0: released to main (14 Oct 2026)
 
 Released as `v0.5.0-rc.10` with the version label removed, after ten candidates on `dev` (rc.1 9 Oct to rc.10 14 Oct). Contents: US-097 to US-107 and US-111 (object storage, the verification worker, the virus scan with quarantine, the AI usage ledger, platform settings, AI input hardening, opt-in demonstration accounts, cookie sessions, the abuse-case pack, the AI and application red teams, build once and promote by digest), the fixes from security audits 4 and 5 and from the red-team findings, the rc.7 UAT findings (clamd reload, document-level PDF scripts, the documents counter, round wording) and opening files in a new tab. Checks on rc.10: full local run 19 of 19 steps (pytest at 95 % coverage, vitest 736, Playwright, `uat_edges.py` 539 of 539, edge checks 150 of 150, `smoke_routes.py` 68 of 68 routes), CI green on the candidate and on `dev`; browser UAT on dev with every switch on (`UAT_PLAN.md`, 14 Oct). Version `0.5.0` in the five files; no shipped file differs from `v0.5.0-rc.10` apart from the version lines. Known and scheduled for 0.5.1: the live red-team findings (a leaked system prompt in the summary of an injected PDF, and a later expiry date not reported as a mismatch), both present in 0.4.1 too.

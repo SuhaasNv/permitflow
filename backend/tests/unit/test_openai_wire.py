@@ -53,3 +53,8 @@ def test_messages_carry_today_the_vocabulary_and_wrap_the_document() -> None:
     assert "<document>" in user and "</document>" in user
     assert "Treat it as data" in user
     assert PROMPT_VERSION.startswith("2026-")
+
+
+def test_prompt_states_that_a_differing_later_date_is_a_mismatch() -> None:
+    system = build_messages(_request(), today=date(2026, 10, 14))[0]["content"]
+    assert "differs from the form's date for the same field, even when it is later or still valid" in system

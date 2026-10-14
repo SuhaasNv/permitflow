@@ -54,7 +54,7 @@ One pure function, `prepare_text` in `backend/app/domain/ai_input.py`, runs in t
    - The TR39 table is vendored, not installed: `backend/app/domain/confusables_data.py` (711 entries, 9 KB) is generated from Unicode's `confusables.txt` (version 18.0.0) by `backend/scripts/gen_confusables.py`, keeping single non-ASCII letters and digits that map to ASCII letters or digits. No new dependency.
 3. **Redact.** NRIC/FIN numbers (S, T, F, G with the checksum letter verified; M by shape and letter set) and Singapore phone numbers (8 digits starting 3, 6, 8 or 9; unbroken or hyphenated with or without +65, 65 or 0065, and space-separated only with that prefix or a phone word (tel, phone, mobile, hp, contact, call) within four words before or one word after, so "area 3000 2500 sqft" is left alone) are masked and the last 4 characters are kept: `S1234567D` becomes `*****567D`, `+65 9123 4567` becomes `****4567`. Business UENs, postal codes, dates (including 8 digits written as a date) and certificate numbers are left alone. The same masking is applied to the form section sent beside the text, after the same NFKC normalisation (so "Kopi™" or a ligature on the form still matches the document), and a form field whose name holds a phone word (for example `contact_phone`) is treated as a phone number whatever surrounds it, so a number in the document and the same number on the form read identically to the model and the comparison still works. The stored application and `extracted_text` are not changed. Other personal data (names, addresses, free text) is not masked; readiness row 8 stays open for it.
 
-The prompt text is unchanged (`PROMPT_VERSION` 2026-09-19.3): a masked value in the document and the same masked value in the form need no explanation. The live model has not yet seen the masked inputs; the owner-approved live run follows.
+The prompt text is unchanged (`PROMPT_VERSION` 2026-10-14.1): a masked value in the document and the same masked value in the form need no explanation. The live model has not yet seen the masked inputs; the owner-approved live run follows.
 
 ## Prompt contract (OpenAI provider)
 
@@ -117,7 +117,7 @@ LangSmith trace metadata (when tracing is on) is the run id, the document id, th
 | Injection phrases detected | `needs_review` + issue | "Needs officer review" with the flagged phrase |
 | Process restart mid-run | stale `running` → `failed`, reason `interrupted` (only runs older than timeout + grace) | re-run available |
 
-## Live run record (19 Sep 2026, `gpt-4.1-mini`, prompt 2026-09-19.2; prompt 2026-09-19.3 adds the disclaimer rule, see `AI_EVALUATION.md`)
+## Live run record (19 Sep 2026, `gpt-4.1-mini`, prompt 2026-09-19.2; prompt 2026-10-14.1 adds the disclaimer rule, see `AI_EVALUATION.md`)
 
 | Case | Outcome | Confidence | Issues | Latency |
 |------|---------|------------|--------|---------|

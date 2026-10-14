@@ -12,6 +12,17 @@ Format: the product reads this file at build time for its What's new page (the v
 
 **After v0.5.0:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
 
+## v0.5.1, 14 October 2026: a sharper document check
+
+**New for operators and licensing officers**
+- A document that tries to make the automatic check reveal its own instructions is sent to a licensing officer, and the check's summary never repeats those instructions.
+- A date in a document that differs from the date on your form, for example a tenancy that ends later than the form says, is now reported as a mismatch.
+
+## v0.5.1-rc.1, 14 October 2026: a sharper document check
+
+**Also**
+- The automatic check no longer repeats its own instructions in a summary, and reports a date that differs from the form.
+
 ## v0.5.0, 14 October 2026: safe intake
 
 Every uploaded file can now be checked for viruses before anyone opens it, documents open straight in the browser, the automatic document check runs on its own worker, and the licensing office can see what each check cost and tune the service's limits without a redeploy.
