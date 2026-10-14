@@ -77,7 +77,7 @@ describe('CompletionCard', () => {
     render(
       <MemoryRouter>
         <CompletionCard
-          view={{ ...view, document_slots: slots, completeness: { ...view.completeness, documents_present: 3, documents_total: 3 } }}
+          view={{ ...view, document_slots: slots, completeness: { ...view.completeness, documents_present: 1, documents_total: 3 } }}
         />
       </MemoryRouter>,
     )

@@ -137,8 +137,10 @@ function renderRoutes(path: string) {
 const HOLD = 'Review and submit opens when no document is blocked or being scanned.'
 
 /** What the backend sends: with a reason, can_submit is false. */
-const draft = (slots: DocumentSlotView[], reason: string | null = null) =>
-  applicationView({
+const draft = (slots: DocumentSlotView[], reason: string | null = null, documentsPresent = slots.length) => {
+  const base = applicationView()
+  return applicationView({
+    completeness: { ...base.completeness, documents_present: documentsPresent, documents_total: slots.length },
     status_label: 'Draft',
     status_tone: 'neutral',
     can_edit: true,
@@ -149,6 +151,7 @@ const draft = (slots: DocumentSlotView[], reason: string | null = null) =>
     sections: [sectionView('business', { editable: true }), sectionView('premises', { editable: true })],
     document_slots: slots,
   })
+}
 
 describe('Documents page and Review page with a blocked or scanning document (US-099)', () => {
   beforeEach(() => {
@@ -157,12 +160,22 @@ describe('Documents page and Review page with a blocked or scanning document (US
   })
 
   it('disables Review and submit with its reason and counts only the clear documents as ready', async () => {
-    vi.spyOn(appsApi, 'getApplication').mockResolvedValue(draft([scanned('business_profile', 'clean'), scanned('floor_plan', 'scanning')], `${HOLD} 1 being scanned.`))
+    vi.spyOn(appsApi, 'getApplication').mockResolvedValue(draft([scanned('business_profile', 'clean'), scanned('floor_plan', 'scanning')], `${HOLD} 1 being scanned.`, 1))
     renderRoutes('/app/applications/app-1/documents')
     expect(await screen.findByText('Review and submit opens when no document is blocked or being scanned. 1 being scanned.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review and submit' })).toBeDisabled()
     expect(screen.queryByRole('link', { name: 'Review and submit' })).not.toBeInTheDocument()
     expect(screen.getByText('1/2')).toBeInTheDocument()
+  })
+
+  it('shows the backend documents_present as is, never below zero (scanning and blocked slots)', async () => {
+    vi.spyOn(appsApi, 'getApplication').mockResolvedValue(draft([scanned('business_profile', 'scanning'), scanned('floor_plan', 'scanning')], `${HOLD} 2 being scanned.`, 0))
+    const { unmount } = renderRoutes('/app/applications/app-1/documents')
+    expect(await screen.findByText('0/2')).toBeInTheDocument()
+    unmount()
+    vi.spyOn(appsApi, 'getApplication').mockResolvedValue(draft([scanned('business_profile', 'clean'), scanned('floor_plan', 'infected')], `${HOLD} 1 blocked.`, 1))
+    renderRoutes('/app/applications/app-1/documents')
+    expect(await screen.findByText('1/2')).toBeInTheDocument()
   })
 
   it('a blocked document adds the rail note and a Blocked chip', async () => {

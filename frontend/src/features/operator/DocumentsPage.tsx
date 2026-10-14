@@ -105,7 +105,7 @@ export function DocumentsPage() {
             <div className="flex items-baseline justify-between px-5 pt-4">
               <h2 className="text-[15px] font-semibold">Required documents</h2>
               <span className="font-mono text-sm tabular-nums text-text-2">
-                {c.documents_present - blockedOrScanning.length}/{c.documents_total}
+                {c.documents_present}/{c.documents_total}
               </span>
             </div>
             <ul className="mt-2 divide-y divide-line px-5 pb-2">
