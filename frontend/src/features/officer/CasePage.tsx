@@ -505,7 +505,7 @@ export function OfficerCasePage() {
             <ol className="divide-y divide-line">
               {view.documents.map((d, i) => (
                 <li key={d.id} id={`target-document-${d.document_type}`} className="scroll-mt-24 px-5 py-5 sm:px-7">
-                  <div className="flex items-start gap-3.5">
+                  <div className="flex flex-wrap items-start gap-x-3.5 gap-y-2">
                     <span
                       className={cn(
                         'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
@@ -527,7 +527,7 @@ export function OfficerCasePage() {
                         <path d="M14 2v6h6" />
                       </svg>
                     </span>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-40 flex-1">
                       <div className="flex flex-wrap items-baseline gap-x-2">
                         <span className="font-mono text-xs text-text-3">0{i + 1}</span>
                         <h3 className="text-[15px] font-semibold leading-[22px]">{d.label}</h3>
