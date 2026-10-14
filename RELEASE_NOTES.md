@@ -38,6 +38,18 @@ Every uploaded file can now be checked for viruses before anyone opens it, the a
 - The version you use in production is exactly the build that was tested before the release.
 - Demonstration accounts are switched on per environment; production keeps them, so anyone can still try the service.
 
+## v0.5.0-rc.8, 14 October 2026: found in testing
+
+**New for licensing officers**
+- Any PDF with a script inside, including one that runs as soon as the file opens, now carries the active-content warning.
+
+**New for operators**
+- The document count no longer shows a negative number while files are being checked.
+- A new round of questions no longer says every item is answered before you have answered it, and the confirmation counts only this round's answers.
+
+**Also**
+- The service now checks every minute that the virus scanner is running and alerts the team when it stops or comes back.
+
 ## v0.5.0-rc.7, 13 October 2026: tighter limits
 
 **New for licensing officers**

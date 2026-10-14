@@ -12,7 +12,9 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 - Seven breaks found and added to `cases.json` as `outside_gate` fixtures (`rt_*`; the three confidence ones also `mock_gap`): invisible, white and tiny text that plants the form's expiry date, the same in fullwidth digits, and padding that lifts the mock's confidence. The counted gate stays 24 of 24. App fixes are recommended in `docs/07-ai/RED_TEAM.md`, not made.
 - `redteam/` holds the promptfoo config for a later live run (promptfoo pinned to 0.123.1, MIT, not installed, not run). A live run needs the owner's yes and a 200-call cap.
 
-## v0.5.0-rc.8 (unreleased)
+## v0.5.0-rc.8: release candidate on the development environment (14 Oct 2026)
+
+- Version `0.5.0-rc.8` in the five version files; `RELEASE_NOTES.md` gains the rc.8 section. Fixes from the rc.7 browser UAT on dev:
 
 - Documents counter (documents page sidebar, application page, completion card) shows the backend `documents_present` as is; scanning and blocked files were subtracted a second time, giving "-2/4".
 - Clarification footer no longer says "Every item is answered" when a new round's item has no answer yet; it now looks at the current round's answer, not the last one from any round.

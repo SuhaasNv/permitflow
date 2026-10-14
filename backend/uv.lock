@@ -1347,7 +1347,7 @@ wheels = [
 
 [[package]]
 name = "permitflow-backend"
-version = "0.5.0rc7"
+version = "0.5.0rc8"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
