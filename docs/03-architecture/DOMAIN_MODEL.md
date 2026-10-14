@@ -106,7 +106,7 @@ One AI verification attempt for a document. The latest run is the document's dis
 |-------|------|-------|
 | id | UUID | |
 | document_id | FK Document | |
-| status | enum `VerificationStatus` | `pending`, `running`, `verified`, `issues_found`, `needs_review`, `unreadable`, `failed`, `unavailable` |
+| status | enum `VerificationStatus` | `pending` (queued), `running`, `verified`, `issues_found`, `needs_review`, `unreadable`, `failed`, `unavailable`, `dead` (US-098; served to clients as `failed`) |
 | provider | str | `openai`, `mock`, `none` |
 | model | str, nullable | |
 | confidence | float, nullable | 0–1 as reported by the model |
@@ -117,6 +117,14 @@ One AI verification attempt for a document. The latest run is the document's dis
 | raw_output_valid | bool, nullable | whether provider output passed schema validation |
 | started_at, finished_at | datetime | |
 | latency_ms | int, nullable | |
+| attempts | int, default 0 | US-098 (migration 0016): how many times a worker has claimed the run; `dead` after the third claim whose lease expires. Stays 0 in `inline` mode |
+| lease_until | datetime, nullable | US-098: until when the claim of a `running` run is good; cleared when the run finishes or is requeued. Null in `inline` mode |
+| worker_id | str(64), nullable | US-098: the worker holding the run; the result is written only while it matches |
+| requested_by | FK User, nullable | US-100 (migration 0017): the person whose upload or re-run created the run; null for runs that predate the migration. The AI usage row names this person |
+
+Virus scan columns (US-099, migration 0018), on `documents` and on `clarification_attachments`: `scan_state` (varchar 16, nullable: null when stored with `SCAN_MODE=off` or before the scan existed, else `scanning`, `clean` or `infected`; only null and `clean` are served), `scan_signature` (varchar 120, nullable: the scanner's name for what it found, infected only), `scanned_at` (timestamptz, nullable: when the verdict, clean or infected, landed; null while `scanning` and for rows the scan never touched) and `active_content` (boolean, default false: a PDF with an automatic action plus a script, a launch action or an embedded file; a flag, not a block). A file in `scanning` or `infected` lives under the key prefix `quarantine/`; a clean one is moved to its normal key and `stored_key` follows.
+
+Indexes (migration 0016): `ix_verification_runs_queued (created_at) WHERE status = 'pending'` serves the worker's claim; `ix_verification_runs_lease (lease_until) WHERE status = 'running'` serves the reaper.
 
 Rules: results are advisory. No service reads verification status to decide workflow state (ADR-006).
 
@@ -124,8 +132,9 @@ Verification status vocabulary (who sets it, when):
 
 | Status | Set by | When |
 |--------|--------|------|
-| `pending` | upload service | run row created; task not started |
-| `running` | task | task picked up the run |
+| `pending` | upload service | run row created; task not started. In `worker` mode this is "queued": it waits until a worker claims it, or stays while the AI is paused |
+| `running` | task, or a worker's claim | the run was picked up (inline: `claim_run`; worker: `claim_next`, with a lease) |
+| `dead` | worker's reaper | a `running` run whose lease expired after its third claim (`error_reason = worker_gave_up`). Terminal; the applicant may re-run. Served as `failed` to operators and officers; counted separately on the admin overview |
 | `unreadable` | rule (no model call) | no extractable text (image, empty or encrypted PDF, unsupported type) |
 | `verified` | model + rules | model reports `verified`, confidence ≥ threshold, no injection flag |
 | `issues_found` | model | model reports one or more issues (see codes) |
@@ -171,6 +180,49 @@ Lifecycle: `open` → `addressed` (system, on resubmission when the target chang
 
 Email delivery is mocked: an `EmailNotifier` logs the message.
 
+### PlatformSetting (v0.5.0, US-101)
+One administrator override of an environment default. A missing row means "follow the environment", so an empty table changes nothing. The definition of each editable setting (key, type, bounds, default source) lives in `app/domain/platform_settings.py`, not in the table.
+| Field | Type | Notes |
+|-------|------|-------|
+| key | str(64), PK | one of the eleven keys in the domain module |
+| value | JSON scalar | a whole number, a boolean or a choice string, typed by the setting; read back inside today's bounds (a number above the environment ceiling is clamped, one below the minimum or of the wrong type is ignored) |
+| updated_by | FK User | the administrator who set it |
+| updated_at | datetime | |
+| reason | text | required on every change |
+
+There is no history table: the history is the audit trail (`settings.changed`, `settings.reverted`, below), which already records the old and new value, the actor and the reason, and is append-only. Migration 0015.
+
+### AiPrice and AiUsage (v0.5.0, US-100, migration 0017)
+What a model costs, and what each check cost. ADR-020.
+
+`AiPrice` is versioned and never edited: a new row with a later `effective_from` replaces the price from that moment. The price of a run is the row of its model with the latest `effective_from` not after the moment the result is stored. The migration seeds `gpt-4.1-mini` at USD 0.40 input and 1.60 output per million tokens, effective 14 Apr 2025.
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | |
+| model | str(64) | as the provider reports it (`OPENAI_MODEL`) |
+| input_per_million, output_per_million | numeric(12,6) | USD per million tokens |
+| effective_from | datetime | unique with `model` |
+
+`AiUsage` is one row per verification run, added in the transaction that stores the run's result (both `VERIFICATION_MODE` values). `run_id`, `document_id` and `application_id` are plain columns, not foreign keys: deleting a draft removes its runs and documents, and the spend stays.
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | |
+| run_id | UUID, unique | the verification run |
+| document_id | UUID | |
+| application_id | UUID, nullable | |
+| user_id | FK User, nullable | `VerificationRun.requested_by`; an officer's re-run is the officer's |
+| document_type | str(32) | the `DocumentType` value |
+| provider | str(16) | `openai`, `mock`, `none` |
+| model | str(64), nullable | null when no provider ran |
+| input_tokens, output_tokens | int | what the provider billed; 0 for the mock and for runs that never reached a provider |
+| cost_usd | numeric(14,8) | tokens times the price in force; 0 when no tokens or no price row for the model |
+| price_id | FK AiPrice, nullable | the price the cost was computed at |
+| latency_ms | int | |
+| outcome | str(16) | the `VerificationStatus` value the run ended in |
+| created_at | datetime | |
+
+Indexes: `(created_at)`, `(user_id, created_at)`, `(application_id, created_at)`. A run that never called the provider (a quota refusal, the pause switch, an unreadable file, no provider configured, `dead`, `failed: interrupted`) still has its row, with zero tokens and cost.
+
 ### AuditEvent
 Append-only.
 | Field | Type | Notes |
@@ -178,7 +230,7 @@ Append-only.
 | id | UUID | |
 | application_id | FK Application, nullable | null for user-management events |
 | actor_id | FK User, nullable | null for system events |
-| event_type | str | `application.created`, `section.updated`, `document.uploaded`, `document.replaced`, `document.deleted`, `verification.requested`, `verification.completed`, `revision.submitted`, `status.changed`, `feedback.created`, `feedback.released`, `feedback.addressed`, `feedback.resolved`, `feedback.withdrawn`, `feedback.reopened`, `feedback.restored`, `licence.issued`, the site visit, checklist and clarification events (`site_visit.*`, `checklist.*`, `clarification.*`, v0.4.0), and the user events with no application (`user.created`, `user.role_changed`, `user.deactivated`, `user.reactivated`, `user.session_taken_over`, `user.signed_out`) |
+| event_type | str | `application.created`, `section.updated`, `document.uploaded`, `document.replaced`, `document.deleted`, `verification.requested`, `verification.completed`, `revision.submitted`, `status.changed`, `feedback.created`, `feedback.released`, `feedback.addressed`, `feedback.resolved`, `feedback.withdrawn`, `feedback.reopened`, `feedback.restored`, `licence.issued`, the site visit, checklist and clarification events (`site_visit.*`, `checklist.*`, `clarification.*`, v0.4.0), and the user events with no application (`user.created`, `user.role_changed`, `user.deactivated`, `user.reactivated`, `user.session_taken_over`, `user.signed_out`, `user.step_up_failed`: payload `action` and the target, never the password) and the settings events with no application (`settings.changed`, `settings.reverted`: payload `key`, `label`, `old`, `new`, `old_was_default`, `reason`, `reverted_event_id` on a revert, and `ended_while_paused` when the AI pause is switched off; `settings.step_up_failed`: payload `key`, `action`, `history_entry` on a revert; US-101; `admin.ai_usage_exported`: payload the filters, `rows` and `cut`, no names; US-100) |
 | payload | JSON | event-specific data (from/to status, revision number, feedback id, document type, verification status) |
 | created_at | datetime | |
 
@@ -341,3 +393,4 @@ Required document types: `business_profile`, `floor_plan`, `tenancy_agreement`, 
 10. One checklist per (application, visit number); every template key is present from creation; `result`, `comment` and `needs_clarification` never change after `submitted_at`.
 11. Indexes for the admin reads at volume (migration 0013, US-086): `audit_events (application_id, created_at)`, `(created_at, id)`, `(event_type, created_at)`; `verification_runs (created_at)` and `(started_at)`.
 12. At most one live session per user; a token whose session is revoked, idle or missing never authenticates, whatever its `exp`.
+13. A platform setting changes only inside `[minimum, ceiling]`, where the ceiling is the environment value (further limited by the setting's absolute cap, 10 MB for uploads) and the minimum is at least 1; the override row and its `settings.changed` or `settings.reverted` audit row are written in one transaction; the scanner never fails open when `APP_ENV=production`. The same bounds are applied again when a value is read, so a row edited by hand cannot loosen a limit.

@@ -1,7 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AppError, setUnauthorizedHandler } from './client'
-import { downloadDocument, downloadLicence, fetchLicencePreview, setUploadTokenProvider, uploadDocument, validateFile } from './documents'
+import {
+  downloadDocument,
+  downloadLicence,
+  fetchLicencePreview,
+  openDocument,
+  openLicence,
+  scanMessage,
+  setUploadTokenProvider,
+  uploadDocument,
+  validateFile,
+} from './documents'
 
 function file(name: string, size: number, type = 'application/pdf'): File {
   const f = new File([new Uint8Array(size)], name, { type })
@@ -166,5 +176,101 @@ describe('downloads', () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 401 }))
     await downloadDocument('app-1', 'doc-1', 'plan.pdf').catch(() => undefined)
     expect(onUnauthorized).toHaveBeenCalledTimes(1)
+  })
+
+  it('maps the scan codes on a refused download: the server wording for a blocked file, one sentence for the rest', async () => {
+    const body = (code: string, message: string) => new Response(JSON.stringify({ error: { code, message } }), { status: 403 })
+    fetchMock.mockResolvedValueOnce(body('file_infected', 'This file was blocked by the security check and cannot be opened.'))
+    const blocked = (await downloadDocument('app-1', 'doc-1', 'plan.pdf').catch((x: unknown) => x)) as AppError
+    expect(blocked.code).toBe('file_infected')
+    expect(blocked.message).toBe('This file was blocked by the security check and cannot be opened.')
+
+    fetchMock.mockResolvedValueOnce(body('file_scanning', 'raw'))
+    const scanning = (await downloadDocument('app-1', 'doc-1', 'plan.pdf').catch((x: unknown) => x)) as AppError
+    expect(scanning.message).toBe('This file is still being scanned. Try again in a moment.')
+
+    fetchMock.mockResolvedValueOnce(body('forbidden', 'raw'))
+    const other = (await downloadDocument('app-1', 'doc-1', 'plan.pdf').catch((x: unknown) => x)) as AppError
+    expect(other.message).toBe('Could not download this file.')
+  })
+
+  describe('opening in a new tab', () => {
+    const tab = { opener: 'x' as unknown, close: vi.fn(), location: { href: '' } }
+    const openMock = vi.fn<(url: string, target: string) => typeof tab | null>()
+    const file = (type: string) => new Response('body', { status: 200, headers: { 'Content-Type': type } })
+    beforeEach(() => {
+      tab.opener = 'x'
+      tab.close.mockReset()
+      tab.location.href = ''
+      openMock.mockReset().mockReturnValue(tab)
+      vi.stubGlobal('open', openMock)
+    })
+
+    it('opens the tab before the fetch, then points it at a blob URL that is revoked after 60 s', async () => {
+      let tabWasOpen = false
+      fetchMock.mockImplementation(async () => {
+        tabWasOpen = openMock.mock.calls.length === 1
+        return file('application/pdf')
+      })
+      await openDocument('app-1', 'doc-1', 'plan.pdf')
+      expect(tabWasOpen).toBe(true)
+      expect(openMock).toHaveBeenCalledWith('', '_blank')
+      expect(tab.opener).toBeNull()
+      expect(tab.location.href).toBe('blob:x')
+      expect(clicks).toEqual([])
+      vi.advanceTimersByTime(59_000)
+      expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1_000)
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:x')
+    })
+
+    it('forces the blob type from the allowlist, with a charset for text', async () => {
+      const made: Blob[] = []
+      vi.mocked(URL.createObjectURL).mockImplementation((b) => (made.push(b as Blob), 'blob:x'))
+      fetchMock.mockResolvedValueOnce(file('IMAGE/PNG; foo=bar'))
+      await openDocument('app-1', 'doc-1', 'a.png')
+      fetchMock.mockResolvedValueOnce(file('text/plain'))
+      await openDocument('app-1', 'doc-1', 'a.txt')
+      expect(made.map((b) => b.type)).toEqual(['image/png', 'text/plain;charset=utf-8'])
+    })
+
+    it.each(['text/html', 'image/svg+xml', 'application/octet-stream'])('falls back to a download for %j', async (type) => {
+      fetchMock.mockResolvedValueOnce(file(type))
+      await openDocument('app-1', 'doc-1', 'x.bin')
+      expect(tab.close).toHaveBeenCalled()
+      expect(tab.location.href).toBe('')
+      expect(clicks).toEqual(['x.bin'])
+    })
+
+    it('downloads when the popup is blocked', async () => {
+      openMock.mockReturnValue(null)
+      fetchMock.mockResolvedValueOnce(file('application/pdf'))
+      await openDocument('app-1', 'doc-1', 'plan.pdf')
+      expect(clicks).toEqual(['plan.pdf'])
+    })
+
+    it('closes the tab and throws the same error as the download when the fetch fails', async () => {
+      fetchMock.mockResolvedValueOnce(new Response('', { status: 404 }))
+      const e = (await openDocument('app-1', 'doc-1', 'plan.pdf').catch((x: unknown) => x)) as AppError
+      expect(e).toBeInstanceOf(AppError)
+      expect(e.message).toBe('This file is no longer available.')
+      expect(tab.close).toHaveBeenCalled()
+    })
+
+    it('opens the licence as a PDF', async () => {
+      fetchMock.mockResolvedValueOnce(file('application/pdf'))
+      await openLicence('app-1', 'FEL-1')
+      expect(fetchMock.mock.calls[0][0]).toMatch(/\/applications\/app-1\/licence$/)
+      expect(tab.location.href).toBe('blob:x')
+    })
+  })
+
+  it('scanMessage words the four codes and ignores anything else', () => {
+    const err = (code: string) => new AppError(500, { code, message: 'raw' })
+    expect(scanMessage(err('file_infected'))).toBe('This file was blocked by the security check. Upload a different copy.')
+    expect(scanMessage(err('scanner_unavailable'))).toMatch(/not available right now/)
+    expect(scanMessage(err('documents_not_clear'))).toMatch(/no document is blocked or being scanned/)
+    expect(scanMessage(err('storage_full'))).toBeNull()
+    expect(scanMessage(new Error('x'))).toBeNull()
   })
 })

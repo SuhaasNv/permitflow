@@ -28,6 +28,15 @@ describe('EnvironmentStrip (US-109)', () => {
     expect(strip).toHaveTextContent('Development environment: test data only, not the live service')
   })
 
+  it('wraps instead of forcing a sideways scroll at large text sizes (WCAG 1.4.4, 1.4.10)', async () => {
+    vi.spyOn(healthApi, 'getHealth').mockResolvedValue(health('development'))
+    renderStrip()
+    const strip = await screen.findByRole('region', { name: 'Environment notice' })
+    expect(strip.innerHTML).not.toContain('whitespace-nowrap')
+    expect(strip.className).toContain('min-h-7')
+    expect(strip.className).not.toMatch(/(^|\s)h-7(\s|$)/)
+  })
+
   it('shows for any environment other than production', async () => {
     vi.spyOn(healthApi, 'getHealth').mockResolvedValue(health('test'))
     renderStrip()

@@ -4,9 +4,9 @@ import { Link, useParams } from 'react-router-dom'
 
 import type { StorageView } from '@/api/applications'
 import type { ClarificationItem } from '@/api/clarification'
-import { downloadAttachment } from '@/api/clarification'
+import { downloadAttachment, openAttachment } from '@/api/clarification'
 import { AppError } from '@/api/client'
-import { validateFile } from '@/api/documents'
+import { BLOCKED_MESSAGE, scanMessage, validateFile } from '@/api/documents'
 import { Alert } from '@/features/shared/Alert'
 import { Button, buttonClasses } from '@/features/shared/Button'
 import { TextAreaField } from '@/features/shared/Controls'
@@ -16,6 +16,7 @@ import { StorageRoom } from '@/features/shared/StorageRoom'
 import type { Tone } from '@/features/shared/StatusBadge'
 import { ErrorPanel, NotFoundPanel, PageSkeleton, Skeleton } from '@/features/shared/states'
 import { useToast } from '@/features/shared/Toast'
+import { cn } from '@/lib/cn'
 import { isTransient, retryDelay, tabHidden, useOnline } from '@/lib/connection'
 import { formatBytes, formatDateTime } from '@/lib/format'
 import { clearLocalDraft, readLocalDraft, writeLocalDraft } from '@/lib/localDraft'
@@ -230,13 +231,16 @@ function ItemAnswer({
         },
         onError: (e) => {
           setProgress(null)
+          const scan = scanMessage(e)
+          // A blocked file is kept as a row so it can be removed: load it. A scanner that is down is said so, not retried silently.
+          if (e instanceof AppError && e.code === 'file_infected') void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(appId) })
           // The server keeps one copy of an identical file, so sending it again on a lost connection is safe.
-          if (isTransient(e)) {
+          if (isTransient(e) && !scan) {
             later('upload', () => sendFile(responseId, file))
             return
           }
           setRetrying(null)
-          setFileError(e.message)
+          setFileError(scan ?? e.message)
         },
       },
     )
@@ -285,20 +289,45 @@ function ItemAnswer({
               {attachments.map((a) => (
                 <li
                   key={a.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-line bg-surface-2 px-3 py-2 text-sm"
+                  className={cn(
+                    'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-2 text-sm',
+                    a.scan_state === 'infected' ? 'border-error-line bg-error-soft' : 'border-line bg-surface-2',
+                  )}
                 >
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 truncate text-left font-medium hover:underline"
-                    onClick={() =>
-                      void downloadAttachment(appId, a.id, a.original_filename).catch((e: unknown) =>
-                        toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
-                      )
-                    }
-                  >
-                    {a.original_filename}
-                  </button>
+                  {a.active_content ? (
+                    <span className="min-w-0 flex-1 truncate text-left font-medium">{a.original_filename}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={a.scan_state === 'infected' || a.scan_state === 'scanning'}
+                      aria-label={`Open ${a.original_filename} in a new tab`}
+                      className="min-w-0 flex-1 truncate text-left font-medium enabled:hover:underline"
+                      onClick={() =>
+                        void openAttachment(appId, a.id, a.original_filename).catch((e: unknown) =>
+                          toast.push({ title: 'Could not open the file', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                        )
+                      }
+                    >
+                      {a.original_filename}
+                    </button>
+                  )}
                   <span className="text-xs text-text-3">{formatBytes(a.size_bytes)}</span>
+                  {a.scan_state === 'infected' || a.scan_state === 'scanning' ? null : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Download ${a.original_filename}`}
+                      onClick={() =>
+                        void downloadAttachment(appId, a.id, a.original_filename).catch((e: unknown) =>
+                          toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                        )
+                      }
+                    >
+                      Download
+                    </Button>
+                  )}
+                  {a.scan_state === 'infected' ? <StatusBadge label="Blocked" tone="error" /> : null}
+                  {a.scan_state === 'scanning' ? <StatusBadge label="Scanning" tone="info" live /> : null}
                   {canEdit ? (
                     <Button
                       variant="ghost"
@@ -314,6 +343,7 @@ function ItemAnswer({
                       Remove
                     </Button>
                   ) : null}
+                  {a.scan_state === 'infected' ? <p className="basis-full text-[13px] font-medium text-error">{BLOCKED_MESSAGE}</p> : null}
                 </li>
               ))}
             </ul>
@@ -441,16 +471,20 @@ export function ClarificationPage() {
   const view = app.data
   const c = clar.data
   const open = c.items.filter((i) => i.status === 'Waiting for your response')
-  const unanswered = open.filter((i) => !(i.responses.at(-1)?.message ?? '').trim())
+  // Only this round's answer counts: an earlier round's sent answer does not answer the new question.
+  const unanswered = open.filter((i) => !(i.responses.find((r) => r.round_no === i.round_no)?.message ?? '').trim())
   const base = `/app/applications/${id}`
+  const blockedFile = open.some((i) => i.responses.some((r) => r.round_no === i.round_no && r.attachments.some((a) => a.scan_state === 'infected')))
   const doSend = () => {
     if (saving) return // a blur and a tap can land in the same task; the answer goes first
+    // The answers of this round only: every open item is answered to send. The server's answered_count spans all rounds.
+    const sentNow = open.length
     send.mutate(undefined, {
-      onSuccess: (next) => {
+      onSuccess: () => {
         setConfirming(false)
         toast.push({
           title: 'Answers sent',
-          body: `${next.answered_count} ${next.answered_count === 1 ? 'answer was' : 'answers were'} sent to the licensing office.`,
+          body: `${sentNow} ${sentNow === 1 ? 'answer was' : 'answers were'} sent to the licensing office.`,
           tone: 'success',
         })
       },
@@ -557,14 +591,24 @@ export function ClarificationPage() {
           {c.can_respond ? (
             <div className="sticky bottom-0 mt-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface px-5 py-3.5 shadow-[0_-8px_24px_rgba(27,36,48,0.06)] max-lg:bottom-[64px]">
               <span className="text-sm text-text-2">
-                {unanswered.length === 0
+                {blockedFile
+                  ? 'Remove the file the security check blocked, then send your answers.'
+                  : unanswered.length === 0
                   ? `Every item is answered. Send ${open.length === 1 ? 'your answer' : `your ${open.length} answers`} to the licensing office.`
                   : `${unanswered.length} of ${open.length} ${open.length === 1 ? 'item' : 'items'} still ${unanswered.length === 1 ? 'needs' : 'need'} an answer.`}
               </span>
               <Button
                 size="lg"
-                disabled={!c.can_send || saving}
-                title={saving ? 'Wait for your answer to save.' : c.can_send ? undefined : 'Answer every item first.'}
+                disabled={!c.can_send || saving || blockedFile}
+                title={
+                  saving
+                    ? 'Wait for your answer to save.'
+                    : blockedFile
+                      ? 'Remove the file the security check blocked, then send your answers.'
+                      : c.can_send
+                        ? undefined
+                        : 'Answer every item first.'
+                }
                 onClick={() => setConfirming(true)}
               >
                 Send responses

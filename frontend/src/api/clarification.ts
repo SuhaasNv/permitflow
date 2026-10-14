@@ -1,6 +1,7 @@
 import type { StorageView } from './applications'
-import { API_URL, AppError, notifyUnauthorized, request } from './client'
-import { uploadToken, uploadWithProgress } from './documents'
+import { API_URL, authInit, notifyUnauthorized, request } from './client'
+import type { ScanState } from './documents'
+import { downloadError, openBlobInTab, saveBlob, uploadToken, uploadWithProgress } from './documents'
 
 export interface ClarificationRequest {
   id: string
@@ -15,6 +16,11 @@ export interface ClarificationAttachment {
   content_type: string
   size_bytes: number
   uploaded_at: string
+  /** US-099: null (stored with the scan off), scanning, clean or infected. A blocked file cannot be opened. */
+  scan_state?: ScanState
+  scanned_at?: string | null
+  /** Officer view only: a PDF with an automatic action plus a script, a launch action or an embedded file. */
+  active_content?: boolean
 }
 
 export interface ClarificationResponse {
@@ -99,26 +105,26 @@ export function sendClarifications(id: string): Promise<ClarificationView> {
   return request<ClarificationView>(`/applications/${id}/clarifications/send`, { method: 'POST' })
 }
 
-/** Downloads an attachment for the owner, an officer or an admin (same path for every role). */
-export async function downloadAttachment(applicationId: string, attachmentId: string, filename: string): Promise<void> {
-  const token = uploadToken()
-  const res = await fetch(`${API_URL}/applications/${applicationId}/clarifications/attachments/${attachmentId}/download`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
+async function fetchAttachmentBlob(applicationId: string, attachmentId: string): Promise<Blob> {
+  const res = await fetch(
+    `${API_URL}/applications/${applicationId}/clarifications/attachments/${attachmentId}/download`,
+    authInit(uploadToken()),
+  )
   if (!res.ok) {
     if (res.status === 401) notifyUnauthorized()
-    throw new AppError(res.status, {
-      code: 'http_error',
-      message: res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.',
-    })
+    throw await downloadError(res, res.status === 404 ? 'This file is no longer available.' : 'Could not download this file.')
   }
-  const blob = await res.blob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1500)
+  return res.blob()
+}
+
+/** Downloads an attachment for the owner, an officer or an admin (same path for every role). */
+export async function downloadAttachment(applicationId: string, attachmentId: string, filename: string): Promise<void> {
+  saveBlob(await fetchAttachmentBlob(applicationId, attachmentId), filename)
+}
+
+/** Opens an attachment in a new tab. */
+export function openAttachment(applicationId: string, attachmentId: string, filename: string): Promise<void> {
+  return openBlobInTab(() => fetchAttachmentBlob(applicationId, attachmentId), filename)
 }
 
 // Officer side (US-066) ------------------------------------------------------------------------------

@@ -29,3 +29,20 @@ class TokenOut(BaseModel):
     token_type: str = "bearer"
     expires_at: datetime
     user: UserOut
+
+
+class SessionOut(BaseModel):
+    """Cookie mode (US-104): the sign-in answer carries no bearer token. `csrf_token` is the value for the
+    X-CSRF-Token header; it is useless without the HttpOnly session cookie, and the cookie copy is not
+    readable by a script on another origin (the API is a different host), so the body hands it over."""
+
+    expires_at: datetime
+    user: UserOut
+    csrf_token: str
+
+
+class MeOut(UserOut):
+    # Cookie mode only; absent in token mode. `expires_at` is the session's end, so a reloaded page can run
+    # its expiry timer (the sign-in answer carries it, but a reload has no sign-in answer).
+    csrf_token: str | None = None
+    expires_at: datetime | None = None

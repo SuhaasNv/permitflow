@@ -13,16 +13,35 @@ same windows in Redis, or a limit at the edge). The client key honours `X-Forwar
 trusted proxy, so a caller cannot pick a fresh bucket per request (T4).
 """
 
+import ipaddress
 import math
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 
 from fastapi import Request
 
 
 def client_key(request: Request, trusted_proxies: str, client_ip_header: str = "") -> str:
-    """The address every per-client limiter keys on.
+    """The address every per-client limiter keys on. An IPv6 client is keyed by its /64, the smallest
+    block one subscriber routes, so rotating addresses inside it does not buy a fresh bucket; IPv4 and
+    anything that is not an address stay as they are.
+    """
+    key = _client_address(request, trusted_proxies, client_ip_header)
+    try:
+        ip = ipaddress.ip_address(key)
+    except ValueError:
+        return key
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped:
+            return str(ip.ipv4_mapped)
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False))
+    return key
+
+
+def _client_address(request: Request, trusted_proxies: str, client_ip_header: str) -> str:
+    """The client address before any grouping.
 
     Without a trusted proxy it is the socket address, whatever headers the caller sends (T4). Behind one,
     the platform's own client header wins when it is configured and present (`CLIENT_IP_HEADER`, Railway's
@@ -52,12 +71,25 @@ def client_key(request: Request, trusted_proxies: str, client_ip_header: str = "
     return hops[-1] if hops else host
 
 
+Limit = int | Callable[[], int]
+
+
 class _Window:
-    def __init__(self, limit: int, window_seconds: float = 60.0) -> None:
-        self.limit = limit
+    """`limit` is a number, or a callable read on every hit so the live value (US-101) applies at once."""
+
+    def __init__(self, limit: Limit, window_seconds: float = 60.0) -> None:
+        self._limit = limit
         self.window = window_seconds
         self._hits: dict[str, deque[float]] = {}
         self._lock = threading.Lock()
+
+    @property
+    def limit(self) -> int:
+        return self._limit() if callable(self._limit) else self._limit
+
+    @limit.setter
+    def limit(self, value: int) -> None:
+        self._limit = value
 
     @property
     def enabled(self) -> bool:
@@ -81,7 +113,7 @@ class _Window:
 class FailedLoginLimiter(_Window):
     """Blocks a client after `limit` failed sign-ins within a minute."""
 
-    def __init__(self, limit_per_minute: int) -> None:
+    def __init__(self, limit_per_minute: Limit) -> None:
         super().__init__(limit_per_minute)
 
     def is_blocked(self, key: str) -> bool:
@@ -120,7 +152,7 @@ class RequestLimiter:
     """The two request buckets the middleware consults, replaceable on `app.state` in tests."""
 
     def __init__(
-        self, *, per_minute: int, login_per_minute: int, trusted_proxies: str, client_ip_header: str = ""
+        self, *, per_minute: Limit, login_per_minute: Limit, trusted_proxies: str, client_ip_header: str = ""
     ) -> None:
         self.general = WindowLimiter(per_minute)
         self.login = WindowLimiter(login_per_minute)

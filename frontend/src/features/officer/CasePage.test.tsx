@@ -341,6 +341,22 @@ describe('OfficerCasePage', () => {
     expect(screen.getByText('Draft, not sent yet')).toBeInTheDocument()
   })
 
+  it('moves focus into the composer, and back to Add feedback when it is cancelled', async () => {
+    vi.spyOn(api, 'getOfficerApplication').mockResolvedValue({
+      ...view,
+      status: 'under_review',
+      status_label: 'Under Review',
+      feedback_editable: true,
+      feedback_locked_reason: null,
+      actions: [],
+    })
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Add feedback' }))
+    await waitFor(() => expect(screen.getByLabelText(/Feedback for the operator/)).toHaveFocus())
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add feedback' })).toHaveFocus())
+  })
+
   it('shows the stale banner on a version conflict and reloads the case on request', async () => {
     const get = vi.spyOn(api, 'getOfficerApplication').mockResolvedValue(view)
     vi.spyOn(api, 'transitionApplication').mockRejectedValue(

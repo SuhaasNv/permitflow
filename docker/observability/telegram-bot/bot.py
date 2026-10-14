@@ -12,6 +12,8 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta, timezone
+from html import escape as esc
 
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = str(os.environ["TELEGRAM_CHAT_ID"])
@@ -27,7 +29,7 @@ HELP = (
     "/dev  ·  development only\n"
     "/prod  ·  production only\n"
     "/checks  ·  the document checks in the last hour\n"
-    "/cost  ·  what the checks cost (list price)\n"
+    "/cost  ·  what the checks cost, per document type (today, 7 days)\n"
     "/queue  ·  applications by status, who is waiting\n"
     "/alerts  ·  rules firing right now\n"
     "/help  ·  this list\n"
@@ -76,13 +78,37 @@ def cost_expr(e: str) -> str:
             f' + sum(increase(permitflow_openai_tokens_total{{{e}, kind="completion"}}[1h])) * {PRICE_OUT}) / 1e6')
 
 
+def seconds_since_sgt_midnight() -> int:
+    """Seconds of the Singapore day so far (UTC+8, no daylight saving), at least 60 so the window is never empty."""
+    now = datetime.now(timezone(timedelta(hours=8)))
+    return max(60, int((now - now.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()))
+
+
+def cost_by_type(e: str) -> str:
+    """US-100: what the checks cost per document type, today (Singapore day) and over 7 days, from the usage
+    record's counters. These metrics carry no names or ids, only the document type and the outcome."""
+    rows: dict[str, dict[str, tuple[float, float]]] = {}
+    for label, window in (("today", f"{seconds_since_sgt_midnight()}s"), ("7 days", "7d")):
+        spend = {m.get("document_type", "?"): v for m, v in prom_series(f'sum by (document_type) (increase(permitflow_ai_cost_usd_total{{{e}}}[{window}]))')}
+        count = {m.get("document_type", "?"): v for m, v in prom_series(f'sum by (document_type) (increase(permitflow_ai_checks_total{{{e}}}[{window}]))')}
+        for kind in set(spend) | set(count):
+            rows.setdefault(kind, {})[label] = (spend.get(kind, 0.0), count.get(kind, 0.0))
+    if not rows:
+        return "By document type  <i>no checks recorded yet</i>"
+    lines = []
+    for kind in sorted(rows):
+        parts = [f"{label} <b>USD {rows[kind].get(label, (0.0, 0.0))[0]:.4f}</b> ({rows[kind].get(label, (0.0, 0.0))[1]:.0f})" for label in ("today", "7 days")]
+        lines.append(f"{esc(kind).replace('_', ' ')}  ·  " + "  ·  ".join(parts))
+    return "By document type  <i>(checks in brackets)</i>\n" + "\n".join(lines)
+
+
 def build_of(env: str) -> str:
     """The version and commit the API in this environment reports (permitflow_build_info), or n/a."""
     rows = prom_series(f'max by (version, commit) (permitflow_build_info{{environment="{env}"}})')
     if not rows:
         return "n/a"
     m = rows[-1][0]
-    return f"{m.get('version', '?')}  ({m.get('commit', '?')})"
+    return esc(f"{m.get('version', '?')}  ({m.get('commit', '?')})")
 
 
 def section_status(env: str) -> str:
@@ -101,7 +127,7 @@ def section_status(env: str) -> str:
     quiet = not rpm  # no request in the last five minutes: latency and error share have no meaning
     traffic = ("Requests  <b>0</b> / min   ·   <i>quiet for five minutes</i>" if quiet else
                f"Requests  <b>{n(rpm)}</b> / min   ·   p99.5  <b>{n(p995)}</b> ms   ·   5xx  <b>{n((err or 0) * 100, '%.1f')} %</b>")
-    return (f"<b>{env.capitalize()}</b>  ·  API {api}  ·  version <b>{build}</b>\n{traffic}\n"
+    return (f"<b>{esc(env).capitalize()}</b>  ·  API {api}  ·  version <b>{build}</b>\n{traffic}\n"
             f"Checks (1 h)  <b>{n(checks, none='0')}</b>   ·   spend  <b>USD {n(spend, '%.3f', '0.000')}</b>\n"
             f"Applications  <b>{n(apps)}</b>   ·   officer's turn  <b>{n(officer)}</b>   ·   operator's turn  <b>{n(operator)}</b>")
 
@@ -117,9 +143,9 @@ def checks(envs: list[str]) -> str:
     for env in envs:
         e = f'environment="{env}"'
         by = prom_series(f'sum by (outcome) (increase(permitflow_verification_runs_total{{{e}}}[1h]))')
-        outcomes = "   ·   ".join(f"{m.get('outcome')} <b>{v:.0f}</b>" for m, v in sorted(by, key=lambda x: -x[1]) if v >= 0.5) or "none in the last hour"
+        outcomes = "   ·   ".join(f"{esc(str(m.get('outcome')))} <b>{v:.0f}</b>" for m, v in sorted(by, key=lambda x: -x[1]) if v >= 0.5) or "none in the last hour"
         p95 = prom(f'histogram_quantile(0.95, sum by (le) (rate(permitflow_verification_run_seconds_bucket{{{e}}}[1h])))')
-        parts.append(f"<b>{env.capitalize()}</b>\n{outcomes}\np95 check time  <b>{n(p95, '%.1f')}</b> s  <i>(objective 180 s)</i>")
+        parts.append(f"<b>{esc(env).capitalize()}</b>\n{outcomes}\np95 check time  <b>{n(p95, '%.1f')}</b> s  <i>(objective 180 s)</i>")
     return f"<b>Document checks · the last hour</b>\n{RULE}\n" + f"\n{RULE}\n".join(parts) + f"\n{RULE}\nDashboard  {DASHBOARD}"
 
 
@@ -131,8 +157,9 @@ def cost(envs: list[str]) -> str:
         spend24 = ((tokens["prompt"] - tokens["cached"]) * PRICE_IN + tokens["cached"] * PRICE_CACHED + tokens["completion"] * PRICE_OUT) / 1e6
         runs = prom(f'sum(increase(permitflow_verification_runs_total{{{e}, provider="openai"}}[24h]))') or 0
         per = spend24 / runs if runs else 0
-        parts.append(f"<b>{env.capitalize()}</b>  ·  last 24 h\nTokens  prompt <b>{tokens['prompt']:.0f}</b>  ·  cached <b>{tokens['cached']:.0f}</b>  ·  output <b>{tokens['completion']:.0f}</b>\n"
-                     f"Spend  <b>USD {spend24:.3f}</b>   ·   per check  <b>USD {per:.4f}</b>   ·   at this rate  <b>USD {spend24 * 30:.2f}</b> a month")
+        parts.append(f"<b>{esc(env).capitalize()}</b>  ·  last 24 h\nTokens  prompt <b>{tokens['prompt']:.0f}</b>  ·  cached <b>{tokens['cached']:.0f}</b>  ·  output <b>{tokens['completion']:.0f}</b>\n"
+                     f"Spend  <b>USD {spend24:.3f}</b>   ·   per check  <b>USD {per:.4f}</b>   ·   at this rate  <b>USD {spend24 * 30:.2f}</b> a month\n"
+                     f"{cost_by_type(e)}")
     return (f"<b>Cost of the document checks</b>\n<i>gpt-4.1-mini list price: 0.40 / 0.10 cached / 1.60 USD per million tokens; the invoice is the truth</i>\n{RULE}\n"
             + f"\n{RULE}\n".join(parts) + f"\n{RULE}\nDashboard  {DASHBOARD}")
 
@@ -142,12 +169,12 @@ def queue(envs: list[str]) -> str:
     for env in envs:
         e = f'environment="{env}"'
         by = [(m.get("status"), v) for m, v in prom_series(f'permitflow_applications{{{e}}}') if v > 0]
-        lines = "\n".join(f"{s}  <b>{v:.0f}</b>" for s, v in sorted(by, key=lambda x: -x[1])) or "no applications"
+        lines = "\n".join(f"{esc(str(s))}  <b>{v:.0f}</b>" for s, v in sorted(by, key=lambda x: -x[1])) or "no applications"
         moved = prom(f'sum(increase(permitflow_transitions_total{{{e}}}[1h]))')
         post_site = prom(f'sum(permitflow_applications{{{e}, status=~"site_visit_scheduled|site_visit_done|awaiting_post_site_clarification|pending_post_site_resubmission|post_site_clarification_resubmitted"}})')
         checklists = prom(f'sum(increase(permitflow_checklists_submitted_total{{{e}}}[24h]))')
         rounds = prom(f'sum(increase(permitflow_clarification_rounds_total{{{e}}}[24h]))')
-        parts.append(f"<b>{env.capitalize()}</b>\n{lines}\ntransitions in the last hour  <b>{n(moved, none='0')}</b>\n"
+        parts.append(f"<b>{esc(env).capitalize()}</b>\n{lines}\ntransitions in the last hour  <b>{n(moved, none='0')}</b>\n"
                      f"post-site (visit to clarification)  <b>{n(post_site, none='0')}</b>   ·   checklists (24 h)  <b>{n(checklists, none='0')}</b>   ·   rounds (24 h)  <b>{n(rounds, none='0')}</b>")
     return f"<b>The queue</b>\n{RULE}\n" + f"\n{RULE}\n".join(parts) + f"\n{RULE}\nDashboard  {DASHBOARD}"
 
@@ -161,7 +188,7 @@ def alerts() -> str:
     firing = [a for a in active if a.get("state") == "firing"]
     if not firing:
         return f"<b>Alerts</b>\nNothing is firing. Six rules watch the objective (API down, 5xx above 1 %, p99.5 above 500 ms, checks failing above 20 %, checks slower than 3 min, rate limiting).\n{RULE}\nDashboard  {DASHBOARD}"
-    lines = [f"<b>{a['labels'].get('alertname')}</b>  ·  {a['labels'].get('environment', '')}  ·  {a['labels'].get('severity', '')}\n{a.get('annotations', {}).get('summary', '')}" for a in firing]
+    lines = [f"<b>{esc(str(a['labels'].get('alertname')))}</b>  ·  {esc(a['labels'].get('environment', ''))}  ·  {esc(a['labels'].get('severity', ''))}\n{esc(a.get('annotations', {}).get('summary', ''))}" for a in firing]
     return f"<b>Alerts firing</b>\n{RULE}\n" + f"\n{RULE}\n".join(lines) + f"\n{RULE}\nDashboard  {DASHBOARD}"
 
 

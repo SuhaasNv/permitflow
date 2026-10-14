@@ -11,23 +11,28 @@ export interface DialogProps {
   cancelLabel?: string
   danger?: boolean
   busy?: boolean
+  /** The id of the short text that describes the dialog (a screen reader reads it on opening). Left out: the whole body. `null`: nothing. */
+  describedBy?: string | null
   onConfirm: () => void
   onCancel: () => void
 }
 
 /** Confirmation dialog: title as a question, consequence in plain language, one primary action. Enters with a 220 ms rise. */
-export function Dialog({ open, title, children, confirmLabel, cancelLabel = 'Cancel', danger, busy, onConfirm, onCancel }: DialogProps) {
+export function Dialog({ open, title, children, confirmLabel, cancelLabel = 'Cancel', danger, busy, describedBy, onConfirm, onCancel }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const bodyId = useId()
   // Focus is set after showModal(): React's autoFocus runs at mount, while the dialog is still closed.
-  // Destructive dialogs start on Cancel, the others on the primary action.
+  // Destructive dialogs start on Cancel, the others on the primary action; a dialog with a form marks its first
+  // field `data-autofocus` and starts there.
   useEffect(() => {
     const el = ref.current
     if (!el) return
     if (open && !el.open) {
       el.showModal()
-      const target = el.querySelector<HTMLButtonElement>(danger ? '[data-dialog-cancel]' : '[data-dialog-confirm]')
+      const target = el.querySelector<HTMLElement>(
+        `[data-autofocus], ${danger ? '[data-dialog-cancel]' : '[data-dialog-confirm]'}`,
+      )
       target?.focus()
     }
     if (!open && el.open) el.close()
@@ -41,7 +46,7 @@ export function Dialog({ open, title, children, confirmLabel, cancelLabel = 'Can
       }}
       className="pf-dialog m-auto w-[min(520px,calc(100vw-32px))] rounded-lg border border-line bg-surface p-0 text-text shadow-[var(--shadow-3)] backdrop:bg-[rgba(16,24,40,0.5)]"
       aria-labelledby={titleId}
-      aria-describedby={bodyId}
+      aria-describedby={describedBy === null ? undefined : (describedBy ?? bodyId)}
     >
       <div className="px-6 pb-2 pt-6">
         <h2 id={titleId} className="text-[20px] font-semibold leading-7 tracking-[-0.01em]">

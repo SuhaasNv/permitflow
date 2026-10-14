@@ -1,0 +1,71 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F0 5 0 R /F8 7 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 635 >>
+stream
+BT /F0 16 Tf 0 g 0 Tr 50 779 Td (TENANCY AGREEMENT) Tj ET
+BT /F0 11 Tf 0 g 0 Tr 50 763 Td (Landlord: Lim Property Holdings Pte. Ltd.) Tj ET
+BT /F0 11 Tf 0 g 0 Tr 50 747 Td (Tenant: Kopi & Kaya Toast House Pte. Ltd.) Tj ET
+BT /F0 11 Tf 0 g 0 Tr 50 731 Td (Premises: 10 Jalan Besar #01-12, Singapore 208787) Tj ET
+BT /F0 11 Tf 0 g 0 Tr 50 715 Td (Term: 1 April 2025 to 2028-03-31) Tj ET
+BT /F0 11 Tf 0 g 0 Tr 50 699 Td (Expiry: 2028-03-31) Tj ET
+BT /F0 11 Tf 0 g 0 Tr 50 683 Td (Signed by both parties and witnessed. The tenant shall keep the premises in good repair.) Tj ET
+BT /F8 11 Tf 0 g 0 Tr 50 667 Td (Term expiry 2027-10-31) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Length 427 >>
+stream
+/CIDInit /ProcSet findresource begin 12 dict begin begincmap
+/CMapName /Adobe-Identity-UCS def /CMapType 2 def
+1 begincodespacerange <00> <FF> endcodespacerange
+15 beginbfchar
+<54> <0054>
+<65> <0065>
+<72> <0072>
+<6D> <006D>
+<20> <0020>
+<78> <0078>
+<70> <0070>
+<69> <0069>
+<79> <0079>
+<32> <FF12>
+<30> <FF10>
+<37> <FF17>
+<2D> <002D>
+<31> <FF11>
+<33> <FF13>
+endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop end end
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding /ToUnicode 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000937 00000 n 
+0000001034 00000 n 
+0000001512 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+1626
+%%EOF

@@ -1,3 +1,4 @@
+from app.models.ai_usage import AiPrice, AiUsage
 from app.models.application import Application, ApplicationRevision
 from app.models.audit import AuditEvent
 from app.models.base import Base
@@ -7,11 +8,14 @@ from app.models.document import Document, VerificationRun
 from app.models.feedback import Feedback
 from app.models.licence import Licence
 from app.models.notification import Notification
+from app.models.platform_setting import PlatformSetting
 from app.models.session import UserSession
 from app.models.site_visit import SiteVisit, SiteVisitProposal
 from app.models.user import User
 
 __all__ = [
+    "AiPrice",
+    "AiUsage",
     "Application",
     "ApplicationRevision",
     "AuditEvent",
@@ -20,6 +24,7 @@ __all__ = [
     "Feedback",
     "Licence",
     "Notification",
+    "PlatformSetting",
     "Checklist",
     "ChecklistItem",
     "ClarificationAttachment",

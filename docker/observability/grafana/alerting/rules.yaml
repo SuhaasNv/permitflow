@@ -386,6 +386,60 @@ groups:
     noDataState: OK
     execErrState: Error
     isPaused: false
+  - uid: pf-storage-ceiling
+    title: PermitFlow stored files near the ceiling
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: max by (environment) (permitflow_storage_bytes{kind="stored"}) / max by (environment) (permitflow_storage_bytes{kind="limit"})
+        instant: true
+        intervalMs: 15000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0.8
+          operator:
+            type: and
+          query:
+            params:
+            - B
+          reducer:
+            type: last
+            params: []
+          type: query
+    for: 15m
+    labels:
+      severity: warning
+      kind: incident
+    annotations:
+      summary: Stored files are above 80 % of STORAGE_TOTAL_MAX_BYTES; raise the ceiling or clear space before uploads are refused (US-098).
+      value: '{{ printf "%.3g" $values.B.Value }}'
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
   - uid: pf-digest-development
     title: PermitFlow hourly digest (development)
     condition: C

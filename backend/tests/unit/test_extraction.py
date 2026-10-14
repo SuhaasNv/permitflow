@@ -1,4 +1,8 @@
+import pytest
+
+from app.infra import extraction
 from app.infra.extraction import extract_text
+from evals.redteam.render import Span, render_pdf
 
 
 def test_text_and_caps() -> None:
@@ -26,3 +30,51 @@ def test_real_pdf_text() -> None:
     w.write(buf)
     out = extract_text("application/pdf", buf.getvalue(), max_chars=100)
     assert out.reason == "no_text"
+
+
+def _hidden(*spans: Span) -> str:
+    out = extract_text("application/pdf", render_pdf([Span("Visible line"), *spans]), max_chars=1000)
+    assert out.reason is None and "Visible line" in out.text
+    return out.hidden
+
+
+def test_invisible_white_and_tiny_text_is_reported_and_kept() -> None:
+    for span in (Span("planted", invisible=True), Span("planted", gray=1.0), Span("planted", size=1.0)):
+        assert _hidden(span) == "planted"
+    out = extract_text("application/pdf", render_pdf([Span("planted", invisible=True)]), max_chars=1000)
+    assert "planted" in out.text
+
+
+def test_ordinary_text_reports_nothing_hidden() -> None:
+    assert _hidden(Span("small but legible", size=8.0), Span("dark grey", gray=0.4)) == ""
+
+
+def test_pdf_children_are_bounded_by_the_process_wide_semaphore(monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess
+    import threading
+    import time
+
+    monkeypatch.setattr(extraction, "_SLOTS", threading.BoundedSemaphore(1))
+    live = peak = 0
+    lock = threading.Lock()
+
+    def fake_run(*_a: object, **_k: object) -> subprocess.CompletedProcess[bytes]:
+        nonlocal live, peak
+        with lock:
+            live += 1
+            peak = max(peak, live)
+        time.sleep(0.05)
+        with lock:
+            live -= 1
+        return subprocess.CompletedProcess([], 0, b'{"encrypted": false, "text": "x", "hidden": ""}')
+
+    monkeypatch.setattr(extraction.subprocess, "run", fake_run)
+    threads = [
+        threading.Thread(target=extract_text, args=("application/pdf", b"%PDF"), kwargs={"max_chars": 10})
+        for _ in range(4)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert peak == 1

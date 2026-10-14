@@ -36,6 +36,19 @@ VERIFICATION_SECONDS = Histogram(
     ["provider"],
     buckets=(0.1, 0.5, 1, 2, 5, 10, 20, 30, 60),
 )
+# The queue behind the document checks (US-098, ADR-016). Refreshed from the database on every API scrape
+# and every few seconds by the worker, which serves them on its own private port too.
+QUEUE_DEPTH = Gauge("permitflow_verification_queue_depth", "Document checks waiting for a worker.")
+QUEUE_OLDEST_SECONDS = Gauge(
+    "permitflow_verification_queue_oldest_seconds", "Age of the oldest waiting check, 0 when none."
+)
+ACTIVE_LEASES = Gauge("permitflow_verification_active_leases", "Checks a worker is running right now.")
+DEAD_RUNS = Gauge("permitflow_verification_dead_runs", "Checks the workers gave up on (status dead).")
+REAPED = Counter(
+    "permitflow_verification_reaped_total",
+    "Checks taken back from a worker whose lease expired, by outcome (requeued, dead, interrupted).",
+    ["outcome"],
+)
 QUOTA_REFUSALS = Counter(
     "permitflow_quota_refusals_total", "Refusals by a database quota (US-058).", ["quota"]
 )
@@ -48,6 +61,29 @@ OPENAI_TOKENS = Counter(
     "permitflow_openai_tokens_total",
     "Tokens billed by OpenAI for document checks, by model and kind (prompt, cached, completion).",
     ["model", "kind"],
+)
+# US-100: what each check cost. Labels are the document type and the outcome, both from closed enums
+# (`domain.ai_usage.bounded_label`); a user or an application id is never a label.
+AI_CHECKS = Counter(
+    "permitflow_ai_checks_total",
+    "Document checks recorded in the AI usage table, by document type and outcome.",
+    ["document_type", "outcome"],
+)
+AI_TOKENS = Counter(
+    "permitflow_ai_tokens_total",
+    "Tokens used by document checks, by document type, outcome and kind (input, output).",
+    ["document_type", "outcome", "kind"],
+)
+AI_COST = Counter(
+    "permitflow_ai_cost_usd_total",
+    "Cost in USD of document checks at the price in force when each ran, by document type and outcome.",
+    ["document_type", "outcome"],
+)
+AI_UNRECORDED_TOKENS = Counter(
+    "permitflow_ai_unrecorded_tokens_total",
+    "Tokens the provider billed for a check whose result was then dropped (lease lost, draft deleted), so "
+    "no usage row holds them, by kind (input, output).",
+    ["kind"],
 )
 APPLICATIONS = Gauge(
     "permitflow_applications", "Applications by status, refreshed on every scrape.", ["status"]
@@ -70,12 +106,19 @@ CLARIFICATION_ROUNDS = Counter(
     "Clarification rounds by event: released to the operator, answered by the operator.",
     ["event"],
 )
+# The virus scan (US-099): one count per scanner verdict, `error` when clamd could not give one.
+SCANS = Counter("permitflow_scans_total", "Virus scans by result (clean, infected, error).", ["result"])
+SCANNER_UP = Gauge(
+    "permitflow_scanner_up",
+    "1 when the worker's last clamd PING was answered, 0 when not (SCAN_MODE=enforce).",
+)
 ATTACHMENT_BYTES = Counter(
     "permitflow_attachment_bytes_total", "Bytes stored as clarification evidence (US-065)."
 )
 STORAGE_BYTES = Gauge(
     "permitflow_storage_bytes",
-    "Bytes on the upload volume by kind (documents, attachments, volume_used, volume_total), per scrape.",
+    "Bytes stored by kind (documents, attachments, stored, limit) and on the volume (volume_used, "
+    "volume_total), per scrape.",
     ["kind"],
 )
 
@@ -99,6 +142,10 @@ def route_template(request: Request) -> str:
     return str(template)
 
 
+# A client chooses the method, so only the standard ones become label values (the series stay bounded).
+HTTP_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
+
+
 async def metrics_middleware(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
@@ -107,8 +154,9 @@ async def metrics_middleware(
     route = route_template(request)
     if route.endswith("/metrics"):
         return response  # the scraper does not count itself
-    HTTP_REQUESTS.labels(request.method, route, str(response.status_code)).inc()
-    HTTP_SECONDS.labels(request.method, route).observe(time.perf_counter() - started)
+    method = request.method if request.method in HTTP_METHODS else "OTHER"
+    HTTP_REQUESTS.labels(method, route, str(response.status_code)).inc()
+    HTTP_SECONDS.labels(method, route).observe(time.perf_counter() - started)
     return response
 
 

@@ -23,7 +23,7 @@ import type { Checklist, ChecklistSaveInput } from '@/api/checklist'
 import { getChecklist, getChecklistSchema, openChecklist, saveChecklist, submitChecklist } from '@/api/checklist'
 import type { DateInput, DecideInput, ProposeInput } from '@/api/siteVisit'
 import { confirmSiteVisitWithoutReply, decideSiteVisit, proposeSiteVisit, rescheduleSiteVisitAsOfficer } from '@/api/siteVisit'
-import { isCheckStale } from '@/features/operator/queries'
+import { isCheckStale, isScanLive } from '@/features/operator/queries'
 
 export const officerKeys = {
   queue: ['officer', 'queue'] as const,
@@ -44,12 +44,19 @@ export function useQueue() {
   return useQuery({ queryKey: officerKeys.queue, queryFn: getQueue, refetchInterval: 30_000 })
 }
 
-/** True while a check is pending or running and younger than the staleness window (same rule as the operator side). */
+/** True while a check is pending or running, or a file (document or clarification attachment) is still being
+ * scanned, and younger than the staleness window (same rule as the operator side). */
 export function hasLiveCheck(view: OfficerApplication, now: number = Date.now()): boolean {
-  return view.documents.some((d) => {
-    const v = d.verification
-    return v !== null && (v.status === 'pending' || v.status === 'running') && !isCheckStale(v.requested_at, now)
-  })
+  return (
+    view.documents.some((d) => {
+      const v = d.verification
+      return (v !== null && (v.status === 'pending' || v.status === 'running') && !isCheckStale(v.requested_at, now)) || isScanLive(d.scan_state, d.uploaded_at, now)
+    }) ||
+    (view.clarification?.items.some((i) =>
+      i.requests.some((r) => r.response?.attachments.some((a) => isScanLive(a.scan_state, a.uploaded_at, now))),
+    ) ??
+      false)
+  )
 }
 
 /** Polls every 2 s while any document check is still running, so the officer sees results land; stops after

@@ -49,6 +49,7 @@ const overview: AdminOverview = {
     unreadable: 0,
     failed_or_unavailable: 1,
     still_running: 0,
+    dead: 0,
     average_seconds: 4.1,
     p95_seconds: 9.8,
     provider: 'OpenAI',
@@ -190,6 +191,17 @@ describe('admin overview (S-40, US-070)', () => {
     expect(screen.getAllByText('no runs yet')).toHaveLength(2)
   })
 
+  it('shows checks the worker gave up on (US-098), and only when there are some', async () => {
+    const get = vi.spyOn(api, 'getAdminOverview').mockResolvedValue({ ...overview, checks: { ...overview.checks, dead: 2 } })
+    const { unmount } = renderAt('/admin/overview')
+    expect(await screen.findByText('Gave up after 3 tries')).toBeInTheDocument()
+    unmount()
+    get.mockResolvedValue(overview)
+    renderAt('/admin/overview')
+    await screen.findByText('Checks run')
+    expect(screen.queryByText('Gave up after 3 tries')).not.toBeInTheDocument()
+  })
+
   it('shows the error state with a retry', async () => {
     // a 4xx is not retried by the query client, so the panel shows at once
     vi.spyOn(api, 'getAdminOverview').mockRejectedValue(new AppError(403, { code: 'forbidden', message: 'Not available for your role.' }))
@@ -267,11 +279,16 @@ describe('admin users (S-41, US-073)', () => {
     expect(
       within(dialog).getByText('They get licensing officer permissions on their next request. This does not sign them out.'),
     ).toBeInTheDocument()
+    // The step-up: nothing is sent until the administrator's own password is typed.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Change role' }))
+    expect(within(dialog).getByText('Enter your password to confirm.')).toBeInTheDocument()
+    expect(patch).not.toHaveBeenCalled()
+    await userEvent.type(within(dialog).getByLabelText(/Your password/), 'Admin-Own-Pass-1')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Change role' }))
     expect(await within(dialog).findByText('This is the last active administrator.')).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Change role' }))
     await waitFor(() => expect(patch).toHaveBeenCalledTimes(2))
-    expect(patch).toHaveBeenLastCalledWith('u-lim', { role: 'officer' })
+    expect(patch).toHaveBeenLastCalledWith('u-lim', { role: 'officer', admin_password: 'Admin-Own-Pass-1' })
     await waitFor(() => expect(screen.queryByRole('dialog', { name: "Change Lim Jun Hao's role?" })).not.toBeInTheDocument())
     expect(within(screen.getByText('Lim Jun Hao').closest('li')!).getByText('Licensing officer')).toBeInTheDocument()
   })
@@ -296,23 +313,27 @@ describe('admin users (S-41, US-073)', () => {
     await userEvent.click(within(row).getByRole('button', { name: 'Deactivate' }))
     const dialog = await screen.findByRole('dialog', { name: 'Deactivate Lim Jun Hao?' })
     expect(within(dialog).getByText(/signed out on their next request/)).toBeInTheDocument()
+    await userEvent.type(within(dialog).getByLabelText(/Your password/), 'Admin-Own-Pass-1')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Deactivate' }))
-    await waitFor(() => expect(patch).toHaveBeenCalledWith('u-lim', { is_active: false }))
+    await waitFor(() => expect(patch).toHaveBeenCalledWith('u-lim', { is_active: false, admin_password: 'Admin-Own-Pass-1' }))
     const contractor = screen.getByText('Contractor account').closest('li')!
     await userEvent.click(within(contractor).getByRole('button', { name: 'Reactivate' }))
-    await userEvent.click(
-      within(await screen.findByRole('dialog', { name: 'Reactivate Contractor account?' })).getByRole('button', { name: 'Reactivate' }),
-    )
-    await waitFor(() => expect(patch).toHaveBeenCalledWith('u-con', { is_active: true }))
+    const reactivate = await screen.findByRole('dialog', { name: 'Reactivate Contractor account?' })
+    await userEvent.type(within(reactivate).getByLabelText(/Your password/), 'Admin-Own-Pass-1')
+    await userEvent.click(within(reactivate).getByRole('button', { name: 'Reactivate' }))
+    await waitFor(() => expect(patch).toHaveBeenCalledWith('u-con', { is_active: true, admin_password: 'Admin-Own-Pass-1' }))
 
     await userEvent.click(screen.getByRole('button', { name: 'Add an account' }))
     const add = await screen.findByRole('dialog', { name: 'Add an account' })
     await userEvent.click(within(add).getByRole('button', { name: 'Create account' }))
     expect(within(add).getByText("Enter the person's name.")).toBeInTheDocument()
     expect(within(add).getByText('At least 12 characters.')).toBeInTheDocument()
+    expect(within(add).getByText('Enter your password to confirm.')).toBeInTheDocument()
+    expect(create).not.toHaveBeenCalled()
     await userEvent.type(within(add).getByLabelText(/Full name/), 'Ng Li Ying')
     await userEvent.type(within(add).getByLabelText(/Email address/), 'Ng.LiYing@Example.sg')
     await userEvent.type(within(add).getByLabelText(/Temporary password/), 'Correct-Horse-9-Battery')
+    await userEvent.type(within(add).getByLabelText(/Your password/), 'Admin-Own-Pass-1')
     await userEvent.click(within(add).getByRole('button', { name: 'Create account' }))
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith({
@@ -320,6 +341,7 @@ describe('admin users (S-41, US-073)', () => {
         full_name: 'Ng Li Ying',
         role: 'officer',
         password: 'Correct-Horse-9-Battery',
+        admin_password: 'Admin-Own-Pass-1',
       }),
     )
   })

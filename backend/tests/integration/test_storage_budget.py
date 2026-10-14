@@ -3,6 +3,7 @@ an upload. The per-file rules (allowlist, magic bytes, 10 MB) stay the document 
 
 from io import BytesIO
 
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image, PngImagePlugin
 from sqlalchemy.orm import Session
@@ -179,3 +180,19 @@ def test_budget_counts_every_version_and_the_evidence(client: TestClient, db: Se
     after = r.json()["view"]["storage"]
     assert after["used_bytes"] == before["used_bytes"] + len(PDF + b"evidence")
     assert after["remaining_bytes"] == after["budget_bytes"] - after["used_bytes"]
+
+
+def test_operator_budget_spans_all_their_applications(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    h, first_app = _operator(client, db)
+    second_app = _draft(client, h)
+    monkeypatch.setattr(settings_module.get_settings(), "storage_per_operator_bytes", len(PDF) + 10)
+    assert _upload(client, h, first_app, "business_profile", "one.pdf", PDF).status_code == 201
+    r = _upload(client, h, second_app, "business_profile", "two.pdf", PDF + b"2")
+    assert r.status_code == 422, r.text
+    err = r.json()["error"]
+    assert err["code"] == "validation_failed" and err["details"]["reason"] == "storage_operator_budget"
+    assert err["details"]["remaining_bytes"] == 10 and "across all your applications" in err["message"]
+    view = client.get(f"/api/v1/applications/{second_app}", headers=h).json()
+    assert view["storage"]["used_bytes"] == 0 and view["storage"]["remaining_bytes"] == 10

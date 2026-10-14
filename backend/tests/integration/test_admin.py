@@ -18,6 +18,8 @@ from tests.factories import DEFAULT_PASSWORD, login, make_user
 from tests.journeys import TXT, draft, flag_and_request, submitted, to_pending_approval, under_review, upload
 
 API = "/api/v1"
+# The step-up every user-management write carries: the signed-in administrator's own password.
+PW = {"admin_password": DEFAULT_PASSWORD}
 
 
 def _admin(client: TestClient, db: Session, email: str = "adm@example.sg") -> dict[str, str]:
@@ -127,7 +129,7 @@ def test_audit_feed_pages_by_keyset_and_carries_user_rows(client: TestClient, db
     app_id, op, off, _ = under_review(client, db)
     adm = _admin(client, db)
     spare = make_user(db, "spare@example.sg", Role.OPERATOR)
-    client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={"role": "officer"})
+    client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={**PW, "role": "officer"})
     first = client.get(f"{API}/admin/audit-feed?limit=3", headers=adm)
     assert first.status_code == 200, first.text
     page = first.json()
@@ -268,26 +270,28 @@ def test_directory_and_the_rules(client: TestClient, db: Session) -> None:
     }
 
     # self-change wins over everything
-    r = client.patch(f"{API}/admin/users/{me.id}", headers=adm, json={"is_active": False})
+    r = client.patch(f"{API}/admin/users/{me.id}", headers=adm, json={**PW, "is_active": False})
     assert r.status_code == 409 and r.json()["error"]["code"] == "self_change"
     # protected accounts cannot be changed
-    r = client.patch(f"{API}/admin/users/{demo.id}", headers=adm, json={"role": "operator"})
+    r = client.patch(f"{API}/admin/users/{demo.id}", headers=adm, json={**PW, "role": "operator"})
     assert r.status_code == 409 and r.json()["error"]["code"] == "protected_account"
     # the last active admin cannot be demoted or deactivated (another admin trying)
     other = make_user(db, "adm2@example.sg", Role.ADMIN, active=False)
-    r = client.patch(f"{API}/admin/users/{other.id}", headers=adm, json={"is_active": True})
+    r = client.patch(f"{API}/admin/users/{other.id}", headers=adm, json={**PW, "is_active": True})
     assert r.status_code == 200 and r.json()["is_active"] is True
     adm2 = login(client, "adm2@example.sg")
-    r = client.patch(f"{API}/admin/users/{other.id}", headers=adm, json={"is_active": False})
+    r = client.patch(f"{API}/admin/users/{other.id}", headers=adm, json={**PW, "is_active": False})
     assert r.status_code == 200  # two active admins: fine
-    r = client.patch(f"{API}/admin/users/{me.id}", headers=adm2, json={"role": "officer"})
+    r = client.patch(f"{API}/admin/users/{me.id}", headers=adm2, json={**PW, "role": "officer"})
     assert r.status_code == 401  # adm2 was just deactivated: the next request ends the session
     # nothing to change
-    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={})
+    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json=PW)
     assert r.status_code == 422
     # unknown user
     assert (
-        client.patch(f"{API}/admin/users/{uuid.uuid4()}", headers=adm, json={"role": "officer"}).status_code
+        client.patch(
+            f"{API}/admin/users/{uuid.uuid4()}", headers=adm, json={**PW, "role": "officer"}
+        ).status_code
         == 404
     )
     # roles
@@ -302,12 +306,12 @@ def test_role_change_and_deactivation_take_effect_on_the_next_request(
     spare = make_user(db, "spare@example.sg", Role.OPERATOR)
     sp = login(client, "spare@example.sg")
     assert client.get(f"{API}/applications", headers=sp).status_code == 200
-    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={"role": "officer"})
+    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={**PW, "role": "officer"})
     assert r.status_code == 200 and r.json()["role"] == "officer"
     # the same token now acts as an officer: the operator list is 403, the queue 200
     assert client.get(f"{API}/applications", headers=sp).status_code == 403
     assert client.get(f"{API}/officer/applications", headers=sp).status_code == 200
-    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={"is_active": False})
+    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={**PW, "is_active": False})
     assert r.status_code == 200 and r.json()["is_active"] is False
     assert client.get(f"{API}/officer/applications", headers=sp).status_code == 401
     assert (
@@ -317,7 +321,7 @@ def test_role_change_and_deactivation_take_effect_on_the_next_request(
         ).status_code
         == 401
     )
-    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={"is_active": True})
+    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={**PW, "is_active": True})
     assert r.status_code == 200
     # the deactivation ended the live session: the old token stays dead after the reactivation, with the
     # reason, and a fresh sign-in needs no take-over (review finding, 21 Sep)
@@ -345,15 +349,15 @@ def test_role_change_and_deactivation_take_effect_on_the_next_request(
 
     app_id, op, _off = submitted(client, db)
     assert db.scalars(select(Notification).where(Notification.user_id == spare.id)).all()
-    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={"role": "operator"})
+    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={**PW, "role": "operator"})
     assert r.status_code == 200
     sp = login(client, "spare@example.sg")
     assert client.get(f"{API}/notifications", headers=sp).json()["items"] == []
-    client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={"role": "officer"})
+    client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={**PW, "role": "officer"})
     # a deactivated officer receives no notifications: the fan-out reads active officers only
     from app.repositories.notifications import NotificationRepository
 
-    client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={"is_active": False})
+    client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={**PW, "is_active": False})
     assert spare.id not in NotificationRepository(db).active_officer_ids()
 
 
@@ -362,21 +366,21 @@ def test_last_admin_cannot_be_removed(client: TestClient, db: Session) -> None:
     adm = login(client, "adm@example.sg")
     second = make_user(db, "adm2@example.sg", Role.ADMIN)
     # demote the second: fine (the caller stays)
-    r = client.patch(f"{API}/admin/users/{second.id}", headers=adm, json={"role": "officer"})
+    r = client.patch(f"{API}/admin/users/{second.id}", headers=adm, json={**PW, "role": "officer"})
     assert r.status_code == 200
     # promote back, then deactivate the caller from the second: refused, the caller would be the last
-    client.patch(f"{API}/admin/users/{second.id}", headers=adm, json={"role": "admin"})
+    client.patch(f"{API}/admin/users/{second.id}", headers=adm, json={**PW, "role": "admin"})
     adm2 = login(client, "adm2@example.sg")
     me = db.scalar(select(User).where(User.email == "adm@example.sg"))
     assert me is not None
-    r = client.patch(f"{API}/admin/users/{me.id}", headers=adm2, json={"is_active": False})
+    r = client.patch(f"{API}/admin/users/{me.id}", headers=adm2, json={**PW, "is_active": False})
     assert r.status_code == 200  # two active admins: allowed
-    r = client.patch(f"{API}/admin/users/{me.id}", headers=adm2, json={"is_active": True})
+    r = client.patch(f"{API}/admin/users/{me.id}", headers=adm2, json={**PW, "is_active": True})
     assert r.status_code == 200
     # now demote adm2 from adm and try to demote adm from adm2: the last-admin rule bites
-    client.patch(f"{API}/admin/users/{second.id}", headers=adm, json={"is_active": False})
+    client.patch(f"{API}/admin/users/{second.id}", headers=adm, json={**PW, "is_active": False})
     r = client.patch(
-        f"{API}/admin/users/{me.id}", headers=login(client, "adm@example.sg"), json={"role": "officer"}
+        f"{API}/admin/users/{me.id}", headers=login(client, "adm@example.sg"), json={**PW, "role": "officer"}
     )
     assert r.status_code == 409 and r.json()["error"]["code"] == "self_change"
 
@@ -392,7 +396,9 @@ def test_two_admins_cannot_both_leave(client: TestClient, db: Session) -> None:
 
     def demote(headers: dict[str, str], target: uuid.UUID) -> None:
         results.append(
-            client.patch(f"{API}/admin/users/{target}", headers=headers, json={"role": "officer"}).status_code
+            client.patch(
+                f"{API}/admin/users/{target}", headers=headers, json={**PW, "role": "officer"}
+            ).status_code
         )
 
     t1 = threading.Thread(target=demote, args=(ha, b.id))
@@ -406,6 +412,73 @@ def test_two_admins_cannot_both_leave(client: TestClient, db: Session) -> None:
     assert len(admins) >= 1
 
 
+def test_creating_an_account_needs_the_admins_own_password(client: TestClient, db: Session) -> None:
+    """Security audit F2: a stolen session alone cannot mint an administrator."""
+    make_user(db, "adm@example.sg", Role.ADMIN)
+    adm = login(client, "adm@example.sg")
+    body = {
+        "email": "mint@example.sg",
+        "full_name": "Mint Admin",
+        "role": "admin",
+        "password": DEFAULT_PASSWORD,
+    }
+    r = client.post(f"{API}/admin/users", headers=adm, json={**body, "admin_password": "Not-The-Password-1"})
+    assert r.status_code == 403 and r.json()["error"]["code"] == "step_up_failed"
+    assert client.post(f"{API}/admin/users", headers=adm, json=body).status_code == 422  # missing
+    assert db.scalar(select(User).where(User.email == "mint@example.sg")) is None
+    assert db.scalar(select(AuditEvent).where(AuditEvent.event_type == "user.created")) is None
+    (failed,) = db.scalars(select(AuditEvent).where(AuditEvent.event_type == "user.step_up_failed")).all()
+    assert failed.payload == {"action": "create", "email": "mint@example.sg"}
+    assert "Not-The-Password-1" not in str(failed.payload)
+    # The new account's password is not the step-up: the admin's own is.
+    assert (
+        client.post(
+            f"{API}/admin/users", headers=adm, json={**body, "admin_password": body["password"]}
+        ).status_code
+        == 201
+    )
+
+
+def test_changing_an_account_needs_the_admins_own_password(client: TestClient, db: Session) -> None:
+    make_user(db, "adm@example.sg", Role.ADMIN)
+    spare = make_user(db, "spare@example.sg", Role.OPERATOR)
+    adm = login(client, "adm@example.sg")
+    url = f"{API}/admin/users/{spare.id}"
+    for patch in ({"role": "admin"}, {"is_active": False}):
+        r = client.patch(url, headers=adm, json={**patch, "admin_password": "Not-The-Password-1"})
+        assert r.status_code == 403 and r.json()["error"]["code"] == "step_up_failed"
+        assert client.patch(url, headers=adm, json=patch).status_code == 422  # missing
+    db.expire_all()
+    refreshed = db.get(User, spare.id)
+    assert refreshed is not None and refreshed.role == Role.OPERATOR and refreshed.is_active is True
+    assert db.scalar(select(AuditEvent).where(AuditEvent.event_type == "user.role_changed")) is None
+    failed = db.scalars(select(AuditEvent).where(AuditEvent.event_type == "user.step_up_failed")).all()
+    assert len(failed) == 2
+    assert all(f.payload == {"action": "change", "user_id": str(spare.id)} for f in failed)
+    assert client.patch(url, headers=adm, json={**PW, "role": "officer"}).status_code == 200
+
+
+def test_wrong_passwords_on_user_management_count_against_the_sign_in_limiter(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.api.v1 import auth as auth_module
+    from app.core.rate_limit import FailedLoginLimiter
+
+    make_user(db, "adm@example.sg", Role.ADMIN)
+    spare = make_user(db, "spare@example.sg", Role.OPERATOR)
+    adm = login(client, "adm@example.sg")
+    monkeypatch.setattr(auth_module, "login_limiter", FailedLoginLimiter(2))
+    for _ in range(2):
+        r = client.patch(
+            f"{API}/admin/users/{spare.id}",
+            headers=adm,
+            json={"role": "officer", "admin_password": "no-no-no-1"},
+        )
+        assert r.status_code == 403
+    r = client.patch(f"{API}/admin/users/{spare.id}", headers=adm, json={**PW, "role": "officer"})
+    assert r.status_code == 429
+
+
 def test_create_user_from_the_page(client: TestClient, db: Session) -> None:
     make_user(db, "adm@example.sg", Role.ADMIN)
     adm = login(client, "adm@example.sg")
@@ -414,6 +487,7 @@ def test_create_user_from_the_page(client: TestClient, db: Session) -> None:
         "full_name": "Lim Jun Hao",
         "role": "officer",
         "password": DEFAULT_PASSWORD,
+        "admin_password": DEFAULT_PASSWORD,
     }
     r = client.post(f"{API}/admin/users", headers=adm, json=body)
     assert r.status_code == 201, r.text

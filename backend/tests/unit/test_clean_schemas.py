@@ -49,7 +49,15 @@ def test_site_visit_notes_are_cleaned() -> None:
 
 
 def test_an_account_name_cannot_be_blank_or_hidden() -> None:
-    ok = UserCreateIn(email="a@b.sg", full_name=f"  Tan{HIDDEN}   Wei ", role=Role.OFFICER, password="x" * 12)
+    ok = UserCreateIn(
+        email="a@b.sg",
+        full_name=f"  Tan{HIDDEN}   Wei ",
+        role=Role.OFFICER,
+        password="x" * 12,
+        admin_password="y",
+    )
     assert ok.full_name == "Tan Wei"
     with pytest.raises(ValidationError):
-        UserCreateIn(email="a@b.sg", full_name=f" {HIDDEN} ", role=Role.OFFICER, password="x" * 12)
+        UserCreateIn(
+            email="a@b.sg", full_name=f" {HIDDEN} ", role=Role.OFFICER, password="x" * 12, admin_password="y"
+        )

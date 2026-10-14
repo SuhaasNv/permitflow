@@ -1,0 +1,6 @@
+# Trivy findings accepted on purpose (US-103). The images job fails on any HIGH or CRITICAL vulnerability that
+# has a fixed version; an entry here silences one id for both images. Every entry needs, on the line above it:
+# why it does not apply or cannot be fixed yet, who accepted it, and the date to look again. No entries today.
+#
+# Example shape (not an active entry):
+# CVE-0000-00000   # not reachable: the package is only used by the build stage; accepted 2026-10-09, review 2026-11-09

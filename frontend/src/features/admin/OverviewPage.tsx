@@ -9,6 +9,7 @@ import { ErrorPanel, Skeleton } from '@/features/shared/states'
 import { cn } from '@/lib/cn'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { useBuildInfo } from '@/features/releases/queries'
+import { appVersion } from '@/features/releases/version'
 import { useAdminOverview } from './queries'
 
 const BAR_TONE: Record<string, string> = {
@@ -102,6 +103,7 @@ function ChecksPanel({ checks }: { checks: Checks }) {
           <Row label="Could not read" value={checks.unreadable} />
           <Row label="Failed or unavailable" value={checks.failed_or_unavailable} />
           {checks.still_running > 0 ? <Row label="Still running" value={checks.still_running} muted /> : null}
+          {checks.dead > 0 ? <Row label="Gave up after 3 tries" value={checks.dead} /> : null}
           <Row label="Average time" value={seconds(checks.average_seconds)} />
           <Row label="Slowest 5 % of checks" value={seconds(checks.p95_seconds)} />
         </dl>
@@ -155,7 +157,7 @@ function BuildLine() {
     <p className="flex flex-wrap items-center gap-x-1.5 px-1 text-[13px] text-text-3" data-testid="admin-build-line">
       <span>Build</span>
       <span className="font-mono text-text-2">
-        v{__APP_VERSION__}
+        v{appVersion()}
         {commit}
       </span>
       {build.data ? <span>· {build.data.environment}</span> : null}

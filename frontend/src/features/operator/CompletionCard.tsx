@@ -2,6 +2,9 @@ import { Link } from 'react-router-dom'
 
 import type { ApplicationView } from '@/api/applications'
 import { cn } from '@/lib/cn'
+import { StatusBadge } from '@/features/shared/StatusBadge'
+
+import { isScanHeld } from './queries'
 
 function Mark({ ok, warn }: { ok: boolean; warn?: boolean }) {
   return (
@@ -84,9 +87,15 @@ export function CompletionCard({ view }: { view: ApplicationView }) {
         ))}
         {view.document_slots.map((d) => (
           <li key={d.type} className="flex items-center gap-2.5 py-2.5 text-sm">
-            <Mark ok={d.present} />
+            <Mark ok={d.present && !isScanHeld(d)} />
             <span className="min-w-0 flex-1 truncate">{d.label}</span>
-            <span className="text-xs text-text-3">{d.present ? 'Uploaded' : 'Missing'}</span>
+            {d.document?.scan_state === 'infected' ? (
+              <StatusBadge label="Blocked" tone="error" />
+            ) : d.document?.scan_state === 'scanning' ? (
+              <StatusBadge label="Scanning" tone="info" live />
+            ) : (
+              <span className="text-xs text-text-3">{d.present ? 'Uploaded' : 'Missing'}</span>
+            )}
             {d.editable && !d.present ? (
               <Link to={`${base}/documents`} className="inline-block py-2 text-xs font-semibold sm:py-0">
                 Upload

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
-import { downloadLicence } from '@/api/documents'
+import { downloadLicence, openLicence, scanMessage } from '@/api/documents'
 import { Alert } from '@/features/shared/Alert'
 import { Button, buttonClasses } from '@/features/shared/Button'
 import { TextAreaField } from '@/features/shared/Controls'
@@ -17,7 +17,7 @@ import { CompletionCard } from './CompletionCard'
 import { FeedbackNotice, targetHref } from './FeedbackNotice'
 import { ClarificationNotice } from './ClarificationNotice'
 import { SiteVisitCard } from './SiteVisitCard'
-import { applicationKeys, useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
+import { applicationKeys, isScanHeld, useApplication, useDeleteDraft, useResubmitApplication, useWithdrawApplication } from './queries'
 
 const ArrowIcon = (
   <svg
@@ -46,6 +46,11 @@ export function ApplicationPage() {
   const [confirm, setConfirm] = useState(false)
   /** A 409 means the application moved under us (the officer decided, another tab acted): reload, never show the raw reason. */
   const explainConflict = (e: Error, title: string) => {
+    if (e instanceof AppError && e.status === 409 && scanMessage(e)) {
+      toast.push({ title, body: scanMessage(e) ?? e.message, tone: 'error' })
+      void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(id) })
+      return
+    }
     if (e instanceof AppError && e.status === 409) {
       toast.push({ title, body: 'This application changed since you opened it. Showing the latest.', tone: 'error' })
       void queryClient.invalidateQueries({ queryKey: applicationKeys.detail(id) })
@@ -78,12 +83,15 @@ export function ApplicationPage() {
   }
   const view = app.data
   const nextSection = view.sections.find((s) => !s.complete)
+  const heldCount = view.document_slots.filter(isScanHeld).length
   const docsDone = view.completeness.documents_present === view.completeness.documents_total
   const responding = view.resubmit !== null
   const firstOpen = view.feedback.find((f) => f.resolution === 'open')
   // Readiness counts flagged targets (sections and document types), never feedback items.
   const changedTargets = view.resubmit ? view.resubmit.changed_sections.length + view.resubmit.changed_document_types.length : 0
   const flaggedTargets = view.resubmit ? changedTargets + view.resubmit.untouched_targets.length : 0
+  // The backend words the reason; this only picks the title when a file that is blocked or being scanned holds Resubmit.
+  const scanHold = heldCount > 0
   const doResubmit = () => {
     if (resubmit.isPending) return
     resubmit.mutate(undefined, {
@@ -150,6 +158,10 @@ export function ApplicationPage() {
                 <Link to={`/app/applications/${id}/review`} className={buttonClasses('secondary')}>
                   Review and submit
                 </Link>
+              ) : view.submit_blocked_reason ? (
+                <Button variant="secondary" disabled title={view.submit_blocked_reason}>
+                  Review and submit
+                </Button>
               ) : null}
               <Link to={`/app/applications/${id}/form${nextSection ? `/${nextSection.key}` : ''}`} className={buttonClasses('primary')}>
                 {view.completeness.percent === 0 ? 'Start application' : 'Continue application'}
@@ -198,6 +210,17 @@ export function ApplicationPage() {
               <Button
                 size="sm"
                 onClick={() =>
+                  void openLicence(id, view.licence?.licence_no ?? 'licence').catch((e: unknown) =>
+                    toast.push({ title: 'Could not open the file', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                  )
+                }
+              >
+                Open licence (PDF) in a new tab
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
                   void downloadLicence(id, view.licence?.licence_no ?? 'licence').catch((e: unknown) =>
                     toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
                   )
@@ -220,7 +243,9 @@ export function ApplicationPage() {
             title={
               view.resubmit.can_resubmit
                 ? `Ready to resubmit: ${changedTargets} of ${flaggedTargets} flagged ${flaggedTargets === 1 ? 'item' : 'items'} changed.`
-                : 'Nothing has changed yet.'
+                : scanHold
+                  ? 'Resubmit is on hold.'
+                  : 'Nothing has changed yet.'
             }
           >
             {view.resubmit.can_resubmit

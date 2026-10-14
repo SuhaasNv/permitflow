@@ -9,7 +9,9 @@ import {
   OPERATOR,
   openCase,
   seedAwaitingClarification,
+  seedDraft,
   seedPendingResubmission,
+  seedResubmitted,
   seedUnderReview,
   seedVisitConfirmed,
   seedVisitProposed,
@@ -28,8 +30,10 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-prac
 // every seed is four document checks against the demonstration operator's daily quota.
 let pendingOnce: ReturnType<typeof seedPendingResubmission> | undefined
 let visitOnce: ReturnType<typeof seedVisitConfirmed> | undefined
+let resubmittedOnce: ReturnType<typeof seedResubmitted> | undefined
 const sharedPending = () => (pendingOnce ??= seedPendingResubmission())
 const sharedVisit = () => (visitOnce ??= seedVisitConfirmed())
+const sharedResubmitted = () => (resubmittedOnce ??= seedResubmitted())
 
 /** Collects one line per violation so a run reports every screen, not only the first broken one. */
 async function violations(page: Page, screen: string): Promise<string[]> {
@@ -580,4 +584,93 @@ test('no screen spills out of its box from 320 to 1440 px for any role (US-096)'
   await signIn(page, ADMIN)
   for (const [s, p] of [['overview', '/admin/overview'], ['activity', '/admin/activity'], ['users', '/admin/users']] as const) await sweep(s, p)
   expect(found, found.join('\n')).toEqual([])
+})
+
+test("a resubmitted case's compare view is a table with no axe violations, for the officer at 1280 and 390 and the administrator (WCAG 1.3.1)", async ({ page }) => {
+  const app = await sharedResubmitted()
+  const found: string[] = []
+  const compare = async (screen: string, path: string) => {
+    await page.goto(path)
+    const table = page.getByRole('table', { name: /^Fields changed in / }).first()
+    await table.waitFor()
+    // Column headers name the two revisions, the field heads its row, and no definition list is left over.
+    await expect(table.getByRole('columnheader')).toHaveText(['Field', 'Revision 1', 'Revision 2'])
+    await expect(table.getByRole('rowheader').first()).toBeVisible()
+    expect(await table.locator('dl, dt, dd').count()).toBe(0)
+    await page.waitForLoadState('networkidle')
+    found.push(...(await violations(page, screen)))
+  }
+  await signIn(page, OFFICER)
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    await compare(`${width} officer compare view`, `/officer/applications/${app.id}`)
+  }
+  await page.setViewportSize({ width: 1280, height: 844 })
+  await signOut(page)
+  await signIn(page, ADMIN)
+  await compare('1280 admin read-only compare view', `/admin/applications/${app.id}`)
+  await signOut(page)
+  expectNone(found)
+})
+
+test('the hours toggles, quick links and checkbox show the 2px focus outline, not the faint halo (WCAG 2.4.7, 1.4.11)', async ({ page }) => {
+  const app = await seedDraft()
+  await signIn(page, OPERATOR)
+  await page.goto(`${app.url}/form/operations`)
+  await page.getByRole('group', { name: 'Open on' }).waitFor()
+  const weak: string[] = []
+  for (const [label, control] of [
+    ['day toggle', page.getByRole('button', { name: 'Mon', exact: true })],
+    ['quick link', page.getByRole('button', { name: 'Mon to Fri', exact: true })],
+    ['Open 24 hours', page.getByRole('checkbox', { name: 'Open 24 hours' })],
+  ] as const) {
+    // Arrive by keyboard (away and back), so the browser treats the focus as :focus-visible.
+    await control.focus()
+    await page.keyboard.press('Shift+Tab')
+    await page.keyboard.press('Tab')
+    await expect(control).toBeFocused()
+    // The outline may still be easing in (the global transition), so wait for it to reach full width.
+    await expect
+      .poll(() => control.evaluate((el) => parseFloat(getComputedStyle(el).outlineWidth)), { message: `${label}: no 2px outline on focus` })
+      .toBeGreaterThanOrEqual(2)
+    const paint = await control.evaluate((el) => {
+      const cs = getComputedStyle(el)
+      return { width: parseFloat(cs.outlineWidth), style: cs.outlineStyle, color: cs.outlineColor, shadow: cs.boxShadow }
+    })
+    if (paint.style === 'none' || paint.width < 2) weak.push(`${label}: outline is ${paint.style} ${paint.width}px`)
+    if (paint.color !== 'rgb(23, 92, 211)') weak.push(`${label}: outline colour is ${paint.color}`)
+    if (paint.shadow.includes('rgba(23, 92, 211, 0.2)')) weak.push(`${label}: the faint halo is back (${paint.shadow})`)
+  }
+  // Every day pressed shows seven check marks; at 320 px none of them may spill out of its box or off the page.
+  await page.setViewportSize({ width: 320, height: 800 })
+  await page.getByRole('button', { name: 'Every day', exact: true }).click()
+  const spill = await page.getByRole('group', { name: 'Open on' }).getByRole('button').evaluateAll((buttons) =>
+    buttons.filter((b) => b.scrollWidth > b.clientWidth + 1).map((b) => `${b.textContent}: ${b.scrollWidth} > ${b.clientWidth}`),
+  )
+  if (spill.length) weak.push(`pressed days spill out of their boxes at 320 px: ${spill.join(', ')}`)
+  const page320 = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)
+  if (page320) weak.push('the hours picker makes the page scroll sideways at 320 px')
+  expect(weak, weak.join('\n')).toEqual([])
+})
+
+test('focus follows the action: into the feedback box, back to Add feedback, and a failed sign-in keeps the button (WCAG 2.4.3)', async ({ page }) => {
+  const app = await seedUnderReview()
+  await signIn(page, OFFICER)
+  await openCase(page, app.reference)
+  const add = page.getByRole('button', { name: 'Add feedback' })
+  await add.click()
+  await expect(page.getByLabel(/Feedback for the operator/)).toBeFocused()
+  await page.getByRole('button', { name: 'Cancel' }).first().click()
+  await expect(add).toBeFocused()
+  await signOut(page)
+
+  await page.goto('/login')
+  await page.getByLabel(/Email address/).fill('nobody@permitflow.example.sg')
+  await page.getByLabel(/^Password/).fill('not-the-password')
+  const signInButton = page.getByRole('button', { name: 'Sign in', exact: true })
+  await signInButton.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('alert').first()).toBeVisible()
+  await expect(signInButton).toBeFocused()
+  await expect(signInButton).not.toHaveAttribute('aria-disabled', 'true')
 })

@@ -1,8 +1,9 @@
-"""AI verification runs (ADR-004, ADR-006). The only module that talks to `infra.ai`.
+"""AI verification runs (ADR-004, ADR-006, ADR-016). The only module that talks to `infra.ai`.
 
-`run_verification(run_id)` is a plain synchronous function that opens its own database session, so it
-can run in FastAPI's threadpool via BackgroundTasks after the request session is gone. It never raises:
-every failure is recorded on the run as data (REL-003).
+`execute_run(run_id)` is a plain synchronous function that opens its own database session, so it can run
+in FastAPI's threadpool via BackgroundTasks after the request session is gone (`VERIFICATION_MODE=inline`),
+or in a worker thread of `python -m app.worker` (`worker`). It never raises: every failure is recorded on
+the run as data (REL-003). A queued run is `pending`; a claimed one is `running` and held by a lease.
 """
 
 import logging
@@ -13,18 +14,20 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core import metrics
-from app.core.errors import Conflict, Forbidden, NotFound
+from app.core.errors import Conflict, Forbidden, NotFound, RateLimited
 from app.core.settings import get_settings
+from app.domain.ai_input import prepare_text, redact_form_section
 from app.domain.enums import Role, VerificationStatus
+from app.domain.scan import CLEAN, REASON_INFECTED, REASON_SCANNER_UNAVAILABLE, SCANNING
 from app.domain.verification_rules import (
     DOCUMENT_TYPE_DESCRIPTIONS,
     SECTION_FOR_DOCUMENT,
     VerificationRequest,
     VerificationResult,
     apply_rules,
-    find_injection_phrases,
 )
 from app.infra.ai import ProviderError, ProviderUnavailable
+from app.infra.ai.base import VerificationProvider
 from app.infra.ai.factory import get_provider
 from app.infra.ai.openai_provider import PROMPT_VERSION
 from app.infra.db import session_factory
@@ -34,8 +37,18 @@ from app.models import Application, Document, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
+from app.services.ai_usage import (
+    count_unrecorded,
+    publish,
+    record_ended_runs,
+    record_refused,
+    record_usage,
+    trace_ids,
+)
 from app.services.applications import ApplicationService
-from app.services.quotas import new_run
+from app.services.platform_settings import live
+from app.services.quotas import AI_PAUSED_REASON, DAILY_LIMIT_REASON, new_run, verification_over_quota
+from app.services.scan import ScanOutcome, alert_scanner_down, enforcing, scan_document, will_retry
 
 logger = logging.getLogger("permitflow.verification")
 
@@ -46,31 +59,109 @@ TERMINAL = {
     VerificationStatus.UNREADABLE,
     VerificationStatus.FAILED,
     VerificationStatus.UNAVAILABLE,
+    VerificationStatus.DEAD,
 }
+MAX_ATTEMPTS = 3
+REPLACED_REASON = "document_replaced"
+# US-099: how long a check held for a scanner outage waits before the reaper queues it again.
+SCANNER_RETRY_SECONDS = 60
+
+
+def start_run(run_id: uuid.UUID) -> None:
+    """The request's background task. Inline: run the check here. Worker: the run is already queued, so
+    only wake the workers (a missed wake-up costs at most the polling interval)."""
+    scan_unqueued(run_id)
+    if get_settings().verification_mode == "inline":
+        run_verification(run_id)
+        return
+    try:
+        with session_factory()() as db:
+            DocumentRepository(db).notify_queue()
+            db.commit()
+    except Exception:  # noqa: BLE001 - the workers poll anyway; the request has already been answered
+        logger.exception("verification_notify_failed")
+
+
+def scan_unqueued(run_id: uuid.UUID) -> None:
+    """US-099: a run stored finished at creation (the AI paused, a quota refusal) is never claimed, so its
+    file would wait in quarantine for ever. The virus scan does not depend on the AI: scan it here."""
+    if not enforcing():
+        return
+    try:
+        with session_factory()() as db:
+            run = db.get(VerificationRun, run_id)
+            doc = db.get(Document, run.document_id) if run else None
+            app = db.get(Application, doc.application_id) if doc else None
+            if run and doc and app and run.status in TERMINAL and doc.scan_state == SCANNING:
+                # As in execute_run: end the read transaction so the pooled connection is returned while
+                # clamd is called (the loaded rows stay usable); scan_document opens a new one to write.
+                db.commit()
+                scan_document(db, doc, app)
+    except Exception:  # noqa: BLE001 - a background task; the file stays held and a re-run scans it
+        logger.exception("scan_unqueued_failed", extra={"extra_fields": {"run_id": str(run_id)}})
 
 
 def run_verification(run_id: uuid.UUID) -> None:
-    settings = get_settings()
+    """Inline mode: claim the pending run (the atomic pending-to-running move: true for one caller only)
+    and execute it."""
     with session_factory()() as db:
-        # Atomic claim: only one worker can move a run from pending to running.
         claimed = DocumentRepository(db).claim_run(run_id, datetime.now(UTC))
         db.commit()
-        if not claimed:
-            return
+    if claimed:
+        execute_run(run_id)
+
+
+def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
+    """Run a claimed check. `worker_id` is the claimant (None inline); the result is written only while the
+    run is still `running` and still held by it, so a duplicate execution is harmless (at-least-once)."""
+    settings = get_settings()
+    with session_factory()() as db:
         run = db.get(VerificationRun, run_id)
-        doc = db.get(Document, run.document_id) if run else None
+        if run is None or run.status != VerificationStatus.RUNNING or run.worker_id != worker_id:
+            return
+        doc = db.get(Document, run.document_id)
         app = db.get(Application, doc.application_id) if doc else None
-        if run is None or doc is None or app is None:
+        if doc is None or app is None:
             return
         # End the read transaction here: the session keeps the loaded rows (expire_on_commit=False) but
         # returns its pooled connection while the file is read and the model is called, so a burst of slow
         # checks cannot park every connection and starve the API. `_finish` opens a new one to write.
         db.commit()
         started = time.perf_counter()
+        provider: VerificationProvider | None = None
 
         try:
+            # US-099: the scan comes first, before any text is read or any model is called. With the scan
+            # enforced, a file that is not `clean` is scanned (a NULL one was stored before the scan, or with
+            # it off: it is scanned now and stays where it is); infected or unanswered means it goes no
+            # further. With the scan off nothing here runs: a `scanning` row needs a re-run after the scan is
+            # switched on again.
+            if enforcing() and doc.scan_state != CLEAN:
+                gate = scan_document(db, doc, app)
+                if gate is ScanOutcome.GONE:
+                    return
+                if gate is ScanOutcome.INFECTED:
+                    _finish(
+                        db, run, app, VerificationStatus.UNREADABLE,
+                        provider="none", error_reason=REASON_INFECTED, started=started,
+                    )  # fmt: skip
+                    return
+                if gate is ScanOutcome.HELD:
+                    if not will_retry(run.attempts):
+                        alert_scanner_down()
+                    _finish(
+                        db, run, app, VerificationStatus.UNAVAILABLE,
+                        provider="none", error_reason=REASON_SCANNER_UNAVAILABLE, started=started,
+                    )  # fmt: skip
+                    return
+                if worker_id is not None and live().bool_value("ai_paused"):
+                    # Scanned while the AI is paused: the file is released, the check goes back to the queue.
+                    release_run(run.id, worker_id)
+                    return
+
             data = b"".join(get_storage().open(doc.stored_key))
-            extracted = extract_text(doc.content_type, data, max_chars=settings.ai_max_text_chars)
+            max_chars = live().int_value("ai_max_text_chars")
+            extracted = extract_text(doc.content_type, data, max_chars=max_chars)
             doc.extracted_text = extracted.text or None
             if extracted.reason:
                 _finish(
@@ -83,6 +174,40 @@ def run_verification(run_id: uuid.UUID) -> None:
                     started=started,
                 )
                 return
+
+            # US-101: a check created before the administrator paused the AI is stopped here, before
+            # any provider is chosen or called.
+            if live().bool_value("ai_paused"):
+                _finish(
+                    db,
+                    run,
+                    app,
+                    VerificationStatus.UNAVAILABLE,
+                    provider="none",
+                    error_reason=AI_PAUSED_REASON,
+                    started=started,
+                )
+                return
+
+            # The draft may have been deleted, or the file replaced, while the text was read: look again
+            # before anything leaves the system. A deleted draft's text never reaches the provider.
+            with db.no_autoflush:
+                state = DocumentRepository(db).lifecycle(run.id)
+            if state == "removed":
+                db.rollback()
+                return
+            if state == "replaced":
+                _finish(
+                    db,
+                    run,
+                    app,
+                    VerificationStatus.UNAVAILABLE,
+                    provider="none",
+                    error_reason=REPLACED_REASON,
+                    started=started,
+                )
+                return
+            db.commit()  # keep the extracted text, and give the connection back during the model call
 
             provider = get_provider()
             if provider is None:
@@ -97,14 +222,22 @@ def run_verification(run_id: uuid.UUID) -> None:
                 )
                 return
 
-            injection = find_injection_phrases(extracted.text)
+            # Clean, check and redact before anything reaches the provider (US-102).
+            # The cap is applied again after NFKC, which can expand a character many times over.
+            prepared = prepare_text(extracted.text, max_chars=max_chars, invisible=extracted.hidden)
             section_key = SECTION_FOR_DOCUMENT[doc.document_type.value]
             request = VerificationRequest(
                 document_type=doc.document_type.value,
                 document_type_description=DOCUMENT_TYPE_DESCRIPTIONS[doc.document_type.value],
-                form_section=dict(app.draft_data.get(section_key) or {}),
-                text=extracted.text,
-                extra={"verification_run_id": run.id, "application_id": app.id, "document_id": doc.id},
+                form_section=redact_form_section(dict(app.draft_data.get(section_key) or {})),
+                text=prepared.text,
+                # LangSmith metadata (US-100): the run and document ids, and keyed hashes for the case and the
+                # person; neither the application id, the user id nor the email.
+                extra={
+                    "verification_run_id": run.id,
+                    "document_id": doc.id,
+                    **trace_ids(run.requested_by, app.id),
+                },
             )
             try:
                 result: VerificationResult = provider.verify(request)
@@ -117,6 +250,7 @@ def run_verification(run_id: uuid.UUID) -> None:
                     provider=provider.name,
                     model=provider.model,
                     error_reason=_reason(exc),
+                    tokens=_billed(provider),
                     started=started,
                 )
                 return
@@ -130,12 +264,15 @@ def run_verification(run_id: uuid.UUID) -> None:
                     model=provider.model,
                     error_reason=_reason(exc),
                     raw_output_valid=False,
+                    tokens=_billed(provider),
                     started=started,
                 )
                 return
 
             outcome = apply_rules(
-                result, confidence_threshold=settings.ai_confidence_threshold, injection_phrases=injection
+                result,
+                confidence_threshold=settings.ai_confidence_threshold,
+                injection_phrases=prepared.injection,
             )
             run.confidence = result.confidence
             run.summary = result.summary
@@ -149,20 +286,24 @@ def run_verification(run_id: uuid.UUID) -> None:
                 provider=provider.name,
                 model=provider.model,
                 raw_output_valid=True,
+                tokens=_billed(provider),
                 started=started,
             )
         except Exception as exc:  # noqa: BLE001 - last line of defence: the task must never raise
             logger.exception("verification_crashed", extra={"extra_fields": {"run_id": str(run_id)}})
             db.rollback()
             run = db.get(VerificationRun, run_id)
-            if run is not None:
+            if run is not None and run.status == VerificationStatus.RUNNING and run.worker_id == worker_id:
+                # A crash after the provider answered still cost what it billed: keep it on the row.
                 _finish(
                     db,
                     run,
                     app,
                     VerificationStatus.FAILED,
-                    provider="none",
+                    provider=provider.name if provider else "none",
+                    model=provider.model if provider else None,
                     error_reason=_reason(exc),
+                    tokens=_billed(provider) if provider else (0, 0),
                     started=started,
                 )
 
@@ -181,6 +322,11 @@ def _reason(exc: Exception) -> str:
     return "internal_error"
 
 
+def _billed(provider: VerificationProvider) -> tuple[int, int]:
+    """(input, output) tokens the provider billed for this check, zero for one that bills nothing."""
+    return int(getattr(provider, "input_tokens", 0) or 0), int(getattr(provider, "output_tokens", 0) or 0)
+
+
 def _finish(
     db: Session,
     run: VerificationRun,
@@ -191,8 +337,23 @@ def _finish(
     model: str | None = None,
     error_reason: str | None = None,
     raw_output_valid: bool | None = None,
+    tokens: tuple[int, int] = (0, 0),
     started: float,
 ) -> None:
+    # Only the holder of the run writes its result, under a row lock: if the draft was deleted (the run
+    # is gone) or the lease was taken over by another worker, this result is dropped.
+    with db.no_autoflush:  # the lock comes first; the result is flushed under it
+        held = DocumentRepository(db).lock_state(run.id, app.id if app else None) == (
+            VerificationStatus.RUNNING,
+            run.worker_id,
+        )
+    if not held:
+        # Log first: after the rollback `run.id` would reload a row that is gone if the draft was deleted.
+        logger.warning("verification_result_dropped", extra={"extra_fields": {"run_id": str(run.id)}})
+        db.rollback()
+        count_unrecorded(tokens)  # billed, but no row will hold them
+        return
+    run.lease_until = None
     run.status = status
     run.provider = provider
     run.model = model
@@ -214,7 +375,26 @@ def _finish(
             "error_reason": error_reason,
         },
     )
+    # US-100: the usage row commits with the result, never before or after it.
+    doc = db.get(Document, run.document_id)
+    usage = (
+        record_usage(
+            db,
+            run=run,
+            doc=doc,
+            outcome=status,
+            provider=provider,
+            model=model,
+            input_tokens=tokens[0],
+            output_tokens=tokens[1],
+            latency_ms=run.latency_ms,
+        )
+        if doc is not None
+        else None
+    )
     db.commit()
+    if usage is not None:
+        publish(usage, app.reference_no if app else None, announce=provider != "none")
     metrics.VERIFICATION_RUNS.labels(status.value, provider).inc()
     metrics.VERIFICATION_SECONDS.labels(provider).observe(run.latency_ms / 1000)
     logger.info(
@@ -232,17 +412,86 @@ def _finish(
     )
 
 
+def claim_next_run(worker_id: str, *, scan_only: bool = False) -> uuid.UUID | None:
+    """Worker mode: take the oldest queued run and commit the claim at once. From here the lease, not a
+    transaction, says the run is being worked."""
+    now = datetime.now(UTC)
+    lease_until = now + timedelta(seconds=get_settings().worker_lease_seconds)
+    with session_factory()() as db:
+        run_id = DocumentRepository(db).claim_next(worker_id, now, lease_until, scan_only=scan_only)
+        db.commit()
+        return run_id
+
+
+def release_run(run_id: uuid.UUID, worker_id: str) -> bool:
+    """Worker shutdown: hand an unfinished run back to the queue."""
+    with session_factory()() as db:
+        released = DocumentRepository(db).release_lease(run_id, worker_id)
+        db.commit()
+        return released
+
+
+def _interrupted_after(grace_seconds: int = 60) -> timedelta:
+    """How long a lease-less `running` run may last before it counts as interrupted."""
+    return timedelta(seconds=get_settings().ai_timeout_seconds * 2 + grace_seconds)
+
+
+def reap_expired_runs() -> tuple[int, int]:
+    """Worker mode: runs whose lease ran out (the worker died or hung) go back to the queue, or die after
+    `MAX_ATTEMPTS` claims. Returns (requeued, dead). A dead run is audited like any finished check. A
+    `running` run with no lease began inline before the switch to worker mode (the startup sweep is skipped
+    there): once older than the sweep's cutoff it becomes `failed: interrupted`."""
+    now = datetime.now(UTC)
+    with session_factory()() as db:
+        requeued, dead_ids = DocumentRepository(db).reap_expired(now, MAX_ATTEMPTS)
+        stranded = DocumentRepository(db).fail_stranded_inline(now - _interrupted_after(), now)
+        if live().value("scanner_fail_mode") == "retry":
+            # US-099: checks held because the scanner was down are retried (up to MAX_ATTEMPTS claims).
+            requeued += DocumentRepository(db).requeue_scanner_held(
+                now - timedelta(seconds=SCANNER_RETRY_SECONDS), MAX_ATTEMPTS
+            )
+        for run_id in dead_ids:
+            run = db.get(VerificationRun, run_id)
+            doc = db.get(Document, run.document_id) if run else None
+            if run is None:
+                continue
+            AuditRepository(db).record(
+                application_id=doc.application_id if doc else None,
+                actor_id=None,
+                event_type="verification.completed",
+                payload={
+                    "run_id": str(run.id),
+                    "document_id": str(run.document_id),
+                    "status": VerificationStatus.DEAD.value,
+                    "provider": run.provider,
+                    "error_reason": run.error_reason,
+                    "attempts": run.attempts,
+                },
+            )
+            metrics.VERIFICATION_RUNS.labels(VerificationStatus.DEAD.value, run.provider).inc()
+        ended = record_ended_runs(db, [*dead_ids, *stranded])
+        db.commit()
+    for usage in ended:
+        publish(usage, None, announce=False)
+    metrics.REAPED.labels("requeued").inc(requeued)
+    metrics.REAPED.labels("dead").inc(len(dead_ids))
+    metrics.REAPED.labels("interrupted").inc(len(stranded))
+    return requeued, len(dead_ids)
+
+
 def mark_stale_runs_failed(grace_seconds: int = 60) -> int:
     """On startup, runs still `running` longer than timeout + grace were interrupted by a restart, and any
     `pending` run was too: background tasks live in the process that died, so nothing will ever claim it.
     Both become `failed: interrupted` so re-run is possible and the queue does not show them as checking
     forever."""
-    settings = get_settings()
-    cutoff = datetime.now(UTC) - timedelta(seconds=settings.ai_timeout_seconds * 2 + grace_seconds)
+    cutoff = datetime.now(UTC) - _interrupted_after(grace_seconds)
     with session_factory()() as db:
-        count = DocumentRepository(db).fail_interrupted_runs(cutoff, datetime.now(UTC))
+        ended = DocumentRepository(db).fail_interrupted_runs(cutoff, datetime.now(UTC))
+        usages = record_ended_runs(db, ended)
         db.commit()
-        return count
+    for usage in usages:
+        publish(usage, None, announce=False)
+    return len(ended)
 
 
 class VerificationService:
@@ -270,8 +519,16 @@ class VerificationService:
         latest = self.documents.latest_run(doc.id)
         if latest is not None and latest.status not in TERMINAL:
             raise Conflict("A check is already in progress for this document.")
-        run = new_run(self.db, doc.id, app.operator_id)
+        # US-107 R-4: over the quota, refuse before anything is written (a refused re-run used to leave a run
+        # row and an audit row per request). The upload path still stores its refused run: the file is stored.
+        if verification_over_quota(self.db, app.operator_id) == DAILY_LIMIT_REASON:
+            raise RateLimited(
+                "The daily limit on automatic checks was reached. Try again tomorrow.",
+                details={"code": DAILY_LIMIT_REASON},
+            )
+        run = new_run(self.db, doc.id, app.operator_id, user.id)
         self.documents.add_run(run)
+        refused = record_refused(self.db, run, doc)
         self.audit.record(
             application_id=app.id,
             actor_id=user.id,
@@ -279,5 +536,7 @@ class VerificationService:
             payload={"document_id": str(doc.id), "document_type": doc.document_type.value},
         )
         self.db.commit()
+        if refused is not None:
+            publish(refused, None, announce=False)  # only now that the row is committed
         self.db.refresh(run)
         return run

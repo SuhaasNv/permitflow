@@ -9,7 +9,8 @@ import unicodedata
 
 # Zero-width (U+200B to U+200D, U+2060, U+FEFF), bidi controls (U+202A to U+202E, U+2066 to U+2069) and the
 # Unicode Tag block (U+E0000 to U+E007F): invisible to a reader, readable by a model or a spoofed filename.
-_HIDDEN = re.compile("[\u200b-\u200d\u2060\ufeff\u202a-\u202e\u2066-\u2069\U000e0000-\U000e007f]")
+# Public since US-102: `ai_input` reuses it to find and strip the same characters before the AI check.
+HIDDEN_CHARS = re.compile("[\u200b-\u200d\u2060\ufeff\u202a-\u202e\u2066-\u2069\U000e0000-\U000e007f]")
 _CONTROL = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
 _SPACES = re.compile(r"[^\S\n]+")
 _LINE_EDGES = re.compile(r" ?\n ?")
@@ -23,7 +24,7 @@ def clean_text(value: str, *, multiline: bool = False) -> str:
     than one blank line in a row); otherwise they are spaces too.
     """
     text = unicodedata.normalize("NFC", value)
-    text = _HIDDEN.sub("", text)
+    text = HIDDEN_CHARS.sub("", text)
     text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\u2028", "\n").replace("\u2029", "\n")
     text = _CONTROL.sub("", text)
     if not multiline:

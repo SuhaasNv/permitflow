@@ -5,6 +5,8 @@ import { vi } from 'vitest'
 
 import * as authApi from '@/api/auth'
 import { AppError } from '@/api/client'
+import type { Health } from '@/api/health'
+import * as healthApi from '@/api/health'
 import { AppProviders } from '@/app/providers'
 import * as auth from './AuthContext'
 import { AuthProvider } from './AuthContext'
@@ -200,5 +202,30 @@ describe('LoginPage', () => {
     expect(within(policies).getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy')
     expect(within(policies).getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms')
     expect(within(policies).getByRole('link', { name: 'Cookies' })).toHaveAttribute('href', '/cookies')
+  })
+
+  describe('the published-passwords notice (US-103)', () => {
+    const build = (environment: Health['environment']): Health => ({
+      status: 'ok',
+      database: 'ok',
+      version: '0.5.0',
+      commit: 'abc1234',
+      environment,
+    })
+
+    it('says the passwords are published on a development environment', async () => {
+      vi.spyOn(healthApi, 'getHealth').mockResolvedValue(build('development'))
+      renderLogin()
+      expect(await screen.findByText(/accounts are shared and their passwords are published/)).toBeInTheDocument()
+    })
+
+    it('does not say so on production, nor while the environment is still unknown', async () => {
+      const getHealth = vi.spyOn(healthApi, 'getHealth').mockResolvedValue(build('production'))
+      renderLogin()
+      expect(screen.getByText(/Demonstration only/)).toBeInTheDocument()
+      await waitFor(() => expect(getHealth).toHaveBeenCalled())
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(screen.queryByText(/passwords are published/)).not.toBeInTheDocument()
+    })
   })
 })

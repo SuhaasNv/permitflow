@@ -8,7 +8,8 @@ COPY . .
 RUN npm run build
 
 FROM nginx:1.27-alpine
-RUN apk add --no-cache curl
+# US-103: the base image's packages are patched at build time (Trivy blocks on a fixable HIGH or CRITICAL).
+RUN apk upgrade --no-cache && apk add --no-cache curl
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY docker/security-headers.conf.template /etc/nginx/templates/security-headers.conf.template

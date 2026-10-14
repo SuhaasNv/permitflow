@@ -62,7 +62,9 @@ test('formats are checked while typing, hours are picked and read back', async (
   await page.getByLabel('Closes', { exact: true }).selectOption('18:00')
   await page.getByRole('button', { name: /Save and continue/ }).click()
   await expect(page.getByText('Opening and closing time cannot be the same.')).toBeVisible()
-  // the picker with its error showing passes the accessibility gate (WCAG 2.2 AA)
+  // the picker with its error showing passes the accessibility gate (WCAG 2.2 AA); the error is only just on the
+  // page (it waits for the save), so measure its resting colour, as the accessibility gate does
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   const axe = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
     .analyze()

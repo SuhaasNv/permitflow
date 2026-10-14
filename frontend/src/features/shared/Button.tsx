@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
 import { cn } from '@/lib/cn'
 
@@ -10,6 +10,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: Size
   loading?: boolean
   children: ReactNode
+  ref?: Ref<HTMLButtonElement>
 }
 
 /**
@@ -22,6 +23,8 @@ export const buttonClasses = (variant: Variant = 'primary', size: Size = 'md', e
     'transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
     'active:translate-y-px active:duration-75',
     'disabled:pointer-events-none disabled:border-line disabled:bg-neutral-soft disabled:text-text-3 disabled:shadow-none',
+    // A loading button is aria-disabled, not disabled, so it keeps keyboard focus (WCAG 2.4.3); it looks the same.
+    'aria-disabled:pointer-events-none aria-disabled:border-line aria-disabled:bg-neutral-soft aria-disabled:text-text-3 aria-disabled:shadow-none',
     // 44 px on touch widths (the root is 15 px, so h-10 is 37.5 px); compact from the desktop breakpoint.
     size === 'md' && 'min-h-[44px] px-4 xl:min-h-10',
     size === 'sm' && 'min-h-[44px] px-3 text-[13px] xl:min-h-8',
@@ -35,9 +38,26 @@ export const buttonClasses = (variant: Variant = 'primary', size: Size = 'md', e
     extra,
   )
 
-export function Button({ variant = 'primary', size = 'md', loading = false, className = '', children, disabled, ...rest }: ButtonProps) {
+/**
+ * While `loading` the button stays focusable (`aria-disabled`, not `disabled`, which would drop focus to the
+ * page) and its clicks, including the implicit submit of a form, are swallowed so nothing is sent twice.
+ */
+export function Button({ variant = 'primary', size = 'md', loading = false, className = '', children, disabled, onClick, ...rest }: ButtonProps) {
   return (
-    <button className={buttonClasses(variant, size, className)} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
+    <button
+      className={buttonClasses(variant, size, className)}
+      disabled={disabled}
+      aria-disabled={loading || undefined}
+      aria-busy={loading || undefined}
+      onClick={(e) => {
+        if (loading) {
+          e.preventDefault()
+          return
+        }
+        onClick?.(e)
+      }}
+      {...rest}
+    >
       {loading ? (
         <span
           className={cn(

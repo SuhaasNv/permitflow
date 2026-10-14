@@ -13,6 +13,12 @@ def _status(value: Any) -> str:
         return str(value)
 
 
+def _setting_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    return str(value)
+
+
 def summarize(event_type: str, payload: dict[str, Any]) -> str:
     p = payload
     match event_type:
@@ -30,9 +36,16 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
             return f"Document replaced: {p.get('document_type', '')}"
         case "document.deleted":
             return f"Document removed: {p.get('document_type', '')}"
+        case "document.infected":
+            return f"Document blocked by the virus scan: {p.get('document_type', '')}"
+        case "clarification.attachment_infected":
+            return "Clarification file blocked by the virus scan"
         case "verification.requested":
             return f"Check re-run requested for {p.get('document_type', '')}"
         case "verification.completed":
+            if p.get("status") == "dead":  # the reaper's status; clients are never shown the word
+                tries = p.get("attempts")
+                return f"Check gave up after {tries} tries" if tries else "Check gave up"
             return f"Check finished: {p.get('status', '')}" + (
                 f" ({p['provider']})" if p.get("provider") else ""
             )
@@ -71,6 +84,22 @@ def summarize(event_type: str, payload: dict[str, Any]) -> str:
             return f"Account reactivated: {p.get('email', '')}"
         case "user.created":
             return f"Account created: {p.get('email', '')} ({p.get('role', '')})"
+        case "settings.changed" | "settings.reverted":
+            verb = "reverted" if event_type == "settings.reverted" else "changed"
+            name = p.get("label", p.get("key", ""))
+            text = f"Setting {verb}: {name}, {_setting_value(p.get('old'))} to {_setting_value(p.get('new'))}"
+            stopped = p.get("ended_while_paused")
+            if stopped is not None:
+                text += f" ({stopped} checks ended as ai_paused while paused)"
+            return text
+        case "admin.ai_usage_exported":
+            rows = p.get("rows", 0)
+            cut = ", cut" if p.get("cut") else ""
+            return f"AI usage exported to CSV ({rows} {'row' if rows == 1 else 'rows'}{cut})"
+        case "settings.step_up_failed":
+            return f"Wrong password on a setting change: {p.get('key') or p.get('history_entry', '')}"
+        case "user.step_up_failed":
+            return f"Wrong password on an account change: {p.get('action', '')}"
         case "user.session_taken_over":
             return f"Signed in on {p.get('to_device', '')}; the session on {p.get('from_device', '')} ended"
         case "user.signed_out":

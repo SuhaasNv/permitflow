@@ -10,7 +10,7 @@ export function EnvironmentStrip() {
     <div
       role="region"
       aria-label="Environment notice"
-      className="pf-env-strip flex h-7 items-center gap-2 border-b border-warning-line bg-warning-soft px-4 text-xs font-medium text-warning sm:px-6"
+      className="pf-env-strip flex min-h-7 items-center gap-2 border-b border-warning-line bg-warning-soft px-4 text-xs font-medium text-warning sm:px-6"
     >
       <svg
         width="14"
@@ -26,7 +26,7 @@ export function EnvironmentStrip() {
       >
         <path d="m10.29 3.86-8.18 14.14A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" />
       </svg>
-      <span className="whitespace-nowrap">
+      <span className="py-1">
         Development environment: test data only<span className="hidden sm:inline">, not the live service</span>
       </span>
     </div>

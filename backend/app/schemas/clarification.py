@@ -35,6 +35,12 @@ class ClarificationAttachmentOut(BaseModel):
     content_type: str
     size_bytes: int
     uploaded_at: datetime
+    # US-099: null (stored with the scan off), scanning, clean or infected. A blocked file cannot be opened.
+    scan_state: str | None = None
+    scanned_at: datetime | None = None
+    # Officer view only (the operator view leaves it false): a PDF with an automatic action plus a
+    # script, a launch action or an embedded file, as on documents.
+    active_content: bool = False
 
 
 class ClarificationItemOut(BaseModel):

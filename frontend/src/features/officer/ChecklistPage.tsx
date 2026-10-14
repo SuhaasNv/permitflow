@@ -202,7 +202,7 @@ function ResultControl({
             className={cn(
               'inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-md border px-3.5 text-sm',
               'transition-[border-color,background-color,color] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
-              'focus-visible:outline-hidden focus-visible:shadow-[0_0_0_3px_rgba(23,92,211,0.2)] disabled:cursor-not-allowed',
+              'disabled:cursor-not-allowed',
               compact && 'flex-1',
               on ? cn('font-semibold', r.on) : 'border-line-strong bg-surface font-medium text-text-2 hover:border-text-3',
             )}

@@ -1,0 +1,64 @@
+# Nightly red team of the document check, mock provider only (US-106).
+#
+# Renders each attack (hidden text, white on white, tiny font, zero-width characters, Tag-block characters,
+# look-alike letters, contradicting metadata) into a real PDF and PNG and pushes it through the golden
+# pipeline on the mock. It fails when an attack breaks the check in a way no golden case records yet. No
+# secrets, no network, no model: the live run is manual and needs the owner's yes (docs/07-ai/RED_TEAM.md).
+
+name: Red team (nightly, mock)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 20 * * *" # 04:30 Singapore, daily
+
+concurrency:
+  group: redteam-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  redteam:
+    name: Attacks on the mock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    env:
+      APP_ENV: test
+      AI_PROVIDER: mock
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Golden set still at 100 percent
+        run: uv run python -m evals.run --provider mock --fail-under 1.0
+      - name: Attacks through the pipeline (blocking on a new break)
+        run: uv run python -m evals.redteam.run --json /tmp/redteam.json | tee /tmp/redteam.txt
+      - name: Publish the result
+        if: always()
+        run: |
+          {
+            echo "## Red team, mock provider"
+            echo '```'
+            cat /tmp/redteam.txt 2>/dev/null || echo "No output: the run failed before reporting."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: redteam-nightly-${{ github.run_number }}
+          path: |
+            /tmp/redteam.json
+            /tmp/redteam.txt
+          retention-days: 30

@@ -1,0 +1,55 @@
+# US-103. Weekly dependency update pull requests, one grouped pull request per ecosystem for routine updates.
+# Security updates are separate: they open on their own as soon as an advisory exists (when "Dependabot
+# security updates" is on in the repository settings) and are not held back by the weekly schedule or the groups.
+# Every pull request targets `dev` and runs the full CI, including pip-audit, npm audit, Semgrep and Trivy;
+# nothing merges without that being green and a person reading the diff.
+version: 2
+updates:
+  # Backend: pyproject.toml and uv.lock (the `uv` ecosystem keeps the lockfile in step).
+  - package-ecosystem: uv
+    directory: /backend
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Asia/Singapore
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore'
+    groups:
+      backend-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Frontend: package.json and package-lock.json.
+  - package-ecosystem: npm
+    directory: /frontend
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Asia/Singapore
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore'
+    groups:
+      frontend-minor-and-patch:
+        update-types: [minor, patch]
+
+  # The workflows' actions. They are pinned to commit SHAs with the version in a trailing comment;
+  # Dependabot rewrites both together.
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Asia/Singapore
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore'
+    groups:
+      github-actions:
+        patterns: ['*']

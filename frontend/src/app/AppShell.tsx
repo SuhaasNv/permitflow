@@ -69,6 +69,13 @@ const NAV: Record<Role, NavItem[]> = {
         'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
       ),
     },
+    {
+      label: 'Settings',
+      short: 'Settings',
+      to: '/admin/settings',
+      icon: icon('M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6'),
+    },
+    { label: 'AI usage', short: 'AI usage', to: '/admin/ai-usage', icon: icon('M3 3v18h18M8 17v-5M13 17V8M18 17v-9') },
   ],
 }
 
@@ -115,9 +122,13 @@ export function AppShell({ children }: { children?: ReactNode }) {
   // Idle warning (US-095, WCAG 2.2.1): any signed-in request keeps the session, so Stay signed in is one call.
   const idle = idleWarning(lastActivity(), now)
   const staySignedIn = () => void me().then(() => setNow(Date.now()), () => undefined)
-  const doSignOut = () => {
+  const doSignOut = async () => {
     setUnsaved(false)
-    signOut()
+    // Cookie mode waits for the server; false means it did not arrive and the person is still signed in.
+    if ((await signOut()) === false) {
+      setConfirmSignOut(false)
+      return
+    }
     navigate('/login', { replace: true })
   }
 
@@ -211,7 +222,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
             className="h-8 rounded-md px-3 text-[13px] font-semibold text-text-2 transition-colors hover:bg-neutral-soft hover:text-text"
             onClick={() => {
               if (hasUnsaved()) setConfirmSignOut(true)
-              else doSignOut()
+              else void doSignOut()
             }}
           >
             Sign out
@@ -317,7 +328,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
         confirmLabel="Sign out"
         cancelLabel="Stay"
         danger
-        onConfirm={doSignOut}
+        onConfirm={() => void doSignOut()}
         onCancel={() => setConfirmSignOut(false)}
       >
         <p>You have unsaved changes in the section you are editing. Sign out now and they will be lost.</p>

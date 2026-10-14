@@ -16,19 +16,37 @@ export interface TokenResponse {
   user: User
 }
 
+/** Cookie mode (US-104): no bearer token; the session is an HttpOnly cookie the page cannot read. */
+export interface SessionResponse {
+  expires_at: string
+  user: User
+  csrf_token: string
+}
+
+/** The sign-in answer tells which mode the server runs: `access_token` is present only in token mode. */
+export type LoginResponse = TokenResponse | SessionResponse
+
+export interface MeResponse extends User {
+  /** Cookie mode only: the CSRF value, and when the session ends (so a reload can run the expiry timer). */
+  csrf_token?: string
+  expires_at?: string
+}
+
 /** `takeOver` signs out the device that holds this account's session and continues here (US-093). */
-export function login(email: string, password: string, takeOver = false): Promise<TokenResponse> {
-  return request<TokenResponse>('/auth/login', {
+export function login(email: string, password: string, takeOver = false): Promise<LoginResponse> {
+  return request<LoginResponse>('/auth/login', {
     method: 'POST',
+    credentials: 'include',
     body: takeOver ? { email, password, take_over: true } : { email, password },
   })
 }
 
-/** Ends this sign-in on the server; the token stops working on its next use. */
+/** Ends this sign-in on the server; the token stops working on its next use. In cookie mode the caller waits for it. */
 export function logout(): Promise<void> {
   return request<void>('/auth/logout', { method: 'POST', keepalive: true })
 }
 
-export function me(): Promise<User> {
-  return request<User>('/auth/me')
+/** `first`: no session is known yet (the load-time check for a cookie session): send credentials; a 401 is silent. */
+export function me(first = false): Promise<MeResponse> {
+  return request<MeResponse>('/auth/me', first ? { credentials: 'include', silent: true } : {})
 }

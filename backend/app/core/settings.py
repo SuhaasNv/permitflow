@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,6 +18,9 @@ class Settings(BaseSettings):
     )
 
     app_env: Literal["development", "test", "production"] = "development"
+    # US-107 R-2: the interactive docs and the OpenAPI document are off unless this is true, and never
+    # served in production. Local work and the e2e job set it; the internet-facing development one does not.
+    expose_api_docs: bool = False
     database_url: str = "postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow"
     # Connection pool (US-044): sized for one uvicorn worker serving the demo load; exhaustion is a fast 503.
     db_pool_size: int = 10
@@ -32,11 +36,38 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000"
 
+    # US-104 (ADR-018): how the signed-in session travels. `token` (default) is the bearer token in the
+    # Authorization header, as before. `cookie` is a `__Host-` HttpOnly cookie plus a double-submit CSRF
+    # token; the sign-in body then carries no bearer token. The frontend origins are CORS_ORIGINS.
+    auth_mode: Literal["token", "cookie"] = "token"
+
     upload_dir: str = "./data/uploads"
     upload_max_bytes: int = 10 * 1024 * 1024
     # US-085: everything one application holds on the volume (every document version, clarification
     # evidence, the licence). A 5 GB volume holds about 34 applications at the ceiling; most use a tenth.
     storage_budget_bytes: int = 150 * 1024 * 1024
+
+    # US-097: where uploaded files live. `local` is the disk under UPLOAD_DIR (the default, today's
+    # behaviour); `s3` is an S3-compatible bucket (a Railway bucket, MinIO locally). No credential has a
+    # default: with `s3` the four below that are marked required must be set or the app refuses to start.
+    storage_backend: Literal["local", "s3"] = "local"
+    s3_endpoint_url: str = ""  # empty = AWS; MinIO or a Railway bucket name theirs
+    s3_bucket: str = ""  # required with `s3`
+    s3_region: str = "us-east-1"
+    s3_access_key_id: str = ""  # required with `s3`
+    s3_secret_access_key: str = ""  # required with `s3`
+    s3_addressing_style: Literal["auto", "path", "virtual"] = "auto"  # MinIO needs `path`
+
+    # US-098: image decode memory and the platform-wide stored-bytes ceiling. At most this many images are
+    # decoded and re-encoded at once in this process (a 40 MP image is hundreds of MB while it is open);
+    # a caller waits a bounded time, then gets a 503. The total ceiling counts every stored document
+    # version and clarification attachment, on either backend; 0 means no ceiling and is refused in
+    # production (the gauge `permitflow_storage_bytes{kind="limit"}` and the 80 % alert read it).
+    image_decode_concurrency: int = Field(default=2, ge=1)
+    storage_total_max_bytes: int = Field(default=5 * 1024**3, ge=0)
+    # Everything one operator holds across all their applications (the per-application sums, added
+    # up), so one account cannot fill the platform ceiling above.
+    storage_per_operator_bytes: int = Field(default=1024**3, ge=1)
 
     # Mark site visit done and the checklist submit wait for the visit day (Singapore date; UAT run 5, F12).
     # Off only where a whole appointment must run in one sitting: the automated suites and a demonstration.
@@ -74,6 +105,44 @@ class Settings(BaseSettings):
     langsmith_project: str = "permitflow"
     langsmith_hide_inputs: bool = True
 
+    # US-101: the limits above are the defaults and the hard ceilings of the admin settings panel. The
+    # worker's concurrency (US-098) is a panel setting too, so its ceiling lives here.
+    worker_concurrency: int = 2
+    # US-101: the API announces every settings change in the Telegram chat the monitoring bot already
+    # uses. Both empty: no message and no network call.
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+
+    # US-098 (ADR-016): where document checks run. `inline` is the API process (FastAPI background tasks,
+    # the default); `worker` queues the run in `verification_runs` and `python -m app.worker` executes it.
+    verification_mode: Literal["inline", "worker"] = "inline"
+    # Worker only. The lease is how long a claimed run may go without finishing before the reaper takes it
+    # back; it must exceed the PDF deadline plus the model timeout. The metrics port is private (no
+    # published port, not routed by the edge). Postgres drops a lock wait after the lock timeout.
+    worker_lease_seconds: int = 180
+    worker_metrics_port: int = 9100
+    worker_lock_timeout_seconds: int = 5
+    # Both modes: the PDF text extraction runs in a child process killed at the wall-clock deadline, with
+    # address-space and CPU-time caps (a hostile or broken PDF cannot take the API or the worker with it).
+    # The CPU cap sits above the page budget (10 s) so a slow but legitimate PDF is cut by the budget and
+    # keeps the text read so far, rather than killed by the cap with nothing; the wall clock sits above both.
+    pdf_extract_timeout_seconds: float = Field(default=25.0, ge=2.0)
+    pdf_extract_memory_mb: int = Field(default=512, ge=64)
+    pdf_extract_cpu_seconds: int = Field(default=20, ge=2)
+    pdf_extract_concurrency: int = Field(default=2, ge=1)
+
+    # US-099 (ADR-017): the virus scan. `off` (the default) is today's behaviour: files are served as soon as
+    # they are stored. `enforce` quarantines every upload, scans it with ClamAV (clamd, INSTREAM over TCP)
+    # before any extraction or AI call, and serves it only when clean. What a scanner outage does is the
+    # administrator's `scanner_fail_mode`; no mode ever serves an unscanned file.
+    scan_mode: Literal["off", "enforce"] = "off"
+    clamd_host: str = "localhost"
+    clamd_port: int = Field(default=3310, ge=1, le=65535)
+    clamd_timeout_seconds: float = Field(default=30.0, gt=0)
+    # With SCAN_MODE=enforce the worker pings clamd this often and alerts when it goes down or comes back
+    # (nothing else talks to clamd between uploads). 0 turns the watch off.
+    scanner_ping_seconds: float = Field(default=60.0, ge=0)
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -91,6 +160,61 @@ class Settings(BaseSettings):
         placeholder from `.env.example` counts as unset."""
         if len(self.jwt_secret) < 16 or self.jwt_secret == "change-me-to-a-long-random-string":
             raise RuntimeError("JWT_SECRET must be set to at least 16 random characters")
+        if self.app_env == "production" and self.storage_total_max_bytes <= 0:
+            raise RuntimeError("STORAGE_TOTAL_MAX_BYTES must be above 0 in production")
+        if (
+            self.app_env == "production"
+            and self.verification_mode == "worker"
+            and self.storage_backend == "local"
+        ):
+            # A separate worker service cannot read the API's volume (ADR-015): every check would fail.
+            raise RuntimeError("VERIFICATION_MODE=worker needs STORAGE_BACKEND=s3 in production")
+        # Credentialed CORS is never open (US-104): the browser frontend always sends credentials, in both
+        # modes, so a wildcard would let any site read the session's answers (and could not sign in anyway).
+        if "*" in self.cors_origin_list:
+            raise RuntimeError("CORS_ORIGINS must list the frontend origins, not *")
+        if self.auth_mode == "cookie":
+            # An empty list would refuse every sign-in; in production the cookie is Secure, so https only.
+            origins = self.cors_origin_list
+            if not origins:
+                raise RuntimeError("AUTH_MODE=cookie needs CORS_ORIGINS to list the frontend origins")
+            for origin in origins:
+                # An Origin header is scheme://host[:port] and nothing else; `null` is what a sandboxed or
+                # file page sends, so listing it would let any such page sign in.
+                parts = urlsplit(origin)
+                bare = f"{parts.scheme}://{parts.netloc}"
+                if parts.scheme not in ("http", "https") or origin != bare:
+                    raise RuntimeError(
+                        f"AUTH_MODE=cookie needs CORS_ORIGINS like https://host[:port]: not {origin!r}"
+                    )
+            if self.app_env == "production" and not all(o.startswith("https://") for o in origins):
+                raise RuntimeError(
+                    "AUTH_MODE=cookie in production needs every CORS_ORIGINS entry to be https"
+                )
+        scan_seconds = self.clamd_timeout_seconds if self.scan_mode == "enforce" else 0.0
+        if (
+            self.worker_lease_seconds
+            <= scan_seconds + self.pdf_extract_timeout_seconds + 2 * self.ai_timeout_seconds
+        ):
+            # A lease shorter than the longest check lets the reaper take back a run that is still working.
+            # The scan (US-099) is the first step of a check, so its timeout counts too.
+            raise RuntimeError(
+                "WORKER_LEASE_SECONDS must exceed PDF_EXTRACT_TIMEOUT_SECONDS + 2 * AI_TIMEOUT_SECONDS"
+                " (+ CLAMD_TIMEOUT_SECONDS with SCAN_MODE=enforce)"
+            )
+        if self.storage_backend == "s3" and self.s3_missing():
+            raise RuntimeError(f"STORAGE_BACKEND=s3 needs {', '.join(self.s3_missing())} to be set")
+        if self.scan_mode == "enforce" and not self.clamd_host.strip():
+            raise RuntimeError("SCAN_MODE=enforce needs CLAMD_HOST to be set")
+
+    def s3_missing(self) -> list[str]:
+        """The required bucket settings that are empty (US-097)."""
+        required = {
+            "S3_BUCKET": self.s3_bucket,
+            "S3_ACCESS_KEY_ID": self.s3_access_key_id,
+            "S3_SECRET_ACCESS_KEY": self.s3_secret_access_key,
+        }
+        return [name for name, value in required.items() if not value]
 
 
 @lru_cache

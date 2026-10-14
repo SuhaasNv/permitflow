@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import * as adminApi from '@/api/admin'
 import * as authApi from '@/api/auth'
 import * as notificationsApi from '@/api/notifications'
 import * as officerApi from '@/api/officer'
@@ -69,6 +70,16 @@ describe('App routing', () => {
       await router.navigate(path)
       await waitFor(() => expect(document.title).toBe(title))
     }
+  })
+
+  it('loads an administrator screen on first visit and shows it under its own title', async () => {
+    signedInAs('admin')
+    vi.spyOn(adminApi, 'getPlatformSettings').mockResolvedValue({ environment: 'development', settings: [] })
+    vi.spyOn(adminApi, 'getSettingsHistory').mockResolvedValue({ entries: [], next_cursor: null })
+    await router.navigate('/admin/settings')
+    render(<App />)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument()
+    await waitFor(() => expect(document.title).toBe('Settings | PermitFlow'))
   })
 
   it('titles a signed-in screen after the screen', async () => {

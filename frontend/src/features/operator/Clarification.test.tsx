@@ -185,7 +185,7 @@ describe('clarification after the site visit, operator side (US-064)', () => {
     const input = document.querySelector('input[type=file][multiple]') as HTMLInputElement
     await userEvent.upload(input, new File(['x'], 'floor.jpg', { type: 'image/jpeg' }))
     await waitFor(() => expect(attach).toHaveBeenCalledTimes(1))
-    expect(await screen.findByRole('button', { name: 'floor.jpg' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^Open floor.jpg/ })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
     await waitFor(() => expect(remove).toHaveBeenCalledWith('a1', 'r1', 'att1'))
     await userEvent.click(screen.getByRole('button', { name: 'Send responses' }))
@@ -390,6 +390,59 @@ describe('clarification after the site visit, operator side (US-064)', () => {
     expect(await screen.findByRole('heading', { name: 'Nothing needs your response yet' })).toBeInTheDocument()
     expect(await screen.findByText('The site visit is recorded. The licensing office is finalising its assessment.')).toBeInTheDocument()
     expect(screen.queryByText('The licensing officer needs more information on 2 items after the site visit.')).not.toBeInTheDocument()
+  })
+
+  const round2Item = (over: Partial<ClarificationView['items'][number]> = {}): ClarificationView['items'][number] => ({
+    ...view.items[0]!,
+    round_no: 2,
+    requests: [
+      view.items[0]!.requests[0]!,
+      { id: 'q3', round_no: 2, message: 'Please send one more photo.', released_at: '2026-09-26T08:40:00Z' },
+    ],
+    responses: [
+      { id: 'r1', round_no: 1, message: 'Regraded on 23 Sep.', created_at: '2026-09-25T01:00:00Z', sent_at: '2026-09-25T01:05:00Z', attachments: [] },
+    ],
+    ...over,
+  })
+
+  it('a new round with its answer box empty does not say every item is answered, even if an earlier round was answered', async () => {
+    vi.spyOn(api, 'getApplication').mockResolvedValue(afterVisit)
+    vi.spyOn(clarApi, 'getClarifications').mockResolvedValue({ ...view, round: 2, items: [round2Item(), view.items[1]!] })
+    renderAt('/app/applications/a1/clarification')
+    expect(await screen.findByText('Round 2: 1 of 2 items need your response')).toBeInTheDocument()
+    expect(screen.getByText('1 of 1 item still needs an answer.')).toBeInTheDocument()
+    expect(screen.queryByText(/Every item is answered/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send responses' })).toBeDisabled()
+  })
+
+  it('the sent toast counts the answers of this round, not the server total across rounds', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    vi.spyOn(api, 'getApplication').mockResolvedValue(afterVisit)
+    const answered = round2Item({
+      responses: [
+        ...round2Item().responses,
+        { id: 'r2', round_no: 2, message: 'Second photo sent.', created_at: '2026-09-27T01:00:00Z', sent_at: null, attachments: [] },
+      ],
+    })
+    vi.spyOn(clarApi, 'getClarifications').mockResolvedValue({ ...view, round: 2, can_send: true, items: [answered, view.items[1]!] })
+    // the server's answered_count spans both rounds: 2, though one answer went in this round
+    vi.spyOn(clarApi, 'sendClarifications').mockResolvedValue({
+      ...view,
+      round: 2,
+      open_count: 0,
+      answered_count: 2,
+      can_respond: false,
+      can_send: false,
+      items: [{ ...answered, status: 'Sent', can_respond: false }, view.items[1]!],
+    })
+    renderAt('/app/applications/a1/clarification')
+    expect(await screen.findByText('Every item is answered. Send your answer to the licensing office.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Send responses' }))
+    await userEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Send your answers?' })).getByRole('button', { name: 'Send responses' }),
+    )
+    expect(await screen.findByText('1 answer was sent to the licensing office.')).toBeInTheDocument()
+    expect(screen.queryByText(/2 answers were sent/)).not.toBeInTheDocument()
   })
 
   it('with nothing released the page says so', async () => {

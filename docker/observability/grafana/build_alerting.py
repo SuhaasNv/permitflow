@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates the Grafana alerting provisioning files (US-077, Telegram): the seven incident rules (one alert
+"""Generates the Grafana alerting provisioning files (US-077, Telegram): the eight incident rules (one alert
 per environment, from the `environment` label) and an hourly digest per environment, one Telegram contact
 point, the notification policy, the message template. Run after editing; the YAML files under alerting/
 are what Grafana provisions. The start script copies them only when TELEGRAM_BOT_TOKEN and
@@ -64,6 +64,9 @@ incidents = [
     incident("pf-volume-filling", "PermitFlow upload volume filling",
              'max by (environment) (permitflow_storage_bytes{kind="volume_used"}) / max by (environment) (permitflow_storage_bytes{kind="volume_total"})',
              "gt", 0.8, "15m", "warning", "The upload volume is more than 80 % full; raise it before it fills (US-089)."),
+    incident("pf-storage-ceiling", "PermitFlow stored files near the ceiling",
+             'max by (environment) (permitflow_storage_bytes{kind="stored"}) / max by (environment) (permitflow_storage_bytes{kind="limit"})',
+             "gt", 0.8, "15m", "warning", "Stored files are above 80 % of STORAGE_TOTAL_MAX_BYTES; raise the ceiling or clear space before uploads are refused (US-098)."),
 ]
 
 

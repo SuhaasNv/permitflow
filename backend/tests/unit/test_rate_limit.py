@@ -92,3 +92,32 @@ def test_limiter_map_stays_bounded_under_many_distinct_clients() -> None:
         limiter.hit(f"10.0.{i // 256}.{i % 256}")
     limiter.hit("fresh")
     assert len(limiter._hits) <= 10_501  # noqa: SLF001 - the bound is the property under test
+
+
+def test_a_limit_given_as_a_callable_is_read_on_every_hit() -> None:
+    """US-101: the live platform setting is passed as a callable, so a change applies without a rebuild."""
+    current = {"n": 3}
+    window = WindowLimiter(lambda: current["n"])
+    assert [window.hit("a") for _ in range(3)] == [None, None, None]
+    assert window.hit("a") is not None
+    current["n"] = 5  # raised: room again
+    assert window.hit("a") is None
+    current["n"] = 2  # lowered: a client already holding more hits than that is held back
+    assert window.hit("a") is not None
+
+
+def test_a_callable_limit_of_zero_disables_the_window() -> None:
+    assert WindowLimiter(lambda: 0).hit("a") is None
+
+
+def test_client_key_groups_ipv6_by_its_slash_64_and_leaves_ipv4_alone() -> None:
+    hdr = "X-Real-IP"
+    a = _request("/x", host="10.10.0.1", real_ip="2001:db8:1:2::1")
+    b = _request("/x", host="10.10.0.1", real_ip="2001:db8:1:2:ffff:ffff:ffff:ffff")
+    other = _request("/x", host="10.10.0.1", real_ip="2001:db8:1:3::1")
+    assert client_key(a, "*", hdr) == client_key(b, "*", hdr) == "2001:db8:1:2::/64"
+    assert client_key(other, "*", hdr) != client_key(a, "*", hdr)
+    assert client_key(_request("/x", host="198.51.100.7"), "") == "198.51.100.7"
+    junk = _request("/x", host="10.10.0.1", real_ip="not-an-address")
+    assert client_key(junk, "*", hdr) == "not-an-address"
+    assert client_key(_request("/x", host="::ffff:198.51.100.7"), "") == "198.51.100.7"  # mapped IPv4

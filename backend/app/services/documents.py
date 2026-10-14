@@ -10,15 +10,18 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import BadRequest, Forbidden, NotFound
 from app.domain.enums import ApplicationStatus, DocumentType
+from app.domain.scan import SCANNING, quarantine_key
 from app.domain.uploads import UploadRejected, canonical_content_type, check_name_and_type
 from app.infra.storage import FileStorage, get_storage, new_storage_key
 from app.models import Application, Document, User, VerificationRun
 from app.repositories.applications import ApplicationRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.documents import DocumentRepository
+from app.services.ai_usage import publish, record_refused
 from app.services.applications import ApplicationService
 from app.services.quotas import new_run
-from app.services.uploads import receive, storage_usage
+from app.services.scan import enforcing, ensure_servable
+from app.services.uploads import platform_remaining, receive, storage_usage
 
 
 @dataclass(frozen=True)
@@ -60,8 +63,19 @@ class DocumentService:
 
         # One pipeline for every upload (US-085): size cap, magic bytes, images without metadata, the
         # application's storage budget; the digest is that of the stored bytes.
+        # US-099: with the scan enforced, the file is stored under quarantine/ until the scanner clears it.
+        scan = enforcing()
         key = new_storage_key(app.id, ext)
-        received = receive(self.storage, key, ext, stream, storage_usage(self.db, app.id, self.storage))
+        if scan:
+            key = quarantine_key(key)
+        received = receive(
+            self.storage,
+            key,
+            ext,
+            stream,
+            storage_usage(self.db, app.id, self.storage),
+            platform_remaining(self.db),
+        )
         sha, size = received.sha256, received.size_bytes
         previous = self.documents.current_of_type(app.id, document_type)
         if previous is not None and previous.sha256 == sha:
@@ -82,13 +96,15 @@ class DocumentService:
             supersedes_id=previous.id if previous else None,
             is_current=True,
             uploaded_by=operator.id,
+            scan_state=SCANNING if scan else None,
         )
         if previous is not None:
             previous.is_current = False
         self.documents.add(doc)
         self.db.flush()
-        run = new_run(self.db, doc.id, app.operator_id)
+        run = new_run(self.db, doc.id, app.operator_id, operator.id)
         self.documents.add_run(run)
+        refused = record_refused(self.db, run, doc)
         self.audit.record(
             application_id=app.id,
             actor_id=operator.id,
@@ -107,6 +123,8 @@ class DocumentService:
         except Exception:
             self.storage.delete(key)
             raise
+        if refused is not None:
+            publish(refused, None, announce=False)  # only now that the row is committed
         self.db.refresh(app)
         self.db.refresh(doc)
         self.db.refresh(run)
@@ -139,6 +157,7 @@ class DocumentService:
         doc = self.documents.get_in_application(app.id, document_id)
         if doc is None:
             raise NotFound("Document not found.")
+        ensure_servable(doc.scan_state, user)
         if not self.storage.exists(doc.stored_key):
             raise NotFound("This file is no longer available.")
         return doc, self.storage.open(doc.stored_key)

@@ -27,6 +27,7 @@ export interface HoursValue {
 }
 
 export const LEGACY_MESSAGE = 'Pick your opening days and hours.'
+export const HOURS_REQUIRED_MESSAGE = 'Choose the days you open and the opening and closing time.'
 export const NO_DAYS_MESSAGE = 'Choose at least one day you open.'
 export const NO_TIMES_MESSAGE = 'Choose an opening and a closing time.'
 export const BAD_TIME_MESSAGE = 'Choose a time on the half hour, from 00:00 to 23:30.'

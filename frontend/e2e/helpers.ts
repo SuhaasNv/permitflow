@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 
 export const PASSWORD = process.env.SEED_PASSWORD ?? 'PermitFlow!2026'
 /** The administrator's password is private on a real deployment (SEED_ADMIN_PASSWORD); it falls back to the shared one. */
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || PASSWORD
+export const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || PASSWORD
 const passwordFor = (email: string) => (email === ADMIN ? ADMIN_PASSWORD : PASSWORD)
 export const OPERATOR = 'operator@permitflow.example.sg'
 export const OFFICER = 'officer@permitflow.example.sg'
@@ -163,8 +163,8 @@ export async function restoreSpareAccount(): Promise<void> {
   const { users } = await call<{ users: { id: string; email: string; role: string; is_active: boolean }[] }>(admin, '/admin/users')
   const spare = users.find((u) => u.email === SPARE)
   if (!spare) return
-  if (!spare.is_active) await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ is_active: true }) })
-  if (spare.role !== 'officer') await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ role: 'officer' }) })
+  if (!spare.is_active) await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ is_active: true, admin_password: ADMIN_PASSWORD }) })
+  if (spare.role !== 'officer') await call(admin, `/admin/users/${spare.id}`, { method: 'PATCH', body: JSON.stringify({ role: 'officer', admin_password: ADMIN_PASSWORD }) })
   await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: admin })
 }
 
@@ -230,6 +230,25 @@ export async function seedPendingResubmission(message = 'Please confirm the prem
     body: JSON.stringify({ target_type: 'section', section_key: 'premises', message }),
   })
   await transition(off, seeded.id, 'pending_pre_site_resubmission')
+  return seeded
+}
+
+/** A new draft with nothing filled in: every section is editable, no document check is spent. */
+export async function seedDraft(): Promise<Seeded> {
+  const op = await login(OPERATOR)
+  const app = await call<{ id: string; reference_no: string }>(op, '/applications', { method: 'POST' })
+  return { id: app.id, reference: app.reference_no, url: `/app/applications/${app.id}` }
+}
+
+/** The operator fixed the premises and resubmitted (Revision 2): the officer's compare view has a change to show. */
+export async function seedResubmitted(): Promise<Seeded> {
+  const seeded = await seedPendingResubmission()
+  const op = await login(OPERATOR)
+  await call(op, `/applications/${seeded.id}/sections/premises`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ...PREMISES, address_line_1: '10 Jalan Besar #01-21', floor_area_sqm: 48, premises_type: 'shophouse' }),
+  })
+  await call(op, `/applications/${seeded.id}/resubmit`, { method: 'POST' })
   return seeded
 }
 

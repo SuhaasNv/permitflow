@@ -19,9 +19,11 @@ from app.core.errors import AppError
 from app.core.logging import configure_logging, request_logging_middleware
 from app.core.metrics import RATE_LIMITED, metrics_middleware
 from app.core.rate_limit import RequestLimiter
+from app.core.session_cookie import CSRF_HEADER, clear_session_cookies
 from app.core.settings import get_settings
 from app.core.version import APP_VERSION
 from app.domain.uploads import too_large_message
+from app.services.platform_settings import live
 
 logger = logging.getLogger("permitflow")
 
@@ -37,12 +39,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.app_env != "test":
         from app.services.verification import mark_stale_runs_failed
 
-        try:
-            n = mark_stale_runs_failed()
-            if n:
-                logger.warning("stale_runs_marked_failed", extra={"extra_fields": {"count": n}})
-        except Exception:  # noqa: BLE001 - startup must not depend on this housekeeping
-            logger.exception("stale_run_cleanup_failed")
+        # Load the platform settings once before serving, so the first requests do not run on the
+        # environment values alone (a failure is logged and the reload retries in the background).
+        live().refresh()
+
+        # Worker mode (US-098): the queue outlives an API restart, and the workers' reaper handles expiry.
+        if settings.verification_mode == "inline":
+            try:
+                n = mark_stale_runs_failed()
+                if n:
+                    logger.warning("stale_runs_marked_failed", extra={"extra_fields": {"count": n}})
+            except Exception:  # noqa: BLE001 - startup must not depend on this housekeeping
+                logger.exception("stale_run_cleanup_failed")
     yield
 
 
@@ -67,10 +75,23 @@ def _error_response(
     )
 
 
+def build_request_limiter(*, enabled: bool = True) -> RequestLimiter:
+    """The per-client request windows, reading the live platform settings (US-101): an administrator's
+    change applies on the next request after the cache refreshes. `enabled=False` is the test environment's
+    "off"; the environment values are still the ceilings of what the panel may set."""
+    settings = get_settings()
+    return RequestLimiter(
+        per_minute=(lambda: live().int_value("rate_limit_per_minute")) if enabled else 0,
+        login_per_minute=(lambda: live().int_value("login_attempts_per_minute")) if enabled else 0,
+        trusted_proxies=settings.trusted_proxies,
+        client_ip_header=settings.client_ip_header,
+    )
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
-    # Interactive docs stay available outside production (THREAT_MODEL: no public schema in production).
-    expose_docs = settings.app_env != "production"
+    # US-107 R-2: the schema is public only when EXPOSE_API_DOCS is set, and never in production.
+    expose_docs = settings.expose_api_docs and settings.app_env != "production"
     app = FastAPI(
         title="PermitFlow API",
         version=APP_VERSION,
@@ -97,12 +118,7 @@ def create_app() -> FastAPI:
 
     # Per-client request limits (US-058), inside CORS so a 429 carries the headers the browser needs.
     # Off in the test environment; tests that exercise it install their own limiter on app.state.
-    app.state.limiter = RequestLimiter(
-        per_minute=0 if settings.app_env == "test" else settings.rate_limit_per_minute,
-        login_per_minute=0 if settings.app_env == "test" else settings.login_attempts_per_minute,
-        trusted_proxies=settings.trusted_proxies,
-        client_ip_header=settings.client_ip_header,
-    )
+    app.state.limiter = build_request_limiter(enabled=settings.app_env != "test")
 
     @app.middleware("http")
     async def rate_limit(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -121,16 +137,27 @@ def create_app() -> FastAPI:
     # body without a length refused outright (review finding, 21 Sep).
     app.add_middleware(
         BodyLimitMiddleware,
-        upload_limit=settings.upload_max_bytes + _MULTIPART_OVERHEAD,
-        upload_message=too_large_message(settings.upload_max_bytes),
+        upload_limit=lambda: live().int_value("upload_max_bytes") + _MULTIPART_OVERHEAD,
+        upload_message=lambda: too_large_message(live().int_value("upload_max_bytes")),
     )
 
+    # Credentials are allowed for the listed frontend origins in BOTH modes (US-104): the frontend sends
+    # them on sign-in and on its load-time /auth/me before it knows which mode this is, and a browser
+    # refuses the answer to a credentialed request without Allow-Credentials. Token mode ignores cookies,
+    # so this opens nothing. A wildcard is refused at startup in both modes. The CSRF header is only allowed
+    # in cookie mode.
+    cookie_mode = settings.auth_mode == "cookie"
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
-        allow_credentials=False,
+        allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+            *([CSRF_HEADER] if cookie_mode else []),
+        ],
         expose_headers=["X-Request-ID"],
     )
 
@@ -144,7 +171,7 @@ def create_app() -> FastAPI:
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cache-Control"] = "no-store"
         # US-058: the API serves JSON and files, never a page, so nothing may run or be embedded. The
-        # interactive docs (non-production only) load Swagger from a CDN and are exempted.
+        # interactive docs (only with EXPOSE_API_DOCS) load Swagger from a CDN and are exempted.
         if not request.url.path.startswith("/api/docs") and not request.url.path.startswith("/api/openapi"):
             response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -157,7 +184,12 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content=exc.to_body())
+        response = JSONResponse(status_code=exc.status_code, content=exc.to_body())
+        # Sign-out always ends with no cookies in the browser, even when the session was already revoked
+        # or expired and the request is refused as 401 (US-104).
+        if exc.status_code == 401 and request.url.path == "/api/v1/auth/logout" and cookie_mode:
+            clear_session_cookies(response)
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

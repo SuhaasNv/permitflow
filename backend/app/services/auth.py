@@ -1,5 +1,6 @@
 """Authentication use cases: sign in, the per-request session check, sign out (US-001, US-093)."""
 
+import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -7,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import SessionActive, SessionRevoked, Unauthorized
+from app.core.errors import SessionActive, SessionRevoked, StepUpFailed, Unauthorized
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.settings import get_settings
 from app.models import User, UserSession
@@ -15,12 +16,15 @@ from app.repositories.audit import AuditRepository
 from app.repositories.sessions import SessionRepository
 from app.repositories.users import UserRepository
 
+logger = logging.getLogger("permitflow.auth")
+
 
 @dataclass(frozen=True)
 class Token:
     access_token: str
     expires_at: datetime
     user: User
+    session_id: uuid.UUID
 
 
 # Verified against when the email is unknown so both outcomes cost one argon2 check (timing oracle, T4).
@@ -91,7 +95,7 @@ class AuthService:
         token, expires_at = create_access_token(user.id, user.role.value, session.id)
         session.expires_at = expires_at
         self.db.commit()
-        return Token(access_token=token, expires_at=expires_at, user=user)
+        return Token(access_token=token, expires_at=expires_at, user=user, session_id=session.id)
 
     def current_user(self, user_id: uuid.UUID, session_id: uuid.UUID) -> User:
         """The per-request check: the user row (role, active flag) and the session row (revoked, idle).
@@ -114,6 +118,24 @@ class AuthService:
             session.last_seen_at = now
             self.db.commit()
         return user
+
+    def confirm_password(
+        self, user: User, password: str, *, failure_event: str, failure_payload: dict[str, str | None]
+    ) -> None:
+        """Step-up (US-101): re-verify the signed-in user's own password before a sensitive change. A wrong
+        password is audited as `failure_event` (never with the password) in its own transaction, committed
+        before the error is raised; the caller counts it against the sign-in limiter."""
+        if verify_password(password, user.password_hash):
+            return
+        try:
+            self.audit.record(
+                application_id=None, actor_id=user.id, event_type=failure_event, payload=failure_payload
+            )
+            self.db.commit()
+        except Exception:  # noqa: BLE001 - the refusal must reach the caller even if it cannot be recorded
+            self.db.rollback()
+            logger.exception("step_up_failure_not_audited")
+        raise StepUpFailed("Your password is incorrect. The change was not made.")
 
     def sign_out(self, user: User, session_id: uuid.UUID) -> None:
         session = self.sessions.get(session_id)

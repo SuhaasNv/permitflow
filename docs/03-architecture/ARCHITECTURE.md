@@ -1,10 +1,31 @@
 # PermitFlow: Architecture
 
-A modular monolith (ADR-001): one FastAPI backend, one React frontend, one PostgreSQL database, local file storage, and an isolated AI verification module.
+A modular monolith (ADR-001): one FastAPI backend, one React frontend, one PostgreSQL database, file storage behind one interface (the local disk by default; an S3-compatible bucket behind `STORAGE_BACKEND=s3`, US-097, ADR-015), and an isolated AI verification module that runs inside the API (`VERIFICATION_MODE=inline`, the default) or in a separate worker process (`worker`, US-098, ADR-016).
 
 ## System diagram
 
 ![Solution architecture: users, the web application and the API with its modules, PostgreSQL and file storage, OpenAI and LangSmith](diagrams/views/solution-architecture.png)
+
+**Worker mode (US-098, ADR-016).** The picture above is the `inline` shape. With `VERIFICATION_MODE=worker` the verification module moves out of the API into a second process of the same image, and `verification_runs` is the queue between them. The PNG views (this one and `deployment.png`) were drawn outside the repository and have not been redrawn; this diagram is the current truth for the worker until they are.
+
+```
+ Browser ──HTTPS──> Frontend ──> API (FastAPI)                          Worker (python -m app.worker)
+                                  │  upload / re-run                     │  no public address, no published port
+                                  │  1. quota check (as today)           │
+                                  │  2. INSERT verification_runs         │  loop: LISTEN verification_runs, poll 2 s
+                                  │     status 'pending' (= queued)      │  claim: UPDATE ... FOR UPDATE SKIP LOCKED
+                                  │  3. after the response:              │         status 'running', lease_until, attempts+1
+                                  │     NOTIFY verification_runs ───────>│  per run (WORKER_CONCURRENCY threads):
+                                  ▼                                      │    read file (FileStorage: bucket on Railway)
+                            PostgreSQL <─────────────────────────────────┤    extract text in a child process (kill + caps)
+                          verification_runs (the queue)                  │    re-check draft/document, then provider.verify
+                          documents, applications, audit_events          │    write result under a row lock (fenced on worker_id)
+                                  ▲                                      │  reaper every 60 s: expired lease -> pending,
+                                  │  GET /applications/{id} polls        │    or 'dead' after the 3rd claim
+                                  │  every 2 s (status served as          │  /metrics on :9100 (private)
+                                  │  pending, running, ..., failed)       ▼
+                                  └──────────────────────────────────  OpenAI / mock provider
+```
 
 ## Backend layering and dependency direction
 
@@ -57,8 +78,10 @@ POST /applications/{id}/documents (multipart)
        → validate extension/MIME/size (streamed, 10 MB cap) → magic bytes
   DocumentService.upload (one transaction): Document row (is_current, supersedes) →
      VerificationRun(pending) → audit document.uploaded → commit
-     file bytes are written to FileStorage before commit; on commit failure the file is deleted
-  BackgroundTasks.add(run_verification, run_id)   # request session is already closed at this point
+     file bytes are written to FileStorage (disk or bucket, same keys) before commit; on commit failure the file is deleted
+  BackgroundTasks.add(start_run, run_id)   # request session is already closed at this point
+  #   inline: start_run runs the check below in this process.
+  #   worker (US-098): start_run only sends NOTIFY; the run stays pending until a worker claims it.
   201 { document, verification: { status: "pending" } }
 
 run_verification(run_id):   # plain sync function; FastAPI runs it in the threadpool
@@ -74,6 +97,20 @@ run_verification(run_id):   # plain sync function; FastAPI runs it in the thread
   → on any exception: failed/unavailable with reason (never raises out of the task)
   Multi-worker note: startup stale-run cleanup only marks runs whose started_at is older than the
   timeout + grace, so a peer worker's in-flight run is not killed.
+
+execute_run(run_id, worker_id) as changed by US-098 (both modes; `worker_id` is None inline):
+  runs only while the row is `running` and held by worker_id
+  → PDF text is extracted in a child process (kill at 25 s, address-space and CPU caps); a timeout or a
+    cap is `pdf_parse_error`, the same reason a corrupt PDF gets
+  → pause check (US-101) → look again: run, document and application still exist and the document is
+    still current (gone: stop, write nothing; replaced: finish `unavailable: document_replaced`)
+  → commit (keeps the extracted text, returns the connection) → provider.verify → rules
+  → _finish: lock the run row, proceed only if still `running` for this worker_id (else drop the
+    result), then write the status, audit row and the AI usage row (tokens from the provider, cost at
+    the price in force, US-100) in one commit; after it, the usage counters and, if the setting is on,
+    the Telegram line (a failure there never touches the check)
+Worker mode only: claim_next_run (one atomic UPDATE, committed at once), reap_expired_runs every 60 s
+(requeue, or `dead` after 3 claims, with an audit row), release_run on SIGTERM.
 
 Client: GET /applications/{id} polls every 2 s while any document is pending/running.
 ```
@@ -114,26 +151,26 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 
 | Method | Path | Role | Purpose |
 |--------|------|------|---------|
-| POST | /auth/login | any | JWT carrying the session id (`sid`); `409 session_active` (details: `device`, `last_seen_at`) while another device holds the account, unless `take_over: true` (US-093) |
-| GET | /auth/me | any | current user |
-| POST | /auth/logout | any | ends this sign-in on the server; the token answers `401 session_revoked` from then on (US-093) |
+| POST | /auth/login | any | JWT carrying the session id (`sid`); `409 session_active` (details: `device`, `last_seen_at`) while another device holds the account, unless `take_over: true` (US-093). With `AUTH_MODE=cookie` (US-104, ADR-018): needs an allowed `Origin` header (else `403 csrf_failed`), sets the `__Host-pf_session` (HttpOnly) and `__Host-pf_csrf` cookies, and answers `{expires_at, user, csrf_token}` with no bearer token |
+| GET | /auth/me | any | current user; in cookie mode also `csrf_token`, so a reload learns who is signed in and gets the CSRF value without reading a cookie |
+| POST | /auth/logout | any | ends this sign-in on the server; the token answers `401 session_revoked` from then on (US-093). In cookie mode it needs `X-CSRF-Token` and clears both cookies |
 | GET | /form-schema | any | sections/fields definition |
 | GET | /officer/feedback-templates | officer | comment templates from `domain/feedback_templates.py` (key, title, suggested target, message); the officer edits before sending (built, US-024) |
 | GET | /applications | operator | own applications |
 | POST | /applications | operator | create draft; `409 conflict` with `details.code = draft_limit` once the operator holds `MAX_DRAFTS_PER_USER` open drafts (US-058) |
 | GET | /applications/{id} | operator (own) | operator view: sections, documents + verification, released feedback (all rounds, no author), `resubmit` readiness (changed and untouched flagged targets), editability from open released feedback, `needs_operator_action` (built) |
 | PATCH | /applications/{id}/sections/{key} | operator (own) | update a section of the working copy (checked against editability) |
-| POST | /applications/{id}/submit | operator (own) | draft → application_received |
-| POST | /applications/{id}/resubmit | operator (own) | pending_pre_site_resubmission → pre_site_resubmitted |
+| POST | /applications/{id}/submit | operator (own) | draft → application_received; with `SCAN_MODE=enforce` 409 `documents_not_clear` while a document is scanning or infected (US-099) |
+| POST | /applications/{id}/resubmit | operator (own) | pending_pre_site_resubmission → pre_site_resubmitted; same 409 `documents_not_clear` (US-099) |
 | POST | /officer/applications/{id}/feedback/{fid}/reopen | officer | addressed → open with the same text, draft until the next round; audited `feedback.reopened` (built, US-049) |
 | POST | /officer/applications/{id}/feedback/{fid}/restore | officer | undo the caller's own withdraw or resolve within 15 s; audited `feedback.restored` (built, US-039) |
 | DELETE | /applications/{id} | operator (own) | delete a draft outright with files, runs and audit events; 409 once submitted (built, US-045) |
 | GET | /applications/{id}/licence | owner, officer or admin | the issued certificate as PDF; 404 before approval (built, US-051) |
 | GET | /officer/applications/{id}/licence/preview | officer | watermarked certificate while pending approval; nothing stored (built, US-051) |
 | POST | /applications/{id}/withdraw | operator (own) | any post-submission non-terminal → withdrawn, optional reason, officers notified (built, US-038) |
-| POST | /applications/{id}/documents | operator (own) | upload / replace by type; JPG and PNG are stored without metadata (US-085); 422 `storage_budget` past the application's 150 MB |
+| POST | /applications/{id}/documents | operator (own) | upload / replace by type; JPG and PNG are stored without metadata (US-085); 422 `storage_budget` past the application's 150 MB, 507 `storage_full` past the platform ceiling (US-098), 503 `unavailable` when no image slot frees up |
 | DELETE | /applications/{id}/documents/{doc_id} | operator (own) | remove a document while in `draft` only |
-| GET | /applications/{id}/documents/{doc_id}/download | owner or officer (admin included since US-072) | file; the document must belong to `{id}` |
+| GET | /applications/{id}/documents/{doc_id}/download | owner or officer (admin included since US-072) | file; the document must belong to `{id}`; with the virus scan on (US-099) 403 `file_infected` for a blocked file and 409 `file_scanning` until the verdict |
 | POST | /applications/{id}/documents/{doc_id}/verify | operator (own) | re-run verification (only when the latest run is terminal); 202 |
 | GET | /applications/{id}/compare?from=n&to=m | owner or officer (admin with US-072) | field-level form diff and document add/remove/replace from `domain/diff.py`; 404 for unknown revisions (built, US-027) |
 | GET | /officer/applications | officer, admin | queue: every non-draft application with applicant, internal status + officer label, server-derived next action and whose turn it is, revision count, open feedback count, document-check attention and checking counts, first submission and last activity; plus turn counts (built, US-020) |
@@ -153,10 +190,10 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | POST | /applications/{id}/site-visit/reschedule | operator (own) | `{ date, slot, reason }` on a confirmed visit before its date: becomes a counter-proposal the officer decides; the confirmed date stays until then; audit `site_visit.rescheduled`; officers notified (built, US-084) |
 | GET | /applications/{id}/clarifications | operator (own) | `?visit=N` reads an earlier visit's thread, read-only (UAT run 5, F18); without it the active visit's (none while the case is back in review, empty for a second visit until its checklist is submitted). `ClarificationOperatorView`: only the flagged items with a released, non-withdrawn question, each with title, guidance, the requests, the operator's own responses (US-065) and a status in operator words (Waiting for your response, Sent, Clarified, No longer needed); no field exists for a result, an unflagged item or an unreleased question; the application view carries `clarification { can_respond, open_count, answered_count, round }` (built, US-064) |
 | POST | /applications/{id}/clarifications/{item_id}/responses | operator (own) | `{ message }` (1 to 2000 characters): draft or rewrite the answer to the current open question on one item; 409 unless the office is waiting for answers, the item is open, and the answer is not yet sent; audit `clarification.response_drafted` once per item (built, US-065) |
-| POST | /applications/{id}/clarifications/responses/{rid}/attachments | operator (own) | multipart `file`: the document rules (allowlist, magic bytes, 10 MB), three per answer (422 `attachment_cap`), 422 `storage_budget` past the application's 150 MB, images stored without metadata (US-085), an identical file is kept once and reported `unchanged`; 409 once sent; audit `clarification.attachment_added` (built, US-065) |
+| POST | /applications/{id}/clarifications/responses/{rid}/attachments | operator (own) | multipart `file`: the document rules (allowlist, magic bytes, 10 MB), three per answer (422 `attachment_cap`), 422 `storage_budget` past the application's 150 MB, 507 `storage_full` past the platform ceiling (US-098), 503 `unavailable` when no image slot frees up, images stored without metadata (US-085), an identical file is kept once and reported `unchanged`; 409 once sent; audit `clarification.attachment_added` (built, US-065) |
 | DELETE | /applications/{id}/clarifications/responses/{rid}/attachments/{aid} | operator (own) | remove until sent (409 after); audit `clarification.attachment_removed` (built, US-065) |
 | POST | /applications/{id}/clarifications/send | operator (own) | every open item must carry an answer (422 `details.items` with the unanswered keys); items withdrawn before the send are left out; responses get `sent_at`, items become `answered`, audit `clarification.answered` per item then `status.changed` (operator actor) to `post_site_clarification_resubmitted`; every active officer notified (built, US-065) |
-| GET | /applications/{id}/clarifications/attachments/{aid}/download | owner, officer, admin | the file with `content_disposition()`; the chain attachment, response, request, item, checklist, application is checked at every hop; an id from elsewhere is 404 (built, US-065) |
+| GET | /applications/{id}/clarifications/attachments/{aid}/download | owner, officer, admin | the file with `content_disposition()`; the chain attachment, response, request, item, checklist, application is checked at every hop; an id from elsewhere is 404 (built, US-065); the same 403 `file_infected` and 409 `file_scanning` as documents (US-099) |
 | POST | /officer/applications/{id}/clarifications/{item_id}/resolve | officer | Mark clarified: an answered item becomes resolved, in `post_site_clarification_resubmitted` only; audit `clarification.resolved`; returns the case (built, US-066) |
 | POST | /officer/applications/{id}/clarifications/{item_id}/reopen | officer | `{ message }`: Still needs clarification: an unreleased request with the item's next round number, the item open again; audit `clarification.reopened`; the operator sees it only after Request another round (built, US-066) |
 | POST | /officer/applications/{id}/clarifications/{item_id}/withdraw | officer | an open question is withdrawn (also in the two operator-turn states); audit `clarification.withdrawn`; a send racing it has one outcome under the row lock (built, US-066) |
@@ -170,13 +207,19 @@ All under `/api/v1`. Error body: `{ "error": { "code": string, "message": string
 | GET | /admin/audit-feed?limit=50&before=<cursor> | admin | the newest audit events across every application and every user change, with the sentence, actor, case reference; keyset cursor `<micros>,<id>` (never `OFFSET`), `next_cursor` null at the end; 400 `bad_cursor`; a draft's events stay out until it is submitted, like every other admin read of a draft (built, US-072; security audit, 24 Sep) |
 | GET | /admin/applications/{id} | admin | the officer view with `actions[]` empty (the viewer's actor; ADR-014); the officer GETs for the queue, the case, the audit trail and the checklist admit the admin as well; compare and the two downloads admit any reader; `feedback-templates`, `licence/preview` and every mutation stay 403 (built, US-072) |
 | GET | /admin/users | admin | the directory (name, email, role, active, protected, created) plus `self_id` (built, US-073) |
-| POST | /admin/users | admin | create an account (email, name, role, password of 12+ characters); 409 `email_taken`; audit `user.created` (built, US-073, added at the owner's request) |
-| PATCH | /admin/users/{id} | admin | change `role` and/or `is_active` under `FOR UPDATE` on the admin rows; 409 `self_change` (wins), `protected_account`, `last_admin`, `try_again` (a deadlock); audit `user.role_changed` (from, to), `user.deactivated`, `user.reactivated` with `application_id = null`; a deactivated user and a changed role take effect on the next request; a role change deletes the user's notifications, which were written for the old role (built, US-073; security audit, 24 Sep) |
+| POST | /admin/users | admin | create an account (email, name, role, `password` of 12+ characters for the new account, and `admin_password`: the signed-in administrator's own, step-up); 403 `step_up_failed` for a wrong one (audit `user.step_up_failed`, counted on the sign-in limiter that answers 429 once full); 409 `email_taken`; audit `user.created` (built, US-073, added at the owner's request; step-up added in the US-101 review fixes, security audit F2) |
+| PATCH | /admin/users/{id} | admin | change `role` and/or `is_active` (with `admin_password`, the signed-in administrator's own: step-up, 403 `step_up_failed` audited as `user.step_up_failed`, 429 after repeated failures) under `FOR UPDATE` on the admin rows; 409 `self_change` (wins), `protected_account`, `last_admin`, `try_again` (a deadlock); audit `user.role_changed` (from, to), `user.deactivated`, `user.reactivated` with `application_id = null`; a deactivated user and a changed role take effect on the next request; a role change deletes the user's notifications, which were written for the old role (built, US-073; security audit, 24 Sep) |
+| GET | /admin/settings | admin | the eleven editable platform settings, each with its value in force, the default (the environment value), `minimum`, `maximum` and `max_source` (`env` or `cap`), whether it is overridden, who changed it last and why, and `in_use` (false while the consumer is a later story); an empty table lists the environment values (built, US-101) |
+| GET | /admin/settings/history?key=&limit=50&before=<cursor> | admin | changes and reverts, newest first, keyset cursor like the audit feed, optionally for one setting; read from the audit trail (`settings.changed`, `settings.reverted`); 404 unknown key (built, US-101) |
+| PUT | /admin/settings/{key} | admin | set one value: body `value`, `reason` (3 to 280 characters) and `password` (the signed-in administrator's own, step-up); 403 `step_up_failed` for a wrong password, counted on the sign-in limiter that answers 429 once full; 422 `validation_failed` naming the bound (`details.bound`, `minimum`, `maximum`) or `no_change` or `production_fail_open`; 404 unknown key; the override row and the audit row `settings.changed` (key, old, new, reason) in one transaction, then a Telegram message; a wrong password is also audited as `settings.step_up_failed` (key, no password) in its own transaction; setting the environment default again clears the override row instead of storing it; switching `ai_paused` off adds `ended_while_paused` (checks stored `ai_paused` since it was switched on) to the audit row and the message (built, US-101) |
+| POST | /admin/settings/history/{event_id}/revert | admin | undo one history entry: the setting returns to the value it had before it (or to the environment default if it had none); same `reason`, `password` and bounds as a change, checked against today's ceilings; 404 for an id that is not a settings entry; audit `settings.reverted` (built, US-101) |
+| GET | /admin/ai-usage?user_id=&application_id=&reference=&from=&to=&limit=50&before=<cursor> | admin | what each check cost and who ran it (US-100, ADR-020): `items` newest first (id, created_at, run, document and application ids, `reference_no`, `business_name` (read from the application's form when asked, null for a deleted draft; never stored in the ledger), user id and name, document type, provider, model, input and output tokens, `cost_usd` as an exact decimal string, latency, outcome), keyset `next_cursor` like the audit feed, `totals` (runs, tokens, cost and `avg_latency_ms`, the average over the checks that reached a provider, null when none did) over everything the filters match, and `today` (the Singapore day: checks that count toward the cap, tokens, cost, and `daily_cap`, the live `ai_runs_per_day`); `reference` is an exact match on the application reference (an unknown one gives an empty result, not an error; with `application_id` both must hold); `from` and `to` are Singapore days, both included; 400 `bad_range` when `from` is after `to`, 400 `bad_cursor`, 422 for a bad date or `limit` above 100; 401 without a session, 403 for operator and officer (built, US-100) |
+| GET | /admin/ai-usage.csv?user_id=&application_id=&reference=&from=&to= | admin | the same rows, no paging, as a streamed `text/csv` attachment (`ai-usage.csv`, `Cache-Control: no-store`); every cell starting with `=`, `+`, `-`, `@`, tab or CR is prefixed with a single quote (CSV injection); columns `created_at, reference_no, business_name, application_id, document_id, run_id, user_id, user_name, document_type, provider, model, input_tokens, output_tokens, cost_usd, latency_ms, outcome`; same filters, errors and authorisation as the page; at most 100,000 rows (a last line says the file was cut), each statement under a 60 second timeout, one audit event `admin.ai_usage_exported` per export (filters, row count, cut or not; no names); an extreme `from` or `to` is 400 `bad_range`, never 500 (built, US-100) |
 | GET | /notifications | any | own notifications (newest first, 50) plus `unread_count` (built, US-025) |
 | POST | /notifications/{id}/read | any | mark read; another user's id is 404 (built, US-025) |
 | POST | /notifications/read-all | any | mark every own notification read (built, US-025) |
-| GET | /metrics | bearer token (`METRICS_TOKEN`); 404 when no token is configured; exempt from the rate limit | Prometheus text format: `permitflow_http_requests_total`, `permitflow_http_request_seconds`, `permitflow_rate_limited_total`, `permitflow_verification_runs_total`, `permitflow_verification_run_seconds`, `permitflow_quota_refusals_total`, `permitflow_transitions_total`, `permitflow_applications` (gauge), `permitflow_openai_tokens_total`, `permitflow_sessions_active` (gauge), `permitflow_checklists_submitted_total`, `permitflow_clarification_rounds_total`, `permitflow_attachment_bytes_total`, `permitflow_storage_bytes` (gauge), `permitflow_build_info` (gauge with the version and commit); route templates and enum values as labels, never ids or text (US-077, US-089, US-093) |
-| GET | /health | public | `{status, database, version, commit, environment}`: liveness, the database, and the build that answers (the version the release ritual bumps, the commit CI bakes in as `GIT_SHA`, `local` outside an image, and `APP_ENV`), the same three values the metrics and Telegram name (US-094; the What's new page heads with them); 503 when the database ping fails, with the standard `error` object beside the status fields; provider details are not exposed publicly (the planned admin AI-health endpoint, US-071, would report them) |
+| GET | /metrics | bearer token (`METRICS_TOKEN`); 404 when no token is configured; exempt from the rate limit | Prometheus text format: `permitflow_http_requests_total`, `permitflow_http_request_seconds`, `permitflow_rate_limited_total`, `permitflow_verification_runs_total`, `permitflow_verification_run_seconds`, `permitflow_quota_refusals_total`, `permitflow_transitions_total`, `permitflow_applications` (gauge), `permitflow_openai_tokens_total`, `permitflow_sessions_active` (gauge), `permitflow_checklists_submitted_total`, `permitflow_clarification_rounds_total`, `permitflow_attachment_bytes_total`, `permitflow_storage_bytes` (gauge), `permitflow_build_info` (gauge with the version and commit), `permitflow_ai_checks_total`, `permitflow_ai_tokens_total`, `permitflow_ai_cost_usd_total` (by `document_type` and `outcome`, US-100); route templates and enum values as labels, never ids or text (US-077, US-089, US-093) |
+| GET | /health | public | `{status, database, version, commit, environment}`: liveness, the database, and the build that answers (the version the release ritual bumps, or `APP_VERSION` when the environment sets it (US-111), the commit CI bakes in as `GIT_SHA`, which in production is the tested candidate's commit, `local` outside an image, and `APP_ENV`), the same three values the metrics and Telegram name (US-094; the What's new page heads with them); 503 when the database ping fails, with the standard `error` object beside the status fields; provider details are not exposed publicly (the planned admin AI-health endpoint, US-071, would report them) |
 
 All paths are under `/api/v1` including `/health`. FastAPI's default `{"detail": …}` bodies for 401/403/422 are replaced by explicit exception handlers so every error uses the standard shape (REL-001).
 
@@ -215,12 +258,13 @@ State: server state in TanStack Query (query keys per resource; invalidation aft
 - Request logging middleware: request id, method, path, status, duration, user id; request id echoed in `X-Request-ID`.
 - Verification logs: run id, provider, model, latency, outcome, `raw_output_valid`.
 - `/health`: database ping (503 on failure) plus `version`, `commit` and `environment` (US-094). AI provider configuration is never reported publicly; the planned admin AI-health endpoint (US-071) would carry it.
-- Metrics (US-077): `core/metrics.py` holds the Prometheus counters and histograms, the outermost middleware counts every answer, the services increment their own events, `api/v1/metrics.py` renders them behind a bearer token. Prometheus scrapes them every 15 s; Grafana draws one dashboard (API health, document checks, cost, queue); seven alert rules and an hourly digest reach Telegram, where a small bot also answers `/status` and friends. The layer in full, with the Railway services: `../13-observability/OBSERVABILITY.md`.
+- Metrics (US-077): `core/metrics.py` holds the Prometheus counters and histograms, the outermost middleware counts every answer, the services increment their own events, `api/v1/metrics.py` renders them behind a bearer token. In worker mode the check counters live in the worker process, which serves its own `/metrics` on a private port (`WORKER_METRICS_PORT`, 9100); the queue gauges (depth, oldest wait, active leases, dead runs) are read from the database by both processes. Prometheus scrapes them every 15 s; Grafana draws one dashboard (API health, document checks, cost, queue); seven alert rules and an hourly digest reach Telegram, where a small bot also answers `/status` and friends. The layer in full, with the Railway services: `../13-observability/OBSERVABILITY.md`.
 
 ## Deployment
 
 - Local: `docker compose up db` (PostgreSQL only; the API and the frontend run natively with `uvicorn` and `vite`) or `docker compose --profile full up` to also run the API container. A local database is kept because the test suite truncates tables between tests and because a reviewer must be able to run the system from a clean clone without any hosted credentials (NFR-001).
-- Railway, two environments (`development` from `dev`, `production` from `main`), each with its own Postgres, uploads volume, secrets and domains; both tiers run as GHCR images built once in CI (frontend: nginx with the API URL injected at start), deployed by `deploy.yml` behind health gates and, for production, a reviewer approval. Shape, secrets, seeding and rollback: `docs/09-operations/OPERATIONS.md`.
+- Railway, two environments (`development` from `dev`, `production` from `main`), each with its own Postgres, uploads volume, secrets and domains; both tiers run as GHCR images built once in CI (frontend: nginx with the API URL injected at start); production runs the release candidate's image, promoted by digest and relabelled with `APP_VERSION`, never rebuilt from `main` (ADR-019); deployed by `deploy.yml` behind health gates and, for production, a reviewer approval. Shape, secrets, seeding and rollback: `docs/09-operations/OPERATIONS.md`.
+- Worker (US-098): with `VERIFICATION_MODE=worker` a new Railway service, `worker`, runs `python -m app.worker` from the same backend image (a custom start command), with no public domain, the same `DATABASE_URL` and bucket variables as the API, and `STORAGE_BACKEND=s3` on both (a volume cannot be shared between services). Locally: `docker compose --profile full --profile worker up -d` with `VERIFICATION_MODE=worker`; the default Compose path is unchanged and runs inline. Not yet created on Railway; see OPERATIONS.md.
 
 ### Visits on the case views (UAT run 5, 24 Sep 2026)
 

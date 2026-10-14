@@ -22,6 +22,7 @@ _ATTENTION = {
     VerificationStatus.UNREADABLE,
     VerificationStatus.FAILED,
     VerificationStatus.UNAVAILABLE,
+    VerificationStatus.DEAD,
 }
 _CHECKING = {VerificationStatus.PENDING, VerificationStatus.RUNNING}
 # The post-site states where the row waits on the operator's answers (SCOPE.md assumption 18).

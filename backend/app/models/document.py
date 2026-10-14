@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, new_id, str_enum, utcnow
@@ -29,6 +29,15 @@ class Document(Base):
     is_current: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     uploaded_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    # US-099 (migration 0018): the virus scan. NULL: stored with the scan off (or before it existed), served
+    # as before. Otherwise scanning, clean or infected (domain/scan.py); only NULL and clean are served.
+    scan_state: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    scan_signature: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # A PDF with an automatic action plus a script, a launch action or an embedded file. Flag only.
+    active_content: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
 
 
 class VerificationRun(Base):
@@ -37,6 +46,17 @@ class VerificationRun(Base):
     __table_args__ = (
         Index("ix_verification_runs_created_at", "created_at"),
         Index("ix_verification_runs_started_at", "started_at"),
+        # US-098: the worker's claim (oldest queued run) and the reaper's scan (expired leases).
+        Index(
+            "ix_verification_runs_queued",
+            "created_at",
+            postgresql_where=text("status = 'pending'"),
+        ),
+        Index(
+            "ix_verification_runs_lease",
+            "lease_until",
+            postgresql_where=text("status = 'running'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_id)
@@ -58,3 +78,10 @@ class VerificationRun(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    # US-098 (worker mode): how many times a worker has claimed the run, until when the claim is good, and
+    # who holds it. They stay at their defaults in inline mode.
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    worker_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # US-100: the person whose action created the run (the upload, or the re-run), for the AI usage record.
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)

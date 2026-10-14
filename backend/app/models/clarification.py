@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, new_id
@@ -55,3 +55,10 @@ class ClarificationAttachment(Base):
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     uploaded_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # US-099 (migration 0018): the virus scan, as on documents.
+    scan_state: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    scan_signature: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    active_content: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )

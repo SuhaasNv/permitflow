@@ -46,6 +46,19 @@ class Forbidden(AppError):
     code = "forbidden"
 
 
+class StepUpFailed(Forbidden):
+    """The signed-in administrator's password did not match on a change that asks for it again (US-101)."""
+
+    code = "step_up_failed"
+
+
+class CsrfFailed(Forbidden):
+    """Cookie mode (US-104): an unsafe request without a matching CSRF token, or a sign-in from a foreign
+    origin."""
+
+    code = "csrf_failed"
+
+
 class NotFound(AppError):
     status_code = 404
     code = "not_found"
@@ -79,3 +92,48 @@ class ValidationFailed(AppError):
 class RateLimited(AppError):
     status_code = 429
     code = "rate_limited"
+
+
+class Unavailable(AppError):
+    """Busy, not broken: the caller may try again in a moment (US-098)."""
+
+    status_code = 503
+    code = "unavailable"
+
+
+class InsufficientStorage(AppError):
+    """The platform has no room left for another file (US-098)."""
+
+    status_code = 507
+    code = "storage_full"
+
+
+class FileInfected(ValidationFailed):
+    """The upload was blocked by the virus scan (US-099). The code is what the screens map to the operator
+    message; the file stays quarantined."""
+
+    code = "file_infected"
+
+
+class FileBlocked(Forbidden):
+    """A download of a file the scan blocked (US-099); same code as `FileInfected`."""
+
+    code = "file_infected"
+
+
+class FileScanning(Conflict):
+    """A download of a file the virus scan has not cleared yet (US-099). Try again in a moment."""
+
+    code = "file_scanning"
+
+
+class DocumentsNotClear(Conflict):
+    """A submission with a document the virus scan is still checking or has blocked (US-099)."""
+
+    code = "documents_not_clear"
+
+
+class ScannerUnavailable(Unavailable):
+    """The virus scanner could not be reached; nothing was stored as clean (US-099)."""
+
+    code = "scanner_unavailable"

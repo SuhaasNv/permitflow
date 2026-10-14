@@ -57,6 +57,8 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  // dist/.vite/manifest.json lets scripts/check-bundle-size.mjs find the entry chunk and the chunks it loads at once.
+  build: { manifest: true },
   server: { port: 3000, strictPort: true },
   test: {
     environment: 'jsdom',

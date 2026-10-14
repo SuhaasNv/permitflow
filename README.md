@@ -10,7 +10,7 @@ https://github.com/user-attachments/assets/942739f7-e2bd-4360-b525-ecf960a7e796
 
 A regulatory licensing platform built for a 3-day full-stack assessment. An operator (the business owner, or an agent applying for the business) applies for a Food Establishment Licence through a guided form with checked uploads; a licensing officer reviews the submission, leaves feedback tied to a section or a document, and requests a resubmission in which only the flagged parts reopen. Every status change, feedback round and decision is audited; approval issues a licence certificate. An advisory AI verifier reads each uploaded document against the form before submission. It never decides anything.
 
-**Try it:** production, v0.4.1, at https://permitflow.space (one example application waiting in the officer's queue); development at https://dev.permitflow.space. Demo accounts below. Local setup takes about ten minutes.
+**Try it:** production, v0.5.0, at https://permitflow.space (one example application waiting in the officer's queue; sign-in details are shared with reviewers); development at https://dev.permitflow.space (shared demo accounts below). Local setup takes about ten minutes.
 
 **Ten minutes to review it:** the technical deck's handout PDF in `docs/14-debrief/technical-deck/`, then `SCOPE.md`, then `docs/11-reviews/ASSESSMENT_TRACEABILITY.md` (every line of the brief mapped to code, test and evidence).
 
@@ -28,20 +28,22 @@ cd backend
 uv sync
 uv run alembic upgrade head
 uv run python scripts/seed.py           # demo accounts, see below
-uv run uvicorn app.main:app --reload   # http://localhost:8000/api/v1/health, docs at /api/docs
+uv run uvicorn app.main:app --reload   # http://localhost:8000/api/v1/health, docs at /api/docs when EXPOSE_API_DOCS=true (set in .env.example)
 
 cd ../frontend
 npm install
 npm run dev                            # http://localhost:3000
 ```
 
-Local quotas: an operator may hold 20 open drafts and run 60 AI checks a day (the mock provider counts too). For local work set `MAX_DRAFTS_PER_USER=0` and `AI_RUNS_PER_USER_PER_DAY=0` in `.env`.
+Local quotas: an operator may hold 20 open drafts and run 60 AI checks a day (the mock provider counts too). For local work set `MAX_DRAFTS_PER_USER=0` and `AI_RUNS_PER_USER_PER_DAY=0` in `.env`. From v0.5.0 these limits are also the ceilings of the administrator's platform settings (US-101): the API can lower them within bounds, never raise them (`docs/09-operations/OPERATIONS.md`).
 
 A site visit is recorded on or after its day (`SITE_VISIT_DAY_GUARD=true`, the default): Mark site visit done and the checklist submit wait for the confirmed date. To run a whole appointment in one sitting (the browser suite, `backend/scripts/uat_edges.py`, a demonstration) set `SITE_VISIT_DAY_GUARD=false`.
 
 ## Demo accounts
 
-`backend/scripts/seed.py` creates four accounts (idempotent); sample documents, clean and with planted issues, are in `docs/12-demo/documents/`. The same accounts exist in every environment. The operator and officer password is shared on purpose: this is a demonstration, the sign-in page and the privacy policy say so, and no real personal data should be entered. The administrator password is not published: it is set privately (`SEED_ADMIN_PASSWORD`) and shared with reviewers directly.
+`backend/scripts/seed.py` creates four accounts (idempotent); sample documents, clean and with planted issues, are in `docs/12-demo/documents/`. The **development** environment (https://dev.permitflow.space) and a local run are shared demonstrations: the operator and officer password below is published on purpose, the sign-in page and the privacy policy say so, and no real personal data should be entered. **Production** keeps the operator, officer and spare officer accounts seeded on 19 Sep 2026 on the same published password, by the owner's decision of 9 Oct 2026: they are public demonstration sign-ins, so enter no real personal data there either. New demonstration accounts in production are opt-in (`SEED_PUBLIC_DEMO`), and the sign-in details for reviewers are shared with them directly. The administrator password is private in every deployed environment (`SEED_ADMIN_PASSWORD`).
+
+Sign-ins (development, local, and the operator, officer and spare officer in production):
 
 | Role | Email | Password |
 |------|-------|----------|
@@ -74,7 +76,7 @@ docs/      01-discovery … 14-debrief, one README per folder; docs/README.md is
 
 ## Security
 
-Argon2 password hashes; short-lived JWTs re-checked against the user row and the sign-in's session row on every request, one live session per account with a take-over from the sign-in page and a 60-minute idle limit (US-093); no fallback secret (the app refuses to start without a real `JWT_SECRET`). Authorization is server-side on every route (role per router, ownership as 404, sub-resource checks), with an authorization test per application-scoped endpoint. Uploads: allowlist, 10 MB, magic-byte check, server-generated keys, served only through authorised endpoints. Abuse limits: 240 requests a minute per client, sign-in limits, 20 open drafts, 60 AI checks a day per applicant and 1,000 per platform, counted in the database. Security headers and CSP on both tiers; gitleaks, pip-audit, bandit and npm audit block the build. Threats and controls: `docs/06-security/THREAT_MODEL.md`; the hardening checklist with a test per item: `docs/06-security/SECURITY_REVIEW.md`; privacy, legal and accessibility: `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.
+Argon2 password hashes; short-lived JWTs re-checked against the user row and the sign-in's session row on every request, one live session per account with a take-over from the sign-in page and a 60-minute idle limit (US-093); no fallback secret (the app refuses to start without a real `JWT_SECRET`). Authorization is server-side on every route (role per router, ownership as 404, sub-resource checks), with an authorization test per application-scoped endpoint. Uploads: allowlist, 10 MB, magic-byte check, server-generated keys, served only through authorised endpoints. Abuse limits: 240 requests a minute per client, sign-in limits, 20 open drafts, 60 AI checks a day per applicant and 1,000 per platform, counted in the database. Security headers and CSP on both tiers; gitleaks, pip-audit, bandit, npm audit, Semgrep and Trivy block the build. Threats and controls: `docs/06-security/THREAT_MODEL.md`; the hardening checklist with a test per item: `docs/06-security/SECURITY_REVIEW.md`; privacy, legal and accessibility: `docs/11-reviews/LEGAL_AND_ACCESSIBILITY_REVIEW.md`.
 
 ## Tests
 
@@ -88,7 +90,7 @@ cd frontend && npm run e2e          # Playwright against the running stack (back
 
 ## Environment variables
 
-`.env.example` documents every variable; `docs/09-operations/OPERATIONS.md` explains each one, per environment. `JWT_SECRET` is required everywhere, tests included. `SEED_PASSWORD` (operator, officer and spare officer demo accounts) and `SEED_ADMIN_PASSWORD` (the administrator) are read by `backend/scripts/seed.py` only; with `APP_ENV=production` the seed refuses to run unless `SEED_ADMIN_PASSWORD` is set to a private value, outside production it falls back to `SEED_PASSWORD`. The frontend needs no `.env` locally (it defaults to `http://localhost:8000/api/v1`).
+`.env.example` documents every variable; `docs/09-operations/OPERATIONS.md` explains each one, per environment. `JWT_SECRET` is required everywhere, tests included. `SEED_PASSWORD` (operator, officer and spare officer demo accounts), `SEED_ADMIN_PASSWORD` (the administrator) and `SEED_PUBLIC_DEMO` are read by `backend/scripts/seed.py` only; with `APP_ENV=production` the seed refuses to run unless `SEED_ADMIN_PASSWORD` is set to a private value, seeds the operator and officer accounts only when `SEED_PUBLIC_DEMO=true` or `SEED_PASSWORD` is private, and refuses the published password without that opt-in; outside production it falls back to `SEED_PASSWORD`. `VERIFICATION_MODE` (`inline` by default, or `worker`), `WORKER_LEASE_SECONDS`, `WORKER_METRICS_PORT`, `WORKER_LOCK_TIMEOUT_SECONDS` and the `PDF_EXTRACT_*` limits belong to the document-check worker (US-098, ADR-016): with `worker` the API only queues the check and `python -m app.worker` runs it (`docker compose --profile worker`); with `inline` nothing changes. `AUTH_MODE` (`token` by default, or `cookie`) chooses how the session travels (US-104, ADR-018): the bearer token in the `Authorization` header, or an HttpOnly `__Host-` cookie with a CSRF token and a sign-in body that carries no bearer token; `cookie` needs `CORS_ORIGINS` to list the frontend origins and, in production, https. The frontend needs no `.env` locally (it defaults to `http://localhost:8000/api/v1`). `APP_VERSION` (unset by default) relabels a promoted image at start (US-111, ADR-019): the backend reports it on `/health` and the frontend writes it into `config.js`; production sets it to the release version, and without it both show the version they were built with. `SCAN_MODE` (`off` by default, or `enforce`), `CLAMD_HOST`, `CLAMD_PORT` and `CLAMD_TIMEOUT_SECONDS` belong to the virus scan (US-099, ADR-017): with `enforce` every upload is quarantined and scanned by ClamAV (`docker compose --profile scan up -d clamav`) before anyone can open it; with `off` nothing changes. The frontend needs no `.env` locally (it defaults to `http://localhost:8000/api/v1`).
 
 ## CI/CD and deployment
 
@@ -96,11 +98,11 @@ cd frontend && npm run e2e          # Playwright against the running stack (back
 
 `main` is production, `dev` is integration, one branch per story merged with `--no-ff`; `main` is protected and receives only pull requests from `dev` with seven green checks (`docs/09-operations/BRANCHING.md`).
 
-`ci.yml` runs seven blocking jobs on every push and pull request: backend, frontend (with a 250 KB bundle budget), end to end with the accessibility gate, secret scan, the six-stage AI gate (`ai-gate.yml`, on the mock provider), dependency and code audit, images. `ai-eval.yml` runs the same golden and fairness sets against the real model nightly and on changes to the AI path. Images are built once and pushed to GHCR; a merge to `dev` deploys the development environment automatically; production is pinned to a release image and deployed by hand behind the owner's approval, with health gates after every rollout. Environments, secrets, migrations and rollback by layer: `docs/09-operations/OPERATIONS.md`.
+`ci.yml` runs eight blocking jobs on every push and pull request: backend, frontend (with a 250 KB first-load bundle budget), end to end with the accessibility gate, secret scan, the six-stage AI gate (`ai-gate.yml`, on the mock provider), dependency and code audit, Semgrep (OWASP Top Ten, Python and TypeScript rules), images (each image is scanned by Trivy before it is pushed). A weekly full-history secret scan (`secret-history.yml`), Dependabot, and an OWASP ZAP baseline scan of the development site after each deploy (report only) complete the scanning; the table is in `docs/06-security/SECURITY_REVIEW.md`. `ai-eval.yml` runs the same golden and fairness sets against the real model nightly and on changes to the AI path. Images are built once and pushed to GHCR; a merge to `dev` deploys the development environment automatically; production is pinned to a release image and deployed by hand behind the owner's approval, with health gates after every rollout. Environments, secrets, migrations and rollback by layer: `docs/09-operations/OPERATIONS.md`.
 
 ## Observability
 
-`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. `docker compose --profile observability up -d` runs Prometheus with seven alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same services run on Railway, Grafana at https://grafana.dev.permitflow.space, and Telegram carries the alerts, an hourly digest per environment and a command bot (`/status`, `/cost`, `/queue`). Details, every metric, the dashboard and what is still missing: `docs/13-observability/OBSERVABILITY.md`.
+`GET /api/v1/metrics` serves Prometheus counters and histograms behind a bearer token (off unless `METRICS_TOKEN` is set): requests by route and status, latency, rate-limit and quota refusals, document checks by outcome with their latency, transitions, applications by status, and the OpenAI tokens each check bills. Since US-100 every check also leaves a row in `ai_usage` (who ran it, tokens, cost at the price in force), readable by an administrator at `GET /api/v1/admin/ai-usage` and as a CSV, and counted by document type and outcome on the dashboard. `docker compose --profile observability up -d` runs Prometheus with seven alert rules and Grafana on :3001 with the provisioned dashboard (API health, document checks, their cost at list price, the queue); the same services run on Railway, Grafana at https://grafana.dev.permitflow.space, and Telegram carries the alerts, an hourly digest per environment and a command bot (`/status`, `/cost`, `/queue`). Details, every metric, the dashboard and what is still missing: `docs/13-observability/OBSERVABILITY.md`.
 
 ## AI verification
 
@@ -116,7 +118,7 @@ The full record, with the prompts grouped by the decision they carry, what was d
 
 ## Release notes
 
-v0.4.1 (9 October 2026) is the version at https://permitflow.space. Next, v0.5.0: virus scanning, a separate worker for the document checks, AI usage per check and limits the administrator can tune. An entry per release, in the users' words: `RELEASE_NOTES.md`; the engineering record: `CHANGELOG.md`.
+v0.5.0 (14 October 2026) is the version at https://permitflow.space: virus scanning, a separate worker for the document checks, AI usage per check, limits the administrator can tune, and documents that open in the browser. An entry per release, in the users' words: `RELEASE_NOTES.md`; the engineering record: `CHANGELOG.md`.
 
 ## What I would do next
 
@@ -126,4 +128,4 @@ Each item has a row with severity in `docs/11-reviews/PRODUCTION_READINESS_REVIE
 2. Object storage with signed URLs and a virus scan, a backup and restore drill, a retention policy.
 3. httpOnly cookie sessions with CSRF protection, CSP nonces, the rate windows in Redis or at the edge.
 4. Observability, second half: acknowledgement and escalation for the Telegram alerts, nginx and Postgres exporters, one Prometheus per environment, a runbook per alert (readiness row 24).
-5. AI assurance beyond 14 golden cases: a labelled set grown from officer overrides, a red-team suite, calibrated confidence, in-region tracing, a multilingual injection classifier, Project Moonshot as the Singapore assurance evidence (`docs/07-ai/AI_ASSURANCE.md`, Limits).
+5. AI assurance beyond 24 golden cases: a labelled set grown from officer overrides, a red-team suite, calibrated confidence, in-region tracing, a multilingual injection classifier, Project Moonshot as the Singapore assurance evidence (`docs/07-ai/AI_ASSURANCE.md`, Limits).

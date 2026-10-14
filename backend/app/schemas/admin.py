@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.enums import Role
 from app.schemas.clean import CleanLine
+from app.schemas.platform_settings import Password
 
 
 class StatusCountOut(BaseModel):
@@ -57,6 +58,7 @@ class ChecksOut(BaseModel):
     unreadable: int
     failed_or_unavailable: int
     still_running: int
+    dead: int  # US-098: checks the worker gave up on (served to clients as failed)
     average_seconds: float | None
     p95_seconds: float | None
     provider: str
@@ -110,13 +112,17 @@ class AdminUsersOut(BaseModel):
 class UserPatchIn(BaseModel):
     role: Role | None = None
     is_active: bool | None = None
+    # The signed-in administrator's own password (step-up, security audit F2).
+    admin_password: Password
 
 
 class UserCreateIn(BaseModel):
     email: EmailStr
     full_name: CleanLine = Field(min_length=1, max_length=120)
     role: Role
-    password: str = Field(min_length=12, max_length=200)
+    password: str = Field(min_length=12, max_length=200)  # the new account's
+    # The signed-in administrator's own password (step-up, security audit F2).
+    admin_password: Password
 
 
 __all__ = [

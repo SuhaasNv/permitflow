@@ -67,10 +67,17 @@ def test_every_route_is_locked() -> None:
 
 
 # The only writes an administrator may make: user management (US-073). Every case route stays read-only.
-ADMIN_WRITES = {("POST", "/admin/users"), ("PATCH", "/admin/users/{user_id}")}
+# Platform settings (US-101) are the second: the limits an administrator may tune inside the environment
+# ceilings, each change behind a reason and a password step-up.
+ADMIN_WRITES = {
+    ("POST", "/admin/users"),
+    ("PATCH", "/admin/users/{user_id}"),
+    ("PUT", "/admin/settings/{key}"),
+    ("POST", "/admin/settings/history/{event_id}/revert"),
+}
 
 
-def test_admin_writes_are_user_management_only() -> None:
+def test_admin_writes_are_users_and_settings_only() -> None:
     """The read-only rule on cases (ADR-014): no route outside user management admits the admin to a write."""
     seen: set[tuple[str, str]] = set()
     for route in _routes():

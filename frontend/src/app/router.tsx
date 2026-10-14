@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react'
 import { Outlet, createBrowserRouter } from 'react-router-dom'
 
 import { AppShell } from './AppShell'
@@ -7,14 +8,7 @@ import { LandingPage } from '@/features/landing/LandingPage'
 import { PolicyPage } from '@/features/legal/PolicyPage'
 import { ReleasesPage } from '@/features/releases/ReleasesPage'
 import { RequireRole } from '@/features/auth/RequireRole'
-import { AdminActivityPage } from '@/features/admin/ActivityPage'
-import { AdminOverviewPage } from '@/features/admin/OverviewPage'
-import { AdminUsersPage } from '@/features/admin/UsersPage'
 import { ReadOnlyProvider } from '@/features/officer/readOnly'
-import { OfficerQueuePage } from '@/features/officer/QueuePage'
-import { OfficerCasePage } from '@/features/officer/CasePage'
-import { ChecklistPage } from '@/features/officer/ChecklistPage'
-import { LicencePreviewPage } from '@/features/officer/LicencePreviewPage'
 import { ApplicationPage } from '@/features/operator/ApplicationPage'
 import { DocumentsPage } from '@/features/operator/DocumentsPage'
 import { FormPage } from '@/features/operator/FormPage'
@@ -25,7 +19,24 @@ import { HistoryPage } from '@/features/operator/HistoryPage'
 import { OperatorDashboardPage } from '@/features/operator/DashboardPage'
 import { ApplicationsPage } from '@/features/operator/ApplicationsPage'
 import { NotFoundPage } from '@/features/shared/NotFoundPage'
+import { Skeleton } from '@/features/shared/states'
 import { RouteTitle, titled } from './RouteTitle'
+
+/** The officer and administrator screens load on first visit, so a sign-in or an operator's first paint does not carry them
+ * (the 250 KB budget measures that first load: scripts/check-bundle-size.mjs). Between two screens the old one stays until the next is ready. */
+function lazyPage<K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) {
+  return { lazy: async () => ({ Component: (await load())[name] }) }
+}
+
+/** Shown while the first screen's code arrives, when the address opens straight on one of the lazy screens. */
+function LoadingScreen() {
+  return (
+    <div className="mx-auto max-w-[1360px] px-4 py-8 sm:px-8" role="status" aria-busy="true" aria-label="Loading">
+      <Skeleton className="mb-3 h-8 w-64" />
+      <Skeleton className="h-4 w-96" />
+    </div>
+  )
+}
 
 /** The one root layout: the environment notice above every page (US-109), then the page under its tab title. */
 function RootLayout() {
@@ -41,6 +52,7 @@ export const router = createBrowserRouter([
   {
     // Every screen names its browser tab through its route's handle (RouteTitle).
     element: <RootLayout />,
+    hydrateFallbackElement: <LoadingScreen />,
     children: [
       { path: '/', element: <LandingPage />, handle: titled('PermitFlow | Food Establishment Licence', true) },
       { path: '/login', element: <LoginPage />, handle: titled('Sign in') },
@@ -79,10 +91,10 @@ export const router = createBrowserRouter([
           {
             element: <AppShell />,
             children: [
-              { path: '/officer/queue', element: <OfficerQueuePage />, handle: titled('Review queue') },
-              { path: '/officer/applications/:id', element: <OfficerCasePage />, handle: titled('Application review') },
-              { path: '/officer/applications/:id/licence-preview', element: <LicencePreviewPage />, handle: titled('Licence preview') },
-              { path: '/officer/applications/:id/checklist', element: <ChecklistPage />, handle: titled('Site visit checklist') },
+              { path: '/officer/queue', ...lazyPage(() => import('@/features/officer/QueuePage'), 'OfficerQueuePage'), handle: titled('Review queue') },
+              { path: '/officer/applications/:id', ...lazyPage(() => import('@/features/officer/CasePage'), 'OfficerCasePage'), handle: titled('Application review') },
+              { path: '/officer/applications/:id/licence-preview', ...lazyPage(() => import('@/features/officer/LicencePreviewPage'), 'LicencePreviewPage'), handle: titled('Licence preview') },
+              { path: '/officer/applications/:id/checklist', ...lazyPage(() => import('@/features/officer/ChecklistPage'), 'ChecklistPage'), handle: titled('Site visit checklist') },
             ],
           },
         ],
@@ -93,9 +105,11 @@ export const router = createBrowserRouter([
           {
             element: <AppShell />,
             children: [
-              { path: '/admin/overview', element: <AdminOverviewPage />, handle: titled('Operations overview') },
-              { path: '/admin/activity', element: <AdminActivityPage />, handle: titled('Activity') },
-              { path: '/admin/users', element: <AdminUsersPage />, handle: titled('Users') },
+              { path: '/admin/overview', ...lazyPage(() => import('@/features/admin/OverviewPage'), 'AdminOverviewPage'), handle: titled('Operations overview') },
+              { path: '/admin/activity', ...lazyPage(() => import('@/features/admin/ActivityPage'), 'AdminActivityPage'), handle: titled('Activity') },
+              { path: '/admin/users', ...lazyPage(() => import('@/features/admin/UsersPage'), 'AdminUsersPage'), handle: titled('Users') },
+              { path: '/admin/settings', ...lazyPage(() => import('@/features/admin/SettingsPage'), 'AdminSettingsPage'), handle: titled('Settings') },
+              { path: '/admin/ai-usage', ...lazyPage(() => import('@/features/admin/AiUsagePage'), 'AiUsagePage'), handle: titled('AI usage') },
               // The officer screens, read-only (US-072): the server sends no actions, the components render no controls.
               {
                 element: (
@@ -104,8 +118,8 @@ export const router = createBrowserRouter([
                   </ReadOnlyProvider>
                 ),
                 children: [
-                  { path: '/admin/applications/:id', element: <OfficerCasePage />, handle: titled('Application (read-only)') },
-                  { path: '/admin/applications/:id/checklist', element: <ChecklistPage />, handle: titled('Site visit checklist (read-only)') },
+                  { path: '/admin/applications/:id', ...lazyPage(() => import('@/features/officer/CasePage'), 'OfficerCasePage'), handle: titled('Application (read-only)') },
+                  { path: '/admin/applications/:id/checklist', ...lazyPage(() => import('@/features/officer/ChecklistPage'), 'ChecklistPage'), handle: titled('Site visit checklist (read-only)') },
                 ],
               },
             ],

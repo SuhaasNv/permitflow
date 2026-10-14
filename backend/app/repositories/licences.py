@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from app.models import Licence
+from app.models import Application, Licence
 
 
 class LicenceRepository:
@@ -16,6 +16,10 @@ class LicenceRepository:
 
     def for_application(self, application_id: uuid.UUID) -> Licence | None:
         return self.db.scalar(select(Licence).where(Licence.application_id == application_id))
+
+    def stored_keys_for_operator(self, operator_id: uuid.UUID) -> list[str]:
+        stmt = select(Licence.stored_key).join(Application, Application.id == Licence.application_id)
+        return list(self.db.scalars(stmt.where(Application.operator_id == operator_id)))
 
     def add(self, licence: Licence) -> Licence:
         self.db.add(licence)

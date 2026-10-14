@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -78,6 +78,27 @@ describe('ComparePanel (FR-022, FR-023)', () => {
     expect(screen.getByText('Business profile (ACRA)')).toBeInTheDocument()
     expect(screen.getByText('Business details')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Hide unchanged' })).toBeInTheDocument()
+  })
+
+  it('lays the changes out as a table: column headers name the revisions, the field heads its row (WCAG 1.3.1)', async () => {
+    vi.spyOn(api, 'compareRevisions').mockResolvedValue(compare)
+    render(
+      <AppProviders>
+        <ComparePanel view={officerView()} />
+      </AppProviders>,
+    )
+    const table = await screen.findByRole('table', { name: 'Fields changed in Premises' })
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Field', 'Revision 1', 'Revision 2'])
+    const row = within(table).getByRole('row', { name: /Postal code/ })
+    expect(within(row).getByRole('rowheader')).toHaveTextContent('Postal code')
+    const cells = within(row).getAllByRole('cell')
+    expect(cells).toHaveLength(2)
+    expect(cells[0]).toHaveTextContent('208787')
+    expect(cells[1]).toHaveTextContent('208788')
+    // Which value is which does not rest on strike-through or colour: the header and the stacked label say it.
+    expect(within(cells[0]!).getByText('Revision 1')).toBeInTheDocument()
+    expect(within(cells[1]!).getByText('Revision 2')).toBeInTheDocument()
+    expect(table.querySelector('dl, dt, dd')).toBeNull()
   })
 
   it('refetches when the pair changes and says so when the pair is identical', async () => {

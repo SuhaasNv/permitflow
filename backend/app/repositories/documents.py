@@ -1,10 +1,12 @@
 import uuid
-from datetime import datetime
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
-from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy import String, and_, delete, exists, func, literal_column, or_, select, text, update
 from sqlalchemy.orm import Session
 
-from app.models import Application, Document, VerificationRun
+from app.domain.scan import CLEAN
+from app.models import AiUsage, Application, ClarificationAttachment, Document, VerificationRun
 from app.models.enums import DocumentType, VerificationStatus
 
 
@@ -20,12 +22,20 @@ class DocumentRepository:
         )
         return list(self.db.scalars(stmt))
 
-    def total_bytes(self, application_id: uuid.UUID | None = None) -> int:
-        """Every version still on disk, superseded ones included (US-085); one application, or all of
-        them for the storage gauge (US-089)."""
+    def total_bytes(
+        self, application_id: uuid.UUID | None = None, operator_id: uuid.UUID | None = None
+    ) -> int:
+        """Every version still on disk, superseded ones included (US-085); one application, one operator's
+        applications, or all of them for the storage gauge (US-089)."""
         stmt = select(func.coalesce(func.sum(Document.size_bytes), 0))
         if application_id is not None:
             stmt = stmt.where(Document.application_id == application_id)
+        if operator_id is not None:
+            stmt = stmt.where(
+                Document.application_id.in_(
+                    select(Application.id).where(Application.operator_id == operator_id)
+                )
+            )
         return int(self.db.scalar(stmt) or 0)
 
     def current_of_type(self, application_id: uuid.UUID, document_type: DocumentType) -> Document | None:
@@ -46,6 +56,13 @@ class DocumentRepository:
         if not ids:
             return []
         return list(self.db.scalars(select(Document).where(Document.id.in_(ids))))
+
+    def count_runs_ended_with(self, error_reason: str, *, since: datetime) -> int:
+        """Checks stored with this reason since a moment (the AI pause switch: how many were stopped)."""
+        stmt = select(func.count()).where(
+            VerificationRun.error_reason == error_reason, VerificationRun.created_at >= since
+        )
+        return int(self.db.scalar(stmt) or 0)
 
     def latest_run(self, document_id: uuid.UUID) -> VerificationRun | None:
         stmt = (
@@ -92,9 +109,9 @@ class DocumentRepository:
         )
         return int(getattr(result, "rowcount", 0) or 0) == 1
 
-    def fail_interrupted_runs(self, running_before: datetime, finished_at: datetime) -> int:
+    def fail_interrupted_runs(self, running_before: datetime, finished_at: datetime) -> list[uuid.UUID]:
         """Runs still `running` since before `running_before`, and every `pending` run, become
-        `failed: interrupted` (startup after a restart); returns how many."""
+        `failed: interrupted` (startup after a restart); returns their ids."""
         result = self.db.execute(
             update(VerificationRun)
             .where(
@@ -107,8 +124,220 @@ class DocumentRepository:
                 )
             )
             .values(status=VerificationStatus.FAILED, error_reason="interrupted", finished_at=finished_at)
+            .returning(VerificationRun.id)
+            .execution_options(synchronize_session=False)
+        )
+        return list(result.scalars())
+
+    # ---- the work queue (US-098, ADR-016): `pending` is queued, `running` is leased ----
+
+    def claim_next(
+        self, worker_id: str, now: datetime, lease_until: datetime, *, scan_only: bool = False
+    ) -> uuid.UUID | None:
+        """Atomically take the oldest queued run: one statement, so two workers never get the same one.
+        `SKIP LOCKED` lets a second worker pass over a row the first is claiming; LIMIT stays inside the
+        subquery. The caller commits at once: the claim is held by the lease, not by a transaction.
+        `scan_only` takes only runs whose document is still `scanning`."""
+        # The status is inlined, not bound, so Postgres can match the partial index
+        # `ix_verification_runs_queued` (a generic plan with a bound parameter cannot).
+        pending = literal_column(f"'{VerificationStatus.PENDING.value}'", String)
+        queued = select(VerificationRun.id).where(VerificationRun.status == pending)
+        if scan_only:  # US-099: while the AI is paused, only the runs whose file still waits for its scan
+            queued = queued.where(
+                VerificationRun.document_id.in_(select(Document.id).where(Document.scan_state == "scanning"))
+            )
+        oldest = (
+            queued.order_by(VerificationRun.created_at)
+            .limit(1)
+            .with_for_update(skip_locked=True)
+            .scalar_subquery()
+        )
+        stmt = (
+            update(VerificationRun)
+            .where(VerificationRun.id == oldest)
+            .values(
+                status=VerificationStatus.RUNNING,
+                started_at=now,
+                lease_until=lease_until,
+                worker_id=worker_id,
+                attempts=VerificationRun.attempts + 1,
+            )
+            .returning(VerificationRun.id)
+            .execution_options(synchronize_session=False)
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
+
+    def release_lease(self, run_id: uuid.UUID, worker_id: str) -> bool:
+        """A worker shutting down hands its unfinished run back to the queue; the interrupted attempt does
+        not count."""
+        result = self.db.execute(
+            update(VerificationRun)
+            .where(
+                VerificationRun.id == run_id,
+                VerificationRun.status == VerificationStatus.RUNNING,
+                VerificationRun.worker_id == worker_id,
+            )
+            .values(
+                status=VerificationStatus.PENDING,
+                lease_until=None,
+                worker_id=None,
+                attempts=VerificationRun.attempts - 1,
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0) == 1
+
+    def reap_expired(self, now: datetime, max_attempts: int) -> tuple[int, list[uuid.UUID]]:
+        """Runs whose lease has expired: back to the queue, or `dead` once they have been claimed
+        `max_attempts` times. Returns how many were requeued and the ids that died."""
+        expired = and_(
+            VerificationRun.status == VerificationStatus.RUNNING, VerificationRun.lease_until < now
+        )
+        dead = self.db.execute(
+            update(VerificationRun)
+            .where(expired, VerificationRun.attempts >= max_attempts)
+            .values(
+                status=VerificationStatus.DEAD,
+                error_reason="worker_gave_up",
+                finished_at=now,
+                lease_until=None,
+                worker_id=None,
+            )
+            .returning(VerificationRun.id)
+            .execution_options(synchronize_session=False)
+        )
+        dead_ids = list(dead.scalars())
+        requeued = self.db.execute(
+            update(VerificationRun)
+            .where(expired)
+            .values(status=VerificationStatus.PENDING, lease_until=None, worker_id=None)
+        )
+        return int(getattr(requeued, "rowcount", 0) or 0), dead_ids
+
+    def fail_stranded_inline(self, started_before: datetime, finished_at: datetime) -> list[uuid.UUID]:
+        """`running` runs with no lease, started before the cutoff: they began inline, before the switch to
+        worker mode, and no process is left to finish them. Same outcome as the startup sweep."""
+        result = self.db.execute(
+            update(VerificationRun)
+            .where(
+                VerificationRun.status == VerificationStatus.RUNNING,
+                VerificationRun.lease_until.is_(None),
+                VerificationRun.started_at < started_before,
+            )
+            .values(status=VerificationStatus.FAILED, error_reason="interrupted", finished_at=finished_at)
+            .returning(VerificationRun.id)
+            .execution_options(synchronize_session=False)
+        )
+        return list(result.scalars())
+
+    def lock_state(
+        self, run_id: uuid.UUID, application_id: uuid.UUID | None = None
+    ) -> tuple[VerificationStatus, str | None] | None:
+        """Lock the run row and read who holds it, without touching the loaded object: the guard before a
+        worker writes its result. None when the run no longer exists (the draft was deleted). The
+        application row is locked first (FOR KEY SHARE, which the audit insert needs anyway), the same
+        order as draft deletion (application, then runs), so the two cannot deadlock."""
+        if application_id is not None:
+            self.db.execute(
+                select(Application.id).where(Application.id == application_id).with_for_update(key_share=True)
+            )
+        row = self.db.execute(
+            select(VerificationRun.status, VerificationRun.worker_id)
+            .where(VerificationRun.id == run_id)
+            .with_for_update()
+        ).first()
+        return None if row is None else (row[0], row[1])
+
+    def lifecycle(self, run_id: uuid.UUID) -> str:
+        """`ok` while the run's application and document exist and the document is the current revision,
+        `replaced` when a newer revision superseded it, `removed` when the draft or document is gone."""
+        current = self.db.execute(
+            select(Document.is_current)
+            .select_from(VerificationRun)
+            .join(Document, Document.id == VerificationRun.document_id)
+            .join(Application, Application.id == Document.application_id)
+            .where(VerificationRun.id == run_id)
+        ).scalar_one_or_none()
+        if current is None:
+            return "removed"
+        return "ok" if current else "replaced"
+
+    # ---- the virus scan (US-099) ----
+
+    def record_scan(
+        self,
+        document_id: uuid.UUID,
+        stored_key: str,
+        *,
+        state: str,
+        signature: str | None,
+        active_content: bool,
+        new_key: str | None = None,
+        model: type[Document] | type[ClarificationAttachment] = Document,
+    ) -> bool:
+        """Write the scan result and the file's new key, if it moved (released when clean, quarantined when a
+        file stored before the scan turns out infected). Fenced on the key the scanner read: false when the
+        row is gone (a deleted draft) or moved on, so the caller removes its copy. `model` is Document or,
+        for the backfill, ClarificationAttachment: both carry the same scan columns."""
+        values: dict[str, object] = {
+            "scan_state": state,
+            "scan_signature": signature,
+            "active_content": active_content,
+            "scanned_at": datetime.now(UTC),  # the verdict landed (clean or infected)
+        }
+        if new_key is not None:
+            values["stored_key"] = new_key
+        result = self.db.execute(
+            update(model)
+            .where(model.id == document_id, model.stored_key == stored_key)
+            .values(**values)
+            .execution_options(synchronize_session=False)
+        )
+        return int(getattr(result, "rowcount", 0) or 0) == 1
+
+    def requeue_scanner_held(self, finished_before: datetime, max_attempts: int) -> int:
+        """Checks that ended `scanner_unavailable` on a file still waiting for its scan go back to the queue
+        (retry later), up to `max_attempts` claims; returns how many."""
+        waiting = select(Document.id).where(Document.scan_state == "scanning", Document.is_current.is_(True))
+        result = self.db.execute(
+            update(VerificationRun)
+            .where(
+                VerificationRun.status == VerificationStatus.UNAVAILABLE,
+                VerificationRun.error_reason == "scanner_unavailable",
+                VerificationRun.finished_at < finished_before,
+                VerificationRun.attempts < max_attempts,
+                VerificationRun.document_id.in_(waiting),
+            )
+            .values(
+                status=VerificationStatus.PENDING,
+                error_reason=None,
+                started_at=None,
+                finished_at=None,
+                latency_ms=None,
+                provider="none",
+            )
+            .execution_options(synchronize_session=False)
         )
         return int(getattr(result, "rowcount", 0) or 0)
+
+    def notify_queue(self) -> None:
+        """Wake the workers (`LISTEN verification_runs`). Polling covers a missed notification."""
+        self.db.execute(text("SELECT pg_notify('verification_runs', '')"))
+
+    def queue_stats(self, now: datetime) -> tuple[int, float, int, int]:
+        """Queue depth, age in seconds of the oldest queued run (0 when none), active leases, dead runs."""
+        depth, oldest = self.db.execute(
+            select(func.count(), func.min(VerificationRun.created_at)).where(
+                VerificationRun.status == VerificationStatus.PENDING
+            )
+        ).one()
+        leases = self.db.scalar(
+            select(func.count()).where(
+                VerificationRun.status == VerificationStatus.RUNNING, VerificationRun.lease_until > now
+            )
+        )
+        dead = self.db.scalar(select(func.count()).where(VerificationRun.status == VerificationStatus.DEAD))
+        age = (now - oldest).total_seconds() if oldest is not None else 0.0
+        return int(depth), age, int(leases or 0), int(dead or 0)
 
     def add(self, doc: Document) -> Document:
         self.db.add(doc)
@@ -122,16 +351,22 @@ class DocumentRepository:
         return list(self.db.scalars(stmt))
 
     def count_runs_since(
-        self, since: datetime, operator_id: uuid.UUID | None = None, *, exclude_reason: str | None = None
+        self,
+        since: datetime,
+        operator_id: uuid.UUID | None = None,
+        *,
+        exclude_reasons: Iterable[str] = (),
     ) -> int:
         """Verification runs requested since `since`, for one applicant's documents or for everyone
         (US-058 quotas: the cost ceiling is counted in the database, so it holds across restarts).
-        Runs stored with `exclude_reason` (the quota refusals themselves) are not counted, otherwise a
-        refused attempt would extend the applicant's lock-out by another day."""
+        Runs stored with one of `exclude_reasons` (the quota refusals themselves, and checks held back by
+        the pause switch) are not counted, otherwise a refused attempt would extend the applicant's
+        lock-out by another day."""
         stmt = select(func.count()).select_from(VerificationRun).where(VerificationRun.created_at >= since)
-        if exclude_reason is not None:
+        excluded = list(exclude_reasons)
+        if excluded:
             stmt = stmt.where(
-                or_(VerificationRun.error_reason.is_(None), VerificationRun.error_reason != exclude_reason)
+                or_(VerificationRun.error_reason.is_(None), VerificationRun.error_reason.not_in(excluded))
             )
         if operator_id is not None:
             stmt = (
@@ -141,16 +376,54 @@ class DocumentRepository:
             )
         return int(self.db.execute(stmt).scalar_one())
 
+    def count_quota_runs_since(
+        self,
+        since: datetime,
+        operator_id: uuid.UUID | None = None,
+        *,
+        exclude_reasons: Iterable[str] = (),
+    ) -> int:
+        """The runs that count toward the daily AI quota (US-058), for one applicant or for everyone: the
+        `ai_usage` ledger, which outlives a deleted draft, plus the live runs that have no ledger row yet
+        (pending or running) and do not carry one of `exclude_reasons` (refused runs never count)."""
+        ledger = select(func.count()).select_from(AiUsage).where(AiUsage.created_at >= since)
+        ledger = ledger.where(
+            AiUsage.quota_operator_id == operator_id
+            if operator_id is not None
+            else AiUsage.quota_operator_id.is_not(None)
+        )
+        unrecorded = (
+            select(func.count())
+            .select_from(VerificationRun)
+            .where(
+                VerificationRun.created_at >= since,
+                ~exists().where(AiUsage.run_id == VerificationRun.id),
+                or_(
+                    VerificationRun.error_reason.is_(None),
+                    VerificationRun.error_reason.not_in(list(exclude_reasons)),
+                ),
+            )
+        )
+        if operator_id is not None:
+            unrecorded = (
+                unrecorded.join(Document, Document.id == VerificationRun.document_id)
+                .join(Application, Application.id == Document.application_id)
+                .where(Application.operator_id == operator_id)
+            )
+        return int(self.db.execute(ledger).scalar_one()) + int(self.db.execute(unrecorded).scalar_one())
+
     def add_run(self, run: VerificationRun) -> VerificationRun:
         self.db.add(run)
         return run
 
     def present_types_for(self, application_ids: list[uuid.UUID]) -> dict[uuid.UUID, set[DocumentType]]:
-        """Current document types per application, one query."""
+        """Current, servable (not scanning or infected) document types per application, one query."""
         if not application_ids:
             return {}
         stmt = select(Document.application_id, Document.document_type).where(
-            Document.application_id.in_(application_ids), Document.is_current.is_(True)
+            Document.application_id.in_(application_ids),
+            Document.is_current.is_(True),
+            or_(Document.scan_state.is_(None), Document.scan_state == CLEAN),
         )
         out: dict[uuid.UUID, set[DocumentType]] = {}
         for app_id, dtype in self.db.execute(stmt):

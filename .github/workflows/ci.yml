@@ -31,6 +31,11 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U permitflow -d permitflow_test"
           --health-interval 5s --health-timeout 3s --health-retries 10
+      # Loads ~1.2 GiB of signatures for a few minutes after start. No health-cmd on purpose: the job
+      # would wait for it before the first step; the wait step below polls instead (US-099).
+      clamav:
+        image: clamav/clamav:1.5.4-debian@sha256:9bb8712a50f0e75166e936c452cd82dd5e5be0b85586598930b5bbb84a99a578
+        ports: ["3310:3310"]
     env:
       APP_ENV: test
       TEST_DATABASE_URL: postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow_test
@@ -39,11 +44,11 @@ jobs:
         working-directory: backend
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Release guard unit test
         working-directory: .
         run: python3 -m unittest scripts/test_release_guard.py
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -51,11 +56,58 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy
       - run: uv run pytest --cov=app --cov-report=term --cov-report=xml --cov-fail-under=80
+      - name: Wait for clamd
+        run: |
+          for _ in $(seq 120); do
+            reply=$(timeout 5 bash -c "exec 3<>/dev/tcp/localhost/3310; echo PING >&3; read -r r <&3; echo \$r" 2>/dev/null || true)
+            [ "$reply" = PONG ] && exit 0
+            sleep 5
+          done
+          echo '::error::clamd did not answer PING within 10 minutes' && exit 1
+      - name: EICAR against a real clamd
+        env:
+          CLAMD_HOST: localhost
+          CLAMD_PORT: "3310"
+        run: |
+          # exactly one pass; a skip (CLAMD_HOST ignored) must fail the job
+          uv run pytest tests/integration/test_virus_scan.py -k eicar -rs | tee eicar.log
+          grep -qE '^1 passed' eicar.log
       - name: Coverage summary
         if: always()
         run: |
           echo '### Backend coverage' >> "$GITHUB_STEP_SUMMARY"
           uv run coverage report --format=total 2>/dev/null | sed 's/^/Total: /; s/$/ %/' >> "$GITHUB_STEP_SUMMARY" || true
+
+  abuse:
+    # US-105: known attacks must keep failing. In-process against the app and Postgres; no clamd here (the
+    # Backend job runs the EICAR check against a real one), so that one case skips with its reason.
+    name: Abuse cases
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: permitflow
+          POSTGRES_PASSWORD: permitflow
+          POSTGRES_DB: permitflow_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U permitflow -d permitflow_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      APP_ENV: test
+      TEST_DATABASE_URL: postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow_test
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run pytest tests/abuse -rs
 
   frontend:
     name: Frontend
@@ -65,8 +117,8 @@ jobs:
         working-directory: frontend
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -96,9 +148,9 @@ jobs:
     name: Dependency and code audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
       - name: pip-audit (production dependencies, blocking)
@@ -136,14 +188,50 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+  semgrep:
+    # US-103: the OWASP Top Ten, Python and TypeScript rule packs over our own source. Blocking at ERROR
+    # severity; WARNING and INFO findings are listed in the log and do not fail the build. Runs on every pull
+    # request and every push (so on dev and main). Semgrep is pinned and run through uvx, so there is no
+    # third-party action in the path. The rules are fetched from the public registry with metrics off; the
+    # scan is retried once if the run could not complete (a rules outage must not block a release for a
+    # transient error, and must not pass it either).
+    name: Semgrep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      - name: Semgrep (owasp-top-ten, python, typescript; blocking at ERROR)
+        run: |
+          # One retry when the run fails for any reason other than findings (exit 1 with `--error`), for
+          # example the rules registry being unreachable. Findings fail at once; a second failure fails the job.
+          for attempt in 1 2; do
+            rc=0
+            uvx --from semgrep==1.172.0 semgrep scan \
+              --config p/owasp-top-ten --config p/python --config p/typescript \
+              --severity ERROR --error --metrics=off \
+              backend/app backend/scripts frontend/src 2>&1 | tee /tmp/semgrep.txt || rc=$?
+            if [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ]; then exit "$rc"; fi
+            echo "Semgrep did not complete (exit $rc, attempt $attempt of 2)"; sleep 30
+          done
+          echo "Semgrep did not complete after two attempts; failing the check rather than skipping it"; exit 1
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Semgrep"
+            echo '```'
+            grep -E "Findings:|Rules run:|Targets scanned:" /tmp/semgrep.txt || tail -n 5 /tmp/semgrep.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -164,6 +252,7 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       APP_ENV: development
+      EXPOSE_API_DOCS: "true"
       DATABASE_URL: postgresql+psycopg://permitflow:permitflow@localhost:5432/permitflow
       JWT_SECRET: ci-only-secret-that-is-long-enough
       CORS_ORIGINS: http://localhost:3000
@@ -181,11 +270,11 @@ jobs:
       E2E_API_URL: http://localhost:8000/api/v1
       VITE_API_URL: http://localhost:8000/api/v1
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           enable-cache: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -214,7 +303,7 @@ jobs:
       - name: Server logs on failure
         if: failure()
         run: tail -n 200 /tmp/backend.log /tmp/frontend.log
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: playwright-report
@@ -224,31 +313,40 @@ jobs:
           retention-days: 7
 
   images:
+    # US-111, build once and promote. This job builds, scans and pushes for every pull request and every push to
+    # dev, and only for those. A release candidate tag (vX.Y.Z-rc.N) builds nothing: it names the image dev already
+    # built for that commit (`sha-<commit>`, the image the development environment runs) and fails if there is
+    # none. It does NOT run for the push to main or for a release tag vX.Y.Z: those are promoted from the last
+    # candidate's images by the `promote` job below, never rebuilt.
     name: Images
+    if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || (github.ref_type == 'tag' && !contains(github.ref_name, '-rc.')))) }}
     runs-on: ubuntu-latest
-    needs: [backend, frontend, ai, e2e, secrets, audit]
+    needs: [backend, frontend, ai, e2e, secrets, audit, semgrep]
     permissions:
       contents: read
       packages: write
     env:
       REGISTRY: ghcr.io
       OWNER: ${{ github.repository_owner }}
+      # Trivy: a pinned release and the SHA-256 of its linux x64 tarball (from the release's checksums file).
+      # Bump both together, in a pull request, with a re-run of the scan.
+      TRIVY_VERSION: 0.75.0
+      TRIVY_SHA256: c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f
+      # The vulnerability databases come from the public ECR mirror, not ghcr.io, so a ghcr.io outage or
+      # rate limit cannot block a release.
+      TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
+      TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db:1
     steps:
       # Full history and tags: the release guard compares a release tag with its release candidate.
-      - uses: actions/checkout@v4
+      # The token is not kept in .git/config: nothing after this step needs git to authenticate.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - name: Release guard (v* tags only)
+          persist-credentials: false
+      - name: Release guard (candidate tags only now; releases are promoted)
         if: github.ref_type == 'tag'
         run: python3 scripts/release_guard.py "$GITHUB_REF_NAME"
-      - uses: docker/setup-buildx-action@v3
-      - name: Log in to GHCR
-        if: github.event_name == 'push'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - name: Tags
         id: tags
         run: |
@@ -272,27 +370,125 @@ jobs:
           fi
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
-      - name: Backend image
-        uses: docker/build-push-action@v6
+      # US-111: a candidate tag names the image dev already built and Trivy-scanned for this commit; nothing is
+      # built on a tag run, so logging in here does not put the `packages: write` token near a scanner. If either
+      # `sha-<commit>` image is missing the job fails: that commit was never built by dev, so it cannot be a
+      # candidate. There is no fallback build.
+      - name: Log in to GHCR (candidate tags)
+        if: github.ref_type == 'tag'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Name the dev image for this candidate (same digest, no build)
+        if: github.ref_type == 'tag'
+        run: |
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          short=${GITHUB_SHA::7}
+          digest_of() { docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r .digest; }
+          : > "$RUNNER_TEMP/digests.txt"
+          for image in backend frontend; do
+            repo="ghcr.io/$owner/permitflow-$image"
+            if ! digest=$(digest_of "$repo:sha-$short"); then
+              echo "no dev image $repo:sha-$short for $GITHUB_REF_NAME: dev never built this commit, so it cannot be a candidate. Wait for the dev push run of $short to finish, then re-run this job." >&2
+              exit 1
+            fi
+            # --prefer-index=false: a single-manifest image is copied as it is, not wrapped in a new index (the digest must not change)
+            docker buildx imagetools create --prefer-index=false -t "$repo:$GITHUB_REF_NAME" "$repo@$digest"
+            now=$(digest_of "$repo:$GITHUB_REF_NAME")
+            test "$now" = "$digest" || { echo "$repo:$GITHUB_REF_NAME is $now, expected $digest" >&2; exit 1; }
+            echo "$repo@$digest" >> "$RUNNER_TEMP/digests.txt"
+          done
+          echo "$GITHUB_REF_NAME names the dev images of sha-$short; nothing built." >> "$GITHUB_STEP_SUMMARY"
+      # US-103: each image is built once, loaded into the runner and scanned there; the image that is pushed is
+      # that same image (tagged and pushed with `docker push`), not a second build. The GHCR login comes after
+      # both scans, so the `packages: write` token is not on disk while the scanner runs. Trivy is the pinned
+      # release binary with a SHA-256 check (as gitleaks is in secret-history.yml), not a third-party action. It
+      # blocks on a HIGH or CRITICAL vulnerability that has a fix; one with no fix yet (`--ignore-unfixed`) does
+      # not block, because nothing can be done about it today. An accepted finding goes in `.trivyignore` with
+      # its reason and a review date, never as a bare id.
+      - name: Install Trivy (pinned, checksum verified)
+        if: github.ref_type != 'tag'
+        run: |
+          curl -fsSL --retry 3 -o /tmp/trivy.tar.gz \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  /tmp/trivy.tar.gz" | sha256sum --check -
+          tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
+          /tmp/trivy --version
+      # The vulnerability database comes from the public ECR mirror (TRIVY_DB_REPOSITORY above), which is not
+      # rate limited like ghcr.io. It is fetched here with retries and the scans run with `--skip-db-update`; if
+      # all three attempts fail the job fails: a release is never cleared by a scan that did not run.
+      - name: Trivy database (retried)
+        if: github.ref_type != 'tag'
+        run: |
+          for attempt in 1 2 3; do
+            if /tmp/trivy image --download-db-only --no-progress; then exit 0; fi
+            echo "Trivy database download failed (attempt $attempt of 3), retrying in 20 s"; sleep 20
+          done
+          echo "Trivy database could not be downloaded; failing the check rather than skipping it"; exit 1
+      - name: Backend image (build once, loaded into the runner)
+        if: github.ref_type != 'tag'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./backend
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.tags.outputs.backend }}
+          load: true
+          push: false
+          tags: permitflow-backend:scan
           build-args: GIT_SHA=${{ github.sha }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
+      - name: Trivy, backend image (blocking at HIGH and CRITICAL)
+        if: github.ref_type != 'tag'
+        run: |
+          /tmp/trivy image --skip-db-update --no-progress --scanners vuln --severity HIGH,CRITICAL \
+            --ignore-unfixed --exit-code 1 --ignorefile .trivyignore permitflow-backend:scan
       # The What's new page reads RELEASE_NOTES.md at build time (US-094); the image build's context is the
       # frontend folder alone, so the file is copied in first (ignored by git, see .gitignore).
       - name: Release notes into the frontend build context
+        if: github.ref_type != 'tag'
         run: cp RELEASE_NOTES.md frontend/RELEASE_NOTES.md
-      - name: Frontend image
-        uses: docker/build-push-action@v6
+      - name: Frontend image (build once, loaded into the runner)
+        if: github.ref_type != 'tag'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./frontend
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.tags.outputs.frontend }}
+          load: true
+          push: false
+          tags: permitflow-frontend:scan
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
+      - name: Trivy, frontend image (blocking at HIGH and CRITICAL)
+        if: github.ref_type != 'tag'
+        run: |
+          /tmp/trivy image --skip-db-update --no-progress --scanners vuln --severity HIGH,CRITICAL \
+            --ignore-unfixed --exit-code 1 --ignorefile .trivyignore permitflow-frontend:scan
+      - name: Log in to GHCR (after the scans)
+        if: github.event_name == 'push' && github.ref_type != 'tag'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push the scanned images (the same image ids Trivy read)
+        if: github.event_name == 'push' && github.ref_type != 'tag'
+        env:
+          BACKEND_TAGS: ${{ steps.tags.outputs.backend }}
+          FRONTEND_TAGS: ${{ steps.tags.outputs.frontend }}
+        run: |
+          # The registry digest (repo@sha256:...) is what a promotion names; it is recorded in the run summary
+          # and the `image-digests` artifact.
+          push_all() {
+            local image="$1" tags="$2" t
+            echo "$image is $(docker image inspect --format '{{.Id}}' "$image")"
+            for t in ${tags//,/ }; do
+              docker tag "$image" "$t"
+              docker push "$t"
+            done
+            docker image inspect --format '{{index .RepoDigests 0}}' "$t" >> "$RUNNER_TEMP/digests.txt"
+          }
+          push_all permitflow-backend:scan "$BACKEND_TAGS"
+          push_all permitflow-frontend:scan "$FRONTEND_TAGS"
       - name: Summary
         run: |
           {
@@ -301,5 +497,100 @@ jobs:
             echo
             echo '`'"${{ steps.tags.outputs.frontend }}"'`'
             echo
-            echo "Pushed: ${{ github.event_name == 'push' }} (pull requests only build)"
+            echo "Pushed: ${{ github.event_name == 'push' && github.ref_type != 'tag' }} (pull requests only build; a candidate tag names the dev image)"
+            if [ -f "$RUNNER_TEMP/digests.txt" ]; then
+              echo
+              echo "Digests (backend, then frontend):"
+              echo '```'
+              cat "$RUNNER_TEMP/digests.txt"
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: github.event_name == 'push'
+        with:
+          name: image-digests
+          path: ${{ runner.temp }}/digests.txt
+          retention-days: 90
+
+  promote:
+    # US-111. The push to main (the merge of the label commit) and the release tag vX.Y.Z build nothing. The
+    # release guard proves the commit is the last candidate with the label removed (a push to main has no tag
+    # yet, so the guard checks the commit itself with --rev), then the candidate's images are given the new
+    # names with `docker buildx imagetools create`: the same manifest, the same digest. Production therefore
+    # runs the exact image that was tested on dev. The candidate was built and Trivy-scanned by `images`;
+    # nothing new is built, so nothing is scanned again.
+    #   push to main -> :main and sha-<merge>        (what the production services track)
+    #   tag vX.Y.Z   -> :vX.Y.Z and sha-<tagged commit>
+    name: Promote the candidate's images
+    if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || (github.ref_type == 'tag' && !contains(github.ref_name, '-rc.'))) }}
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, ai, e2e, secrets, audit, semgrep]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      OWNER: ${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Release guard and the candidate to promote
+        id: plan
+        run: |
+          version=$(python3 -c 'import json; print(json.load(open("frontend/package.json"))["version"])')
+          # The guard also fails when the five version files do not carry the tag's version, so a tag that
+          # differs from frontend/package.json never gets this far.
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            python3 scripts/release_guard.py "$GITHUB_REF_NAME"
+            names="v$version"
+          else
+            python3 scripts/release_guard.py "v$version" --rev "$GITHUB_SHA"
+            names="main"
+          fi
+          candidate=$(git tag --list "v$version-rc.*" --sort=-version:refname | head -n 1)
+          test -n "$candidate" || { echo "no candidate tag for v$version"; exit 1; }
+          rc_short=$(git rev-parse "refs/tags/$candidate^{commit}" | cut -c1-7)
+          printf 'candidate=%s\nrc_short=%s\nnames=%s\n' "$candidate" "$rc_short" "$names" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Give the candidate's images their release names (same digest, no build)
+        env:
+          CANDIDATE: ${{ steps.plan.outputs.candidate }}
+          RC_SHORT: ${{ steps.plan.outputs.rc_short }}
+          NAMES: ${{ steps.plan.outputs.names }}
+        run: |
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          short=${GITHUB_SHA::7}
+          digest_of() { docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r .digest; }
+          : > "$RUNNER_TEMP/digests.txt"
+          for image in backend frontend; do
+            repo="ghcr.io/$owner/permitflow-$image"
+            digest=$(digest_of "$repo:$CANDIDATE")
+            # The candidate's run wrote :vX.Y.Z-rc.N and sha-<its commit> from one image; they must agree.
+            test "$(digest_of "$repo:sha-$RC_SHORT")" = "$digest" || { echo "$repo: $CANDIDATE and sha-$RC_SHORT differ"; exit 1; }
+            # --prefer-index=false: the manifest is copied as it is, so the digest does not change
+            docker buildx imagetools create --prefer-index=false -t "$repo:$NAMES" -t "$repo:sha-$short" "$repo@$digest"
+            for t in "$NAMES" "sha-$short"; do
+              test "$(digest_of "$repo:$t")" = "$digest" || { echo "$repo:$t is not $digest"; exit 1; }
+            done
+            echo "$repo@$digest" >> "$RUNNER_TEMP/digests.txt"
+          done
+          {
+            echo "## Promoted from $CANDIDATE (no build)"
+            echo "Names: \`$NAMES\`, \`sha-$short\`. The image reports the candidate's commit (\`$RC_SHORT\`), not this one."
+            echo '```'
+            cat "$RUNNER_TEMP/digests.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: promoted-digests
+          path: ${{ runner.temp }}/digests.txt
+          retention-days: 90

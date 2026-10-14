@@ -1,3 +1,20 @@
+# Settings the API and the verification worker share (same image, same database, same upload volume).
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://permitflow:permitflow@db:5432/permitflow
+  UPLOAD_DIR: /data/uploads
+  # US-097: STORAGE_BACKEND=s3 (shell or .env) sends uploads to the MinIO below instead of the volume.
+  # The default stays local. These are the local MinIO's development values, not real credentials.
+  STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_BUCKET: permitflow-uploads
+  S3_ACCESS_KEY_ID: permitflow
+  S3_SECRET_ACCESS_KEY: permitflow-local
+  S3_ADDRESSING_STYLE: path
+  # US-099: SCAN_MODE=enforce (shell or .env) quarantines and scans every upload with the clamav service below
+  # (`--profile scan`). The default stays off.
+  SCAN_MODE: ${SCAN_MODE:-off}
+  CLAMD_HOST: clamav
+
 services:
   db:
     image: postgres:16-alpine
@@ -23,8 +40,10 @@ services:
     profiles: ["full"]
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://permitflow:permitflow@db:5432/permitflow
-      UPLOAD_DIR: /data/uploads
+      <<: *backend-env
+      # US-098: `inline` (the default) runs the document checks in this process. VERIFICATION_MODE=worker
+      # (shell or .env) only queues them; start the worker with `--profile worker` to run them.
+      VERIFICATION_MODE: ${VERIFICATION_MODE:-inline}
     ports:
       - "8000:8000"
     volumes:
@@ -32,6 +51,82 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  # The verification worker (US-098, ADR-016): `docker compose --profile full --profile worker up -d` with
+  # VERIFICATION_MODE=worker for the API. Same image as the backend, no published port: its metrics are on
+  # :9100 inside the Compose network only. Without VERIFICATION_MODE=worker on the API there is nothing for
+  # it to do (checks run inline), so it sits idle.
+  worker:
+    build: ./backend
+    container_name: permitflow-worker
+    profiles: ["worker"]
+    env_file: .env
+    environment:
+      <<: *backend-env
+      VERIFICATION_MODE: worker
+    command: [".venv/bin/python", "-m", "app.worker"]
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 15s
+
+  # Object storage for uploads (US-097): `docker compose --profile storage up -d`. S3 API on :9000, console
+  # on :9001 (sign in permitflow / permitflow-local). Used only when STORAGE_BACKEND=s3; nothing else
+  # depends on it. MinIO no longer publishes images of its own, so this is the Chainguard build of it, pinned by
+  # digest (the `latest` build of 9 Oct 2026); bump it on purpose with `docker pull` and `docker inspect`.
+  # The ports are bound to this machine only: the development credentials below must not face the network.
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:59667194421209c2c1eacbe761e24787e047985c5dfa96b15da9b59fe9b55cd0
+    container_name: permitflow-minio
+    profiles: ["storage"]
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: permitflow
+      MINIO_ROOT_PASSWORD: permitflow-local
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio:/data
+
+  # One-shot: creates the bucket, then exits. The image has no shell, so the wait for MinIO is the
+  # restart policy: it fails until MinIO answers, and stops once the bucket exists.
+  minio-init:
+    image: cgr.dev/chainguard/minio-client@sha256:7a5387f27d1aa8fc11286acde9e024b7b1b77585e17c36378552eeafcccf2ba3
+    container_name: permitflow-minio-init
+    profiles: ["storage"]
+    environment:
+      MC_HOST_local: http://permitflow:permitflow-local@minio:9000
+    command: ["mb", "--ignore-existing", "local/permitflow-uploads"]
+    restart: on-failure
+    depends_on:
+      - minio
+
+  # Virus scanner (US-099, ADR-017): `docker compose --profile scan up -d clamav`. clamd listens on :3310 inside the
+  # Compose network only (no published port: the scanner has no authentication). The first start downloads the
+  # signature database, which takes a few minutes (the health check waits); the database lives in a volume so a
+  # restart does not download it again. About 1.5 GB of memory. The tag is pinned (multi-arch Debian build).
+  clamav:
+    image: clamav/clamav:1.5.4-debian
+    container_name: permitflow-clamav
+    profiles: ["scan"]
+    environment:
+      # A file over clamd's MaxFileSize is reported as an error, not silently passed as clean.
+      CLAMD_CONF_AlertExceedsMax: "yes"
+      # Reload the signatures in place: a concurrent reload holds two copies and gets clamd OOM-killed.
+      CLAMD_CONF_ConcurrentDatabaseReload: "no"
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    volumes:
+      - clamav-db:/var/lib/clamav
+    restart: unless-stopped
 
   # Observability (US-077): `docker compose --profile observability up -d`. Prometheus scrapes the API's
   # /metrics (bearer token METRICS_TOKEN from .env; target host.docker.internal:8000 for a backend on the
@@ -101,5 +196,7 @@ services:
 volumes:
   pgdata:
   uploads:
+  minio:
+  clamav-db:
   prometheus:
   grafana:

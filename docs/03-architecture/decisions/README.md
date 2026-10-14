@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Fourteen decisions, each in the same shape: context, the options considered with their trade-offs, the decision, why, the consequences, how it is validated, and amendments dated as the code changed. Read them in four groups.
+Twenty decisions, each in the same shape: context, the options considered with their trade-offs, the decision, why, the consequences, how it is validated, and amendments dated as the code changed. Read them in four groups.
 
 ## How to read
 
@@ -8,6 +8,7 @@ Fourteen decisions, each in the same shape: context, the options considered with
 - **The rules** (004 to 008): the behaviours that make the brief's guarantees true.
 - **The delivery** (009 to 012): stack, pipeline, and the one feature that is a record in its own right.
 - **v0.4.0** (013 and 014): the site visit arranged inside the case, and the administrator who reads everything and changes only accounts.
+- **v0.5.0** (015 to 020): uploads moved to a bucket behind a switch, the document checks moved to a worker fed by the database, uploads scanned for viruses before anyone can open them, the session moved into an HttpOnly cookie behind a switch, and a release became the tested candidate's image under a new name, plus a ledger of what each check cost.
 
 Each line below is the decision in one breath: chose X over Y because Z.
 
@@ -40,6 +41,17 @@ Each line below is the decision in one breath: chose X over Y because Z.
 | [014 Administrator read-only and user management](ADR-014-administrator-read-only-and-user-management.md) | The administrator reads every case through the officer's read routes and screens with `actions[]` empty by construction, and writes only users (role, active flag, creation) under a lock on the admin rows with protected demonstration accounts | A separate administrator case API; a super-role with officer powers | One read model per case and one authorization test per endpoint; the server never offers an administrator a transition; "never zero administrators" holds under concurrent changes |
 | [013 Site visit appointment](ADR-013-site-visit-appointment.md) | The appointment is a record inside Site Visit Scheduled with its own small state (proposed, counter-proposed, confirmed, done) and immutable rounds; one workflow guard (`visit_confirmed`), six proposals at most, the officer holds the closing move and a three-working-day silence rule | New statuses, or a bare date field | The brief's status list stays intact and every consumer of it untouched; a bounded loop with an officer-only close means no case waits forever; rounds as rows give the audit trail, both histories and the checklist one source |
 
+## v0.5.0
+
+| ADR | Chose | Over | Because |
+|-----|-------|------|---------|
+| [015 Object storage behind a switch](ADR-015-object-storage-behind-a-switch.md) | `S3Storage` behind the existing `FileStorage` interface, selected by `STORAGE_BACKEND` (`local` by default, or `s3`); keys unchanged; downloads streamed through the authorised API; a copy script with a sha256 read-back; MinIO in Compose | A shared volume, a worker that fetches files over HTTP, or files in PostgreSQL | A worker service cannot mount the API's volume; the switch makes the move reversible with a setting, and the default keeps today's behaviour until the bucket has proved itself |
+| [016 Verification worker and queue](ADR-016-verification-worker-and-queue.md) | `verification_runs` as the queue (`FOR UPDATE SKIP LOCKED` claim, lease, reaper, `dead` after three claims, `LISTEN/NOTIFY`), a worker process of the same image behind `VERIFICATION_MODE` (`inline` by default), PDF extraction in a killed and capped child process, a re-check of the draft before the provider call | Hardening the in-process task, Redis with a task library, or a Postgres queue library | One source of truth that the UI, quotas and audit already read; no new service or dependency; a restart no longer loses checks; a hostile PDF no longer shares the API's memory; a deleted draft's text is never sent |
+| [017 Virus scan in quarantine](ADR-017-virus-scan-quarantine.md) | ClamAV (clamd over TCP, INSTREAM) as the first step of a check behind `SCAN_MODE` (`off` by default); uploads under `quarantine/`, released only when clean; served only when clean or stored before the scan; submission held while a file is scanning or blocked; a scanner outage never serves an unscanned file (`scanner_fail_mode` retry or hold); a one-off backfill for older files | A hosted scanning API, scanning in the browser, or scanning after the file is already served | Files reach the officer's device only after a verdict; the scan runs where the check already runs, with no new queue; the switch keeps today's behaviour until ClamAV is proven on development |
+| [018 Session in an HttpOnly cookie](ADR-018-session-transport-cookie-or-token.md) | `AUTH_MODE=cookie` (`token` by default): the same JWT in a `__Host-` Secure HttpOnly SameSite=Strict cookie, no bearer token in the body, a double-submit CSRF token bound to the session on every unsafe method, an Origin check on sign-in, credentialed CORS for the listed origins only; one transport per mode | A stricter CSP alone, a refresh token with an in-memory access token, or opaque session ids | A script injected into the page can no longer copy the session away; the session row of US-093 already gives revocation, so the cookie adds no new server state; the switch is the rollback |
+| [019 Build once, promote by digest](ADR-019-build-once-promote-by-digest.md) | One build per commit (the push to `dev`); the candidate tag, the push to `main` and the release tag add names to that image's digest; the version is read at run time (`APP_VERSION`), and the release notes carry the upcoming release's section from every candidate | Rebuilding the release from the `main` merge commit, or rebuilding with the version changed | Production runs the exact image that was tested; the release guard still proves the source is unchanged; nothing is scanned or built twice |
+| [020 AI usage ledger](ADR-020-ai-usage-ledger.md) | A row per check in `ai_usage`, written in the transaction that stores the result (inline and worker), priced from a versioned `ai_prices` table, readable by the administrator as a page and a formula-safe CSV; counters labelled by document type and outcome only; Telegram and LangSmith carry no names, only keyed hashes | Deriving cost from the token counters, or adding cost columns to `verification_runs` | The counters have no person and reset on a restart; the run row is the queue and is deleted with its draft; a row in the result's transaction cannot disagree with the result, and a dated price keeps a past row true |
+
 ## Amendments as built (19 Sep 2026)
 
 - 003: `withdrawn` state (operator, US-038); Return to review from Pending Approval (US-031 follow-up).
@@ -50,6 +62,11 @@ Each line below is the decision in one breath: chose X over Y because Z.
 - 011: the AI checks moved from a `ci.yml` job into the reusable six-stage `ai-gate.yml` (US-056); a separate live evaluation workflow runs nightly and on AI changes (US-054); the dependency audit is blocking and `bandit` was added, and the image job waits for it (US-058).
 
 - 011, 20 Sep: the observability layer (US-077) adds three Railway services (Prometheus, Grafana, the Telegram bot) from public images with their configuration in variables, so the "Railway never builds" rule holds without a new image; `docs/13-observability/OBSERVABILITY.md`.
+
+- 014, 9 Oct (v0.5.0, US-101): the administrator also writes platform settings, a third write beside the users, but only inside the environment's bounds: the variables become ceilings, every change needs a reason and a password step-up and is audited and announced on Telegram, and the history is the audit trail.
+
+- 011, 10 Oct (v0.5.0, US-111): "build once, promote by tag" now holds for the image, not only the source: one build per commit, a candidate and a release add names to its digest, and the version is read at run time. See ADR-019.
+- 017, 10 Oct (v0.5.0, US-099): every upload is stored under `quarantine/`, scanned by ClamAV (clamd, INSTREAM) as the first step of its check and released only when clean; a scanner outage never serves or sends an unscanned file (`scanner_fail_mode` chooses retry or hold); PDF active content is flagged, not blocked.
 
 ## In a debrief
 

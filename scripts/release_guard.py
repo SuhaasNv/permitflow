@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Release guard: a release tag must be its last release candidate with the label removed.
 
-Usage: python3 scripts/release_guard.py <tag>      (from a checkout with full history and tags)
+Usage: python3 scripts/release_guard.py <tag> [--rev <commit>]   (from a checkout with full history and tags)
+
+  --rev checks a commit as if it were the release tag, before the tag exists: CI uses it on the push to main
+  that precedes the tag (the images are promoted from the candidate, not rebuilt).
 
   vX.Y.Z-rc.N  passes when the five version files at that tag carry X.Y.Z-rc.N.
   vX.Y.Z       passes when the five version files carry X.Y.Z, a tag vX.Y.Z-rc.N exists, and between the
@@ -30,7 +33,9 @@ VERSION_FILES = (
     "backend/app/core/version.py",
 )
 SHIPPED_PREFIXES = ("backend/", "frontend/", "docker/")
-SHIPPED_FILES = ("docker-compose.yml",)
+# RELEASE_NOTES.md is bundled into the frontend (the What's new page), so it ships; the release section is
+# written in the candidates (RELEASING.md, section 1) and the release commit does not touch it (US-111).
+SHIPPED_FILES = ("docker-compose.yml", "RELEASE_NOTES.md")
 BACKEND_PACKAGE = "permitflow-backend"
 
 MAX_LISTED_PATHS = 25  # a long drift list is cut after this many; the count is still printed
@@ -148,6 +153,15 @@ def version_problems(texts: dict[str, str | None], semver: str, label: str) -> l
     return problems
 
 
+def release_section_problems(notes_text: str | None, base: str, label: str) -> list[str]:
+    """The candidate must already carry the release's own section, `## vX.Y.Z, D Month YYYY: title`."""
+    if notes_text is None:
+        return [f"{label}: RELEASE_NOTES.md is missing"]
+    if re.search(rf"^## v{re.escape(base)}, ", notes_text, re.MULTILINE):
+        return []
+    return [f"{label}: RELEASE_NOTES.md has no '## v{base}, D Month YYYY: title' section; write it in the candidate"]
+
+
 def highest_candidate(tags: list[str], base: str) -> Tag | None:
     """The vX.Y.Z-rc.N tag with the highest N (numeric) among `tags` for the base version."""
     best: Tag | None = None
@@ -167,35 +181,42 @@ def git(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["git", *args], capture_output=True, text=True, check=False)
 
 
+def tag_ref(tag: str) -> str:
+    return f"refs/tags/{tag}^{{commit}}"
+
+
 def tag_exists(tag: str) -> bool:
-    return git("rev-parse", "--verify", "--quiet", f"refs/tags/{tag}^{{commit}}").returncode == 0
+    return git("rev-parse", "--verify", "--quiet", tag_ref(tag)).returncode == 0
 
 
-def file_at(tag: str, path: str) -> str | None:
-    result = git("show", f"refs/tags/{tag}^{{commit}}:{path}")
+def file_at(ref: str, path: str) -> str | None:
+    result = git("show", f"{ref}:{path}")
     return result.stdout if result.returncode == 0 else None
 
 
-def files_at(tag: str) -> dict[str, str | None]:
-    return {p: file_at(tag, p) for p in VERSION_FILES}
+def files_at(ref: str) -> dict[str, str | None]:
+    return {p: file_at(ref, p) for p in VERSION_FILES}
 
 
 def changed_paths(a: str, b: str) -> list[str]:
-    result = git("diff", "--no-renames", "--name-only", f"refs/tags/{a}^{{commit}}", f"refs/tags/{b}^{{commit}}")
+    result = git("diff", "--no-renames", "--name-only", a, b)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or "git diff failed")
     return [line for line in result.stdout.splitlines() if line]
 
 
-def check(tag_name: str) -> tuple[list[str], str]:
-    """Return (problems, pass message)."""
+def check(tag_name: str, rev: str | None = None) -> tuple[list[str], str]:
+    """Return (problems, pass message). With `rev`, that commit stands in for the release tag."""
     tag = parse_tag(tag_name)
     if tag is None:
         return [f"{tag_name}: tags are vX.Y.Z or vX.Y.Z-rc.N"], ""
-    if not tag_exists(tag.name):
+    if rev is None and not tag_exists(tag.name):
         return [f"{tag.name}: no such tag in this checkout (fetch with full history and tags)"], ""
+    if rev is not None and tag.rc is not None:
+        return [f"{tag.name}: --rev checks a release; a candidate is checked by its tag"], ""
+    release_ref = rev or tag_ref(tag.name)
 
-    problems = version_problems(files_at(tag.name), tag.semver, tag.name)
+    problems = version_problems(files_at(release_ref), tag.semver, tag.name)
     if tag.rc is not None:
         return problems, f"PASS {tag.name}: the five version files carry {tag.semver}"
 
@@ -205,10 +226,12 @@ def check(tag_name: str) -> tuple[list[str], str]:
         problems.append(f"{tag.name}: no release candidate tag v{tag.base}-rc.N exists; cut one and test it first")
         return problems, ""
 
-    rc_texts = files_at(candidate.name)
+    rc_ref = tag_ref(candidate.name)
+    rc_texts = files_at(rc_ref)
     problems += version_problems(rc_texts, candidate.semver, candidate.name)
+    problems += release_section_problems(file_at(rc_ref, "RELEASE_NOTES.md"), tag.base, candidate.name)
     try:
-        paths = changed_paths(candidate.name, tag.name)
+        paths = changed_paths(rc_ref, release_ref)
     except RuntimeError as exc:
         return [*problems, f"git diff {candidate.name}..{tag.name} failed: {exc}"], ""
     drift = shipped_changes(paths)
@@ -219,7 +242,7 @@ def check(tag_name: str) -> tuple[list[str], str]:
             f"and {len(drift) - MAX_LISTED_PATHS} more shipped files differ ({len(drift)} in all) "
             f"between {candidate.name} and {tag.name}"
         )
-    release_texts = files_at(tag.name)
+    release_texts = files_at(release_ref)
     for path in VERSION_FILES:
         old_text, new_text = rc_texts.get(path), release_texts.get(path)
         if old_text is None or new_text is None:
@@ -231,10 +254,11 @@ def check(tag_name: str) -> tuple[list[str], str]:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 2:
-        print("usage: python3 scripts/release_guard.py <tag>", file=sys.stderr)
+    rev = argv[3] if len(argv) == 4 and argv[2] == "--rev" else None
+    if len(argv) != 2 and rev is None:
+        print("usage: python3 scripts/release_guard.py <tag> [--rev <commit>]", file=sys.stderr)
         return 2
-    problems, message = check(argv[1])
+    problems, message = check(argv[1], rev)
     if problems:
         for p in problems:
             print(f"FAIL {p}")

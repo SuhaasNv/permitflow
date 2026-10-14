@@ -36,7 +36,11 @@ def is_upload(method: str, path: str) -> bool:
 
 
 class BodyLimitMiddleware:
-    def __init__(self, app: ASGIApp, *, upload_limit: int, upload_message: str) -> None:
+    def __init__(
+        self, app: ASGIApp, *, upload_limit: Callable[[], int], upload_message: Callable[[], str]
+    ) -> None:
+        # Both are read per request, so an administrator's change to the upload size (US-101) applies
+        # at once and the refusal quotes the size in force.
         self.app = app
         self.upload_limit = upload_limit
         self.upload_message = upload_message
@@ -47,7 +51,7 @@ class BodyLimitMiddleware:
             return
         headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
         upload = is_upload(scope["method"], scope["path"])
-        limit = self.upload_limit if upload else JSON_BODY_LIMIT
+        limit = self.upload_limit() if upload else JSON_BODY_LIMIT
         raw = headers.get("content-length")
         request_id = scope.get("state", {}).get("request_id")  # set by the logging layer outside
         if raw is None:
@@ -59,7 +63,7 @@ class BodyLimitMiddleware:
         elif not raw.isdigit() or int(raw) > limit:
             if upload:
                 await _refuse(
-                    send, 400, "bad_request", self.upload_message, request_id, {"reason": "too_large"}
+                    send, 400, "bad_request", self.upload_message(), request_id, {"reason": "too_large"}
                 )
             else:
                 await _refuse(send, 413, "payload_too_large", "The request body is too large.", request_id)

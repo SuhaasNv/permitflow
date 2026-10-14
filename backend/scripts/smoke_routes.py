@@ -129,7 +129,13 @@ def main() -> None:
         "/admin/users",
         "/admin/users",
         (201, 200),
-        json={"email": email, "full_name": "Smoke Operator", "role": "operator", "password": NEW_OP_PW},
+        json={
+            "email": email,
+            "full_name": "Smoke Operator",
+            "role": "operator",
+            "password": NEW_OP_PW,
+            "admin_password": ADMIN_PW,
+        },
     )
     new_user_id = r.json()["id"]
     users = call(adm, "GET", "/admin/users", "/admin/users", 200).json()
@@ -144,7 +150,64 @@ def main() -> None:
         call(adm, "GET", f"/admin/audit-feed?limit=5&before={cursor}", "/admin/audit-feed", 200)
     # admin guards
     me = client.get("/auth/me", headers=adm).json()
-    call(adm, "PATCH", f"/admin/users/{me['id']}", "/admin/users/{user_id}", 409, json={"is_active": False})
+    call(
+        adm,
+        "PATCH",
+        f"/admin/users/{me['id']}",
+        "/admin/users/{user_id}",
+        409,
+        json={"is_active": False, "admin_password": ADMIN_PW},
+    )
+
+    # ---- admin: platform settings (US-101). Change one value with the step-up password, read it back, then
+    # undo it through the history route, so every setting is left as it was found ----
+    cur = call(adm, "GET", "/admin/settings", "/admin/settings", 200).json()["settings"]
+    drafts = next(x for x in cur if x["key"] == "max_drafts_per_user")
+    new_value = drafts["maximum"] - 1 if drafts["maximum"] - 1 >= drafts["minimum"] else None
+    if new_value is None or new_value == drafts["value"]:
+        note(
+            "platform settings: no value to move max_drafts_per_user to here (change and revert skipped)",
+            True,
+        )
+    else:
+        call(
+            adm,
+            "PUT",
+            "/admin/settings/max_drafts_per_user",
+            "/admin/settings/{key}",
+            200,
+            json={"value": new_value, "reason": "Smoke run: route coverage", "password": ADMIN_PW},
+        )
+        hist = call(
+            adm,
+            "GET",
+            "/admin/settings/history?key=max_drafts_per_user&limit=5",
+            "/admin/settings/history",
+            200,
+        ).json()
+        entry = hist["entries"][0]
+        note(
+            "the change is the newest history entry with the reason",
+            entry["new"] == new_value and entry["reason"] == "Smoke run: route coverage",
+        )
+        r = call(
+            adm,
+            "POST",
+            f"/admin/settings/history/{entry['id']}/revert",
+            "/admin/settings/history/{event_id}/revert",
+            200,
+            json={"reason": "Smoke run: put it back", "password": ADMIN_PW},
+        )
+        after = next(
+            x
+            for x in client.get("/admin/settings", headers=adm).json()["settings"]
+            if x["key"] == "max_drafts_per_user"
+        )
+        note(
+            "the revert leaves the setting as it was found",
+            (after["value"], after["overridden"]) == (drafts["value"], drafts["overridden"]),
+            str(after),
+        )
 
     # ---- operator lifecycle ----
     op = login(email, NEW_OP_PW)
@@ -733,6 +796,22 @@ def main() -> None:
     call(op, "GET", "/admin/overview", "/admin/overview", 403)
     call(off, "GET", "/applications", "/applications", 403)
     call(off, "GET", "/admin/users", "/admin/users", 403)
+    probe_event = "00000000-0000-4000-8000-000000000000"
+    settings_body = {"value": 5, "reason": "Smoke run: wrong role", "password": PW}
+    for h, code in ((op, 403), (off, 403), (None, 401)):
+        call(h, "GET", "/admin/settings", "/admin/settings", code)
+        call(h, "GET", "/admin/settings/history", "/admin/settings/history", code)
+        call(
+            h, "PUT", "/admin/settings/max_drafts_per_user", "/admin/settings/{key}", code, json=settings_body
+        )
+        call(
+            h,
+            "POST",
+            f"/admin/settings/history/{probe_event}/revert",
+            "/admin/settings/history/{event_id}/revert",
+            code,
+            json={"reason": "Smoke run: wrong role", "password": PW},
+        )
     call(
         adm,
         "POST",
@@ -750,6 +829,14 @@ def main() -> None:
         json={"items": [], "version": 1},
     )
     call(adm, "POST", "/applications", "/applications", 403)
+    # ---- admin: AI usage (US-100). Read by the administrator only; the CSV is a download. ----
+    usage = call(adm, "GET", "/admin/ai-usage?limit=5", "/admin/ai-usage", 200).json()
+    note("the usage page has its totals and today's cap", "totals" in usage and "daily_cap" in usage["today"])
+    export = call(adm, "GET", "/admin/ai-usage.csv", "/admin/ai-usage.csv", 200)
+    note("the usage CSV starts with its header", export.text.startswith("created_at,"))
+    for h, code in ((op, 403), (off, 403), (None, 401)):
+        call(h, "GET", "/admin/ai-usage", "/admin/ai-usage", code)
+        call(h, "GET", "/admin/ai-usage.csv", "/admin/ai-usage.csv", code)
     call(None, "GET", "/applications", "/applications", 401)
     call(None, "GET", "/officer/applications", "/officer/applications", 401)
     call(None, "GET", "/admin/overview", "/admin/overview", 401)
@@ -762,18 +849,38 @@ def main() -> None:
     call(op, "POST", "/auth/logout", "/auth/logout", (200, 204))
     # deactivate the smoke operator, then reactivate to prove both halves, then deactivate for good
     call(
-        adm, "PATCH", f"/admin/users/{new_user_id}", "/admin/users/{user_id}", 200, json={"is_active": False}
+        adm,
+        "PATCH",
+        f"/admin/users/{new_user_id}",
+        "/admin/users/{user_id}",
+        200,
+        json={"is_active": False, "admin_password": ADMIN_PW},
     )
     r = client.post("/auth/login", json={"email": email, "password": NEW_OP_PW, "take_over": True})
     note("deactivated operator cannot sign in (401)", r.status_code == 401, str(r.status_code))
-    call(adm, "PATCH", f"/admin/users/{new_user_id}", "/admin/users/{user_id}", 200, json={"is_active": True})
     call(
-        adm, "PATCH", f"/admin/users/{new_user_id}", "/admin/users/{user_id}", 200, json={"is_active": False}
+        adm,
+        "PATCH",
+        f"/admin/users/{new_user_id}",
+        "/admin/users/{user_id}",
+        200,
+        json={"is_active": True, "admin_password": ADMIN_PW},
+    )
+    call(
+        adm,
+        "PATCH",
+        f"/admin/users/{new_user_id}",
+        "/admin/users/{user_id}",
+        200,
+        json={"is_active": False, "admin_password": ADMIN_PW},
     )
     call(adm, "POST", "/auth/logout", "/auth/logout", (200, 204))
 
     # ---- coverage against the OpenAPI document ----
-    spec = httpx.get(API.replace("/api/v1", "") + "/api/openapi.json", timeout=30).json()
+    # In process: the served document is off by default (EXPOSE_API_DOCS, red-team R-2); same routes.
+    from app.main import create_app
+
+    spec = create_app().openapi()
     missing = []
     for path, ops in spec["paths"].items():
         t = path.replace("/api/v1", "")
