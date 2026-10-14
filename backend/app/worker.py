@@ -11,6 +11,8 @@ the queue; there is no broker. The loop:
 - leaves queued runs alone while the administrator has paused the AI (US-101); they run after unpause. The
   one exception is the virus scan (US-099): a run whose file still waits for it is claimed, the file is
   scanned and released, and the run goes back to the queue;
+- with `SCAN_MODE=enforce`, pings clamd every `SCANNER_PING_SECONDS` and alerts once when it goes down and
+  once when it is back (nothing else talks to clamd between uploads);
 - every `REAP_SECONDS` takes back runs whose lease has expired (requeue, or `dead` after three claims);
 - on SIGTERM stops claiming, gives running checks `SHUTDOWN_GRACE_SECONDS` to finish, and hands any
   still unfinished run back to the queue.
@@ -30,11 +32,14 @@ from types import FrameType
 
 from prometheus_client import start_http_server
 
+from app.core import metrics
 from app.core.logging import configure_logging
 from app.core.settings import get_settings
+from app.infra.clamd import ScannerError, client_from_settings
 from app.infra.db import listen_connection, session_factory, set_lock_timeout
 from app.services.metrics import refresh_queue_gauges
 from app.services.platform_settings import live
+from app.services.scan import alert_scanner_back, alert_scanner_down, enforcing
 from app.services.verification import claim_next_run, execute_run, reap_expired_runs, release_run
 
 logger = logging.getLogger("permitflow.worker")
@@ -55,6 +60,7 @@ class Worker:
         # Keyed by (run, claim): the same run can be claimed again while a hung thread of its old claim lives.
         self._active: dict[tuple[uuid.UUID, str], threading.Thread] = {}
         self._lock = threading.Lock()
+        self._scanner_up = True  # assumed up at start: a down first ping alerts, an up one is silent
 
     # ---- the loop ----
 
@@ -73,6 +79,7 @@ class Worker:
         logger.info("worker_started", extra={"extra_fields": {"worker": self.id}})
 
         last_reap = last_gauges = 0.0
+        last_ping = -settings.scanner_ping_seconds  # ping on the first pass
         while not self.stop.is_set():
             now = time.monotonic()
             if now - last_reap >= REAP_SECONDS:
@@ -81,6 +88,9 @@ class Worker:
             if now - last_gauges >= GAUGE_SECONDS:
                 self.publish_gauges()
                 last_gauges = now
+            if settings.scanner_ping_seconds and now - last_ping >= settings.scanner_ping_seconds:
+                self.check_scanner()
+                last_ping = now
             self.fill_slots()
             self.wake.wait(POLL_SECONDS)
             self.wake.clear()
@@ -157,6 +167,21 @@ class Worker:
                 refresh_queue_gauges(db)
         except Exception:  # noqa: BLE001
             logger.exception("worker_gauges_failed")
+
+    def check_scanner(self) -> None:
+        """Ping clamd (`SCAN_MODE=enforce` only); alert only on a change of state."""
+        if not enforcing():
+            return
+        try:
+            client_from_settings().ping()
+            up = True
+        except ScannerError as exc:
+            logger.warning("scanner_ping_failed", extra={"extra_fields": {"error": str(exc)[:200]}})
+            up = False
+        metrics.SCANNER_UP.set(int(up))
+        if up != self._scanner_up:
+            self._scanner_up = up
+            (alert_scanner_back if up else alert_scanner_down)()
 
     def drain(self) -> None:
         """Shutdown: let running checks finish for a few seconds, then release what is left."""

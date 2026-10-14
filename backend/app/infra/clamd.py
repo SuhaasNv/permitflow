@@ -13,6 +13,7 @@ from app.core.settings import get_settings
 
 CHUNK = 64 * 1024
 _MAX_REPLY = 4096
+PING_TIMEOUT = 5.0
 
 
 class ScannerError(Exception):
@@ -44,6 +45,19 @@ class ClamdClient:
         except (OSError, ValueError) as exc:  # includes timeouts and refused connections
             raise ScannerError(f"clamd connection failed: {type(exc).__name__}") from exc
         return _parse(reply)
+
+    def ping(self) -> None:
+        """clamd `PING` -> `PONG`; anything else is a `ScannerError`. Short timeout (worker loop)."""
+        timeout = min(self.timeout, PING_TIMEOUT)
+        try:
+            with socket.create_connection((self.host, self.port), timeout=timeout) as sock:
+                sock.settimeout(timeout)
+                sock.sendall(b"zPING\0")
+                reply = self._read_reply(sock)
+        except (OSError, ValueError) as exc:
+            raise ScannerError(f"clamd connection failed: {type(exc).__name__}") from exc
+        if reply != "PONG":
+            raise ScannerError(f"clamd unexpected reply: {reply[:120] or 'empty reply'}")
 
     @staticmethod
     def _read_reply(sock: socket.socket) -> str:

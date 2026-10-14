@@ -108,6 +108,10 @@ CLARIFICATION_ROUNDS = Counter(
 )
 # The virus scan (US-099): one count per scanner verdict, `error` when clamd could not give one.
 SCANS = Counter("permitflow_scans_total", "Virus scans by result (clean, infected, error).", ["result"])
+SCANNER_UP = Gauge(
+    "permitflow_scanner_up",
+    "1 when the worker's last clamd PING was answered, 0 when not (SCAN_MODE=enforce).",
+)
 ATTACHMENT_BYTES = Counter(
     "permitflow_attachment_bytes_total", "Bytes stored as clarification evidence (US-065)."
 )
