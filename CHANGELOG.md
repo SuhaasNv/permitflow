@@ -12,6 +12,10 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 - Seven breaks found and added to `cases.json` as `outside_gate` fixtures (`rt_*`; the three confidence ones also `mock_gap`): invisible, white and tiny text that plants the form's expiry date, the same in fullwidth digits, and padding that lifts the mock's confidence. The counted gate stays 24 of 24. App fixes are recommended in `docs/07-ai/RED_TEAM.md`, not made.
 - `redteam/` holds the promptfoo config for a later live run (promptfoo pinned to 0.123.1, MIT, not installed, not run). A live run needs the owner's yes and a 200-call cap.
 
+## v0.5.1-rc.3 (unreleased)
+
+- Security audit run 7: a clarification attachment is scanned with no transaction or application row lock held, and the answer is checked again before the insert; the `<document>` delimiter regex no longer rescans the text for every unterminated tag; the PDF active-content flag also covers `/XFA`, `/OnInstantiate` and `/RichMedia`; a withdrawn draft can no longer be restored once Request another round has gone out (409).
+
 ## v0.5.1-rc.2: release candidate on the development environment (14 Oct 2026)
 
 - Version `0.5.1-rc.2` in the five version files; `RELEASE_NOTES.md` gains the rc.2 section.

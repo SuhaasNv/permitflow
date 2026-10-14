@@ -1,5 +1,6 @@
 """Hardening of the AI input (US-102): cleaning, hidden-character and look-alike detection, redaction."""
 
+import time
 from pathlib import Path
 
 import pytest
@@ -467,6 +468,13 @@ def test_a_document_delimiter_in_the_text_is_neutralised_and_flagged(tag: str) -
     assert "<" not in prepared.text and ">" not in prepared.text
     assert "document]" in prepared.text
     assert prepared.injection[0].startswith("document delimiter tag in the text"), tag
+
+
+def test_unterminated_document_tags_are_not_quadratic() -> None:
+    started = time.perf_counter()
+    prepared = prepare_text("<document x" * 20_000)
+    assert time.perf_counter() - started < 1.0
+    assert prepared.text  # processed, not dropped
 
 
 def test_a_delimiter_hidden_by_formatting_tricks_is_still_neutralised() -> None:

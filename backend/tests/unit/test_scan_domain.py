@@ -41,6 +41,12 @@ def test_quarantine_key_round_trip() -> None:
         b"<< /Names << /EmbeddedFiles 7 0 R >> >>",
         b"<< /OpenAction 5 0 R >> << /S /Java#53cript >>",  # a name written with a hex escape
         b"<< /S /JavaScript >>",  # a script with no trigger: document-level JS runs on open in Acrobat
+        b"<< /AcroForm << /XFA [(template) 5 0 R] >> >>",  # XFA forms carry scripts
+        b"<< /AcroForm << /XF#41 5 0 R >> >>",  # ...also written with a hex escape
+        b"<< /Subtype /3D /OnInstantiate 9 0 R >>",  # a 3D annotation script
+        b"<< /Subtype /3D /OnInstan#74iate 9 0 R >>",
+        b"<< /Subtype /RichMedia /RichMediaContent 9 0 R >>",
+        b"<< /Subtype /RichMedia /Rich#4dedia 9 0 R >>",
     ],
 )
 def test_pdf_active_content_is_flagged(body: bytes) -> None:
@@ -54,6 +60,7 @@ def test_pdf_active_content_is_flagged(body: bytes) -> None:
         b"<< /OpenAction [3 0 R /Fit] >>",  # an automatic action alone is not active content
         b"<< /AAPL 1 >> << /JSON 2 >>",  # names that only start like /AA and /JS
         b"<< /Launcher 1 >>",
+        b"<< /XFAQ 1 >> << /OnInstantiated 2 >>",  # names that only start like /XFA and /OnInstantiate
     ],
 )
 def test_ordinary_pdfs_are_not_flagged(body: bytes) -> None:
