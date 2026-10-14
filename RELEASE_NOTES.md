@@ -38,6 +38,14 @@ Every uploaded file can now be checked for viruses before anyone opens it, the a
 - The version you use in production is exactly the build that was tested before the release.
 - Demonstration accounts are switched on per environment; production keeps them, so anyone can still try the service.
 
+## v0.5.0-rc.9, 14 October 2026: open files in the browser
+
+**New for everyone**
+- Documents, clarification files and the licence now open in a new browser tab with one click; a Download link sits next to each one for keeping a copy.
+
+**New for licensing officers**
+- A PDF flagged for active content is offered as a download only, never opened in the browser, and its warning now names any script.
+
 ## v0.5.0-rc.8, 14 October 2026: found in testing
 
 **New for licensing officers**

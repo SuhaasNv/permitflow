@@ -12,7 +12,9 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 - Seven breaks found and added to `cases.json` as `outside_gate` fixtures (`rt_*`; the three confidence ones also `mock_gap`): invisible, white and tiny text that plants the form's expiry date, the same in fullwidth digits, and padding that lifts the mock's confidence. The counted gate stays 24 of 24. App fixes are recommended in `docs/07-ai/RED_TEAM.md`, not made.
 - `redteam/` holds the promptfoo config for a later live run (promptfoo pinned to 0.123.1, MIT, not installed, not run). A live run needs the owner's yes and a 200-call cap.
 
-## v0.5.0-rc.9 (unreleased)
+## v0.5.0-rc.9: release candidate on the development environment (14 Oct 2026)
+
+- Version `0.5.0-rc.9` in the five version files; `RELEASE_NOTES.md` gains the rc.9 section. The frontend CSP adds `blob:` to `img-src` so an opened image renders.
 
 - Documents, clarification attachments and licence PDFs now open in a new browser tab (Open) and keep a separate Download button, on the officer case page, the officer clarification rail and the operator document, clarification and application screens
 - Only PDF, PNG, JPEG and plain text open in a tab, rebuilt with that exact type; any other type, or a blocked popup, falls back to the download
