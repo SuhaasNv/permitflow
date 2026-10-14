@@ -275,9 +275,9 @@ def execute_run(run_id: uuid.UUID, worker_id: str | None = None) -> None:
                 injection_phrases=prepared.injection,
             )
             run.confidence = result.confidence
-            run.summary = result.summary
+            run.summary = outcome.summary
             run.issues = outcome.issues
-            run.missing_information = list(result.missing_information)
+            run.missing_information = outcome.missing_information
             _finish(
                 db,
                 run,

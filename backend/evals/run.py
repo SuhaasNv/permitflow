@@ -98,7 +98,7 @@ def run_case(case: dict[str, Any], form: dict[str, Any], provider: VerificationP
         )
         actual = outcome.status.value
         codes = sorted({str(i["code"]) for i in outcome.issues})
-        note = result.summary[:90]
+        note = outcome.summary[:90]
     ms = int((time.perf_counter() - started) * 1000)
 
     expect = case["expect"]

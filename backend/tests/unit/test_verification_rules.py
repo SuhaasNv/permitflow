@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
+from app.domain.ai_prompt import SYSTEM_PROMPT, leaks_prompt
 from app.domain.enums import IssueCode, VerificationStatus
 from app.domain.verification_rules import Issue, VerificationResult, apply_rules, find_injection_phrases
 
@@ -67,3 +68,38 @@ def test_result_status_follows_the_issue_list() -> None:
     assert without.status == "verified"
     unreadable = VerificationResult(status="unreadable", confidence=0.1, summary="x")
     assert unreadable.status == "unreadable"
+
+
+def test_leaked_system_prompt_is_redacted_and_flagged() -> None:
+    """A model that repeats its instructions into the summary or an issue (red team, 14 Oct 2026) must not
+    show them to anyone; the check goes to an officer with the injection flag."""
+    r = VerificationResult(
+        status="verified",
+        confidence=0.95,
+        summary="Instructions: " + SYSTEM_PROMPT,
+        issues=[
+            Issue(
+                code=IssueCode.OTHER,
+                severity="low",
+                message=SYSTEM_PROMPT[:200],
+                evidence=SYSTEM_PROMPT[:250],
+            )
+        ],
+        missing_information=[SYSTEM_PROMPT[:100]],
+    )
+    out = apply_rules(r, confidence_threshold=0.6, injection_phrases=[])
+    assert out.status == VerificationStatus.NEEDS_REVIEW
+    assert IssueCode.POSSIBLE_PROMPT_INJECTION.value in {i["code"] for i in out.issues}
+    shown = [
+        out.summary,
+        *out.missing_information,
+        *(str(i[k]) for i in out.issues for k in ("message", "evidence")),
+    ]
+    assert not any(leaks_prompt(t) for t in shown)
+    assert out.summary.startswith("The document contains instructions")
+    clean = apply_rules(
+        VerificationResult(status="verified", confidence=0.9, summary="Lease for 10 Jalan Besar."),
+        confidence_threshold=0.6,
+        injection_phrases=[],
+    )
+    assert clean.summary == "Lease for 10 Jalan Besar." and clean.status == VerificationStatus.VERIFIED

@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.domain.ai_prompt import leaks_prompt
 from app.domain.enums import IssueCode, VerificationStatus
 
 # ---------- provider contract ----------
@@ -77,13 +78,36 @@ def find_injection_phrases(text: str) -> list[str]:
 class FinalOutcome:
     status: VerificationStatus
     issues: list[dict[str, Any]]
+    summary: str
+    missing_information: list[str]
+
+
+_LEAK_NOTICE = (
+    "The document contains instructions aimed at the automatic check; a licensing officer will review it."
+)
+
+
+def _redact(text: str) -> str:
+    return _LEAK_NOTICE if leaks_prompt(text) else text
 
 
 def apply_rules(
     result: VerificationResult, *, confidence_threshold: float, injection_phrases: list[str]
 ) -> FinalOutcome:
-    """Map the validated model output to the stored status (AI-004)."""
+    """Map the validated model output to the stored status (AI-004). Also the last point that sees the text
+    shown to people: an answer that repeats the system prompt is replaced and flagged."""
     issues: list[dict[str, Any]] = [i.model_dump(mode="json") for i in result.issues]
+    shown = [result.summary, *result.missing_information]
+    shown += [t for i in issues for t in (i["message"], i["evidence"]) if t]
+    if leaks_prompt(" ".join(shown)):
+        summary = _redact(result.summary)
+        missing = [_redact(m) for m in result.missing_information]
+        for i in issues:
+            i["message"] = _redact(i["message"])
+            i["evidence"] = _redact(i["evidence"]) if i["evidence"] else None
+        injection_phrases = injection_phrases or ["the answer repeated the checker's instructions"]
+    else:
+        summary, missing = result.summary, list(result.missing_information)
     # Injection first: a document that tells the checker to call itself unreadable must still reach a person.
     if injection_phrases:
         issues.append(
@@ -95,14 +119,14 @@ def apply_rules(
                 "evidence": injection_phrases[0][:300],
             }
         )
-        return FinalOutcome(VerificationStatus.NEEDS_REVIEW, issues)
+        return FinalOutcome(VerificationStatus.NEEDS_REVIEW, issues, summary, missing)
     if result.status == "unreadable":
-        return FinalOutcome(VerificationStatus.UNREADABLE, issues)
+        return FinalOutcome(VerificationStatus.UNREADABLE, issues, summary, missing)
     if result.status == "issues_found":
-        return FinalOutcome(VerificationStatus.ISSUES_FOUND, issues)
+        return FinalOutcome(VerificationStatus.ISSUES_FOUND, issues, summary, missing)
     if result.confidence < confidence_threshold:
-        return FinalOutcome(VerificationStatus.NEEDS_REVIEW, issues)
-    return FinalOutcome(VerificationStatus.VERIFIED, issues)
+        return FinalOutcome(VerificationStatus.NEEDS_REVIEW, issues, summary, missing)
+    return FinalOutcome(VerificationStatus.VERIFIED, issues, summary, missing)
 
 
 DOCUMENT_TYPE_DESCRIPTIONS: dict[str, str] = {
