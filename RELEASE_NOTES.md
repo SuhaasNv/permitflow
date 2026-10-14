@@ -15,8 +15,13 @@ Format: the product reads this file at build time for its What's new page (the v
 ## v0.5.1, 14 October 2026: a sharper document check
 
 **New for operators and licensing officers**
-- A document that tries to make the automatic check reveal its own instructions is sent to a licensing officer, and the check's summary never repeats those instructions.
+- A document that tries to make the automatic check reveal its own instructions, or that hides instructions in look-alike letters from another alphabet, is sent to a licensing officer, and the check's summary never repeats its own instructions.
 - A date in a document that differs from the date on your form, for example a tenancy that ends later than the form says, is now reported as a mismatch.
+
+## v0.5.1-rc.2, 14 October 2026: look-alike letters
+
+**Also**
+- Words that mix look-alike letters from another alphabet into ordinary text are now flagged for a licensing officer.
 
 ## v0.5.1-rc.1, 14 October 2026: a sharper document check
 
