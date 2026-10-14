@@ -17,6 +17,8 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 - Documents counter (documents page sidebar, application page, completion card) shows the backend `documents_present` as is; scanning and blocked files were subtracted a second time, giving "-2/4".
 - Clarification footer no longer says "Every item is answered" when a new round's item has no answer yet; it now looks at the current round's answer, not the last one from any round.
 - "Answers sent" toast counts the answers sent in this round, not the server's `answered_count` across all rounds.
+- The PDF active-content flag now fires on any embedded script (`/JavaScript` or `/JS`), not only one next to `/OpenAction` or `/AA`; a document-level script in the catalog's `/Names` tree runs on open in Acrobat and was missed.
+- With `SCAN_MODE=enforce` the worker pings clamd every `SCANNER_PING_SECONDS` (default 60, 0 = off), sends one Telegram alert when it goes down and one when it is back, and exposes `permitflow_scanner_up`; `OPERATIONS.md` now sets `CLAMD_CONF_ConcurrentDatabaseReload=no` so the daily reload no longer doubles clamd's memory.
 
 ## v0.5.0-rc.7: release candidate on the development environment (13 Oct 2026)
 

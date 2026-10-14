@@ -139,6 +139,9 @@ class Settings(BaseSettings):
     clamd_host: str = "localhost"
     clamd_port: int = Field(default=3310, ge=1, le=65535)
     clamd_timeout_seconds: float = Field(default=30.0, gt=0)
+    # With SCAN_MODE=enforce the worker pings clamd this often and alerts when it goes down or comes back
+    # (nothing else talks to clamd between uploads). 0 turns the watch off.
+    scanner_ping_seconds: float = Field(default=60.0, ge=0)
 
     @property
     def cors_origin_list(self) -> list[str]:

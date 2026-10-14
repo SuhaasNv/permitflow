@@ -122,6 +122,10 @@ def alert_scanner_down() -> None:
     notifier.notify("PermitFlow: the virus scanner could not be reached. Uploaded files wait, unopened.")
 
 
+def alert_scanner_back() -> None:
+    notifier.notify("PermitFlow: the virus scanner is reachable again.")
+
+
 def scan_document(
     db: Session, doc: Document, app: Application, storage: FileStorage | None = None
 ) -> ScanOutcome:

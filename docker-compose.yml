@@ -116,6 +116,8 @@ services:
     environment:
       # A file over clamd's MaxFileSize is reported as an error, not silently passed as clean.
       CLAMD_CONF_AlertExceedsMax: "yes"
+      # Reload the signatures in place: a concurrent reload holds two copies and gets clamd OOM-killed.
+      CLAMD_CONF_ConcurrentDatabaseReload: "no"
     healthcheck:
       test: ["CMD", "clamdcheck.sh"]
       interval: 30s

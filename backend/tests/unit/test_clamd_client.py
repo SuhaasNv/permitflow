@@ -118,3 +118,37 @@ def test_a_refused_connection_is_a_scanner_error() -> None:
     probe.close()  # nothing listens here now
     with pytest.raises(ScannerError):
         ClamdClient("127.0.0.1", port, 1).scan(b"data")
+
+
+def _ping_server(reply: bytes) -> tuple[socket.socket, list[bytes]]:
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    server.settimeout(5)
+    seen: list[bytes] = []
+
+    def serve() -> None:
+        conn, _ = server.accept()
+        with conn:
+            seen.append(conn.recv(16))
+            conn.sendall(reply)
+
+    threading.Thread(target=serve, daemon=True).start()
+    return server, seen
+
+
+def test_ping_sends_zping_and_accepts_pong() -> None:
+    server, seen = _ping_server(b"PONG\0")
+    ClamdClient("127.0.0.1", server.getsockname()[1], 3).ping()
+    server.close()
+    assert seen == [b"zPING\0"]
+
+
+def test_ping_with_another_reply_or_no_listener_is_a_scanner_error() -> None:
+    server, _ = _ping_server(b"nope\0")
+    port = server.getsockname()[1]
+    with pytest.raises(ScannerError):
+        ClamdClient("127.0.0.1", port, 3).ping()
+    server.close()  # nothing listens here now
+    with pytest.raises(ScannerError):
+        ClamdClient("127.0.0.1", port, 1).ping()
