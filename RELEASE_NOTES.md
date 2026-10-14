@@ -12,9 +12,12 @@ Format: the product reads this file at build time for its What's new page (the v
 
 **After v0.5.0:** a refreshed look across every screen (v0.6.0), then passkeys and two-step sign-in, self-registration and password reset by email (v0.7.0).
 
-## v0.5.0, 11 October 2026: safe intake
+## v0.5.0, 14 October 2026: safe intake
 
-Every uploaded file can now be checked for viruses before anyone opens it, the automatic document check runs on its own worker, and the licensing office can see what each check cost and tune the service's limits without a redeploy.
+Every uploaded file can now be checked for viruses before anyone opens it, documents open straight in the browser, the automatic document check runs on its own worker, and the licensing office can see what each check cost and tune the service's limits without a redeploy.
+
+**New for everyone**
+- Documents, clarification files and the licence open in a new browser tab with one click; a Download link sits next to each one for keeping a copy.
 
 **New for operators**
 - A file that fails the security check is blocked with a clear message, "This file was blocked by the security check. Upload a different copy.", and the application waits to be submitted until every file has passed.
@@ -23,7 +26,8 @@ Every uploaded file can now be checked for viruses before anyone opens it, the a
 - The hours picker, the save buttons and the error summary keep your place when you use a keyboard, and the focus ring is clearly visible on every button.
 
 **New for licensing officers**
-- A blocked file cannot be opened, a file still being checked opens once it has passed, and a PDF that tries to run something when opened carries a note.
+- A blocked file cannot be opened, a file still being checked opens once it has passed, and a PDF with a script or another action inside carries a warning, on documents and on clarification files alike; such a PDF is offered as a download only.
+- A follow-up question you draft stays out of the operator's view until you send the round.
 - A check that could not finish, or that was paused by the administrator, says why in plain words.
 - Comparing two revisions is a proper table that screen readers can follow, and "Add feedback" puts you straight in the message box.
 
@@ -36,7 +40,14 @@ Every uploaded file can now be checked for viruses before anyone opens it, the a
 - The automatic checks run on their own worker and uploads are kept in object storage, so a slow file never slows the rest of the service.
 - Sign-in can move to a more secure cookie that a script in the page cannot read.
 - The version you use in production is exactly the build that was tested before the release.
+- Before this release the service was attacked on purpose (other people's records, forged headers, sign-in tricks, harmful files, hidden instructions in documents); every weakness found was closed.
+- The virus scanner is watched around the clock and the team is told at once if it stops.
 - Demonstration accounts are switched on per environment; production keeps them, so anyone can still try the service.
+
+## v0.5.0-rc.10, 14 October 2026: release notes
+
+**Also**
+- The notes for version 0.5.0 now describe everything in it, including opening files in the browser.
 
 ## v0.5.0-rc.9, 14 October 2026: open files in the browser
 

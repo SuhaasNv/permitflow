@@ -8,7 +8,7 @@ image was built from (the candidate's), never the merge commit."""
 
 import os
 
-APP_VERSION = "0.5.0-rc.9"
+APP_VERSION = "0.5.0-rc.10"
 APP_VERSION = (os.environ.get("APP_VERSION") or "").strip() or APP_VERSION
 BUILD_COMMIT = (os.environ.get("GIT_SHA") or "")[:7] or "local"
 

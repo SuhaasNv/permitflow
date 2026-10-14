@@ -12,6 +12,10 @@ All notable milestones. Format: one section per sprint close plus in-sprint mile
 - Seven breaks found and added to `cases.json` as `outside_gate` fixtures (`rt_*`; the three confidence ones also `mock_gap`): invisible, white and tiny text that plants the form's expiry date, the same in fullwidth digits, and padding that lifts the mock's confidence. The counted gate stays 24 of 24. App fixes are recommended in `docs/07-ai/RED_TEAM.md`, not made.
 - `redteam/` holds the promptfoo config for a later live run (promptfoo pinned to 0.123.1, MIT, not installed, not run). A live run needs the owner's yes and a 200-call cap.
 
+## v0.5.0-rc.10: release candidate on the development environment (14 Oct 2026)
+
+- Version `0.5.0-rc.10` in the five version files. Notes only: the `v0.5.0` section of `RELEASE_NOTES.md` dated 14 October and brought up to date (open in a new tab, the warning on clarification files, the attack testing, the scanner watch); `UAT_PLAN.md` records the rc.7 to rc.9 browser runs. No code change from rc.9.
+
 ## v0.5.0-rc.9: release candidate on the development environment (14 Oct 2026)
 
 - Version `0.5.0-rc.9` in the five version files; `RELEASE_NOTES.md` gains the rc.9 section. The frontend CSP adds `blob:` to `img-src` so an opened image renders.
