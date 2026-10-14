@@ -40,7 +40,6 @@ function Mark({ ok, warn }: { ok: boolean; warn?: boolean }) {
 /** Server-computed completeness (FR-006): percentage plus a checklist of sections and required documents. */
 export function CompletionCard({ view }: { view: ApplicationView }) {
   const c = view.completeness
-  const held = view.document_slots.filter(isScanHeld).length
   const base = `/app/applications/${view.id}`
   return (
     <section className="pf-surface" aria-labelledby="completion-title">
@@ -70,7 +69,7 @@ export function CompletionCard({ view }: { view: ApplicationView }) {
           />
         </div>
         <p className="mt-2.5 text-xs leading-[18px] text-text-3">
-          {c.sections_complete} of {c.sections_total} sections · {c.documents_present - held} of {c.documents_total} documents
+          {c.sections_complete} of {c.sections_total} sections · {c.documents_present} of {c.documents_total} documents
         </p>
       </div>
       <ul className="mt-4 divide-y divide-line border-t border-line px-5 pb-2">

@@ -84,7 +84,7 @@ export function ApplicationPage() {
   const view = app.data
   const nextSection = view.sections.find((s) => !s.complete)
   const heldCount = view.document_slots.filter(isScanHeld).length
-  const docsDone = view.completeness.documents_present - heldCount === view.completeness.documents_total
+  const docsDone = view.completeness.documents_present === view.completeness.documents_total
   const responding = view.resubmit !== null
   const firstOpen = view.feedback.find((f) => f.resolution === 'open')
   // Readiness counts flagged targets (sections and document types), never feedback items.
@@ -324,7 +324,7 @@ export function ApplicationPage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold">Documents</div>
                     <div className="text-[13px] text-text-3">
-                      {view.completeness.documents_present - heldCount} of {view.completeness.documents_total} required documents uploaded
+                      {view.completeness.documents_present} of {view.completeness.documents_total} required documents uploaded
                     </div>
                   </div>
                   <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium', docsDone ? 'text-success' : 'text-text-3')}>
@@ -342,7 +342,7 @@ export function ApplicationPage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold">Documents</div>
                     <div className="text-[13px] text-text-3">
-                      {view.completeness.documents_present - heldCount} of {view.completeness.documents_total} required documents uploaded
+                      {view.completeness.documents_present} of {view.completeness.documents_total} required documents uploaded
                     </div>
                   </div>
                 </div>

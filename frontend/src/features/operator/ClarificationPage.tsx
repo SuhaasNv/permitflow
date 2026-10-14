@@ -452,17 +452,20 @@ export function ClarificationPage() {
   const view = app.data
   const c = clar.data
   const open = c.items.filter((i) => i.status === 'Waiting for your response')
-  const unanswered = open.filter((i) => !(i.responses.at(-1)?.message ?? '').trim())
+  // Only this round's answer counts: an earlier round's sent answer does not answer the new question.
+  const unanswered = open.filter((i) => !(i.responses.find((r) => r.round_no === i.round_no)?.message ?? '').trim())
   const base = `/app/applications/${id}`
   const blockedFile = open.some((i) => i.responses.some((r) => r.round_no === i.round_no && r.attachments.some((a) => a.scan_state === 'infected')))
   const doSend = () => {
     if (saving) return // a blur and a tap can land in the same task; the answer goes first
+    // The answers of this round only: every open item is answered to send. The server's answered_count spans all rounds.
+    const sentNow = open.length
     send.mutate(undefined, {
-      onSuccess: (next) => {
+      onSuccess: () => {
         setConfirming(false)
         toast.push({
           title: 'Answers sent',
-          body: `${next.answered_count} ${next.answered_count === 1 ? 'answer was' : 'answers were'} sent to the licensing office.`,
+          body: `${sentNow} ${sentNow === 1 ? 'answer was' : 'answers were'} sent to the licensing office.`,
           tone: 'success',
         })
       },
