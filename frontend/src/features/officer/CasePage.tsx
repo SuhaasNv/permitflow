@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { AppError } from '@/api/client'
-import { downloadDocument, downloadLicence } from '@/api/documents'
+import { downloadDocument, downloadLicence, openDocument, openLicence } from '@/api/documents'
 import type { OfficerAction, OfficerApplication } from '@/api/officer'
 import { isCheckStale, useFormSchema } from '@/features/operator/queries'
 import { displayValue } from '@/features/operator/SectionSummary'
@@ -154,18 +154,30 @@ function ReviewRail({
             <div className="mt-0.5 text-[13px] text-text-2">
               Valid {formatDate(view.licence.valid_from)} to {formatDate(view.licence.valid_to)} · code {view.licence.verification_code}
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-3"
-              onClick={() =>
-                void downloadLicence(view.id, view.licence?.licence_no ?? 'licence').catch((e: unknown) =>
-                  toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
-                )
-              }
-            >
-              Download licence (PDF)
-            </Button>
+            <div className="mt-3 flex flex-wrap items-center gap-1">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  void openLicence(view.id, view.licence?.licence_no ?? 'licence').catch((e: unknown) =>
+                    toast.push({ title: 'Could not open the file', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                  )
+                }
+              >
+                Open licence (PDF) in a new tab
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  void downloadLicence(view.id, view.licence?.licence_no ?? 'licence').catch((e: unknown) =>
+                    toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                  )
+                }
+              >
+                Download licence (PDF)
+              </Button>
+            </div>
           </div>
         ) : null}
         {view.actions.length > 0 ? (
@@ -536,18 +548,36 @@ export function OfficerCasePage() {
                       </div>
                     </div>
                     {d.scan_state === 'infected' ? null : (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={d.scan_state === 'scanning'}
-                        onClick={() =>
-                          void downloadDocument(id, d.id, d.original_filename).catch((e: unknown) =>
-                            toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
-                          )
-                        }
-                      >
-                        Open
-                      </Button>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {d.active_content ? null : (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={d.scan_state === 'scanning'}
+                            aria-label={`Open ${d.original_filename} in a new tab`}
+                            onClick={() =>
+                              void openDocument(id, d.id, d.original_filename).catch((e: unknown) =>
+                                toast.push({ title: 'Could not open the file', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                              )
+                            }
+                          >
+                            Open
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={d.scan_state === 'scanning'}
+                          aria-label={`Download ${d.original_filename}`}
+                          onClick={() =>
+                            void downloadDocument(id, d.id, d.original_filename).catch((e: unknown) =>
+                              toast.push({ title: 'Download failed', body: e instanceof Error ? e.message : 'Try again.', tone: 'error' }),
+                            )
+                          }
+                        >
+                          Download
+                        </Button>
+                      </div>
                     )}
                   </div>
                   {d.scan_state === 'infected' ? (
@@ -565,7 +595,7 @@ export function OfficerCasePage() {
                   {d.active_content && d.scan_state !== 'infected' ? (
                     <div className="mt-4">
                       <Alert tone="warning" title="This PDF contains active content">
-                        It passed the virus scan, but it can run things when it is opened: an automatic action with a script, a launch
+                        It passed the virus scan, but it can run things when it is opened: a script, a launch
                         action or an embedded file. Open it only in a viewer that blocks scripts, or ask the operator for a flattened copy.
                       </Alert>
                     </div>

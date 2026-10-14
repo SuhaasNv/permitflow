@@ -4,7 +4,7 @@ import { downloadAiUsageCsv } from './aiUsage'
 import { login, logout } from './auth'
 import { attachToResponse } from './clarification'
 import { API_URL, request, setCsrfToken, setTokenProvider, setUnauthorizedHandler } from './client'
-import { downloadDocument, setUploadTokenProvider, uploadDocument } from './documents'
+import { downloadDocument, openDocument, setUploadTokenProvider, uploadDocument } from './documents'
 
 // Cookie mode (US-104, ADR-018): the sign-in answer without `access_token` is the switch; the page holds only a
 // CSRF value, in memory. Token mode is covered by client.test.ts and documents.test.ts, which are unchanged.
@@ -134,9 +134,11 @@ describe('cookie mode: the client', () => {
     fetchMock.mockImplementation(async () => new Response('x', { status: 200 }))
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => undefined }))
+    vi.stubGlobal('open', () => ({ opener: null, close: () => undefined, location: { href: '' } }))
     await downloadDocument('a', 'd', 'f.pdf')
+    await openDocument('a', 'd', 'f.pdf')
     await downloadAiUsageCsv({ user: '', reference: '', from: '', to: '' })
-    for (const n of [0, 1]) {
+    for (const n of [0, 1, 2]) {
       expect(init(n).credentials).toBe('include')
       expect(headers(n).Authorization).toBeUndefined()
       expect(headers(n)['X-CSRF-Token']).toBeUndefined()

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { DocumentSlotView, OperatorFeedback } from '@/api/applications'
 import { AppError } from '@/api/client'
-import { BLOCKED_MESSAGE, deleteDocument, downloadDocument, rerunVerification, scanMessage, uploadDocument, validateFile } from '@/api/documents'
+import { BLOCKED_MESSAGE, deleteDocument, downloadDocument, openDocument, rerunVerification, scanMessage, uploadDocument, validateFile } from '@/api/documents'
 import type { UploadResult } from '@/api/documents'
 import { Alert } from '@/features/shared/Alert'
 import { Button, buttonClasses } from '@/features/shared/Button'
@@ -179,6 +179,15 @@ export function DocumentSlot({
     (RERUNNABLE.has(doc.verification.status) || stale),
   )
 
+  const open = async () => {
+    if (!doc) return
+    try {
+      await openDocument(applicationId, doc.id, doc.original_filename)
+    } catch (error) {
+      toast.push({ title: 'Could not open the file', body: error instanceof Error ? error.message : 'Try again in a moment.', tone: 'error' })
+    }
+  }
+
   const download = async () => {
     if (!doc) return
     try {
@@ -316,7 +325,10 @@ export function DocumentSlot({
             ) : null
           ) : (
             <>
-              <Button variant="ghost" size="sm" disabled={scanning} onClick={() => void download()}>
+              <Button variant="secondary" size="sm" disabled={scanning} aria-label={`Open ${doc.original_filename} in a new tab`} onClick={() => void open()}>
+                Open
+              </Button>
+              <Button variant="ghost" size="sm" disabled={scanning} aria-label={`Download ${doc.original_filename}`} onClick={() => void download()}>
                 Download
               </Button>
               {scanning ? <span className="px-2 text-[13px] text-text-3">Available after the security check</span> : null}

@@ -5,6 +5,8 @@ import {
   downloadDocument,
   downloadLicence,
   fetchLicencePreview,
+  openDocument,
+  openLicence,
   scanMessage,
   setUploadTokenProvider,
   uploadDocument,
@@ -190,6 +192,77 @@ describe('downloads', () => {
     fetchMock.mockResolvedValueOnce(body('forbidden', 'raw'))
     const other = (await downloadDocument('app-1', 'doc-1', 'plan.pdf').catch((x: unknown) => x)) as AppError
     expect(other.message).toBe('Could not download this file.')
+  })
+
+  describe('opening in a new tab', () => {
+    const tab = { opener: 'x' as unknown, close: vi.fn(), location: { href: '' } }
+    const openMock = vi.fn<(url: string, target: string) => typeof tab | null>()
+    const file = (type: string) => new Response('body', { status: 200, headers: { 'Content-Type': type } })
+    beforeEach(() => {
+      tab.opener = 'x'
+      tab.close.mockReset()
+      tab.location.href = ''
+      openMock.mockReset().mockReturnValue(tab)
+      vi.stubGlobal('open', openMock)
+    })
+
+    it('opens the tab before the fetch, then points it at a blob URL that is revoked after 60 s', async () => {
+      let tabWasOpen = false
+      fetchMock.mockImplementation(async () => {
+        tabWasOpen = openMock.mock.calls.length === 1
+        return file('application/pdf')
+      })
+      await openDocument('app-1', 'doc-1', 'plan.pdf')
+      expect(tabWasOpen).toBe(true)
+      expect(openMock).toHaveBeenCalledWith('', '_blank')
+      expect(tab.opener).toBeNull()
+      expect(tab.location.href).toBe('blob:x')
+      expect(clicks).toEqual([])
+      vi.advanceTimersByTime(59_000)
+      expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1_000)
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:x')
+    })
+
+    it('forces the blob type from the allowlist, with a charset for text', async () => {
+      const made: Blob[] = []
+      vi.mocked(URL.createObjectURL).mockImplementation((b) => (made.push(b as Blob), 'blob:x'))
+      fetchMock.mockResolvedValueOnce(file('IMAGE/PNG; foo=bar'))
+      await openDocument('app-1', 'doc-1', 'a.png')
+      fetchMock.mockResolvedValueOnce(file('text/plain'))
+      await openDocument('app-1', 'doc-1', 'a.txt')
+      expect(made.map((b) => b.type)).toEqual(['image/png', 'text/plain;charset=utf-8'])
+    })
+
+    it.each(['text/html', 'image/svg+xml', 'application/octet-stream'])('falls back to a download for %j', async (type) => {
+      fetchMock.mockResolvedValueOnce(file(type))
+      await openDocument('app-1', 'doc-1', 'x.bin')
+      expect(tab.close).toHaveBeenCalled()
+      expect(tab.location.href).toBe('')
+      expect(clicks).toEqual(['x.bin'])
+    })
+
+    it('downloads when the popup is blocked', async () => {
+      openMock.mockReturnValue(null)
+      fetchMock.mockResolvedValueOnce(file('application/pdf'))
+      await openDocument('app-1', 'doc-1', 'plan.pdf')
+      expect(clicks).toEqual(['plan.pdf'])
+    })
+
+    it('closes the tab and throws the same error as the download when the fetch fails', async () => {
+      fetchMock.mockResolvedValueOnce(new Response('', { status: 404 }))
+      const e = (await openDocument('app-1', 'doc-1', 'plan.pdf').catch((x: unknown) => x)) as AppError
+      expect(e).toBeInstanceOf(AppError)
+      expect(e.message).toBe('This file is no longer available.')
+      expect(tab.close).toHaveBeenCalled()
+    })
+
+    it('opens the licence as a PDF', async () => {
+      fetchMock.mockResolvedValueOnce(file('application/pdf'))
+      await openLicence('app-1', 'FEL-1')
+      expect(fetchMock.mock.calls[0][0]).toMatch(/\/applications\/app-1\/licence$/)
+      expect(tab.location.href).toBe('blob:x')
+    })
   })
 
   it('scanMessage words the four codes and ignores anything else', () => {
